@@ -1,0 +1,30 @@
+{
+  "name": "@storywink/workers",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "eslint src --fix",
+    "check-types": "tsc --noEmit",
+    "clean": "rm -rf dist node_modules .turbo"
+  },
+  "dependencies": {
+    "@storywink/database": "*",
+    "@storywink/shared": "*",
+    "bullmq": "^5.48.1",
+    "cloudinary": "^2.6.0",
+    "dotenv": "^16.5.0",
+    "ioredis": "^5.6.1",
+    "openai": "^4.93.0",
+    "pino": "^9.6.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
