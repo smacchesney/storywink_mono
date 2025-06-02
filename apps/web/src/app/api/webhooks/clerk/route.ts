@@ -103,7 +103,7 @@ export async function POST(req: Request) {
         if (deleted && deletedClerkId) { // Ensure it's a true deletion event and ID is present
             logger.info({ clerkUserId: deletedClerkId }, `Attempting to delete user based on clerkId...`);
             const deleteResult = await prisma.user.deleteMany({
-              where: { clerkId: deletedClerkId } as any, // <-- Temporary type assertion
+              where: { clerkId: deletedClerkId },
             });
             if (deleteResult.count > 0) {
                 logger.info({ clerkUserId: deletedClerkId }, `User deleted successfully from DB.`);
