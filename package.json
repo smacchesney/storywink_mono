@@ -10,7 +10,10 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "start": "turbo run start",
+    "start": "echo 'Please specify a service: npm run start:web, start:api, or start:workers'",
+    "start:web": "cd apps/web && npm run start",
+    "start:api": "cd apps/api && npm run start",
+    "start:workers": "cd apps/workers && npm run start",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "check-types": "turbo run check-types",

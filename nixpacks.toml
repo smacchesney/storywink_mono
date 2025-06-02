@@ -1,0 +1,14 @@
+# Nixpacks configuration for Railway deployment
+# This file helps Railway understand how to build our monorepo
+
+[phases.setup]
+nixPkgs = ["nodejs", "yarn", "postgresql"]
+
+[phases.install]
+cmds = ["npm install"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm run start"

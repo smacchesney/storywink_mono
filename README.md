@@ -102,12 +102,16 @@ storywink-monorepo/
 
 ### Railway
 
-1. Install Railway CLI: `npm install -g @railway/cli`
-2. Login: `railway login`
-3. Initialize: `railway init`
-4. Deploy: `railway up`
+For a complete step-by-step guide to deploying on Railway, see [RAILWAY_DEPLOYMENT_GUIDE.md](./RAILWAY_DEPLOYMENT_GUIDE.md).
 
-See [SETUP_GUIDE.md](./SETUP_GUIDE.md) for detailed deployment instructions.
+Quick deployment:
+1. Push your code to GitHub
+2. Create a new Railway project
+3. Deploy PostgreSQL and Redis databases
+4. Deploy the three services (web, api, workers)
+5. Configure environment variables
+
+See [RAILWAY_DEPLOYMENT_GUIDE.md](./RAILWAY_DEPLOYMENT_GUIDE.md) for detailed deployment instructions.
 
 ### Manual Deployment
 
