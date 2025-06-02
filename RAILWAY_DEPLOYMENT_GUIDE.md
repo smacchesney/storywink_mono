@@ -34,36 +34,39 @@ You'll be deploying 5 services:
 4. **API** - Express backend (port 4000)
 5. **Workers** - Background job processors
 
+### Quick Deployment Summary
+Thanks to the `railway.json` configuration files, most settings are automated. You'll mainly need to:
+1. Create services and link to GitHub repo
+2. Set root directories
+3. Add environment variables
+4. Generate domains
+
 ## Step 1: Prepare Your Repository
 
 1. Ensure your repository is pushed to GitHub
-2. Add the following files to your repository root:
+2. The repository already includes `railway.json` files for each service, which will automatically configure:
+   - Build commands
+   - Start commands
+   - Health checks
+   - Restart policies
+   - Watch patterns for rebuilds
 
-### Create `nixpacks.toml` in repository root:
-```toml
-# nixpacks.toml
-[phases.setup]
-nixPkgs = ["nodejs", "yarn", "postgresql"]
+### Pre-configured Files:
+- `apps/web/railway.json` - Web service configuration
+- `apps/api/railway.json` - API service configuration
+- `apps/workers/railway.json` - Workers service configuration
+- `railway-migrate.json` - Database migration configuration
+- `nixpacks.toml` - Build environment configuration
 
-[phases.install]
-cmds = ["npm install"]
+These files eliminate most manual configuration in the Railway dashboard!
 
-[phases.build]
-cmds = ["npm run build"]
-```
-
-### Update `package.json` scripts in root:
-```json
-{
-  "scripts": {
-    "build": "turbo run build",
-    "start": "echo 'Please specify a service to start'",
-    "start:web": "cd apps/web && npm run start",
-    "start:api": "cd apps/api && npm run start",
-    "start:workers": "cd apps/workers && npm run start"
-  }
-}
-```
+### Benefits of railway.json Configuration:
+- **Automatic Setup**: No need to manually configure build/start commands
+- **Health Checks**: Automatically configured for web and API services
+- **Smart Rebuilds**: Only rebuilds when relevant files change
+- **Region Optimization**: All services deploy to US-East for better inter-service communication
+- **Restart Policies**: Appropriate retry strategies for each service type
+- **Version Control**: All deployment settings tracked in Git
 
 ## Step 2: Create Railway Project
 
@@ -100,16 +103,15 @@ cmds = ["npm run build"]
 2. Select your repository
 3. Click on the service and rename it to **"web"**
 4. Go to **"Settings"** tab and configure:
-   - **Root Directory**: `/`
-   - **Build Command**: `npm install && npm run build`
-   - **Start Command**: `npm run start:web`
-   - **Watch Paths**: 
-     ```
-     /apps/web/**
-     /packages/**
-     /package.json
-     /turbo.json
-     ```
+   - **Root Directory**: `/apps/web`
+   - **Config Path**: `railway.json` (Railway will auto-detect this)
+   
+   The `railway.json` file will automatically configure:
+   - Build command
+   - Start command
+   - Health check at `/api/health`
+   - Watch patterns for auto-rebuilds
+   - Restart policy
 
 5. Go to **"Variables"** tab and add:
    ```
@@ -137,16 +139,15 @@ cmds = ["npm run build"]
 2. Select your repository again
 3. Click on the service and rename it to **"api"**
 4. Go to **"Settings"** tab and configure:
-   - **Root Directory**: `/`
-   - **Build Command**: `npm install && npm run build`
-   - **Start Command**: `npm run start:api`
-   - **Watch Paths**: 
-     ```
-     /apps/api/**
-     /packages/**
-     /package.json
-     /turbo.json
-     ```
+   - **Root Directory**: `/apps/api`
+   - **Config Path**: `railway.json` (Railway will auto-detect this)
+   
+   The `railway.json` file will automatically configure:
+   - Build command
+   - Start command
+   - Health check at `/api/health`
+   - Watch patterns for auto-rebuilds
+   - Restart policy
 
 5. Go to **"Variables"** tab and add:
    ```
@@ -185,16 +186,14 @@ cmds = ["npm run build"]
 2. Select your repository again
 3. Click on the service and rename it to **"workers"**
 4. Go to **"Settings"** tab and configure:
-   - **Root Directory**: `/`
-   - **Build Command**: `npm install && npm run build`
-   - **Start Command**: `npm run start:workers`
-   - **Watch Paths**: 
-     ```
-     /apps/workers/**
-     /packages/**
-     /package.json
-     /turbo.json
-     ```
+   - **Root Directory**: `/apps/workers`
+   - **Config Path**: `railway.json` (Railway will auto-detect this)
+   
+   The `railway.json` file will automatically configure:
+   - Build command
+   - Start command
+   - Watch patterns for auto-rebuilds
+   - Restart policy with higher retry count for workers
 
 5. Go to **"Variables"** tab and add:
    ```
@@ -231,12 +230,27 @@ cmds = ["npm run build"]
 - Visit `https://storywink-api.railway.app/api/health` - Should return `{"status":"ok"}`
 
 ### 2. Run Database Migrations
-1. Go to the **web** service in Railway
-2. Click on **"Settings"** → **"Deploy"**
-3. Add a temporary deploy override:
-   - **Start Command**: `npm run db:migrate && npm run start:web`
-4. Trigger a redeploy
-5. After migration completes, remove the override
+
+#### Option A: Using Migration Service (Recommended)
+1. Click **"+ New"** → **"GitHub Repo"**
+2. Select your repository
+3. Rename the service to **"migrate"**
+4. Go to **"Settings"** tab:
+   - **Root Directory**: `/`
+   - **Config Path**: `railway-migrate.json`
+5. Add the same database URL variable:
+   ```
+   DATABASE_URL=${{PostgreSQL.DATABASE_URL}}
+   ```
+6. Deploy and wait for migrations to complete
+7. Once done, you can remove this service
+
+#### Option B: Manual Migration
+1. Go to any service with database access
+2. Use the Railway CLI or dashboard to run:
+   ```
+   npm run db:migrate
+   ```
 
 ### 3. Test User Authentication
 1. Visit your web app and sign up
