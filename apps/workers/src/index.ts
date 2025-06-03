@@ -1,13 +1,12 @@
 import { Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { config } from 'dotenv';
-import { QUEUE_NAMES } from './shared/index.ts';
+import { QUEUE_NAMES } from './shared/index.js';
 import pino from 'pino';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Load environment variables
 // In a monorepo setup with Turbo, the working directory is set to the package directory
@@ -41,9 +40,9 @@ const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
 });
 
 // Import worker processors
-import { processStoryGeneration } from './workers/story-generation.worker.ts';
-import { processIllustrationGeneration } from './workers/illustration-generation.worker.ts';
-import { processBookFinalize } from './workers/book-finalize.worker.ts';
+import { processStoryGeneration } from './workers/story-generation.worker.js';
+import { processIllustrationGeneration } from './workers/illustration-generation.worker.js';
+import { processBookFinalize } from './workers/book-finalize.worker.js';
 
 // Create workers
 const storyWorker = new Worker(
@@ -70,15 +69,6 @@ const finalizeWorker = new Worker(
   {
     connection: redis,
     concurrency: 2,
-    defaultJobOptions: {
-      attempts: 3,
-      backoff: {
-        type: 'exponential',
-        delay: 5000,
-      },
-      removeOnComplete: true,
-      removeOnFail: false,
-    },
   }
 );
 

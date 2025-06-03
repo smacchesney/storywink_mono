@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
-import prisma from '../database/index.ts';
-import { IllustrationGenerationJob } from '../shared/index.ts';
+import prisma from '../database/index.js';
+import { IllustrationGenerationJob } from '../shared/index.js';
 import OpenAI, { toFile } from 'openai';
 import { FileLike } from 'openai/uploads';
 import { v2 as cloudinary } from 'cloudinary';
