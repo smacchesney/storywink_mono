@@ -119,7 +119,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
     }
 
     // Parse the response based on Winkify mode
-    let updatePromises: Promise<any>[] = [];
+    let updatePromises: any[] = [];
     
     try {
       if (book.isWinkifyEnabled) {
@@ -156,7 +156,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
               return null;
             }
           })
-          .filter((promise): promise is Promise<any> => promise !== null);
+          .filter((promise) => promise !== null);
         
       } else {
         // Standard response format: { "1": "text...", "2": "text...", ... }
@@ -184,7 +184,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
               return null;
             }
           })
-          .filter((promise): promise is Promise<any> => promise !== null);
+          .filter((promise) => promise !== null);
       }
     } catch (error) {
       logger.error({ bookId, rawResult, isWinkifyEnabled: book.isWinkifyEnabled }, 'Failed to parse OpenAI response');
