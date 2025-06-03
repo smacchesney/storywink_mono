@@ -4,11 +4,11 @@ import { db as prisma } from '@/lib/db';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { bookId: string } }
+  { params }: { params: Promise<{ bookId: string }> }
 ) {
   try {
     const { dbUser } = await getAuthenticatedUser();
-    const { bookId } = params;
+    const { bookId } = await params;
 
     // Verify book ownership
     const book = await prisma.book.findUnique({
