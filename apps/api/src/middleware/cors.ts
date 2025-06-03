@@ -26,7 +26,8 @@ export const corsMiddleware = (
   res.setHeader("Access-Control-Max-Age", "86400");
 
   if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
+    res.sendStatus(204);
+    return;
   }
 
   next();

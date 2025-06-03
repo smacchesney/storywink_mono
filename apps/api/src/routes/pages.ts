@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "@clerk/express";
-import prisma from "../database/index.ts";
-import { updatePageSchema } from "../shared/index.ts";
+import prisma from "../database/index.js";
+import { updatePageSchema } from "../shared/index.js";
 import {
   ensureDbUser,
   AuthenticatedRequest,
@@ -28,10 +28,11 @@ pagesRouter.patch(
       });
 
       if (!book) {
-        return res.status(404).json({
+        res.status(404).json({
           success: false,
           error: "Book not found",
         });
+        return;
       }
 
       // Update page

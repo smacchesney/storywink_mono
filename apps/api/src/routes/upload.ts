@@ -2,7 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "@clerk/express";
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
-import prisma from "../database/index.ts";
+import prisma from "../database/index.js";
 import {
   ensureDbUser,
   AuthenticatedRequest,
@@ -21,7 +21,7 @@ const upload = multer({
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
     if (!allowedTypes.includes(file.mimetype)) {
       cb(new Error("Invalid file type. Only JPEG, PNG, and WebP are allowed."));
@@ -46,10 +46,11 @@ uploadRouter.post(
       const userId = req.dbUser!.id;
 
       if (!req.file) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: "No file provided",
         });
+        return;
       }
 
       // Upload to Cloudinary
@@ -69,7 +70,7 @@ uploadRouter.post(
           },
         );
 
-        uploadStream.end(req.file.buffer);
+        uploadStream.end(req.file!.buffer);
       });
 
       const result = (await uploadPromise) as any;
