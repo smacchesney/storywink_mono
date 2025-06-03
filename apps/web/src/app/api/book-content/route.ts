@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from '@/lib/db';
-import { Prisma } from '@prisma/client';
 
 export async function GET(request: Request) {
   try {
