@@ -1,8 +1,9 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
-    "builder": "NIXPACKS",
-    "buildCommand": "cd ../.. && npm install && npm run build --filter=@storywink/web",
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "./Dockerfile",
+    "dockerContext": "../..",
     "watchPatterns": [
       "/apps/web/**",
       "/packages/**",
@@ -11,7 +12,6 @@
     ]
   },
   "deploy": {
-    "startCommand": "npm run start",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 30,
     "restartPolicyType": "ON_FAILURE",
