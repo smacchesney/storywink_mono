@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { requireAuth } from "@clerk/express";
-import prisma from "../database/index.ts";
+import prisma from "../database/index.js";
 import {
   ensureDbUser,
   AuthenticatedRequest,

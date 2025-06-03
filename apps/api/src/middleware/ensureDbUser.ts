@@ -25,14 +25,16 @@ export async function ensureDbUser(
     const clerkId = auth.userId;
 
     if (!clerkId) {
-      return res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     // Get user details from Clerk
     const clerkUser = await clerkClient.users.getUser(clerkId);
 
     if (!clerkUser) {
-      return res.status(401).json({ error: "User not found in Clerk" });
+      res.status(401).json({ error: "User not found in Clerk" });
+      return;
     }
 
     const primaryEmail = clerkUser.emailAddresses.find(
@@ -40,7 +42,8 @@ export async function ensureDbUser(
     )?.emailAddress;
 
     if (!primaryEmail) {
-      return res.status(400).json({ error: "User has no primary email" });
+      res.status(400).json({ error: "User has no primary email" });
+      return;
     }
 
     // Upsert user in database
@@ -69,5 +72,6 @@ export async function ensureDbUser(
   } catch (error) {
     console.error("Error in ensureDbUser middleware:", error);
     res.status(500).json({ error: "Internal server error" });
+    return;
   }
 }

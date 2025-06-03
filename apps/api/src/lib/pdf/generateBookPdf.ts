@@ -1,6 +1,6 @@
 import puppeteer from "puppeteer";
 import { Book, Page } from "@prisma/client";
-import logger from "@/lib/logger"; // Assuming logger exists
+import logger from "../logger.js";
 
 // Define the expected input type (Book with Pages)
 type BookWithPages = Book & { pages: Page[] };
@@ -14,8 +14,8 @@ const BLEED_MARGIN_IN = 0.25;
 const PAGE_WIDTH_WITH_BLEED_IN = PAGE_WIDTH_IN + 2 * BLEED_MARGIN_IN;
 const PAGE_HEIGHT_WITH_BLEED_IN = PAGE_HEIGHT_IN + 2 * BLEED_MARGIN_IN;
 
-const PAGE_WIDTH_PX_TRIM = Math.round(PAGE_WIDTH_IN * DPI); // Original, for reference if needed
-const PAGE_HEIGHT_PX_TRIM = Math.round(PAGE_HEIGHT_IN * DPI); // Original, for reference if needed
+// const PAGE_WIDTH_PX_TRIM = Math.round(PAGE_WIDTH_IN * DPI); // Original, for reference if needed
+// const PAGE_HEIGHT_PX_TRIM = Math.round(PAGE_HEIGHT_IN * DPI); // Original, for reference if needed
 
 const PAGE_WIDTH_PX = Math.round(PAGE_WIDTH_WITH_BLEED_IN * DPI); // Full size with bleed
 const PAGE_HEIGHT_PX = Math.round(PAGE_HEIGHT_WITH_BLEED_IN * DPI); // Full size with bleed
@@ -24,7 +24,7 @@ const PAGE_HEIGHT_PX = Math.round(PAGE_HEIGHT_WITH_BLEED_IN * DPI); // Full size
  * Generates HTML for a single book page.
  * TODO: Refine styling for text overlay, fonts, bleed, etc.
  */
-function generatePageHtml(page: Page, bookTitle: string): string {
+function generatePageHtml(page: Page, _bookTitle: string): string {
   // Basic inline styles for now, move to CSS string later
   const pageStyle = `
     width: ${PAGE_WIDTH_PX}px;
@@ -40,19 +40,19 @@ function generatePageHtml(page: Page, bookTitle: string): string {
     height: 100%; 
     object-fit: cover; /* Cover the area, might crop */
   `;
-  const textStyle = `
-    position: absolute;
-    bottom: 5%; /* Position text near bottom */
-    left: 5%;
-    right: 5%;
-    text-align: center;
-    background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent background */
-    color: white;
-    padding: 15px;
-    font-size: 48px; /* Adjust font size based on DPI/desired look */
-    font-family: sans-serif; /* TODO: Use actual book font */
-    border-radius: 10px;
-  `;
+  // const textStyle = `
+  //   position: absolute;
+  //   bottom: 5%; /* Position text near bottom */
+  //   left: 5%;
+  //   right: 5%;
+  //   text-align: center;
+  //   background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent background */
+  //   color: white;
+  //   padding: 15px;
+  //   font-size: 48px; /* Adjust font size based on DPI/desired look */
+  //   font-family: sans-serif; /* TODO: Use actual book font */
+  //   border-radius: 10px;
+  // `;
 
   return `
     <div class="page" style="${pageStyle}">

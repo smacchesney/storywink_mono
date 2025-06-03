@@ -5,8 +5,8 @@ import {
   generateStorySchema,
   generateIllustrationSchema,
   QUEUE_NAMES,
-} from "../shared/index.ts";
-import prisma from "../database/index.ts";
+} from "../shared/index.js";
+import prisma from "../database/index.js";
 import Redis from "ioredis";
 import {
   ensureDbUser,
@@ -51,10 +51,11 @@ generateRouter.post("/story", async (req: AuthenticatedRequest, res, next) => {
     });
 
     if (!book) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: "Book not found",
       });
+      return;
     }
 
     // Update book status
@@ -104,10 +105,11 @@ generateRouter.post(
       });
 
       if (!book) {
-        return res.status(404).json({
+        res.status(404).json({
           success: false,
           error: "Book not found",
         });
+        return;
       }
 
       // Update book status

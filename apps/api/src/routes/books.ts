@@ -1,12 +1,11 @@
 import { Router } from "express";
 import { requireAuth } from "@clerk/express";
-import prisma from "../database/index.ts";
-import { createBookSchema, updateBookSchema } from "../shared/index.ts";
-import { z } from "zod";
+import prisma from "../database/index.js";
+import { createBookSchema, updateBookSchema } from "../shared/index.js";
 import {
   ensureDbUser,
   AuthenticatedRequest,
-} from "../middleware/ensureDbUser.ts";
+} from "../middleware/ensureDbUser.js";
 
 export const booksRouter = Router();
 
@@ -75,10 +74,11 @@ booksRouter.get("/:bookId", async (req: AuthenticatedRequest, res, next) => {
     });
 
     if (!book) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: "Book not found",
       });
+      return;
     }
 
     res.json({
@@ -163,10 +163,11 @@ booksRouter.patch("/:bookId", async (req: AuthenticatedRequest, res, next) => {
     });
 
     if (!existingBook) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: "Book not found",
       });
+      return;
     }
 
     // Update book
@@ -210,10 +211,11 @@ booksRouter.delete("/:bookId", async (req: AuthenticatedRequest, res, next) => {
     });
 
     if (!book) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: "Book not found",
       });
+      return;
     }
 
     // Delete book (cascade will delete pages)

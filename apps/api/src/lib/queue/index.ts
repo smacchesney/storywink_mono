@@ -1,4 +1,4 @@
-import { Queue, QueueOptions, WorkerOptions } from "bullmq";
+import { Queue, WorkerOptions } from "bullmq";
 import IORedis from "ioredis";
 import { FlowProducer } from "bullmq";
 
