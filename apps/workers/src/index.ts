@@ -3,10 +3,6 @@ import Redis from 'ioredis';
 import { config } from 'dotenv';
 import { QUEUE_NAMES } from './shared/index.js';
 import pino from 'pino';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
 
 // Load environment variables
 // In a monorepo setup with Turbo, the working directory is set to the package directory
