@@ -22,4 +22,4 @@ const logger =
 export default logger;
 
 /* Re‑export the Logger type so imports keep their IntelliSense. */
-export type { Logger } from "./logger.server";
+export type { Logger } from "./logger.server.js";

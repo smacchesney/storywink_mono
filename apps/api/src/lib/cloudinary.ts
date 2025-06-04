@@ -1,5 +1,5 @@
 import { v2 as cloudinary } from "cloudinary";
-import logger from "./logger"; // Import the logger we created
+import logger from "./logger.js"; // Import the logger we created
 
 const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
 const apiKey = process.env.CLOUDINARY_API_KEY;

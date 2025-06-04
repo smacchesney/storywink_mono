@@ -1,5 +1,5 @@
-import cloudinary from "./cloudinary";
-import logger from "./logger";
+import cloudinary from "./cloudinary.js";
+import logger from "./logger.js";
 
 interface UploadOptions {
   folder?: string;
