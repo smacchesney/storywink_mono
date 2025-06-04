@@ -171,8 +171,6 @@ export default function CreateBookPage() {
      }
    };
 
-  const triggerUpload = () => fileInputRef.current?.click();
-
   // Modified handler to open the sheet
   const handleStartCreatingClick = () => {
     console.log("Start Creating clicked - Opening PhotoSourceSheet");
