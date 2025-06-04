@@ -48,11 +48,13 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
+// Health check route - BEFORE authentication middleware
+app.use("/api/health", healthRouter);
+
 // Clerk authentication middleware
 app.use(clerkMiddleware());
 
-// Routes
-app.use("/api/health", healthRouter);
+// Protected routes
 app.use("/api/books", booksRouter);
 app.use("/api/pages", pagesRouter);
 app.use("/api/assets", assetsRouter);
