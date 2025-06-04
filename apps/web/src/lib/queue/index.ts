@@ -2,20 +2,41 @@ import { Queue, WorkerOptions } from 'bullmq';
 import IORedis from 'ioredis';
 import { FlowProducer } from 'bullmq';
 
-// Ensure Redis URL is provided via environment variables
-if (!process.env.REDIS_URL) {
-  throw new Error('Missing REDIS_URL environment variable');
+// Lazy initialization variables
+let connectionOptions: { connection: IORedis } | null = null;
+let flowProducerInstance: FlowProducer | null = null;
+
+// Function to get or create connection options
+function getConnectionOptions(): { connection: IORedis } {
+  if (!connectionOptions) {
+    if (!process.env.REDIS_URL) {
+      throw new Error('Missing REDIS_URL environment variable');
+    }
+    connectionOptions = {
+      connection: new IORedis(process.env.REDIS_URL, {
+        maxRetriesPerRequest: null, // Needed for BullMQ
+      }),
+    };
+  }
+  return connectionOptions;
 }
 
-// Reusable connection options
-const connectionOptions = {
-  connection: new IORedis(process.env.REDIS_URL, {
-    maxRetriesPerRequest: null, // Needed for BullMQ
-  }),
-};
+// Lazy getter for FlowProducer instance
+export function getFlowProducer(): FlowProducer {
+  if (!flowProducerInstance) {
+    flowProducerInstance = new FlowProducer(getConnectionOptions());
+  }
+  return flowProducerInstance;
+}
 
-// Create and export a single FlowProducer instance
-export const flowProducer = new FlowProducer(connectionOptions);
+// Export flowProducer as a getter for backward compatibility
+// Use a Proxy to forward all method calls to the lazy-initialized instance
+export const flowProducer = new Proxy({} as FlowProducer, {
+  get: (_target, prop) => {
+    const instance = getFlowProducer();
+    return (instance as any)[prop];
+  }
+});
 
 // Define queue names centrally
 export enum QueueName {
@@ -30,14 +51,23 @@ const queues: Map<QueueName, Queue> = new Map();
 
 export function getQueue(name: QueueName): Queue {
   if (!queues.has(name)) {
-    const newQueue = new Queue(name, connectionOptions);
+    const newQueue = new Queue(name, getConnectionOptions());
     queues.set(name, newQueue);
   }
   return queues.get(name)!;
 }
 
-// Export connection options for worker configuration
-export const workerConnectionOptions: WorkerOptions = connectionOptions;
+// Export connection options for worker configuration as a getter
+export function getWorkerConnectionOptions(): WorkerOptions {
+  return getConnectionOptions();
+}
+
+// For backward compatibility, export as property with getter
+Object.defineProperty(exports, 'workerConnectionOptions', {
+  get: function() {
+    return getConnectionOptions();
+  }
+});
 
 // Example Usage (in API route or server action):
 // import { getQueue, QueueName } from './lib/queue';
