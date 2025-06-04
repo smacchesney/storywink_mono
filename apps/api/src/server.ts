@@ -64,6 +64,24 @@ app.use(notFound);
 app.use(errorHandler);
 
 // Start server
+// Add a simple test endpoint
+app.get("/api/test", (req, res) => {
+  console.log("Test endpoint hit");
+  res.json({ 
+    message: "API is running", 
+    timestamp: new Date().toISOString(),
+    env: {
+      NODE_ENV: process.env.NODE_ENV,
+      DATABASE_URL_SET: !!process.env.DATABASE_URL,
+      DATABASE_URL_LENGTH: process.env.DATABASE_URL?.length || 0
+    }
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 API server running on port ${PORT}`);
+  console.log(`Health check endpoint: /api/health`);
+  console.log(`Test endpoint: /api/test`);
+  console.log(`DATABASE_URL configured: ${!!process.env.DATABASE_URL}`);
+  console.log(`Environment: ${process.env.NODE_ENV}`);
 });
