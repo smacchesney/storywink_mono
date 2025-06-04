@@ -16,10 +16,12 @@ healthRouter.get("/", async (_req, res) => {
       version: process.env.npm_package_version || "1.0.0",
     });
   } catch (error) {
+    console.error("Health check database error:", error);
     res.status(503).json({
       success: false,
       status: "unhealthy",
       error: "Database connection failed",
+      details: error instanceof Error ? error.message : String(error),
     });
   }
 });
