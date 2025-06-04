@@ -3,10 +3,6 @@
   "build": {
     "builder": "DOCKERFILE",
     "dockerfilePath": "./Dockerfile",
-    "buildArgs": {
-      "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
-      "NEXT_PUBLIC_API_URL": "$NEXT_PUBLIC_API_URL"
-    },
     "watchPatterns": [
       "/apps/web/**",
       "/packages/**",
