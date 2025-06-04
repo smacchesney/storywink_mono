@@ -30,6 +30,14 @@ RUN npm run db:generate
 FROM base AS builder
 WORKDIR /app
 
+# Accept build arguments for Next.js public environment variables
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ARG NEXT_PUBLIC_API_URL
+
+# Set environment variables for build time
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 # Copy node_modules from deps stage
 COPY --from=deps /app ./
 
