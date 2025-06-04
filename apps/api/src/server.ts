@@ -65,7 +65,7 @@ app.use(errorHandler);
 
 // Start server
 // Add a simple test endpoint
-app.get("/api/test", (req, res) => {
+app.get("/api/test", (_req, res) => {
   console.log("Test endpoint hit");
   res.json({ 
     message: "API is running", 
