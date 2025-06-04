@@ -61,11 +61,6 @@ export async function POST(
     await prisma.$transaction(async (tx) => {
       logger.info({ clerkId, dbUserId: dbUser.id, bookId }, 'API: Starting page reorder transaction.');
       
-      // Get the book to find coverAssetId
-      const book = await tx.book.findUnique({
-        where: { id: bookId },
-        select: { coverAssetId: true },
-      });
       
       const updatePromises = pages.map(page => 
         tx.page.updateMany({ // Use updateMany to ensure page belongs to the correct book
@@ -77,7 +72,6 @@ export async function POST(
             index: page.index,
             pageNumber: page.index + 1,
             // Update isTitlePage based on whether this page is at index 0
-            // AND matches the coverAssetId (for consistency)
             isTitlePage: page.index === 0,
           },
         })

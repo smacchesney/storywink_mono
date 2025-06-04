@@ -15,7 +15,7 @@ export async function PATCH(
   const { bookId, pageId } = await params; 
   
   try {
-    const { dbUser, clerkId } = await getAuthenticatedUser();
+    const { dbUser } = await getAuthenticatedUser();
 
     if (!bookId || !pageId) {
       return NextResponse.json({ error: 'Missing bookId or pageId parameter' }, { status: 400 });

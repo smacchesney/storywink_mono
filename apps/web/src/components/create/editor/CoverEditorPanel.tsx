@@ -1,10 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Using Tabs for Photo/Title
+import React from 'react';
 import Image from 'next/image';
 import { Asset } from '@prisma/client';
 import { Check } from 'lucide-react'; // Import Check icon
@@ -24,7 +20,7 @@ export function CoverEditorPanel({
 }: CoverEditorPanelProps) {
   // const [activeSubTab, setActiveSubTab] = useState("photo"); // No longer needed
 
-  const currentCoverAsset = allBookAssets.find(a => a.id === currentCoverAssetId);
+  // const currentCoverAsset = allBookAssets.find(a => a.id === currentCoverAssetId); // Unused
 
   return (
     <div className="p-2 space-y-4 h-full flex flex-col">

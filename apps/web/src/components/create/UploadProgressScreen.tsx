@@ -13,9 +13,9 @@ interface UploadProgressScreenProps {
 }
 
 export function UploadProgressScreen({
-  progress,
-  currentFile,
-  totalFiles,
+  progress: _progress,
+  currentFile: _currentFile,
+  totalFiles: _totalFiles,
 }: UploadProgressScreenProps) {
   return (
     <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-50">

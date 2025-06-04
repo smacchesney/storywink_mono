@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from '@/lib/db';
-import { BookStatus } from '@prisma/client'; // Import necessary types
 import { z } from 'zod'; // Import Zod
 import logger from '@/lib/logger'; // Import logger
 
@@ -18,7 +17,7 @@ const updateBookSchema = z.object({
 type RouteContext = { params: Promise<{ bookId: string }> };
 
 export async function GET(
-  req: NextRequest, // Changed from request: Request
+  _req: NextRequest, // Changed from request: Request
   { params }: RouteContext // Applied RouteContext
 ) {
   const { bookId } = await params;

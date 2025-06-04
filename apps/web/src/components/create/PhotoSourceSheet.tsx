@@ -7,8 +7,8 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetTrigger, // We might trigger this externally, but keep for reference
-  SheetClose, // To allow closing
+  // SheetTrigger, // We might trigger this externally, but keep for reference
+  // SheetClose, // To allow closing
 } from "@/components/ui/sheet";
 import { Smartphone, Image as ImageIcon } from 'lucide-react'; // Assuming Google Photos icon isn't directly available
 

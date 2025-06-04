@@ -3,7 +3,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { BookOpen, LayoutGrid, Image as ImageIcon, Palette, Plus, FileText, Check } from 'lucide-react';
+import { BookOpen, LayoutGrid, Palette, Plus, FileText, Check } from 'lucide-react';
 
 export type EditorTab = 'details' | 'cover' | 'pages' | 'artStyle';
 

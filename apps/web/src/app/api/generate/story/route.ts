@@ -3,7 +3,7 @@ import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { z } from 'zod';
 import { getQueue, QueueName } from '@/lib/queue'; // Correct queue import
 // Import types from the default client path
-import { Asset, BookStatus, Prisma } from '@prisma/client';
+import { BookStatus } from '@prisma/client';
 // Import shared prisma instance
 import { db as prisma } from '@/lib/db'; 
 import logger from '@/lib/logger';
@@ -14,28 +14,28 @@ import type { StoryGenerationInput } from '@/lib/openai/prompts'; // Import type
 // REMOVED type Asset = any; workaround (Task 7.8)
 
 // Define the expected input schema using Zod
-const storyRequestSchema = z.object({
-  childName: z.string().min(1, { message: "Child's name is required" }),
-  bookTitle: z.string().min(1, { message: "Book title is required" }),
-  pageCount: z.union([
-    z.literal(8),
-    z.literal(12),
-    z.literal(16),
-  ]),
-  isDoubleSpread: z.boolean(),
-  droppedAssets: z.record(
-    z.string(), // Allow any string key (numeric index OR 'title-page')
-    z.string().nullable() // Value: assetId or null
-  ),
-  // Optional fields - ensure they are strings or undefined
-  storyTone: z.string().optional(),
-  artStyle: z.string().optional(),
-  theme: z.string().optional().default(''), // Use default to avoid undefined
-  people: z.string().optional().default(''),
-  objects: z.string().optional().default(''),
-  excitementElement: z.string().optional().default(''),
-  isWinkifyEnabled: z.boolean().optional().default(false), // Add field to schema
-});
+// const storyRequestSchema = z.object({
+//   childName: z.string().min(1, { message: "Child's name is required" }),
+//   bookTitle: z.string().min(1, { message: "Book title is required" }),
+//   pageCount: z.union([
+//    z.literal(8),
+//    z.literal(12),
+//    z.literal(16),
+//  ]),
+//  isDoubleSpread: z.boolean(),
+//  droppedAssets: z.record(
+//    z.string(), // Allow any string key (numeric index OR 'title-page')
+//    z.string().nullable() // Value: assetId or null
+//  ),
+//  // Optional fields - ensure they are strings or undefined
+//  storyTone: z.string().optional(),
+//  artStyle: z.string().optional(),
+//  theme: z.string().optional().default(''), // Use default to avoid undefined
+//  people: z.string().optional().default(''),
+//  objects: z.string().optional().default(''),
+//  excitementElement: z.string().optional().default(''),
+//  isWinkifyEnabled: z.boolean().optional().default(false), // Add field to schema
+// });
 
 // Define the data structure required by the story generation worker job
 export interface StoryGenerationJobData {

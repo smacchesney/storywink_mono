@@ -1,7 +1,6 @@
 "use client"; // Add this directive
 
 import React from 'react';
-import Link from 'next/link'; // Import Link
 import Image from 'next/image';
 import { BookStatus, Page } from '@prisma/client'; // Import BookStatus and Page
 import {
@@ -24,7 +23,6 @@ import {
 import { MoreHorizontal, Trash2, Copy, Pencil, Eye, Loader2, BookOpen, Clock, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { LibraryBook } from '@/app/library/actions'; // Assuming this type includes pages or coverImageUrl
 
 // Define the props for BookCard, ensuring all needed fields are present
 // We might need to adjust this if LibraryBook from actions.ts has a different structure
@@ -80,7 +78,7 @@ const BookCard: React.FC<BookCardProps> = ({
   title,
   updatedAt,
   status,
-  pages,
+  pages: _pages,
   coverImageUrl,
   onDeleteClick,
   onDuplicateClick,

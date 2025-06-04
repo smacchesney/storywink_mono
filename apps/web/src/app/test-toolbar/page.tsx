@@ -5,7 +5,7 @@ import BottomToolbar, { EditorTab } from '@/components/create/editor/BottomToolb
 
 export default function TestToolbarPage() {
   const [activeTab, setActiveTab] = useState<EditorTab>('pages');
-  const [completedSteps, setCompletedSteps] = useState<Set<EditorTab>>(new Set(['details', 'cover']));
+  const [completedSteps, setCompletedSteps] = useState<Set<EditorTab>>(new Set(['details', 'cover'] as EditorTab[]));
 
   const handleTabChange = (tab: EditorTab) => {
     setActiveTab(tab);

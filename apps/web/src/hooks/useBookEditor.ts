@@ -133,7 +133,7 @@ function bookEditorReducer(state: BookEditorState, action: BookEditorAction): Bo
     case 'MARK_STEP_COMPLETED':
       return { 
         ...state, 
-        completedSteps: new Set([...state.completedSteps, action.step]) 
+        completedSteps: new Set(Array.from(state.completedSteps).concat([action.step])) 
       };
     
     case 'SET_PAGES_CONFIRMED':

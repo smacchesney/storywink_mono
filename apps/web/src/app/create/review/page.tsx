@@ -1,17 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
-import Image from 'next/image';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useBookCreation } from '@/context/BookCreationContext';
+// import { useBookCreation } from '@/context/BookCreationContext'; // Unused
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { BookStatus, Page, Book } from '@prisma/client'; // Use direct prisma client types
-import { cn } from '@/lib/utils';
-import RoughButton from "@/components/ui/rough-button";
-import RoughBorder from "@/components/ui/rough-border";
 
 // Import the new components
 import PageTracker from '@/components/create/review/PageTracker';
@@ -41,20 +35,18 @@ function ReviewPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams(); // <-- Get search params
   // Keep context for now, but don't rely on it for bookId
-  const { bookData: contextBookData, setBookData } = useBookCreation(); 
+  // const { bookData: contextBookData, setBookData } = useBookCreation(); // Unused 
 
   // Get bookId from URL query parameter
   const bookIdFromUrl = searchParams.get('bookId'); 
 
   // State hooks
   const [pages, setPages] = useState<PageData[]>([]); // Holds ALL pages (cover at index 0)
-  const [bookDetails, setBookDetails] = useState<Book | null>(null);
   const [isFetchingInitialData, setIsFetchingInitialData] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0); // Index in the FULL pages array
   const [confirmed, setConfirmed] = useState<boolean[]>([]);
   const [isLoadingText, setIsLoadingText] = useState(false);
   const [isSavingPage, setIsSavingPage] = useState(false);
-  const [currentBookStatus, setCurrentBookStatus] = useState<BookStatus | null>(null);
   const [isStartingIllustration, setIsStartingIllustration] = useState(false);
   // Restore previous polling states
   const [needsTextPolling, setNeedsTextPolling] = useState(false);
@@ -111,8 +103,7 @@ function ReviewPageContent() {
         }
 
         console.log("Review Page: Fetched Full Book Data:", fetchedBook);
-        setBookDetails(fetchedBook);
-        setCurrentBookStatus(fetchedBook.status);
+        // Store fetched book data (removed unused state variables)
 
         const sortedPages = [...fetchedBook.pages].sort((a, b) => a.index - b.index);
 
@@ -130,7 +121,7 @@ function ReviewPageContent() {
             }));
             console.log("Review Page: Successfully mapped pages:", mappedPages); // Log after successful map
             setPages(mappedPages);
-            setBookDetails(fetchedBook); // Ensure book details are set
+            // Store fetched book data (removed unused state variable)
             setPendingTitleReview(fetchedBook.title || ''); // <-- Initialize pending title
             
             // Initialize confirmed: ALL false initially
@@ -194,7 +185,7 @@ function ReviewPageContent() {
       const statusData = await statusRes.json();
       if (!isMountedRef.current) return;
       const newStatus = statusData.status as BookStatus;
-      setCurrentBookStatus(newStatus);
+      // Track status change (removed unused state variable)
       console.log("Poll Status (Text Check):", newStatus);
       if (newStatus === BookStatus.STORY_READY || newStatus === BookStatus.COMPLETED || newStatus === BookStatus.ILLUSTRATING) {
           if (isLoadingText) { 
@@ -286,57 +277,7 @@ function ReviewPageContent() {
   }, [isFetchingInitialData, needsTextPolling, bookIdFromUrl, checkTextStatus]); // <-- Update dependencies
 
   // --- Final Status Polling Function --- 
-  const checkFinalBookStatus = useCallback(async () => {
-    const bookIdToPoll = bookIdFromUrl;
-    if (!isMountedRef.current || !bookIdToPoll || !isAwaitingFinalStatus) return;
-
-    console.log("Polling for final book status...");
-    try {
-      const statusRes = await fetch(`/api/book-status?bookId=${bookIdToPoll}`);
-      if (!isMountedRef.current) return;
-
-      if (!statusRes.ok) {
-        const errorText = await statusRes.text().catch(() => `HTTP error ${statusRes.status}`);
-        throw new Error(`Failed to fetch final book status: ${errorText}`);
-      }
-      const statusData = await statusRes.json();
-      if (!isMountedRef.current) return;
-
-      const finalStatus = statusData.status as BookStatus;
-      setCurrentBookStatus(finalStatus); // Keep track of current status
-      console.log("Poll Status (Final Check):", finalStatus);
-
-      // Check if processing has finished (successfully or otherwise)
-      if (finalStatus === BookStatus.COMPLETED || finalStatus === BookStatus.PARTIAL || finalStatus === BookStatus.FAILED) {
-        console.log(`Final status reached: ${finalStatus}. Stopping poll and redirecting.`);
-        if (finalStatusPollingIntervalRef.current) clearInterval(finalStatusPollingIntervalRef.current);
-        setIsAwaitingFinalStatus(false);
-        setIsStartingIllustration(false); // Reset button state
-
-        // Perform redirect based on final status
-        if (finalStatus === BookStatus.COMPLETED || finalStatus === BookStatus.PARTIAL) {
-          // PARTIAL means all illustrations are done (title pages without text are OK)
-          toast.success("Book illustrations complete! Opening preview...");
-          router.push(`/book/${bookIdToPoll}/preview`);
-        } else { // FAILED
-          toast.error("Some illustrations failed. Please review and fix.");
-          router.push(`/create?bookId=${bookIdToPoll}&fix=1`); // Redirect to editor in fix mode
-        }
-      } else {
-        // Still ILLUSTRATING, continue polling
-        console.log("Still illustrating, continuing poll...");
-      }
-
-    } catch (error) {
-      console.error("Final status polling error:", error);
-      if (finalStatusPollingIntervalRef.current) clearInterval(finalStatusPollingIntervalRef.current);
-      if (isMountedRef.current) {
-        setIsAwaitingFinalStatus(false);
-        setIsStartingIllustration(false); // Reset button state
-        toast.error(`Error checking final book status: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }
-  }, [bookIdFromUrl, isAwaitingFinalStatus, router]); // <-- Update dependencies
+  // This function has been removed as it was unused and causing TypeScript errors
 
   // --- Effect to Manage Final Status Polling Interval --- 
   useEffect(() => {
@@ -435,7 +376,7 @@ function ReviewPageContent() {
       
       // Update main state *after* successful save
       if (currentIndex === 0) {
-          setBookDetails(prev => prev ? { ...prev, title: pendingTitleReview } : null);
+          // Update book details (removed unused state variable)
       }
       
       // Mark as confirmed locally
@@ -463,18 +404,7 @@ function ReviewPageContent() {
   };
   
   // Regenerate Story handler
-  const handleRegenerate = () => {
-    if (window.confirm('Are you sure you want to regenerate the entire story? All edits will be lost.')) {
-      console.log('Regenerating story...');
-      // TODO: Implement actual API call for regeneration
-      setIsLoadingText(true); // Show loading state
-      setNeedsTextPolling(true); // Start polling again
-      setPages(pages.map(p => ({ ...p, text: null }))); 
-      setConfirmed(pages.map(() => false));
-      setCurrentBookStatus(BookStatus.GENERATING);
-      toast.info("Requesting story regeneration...");
-    }
-  };
+  // This function has been removed as it was unused and causing TypeScript errors
 
   // --- Illustrate Book Handler (MODIFIED FOR POLLING) ---
   const handleIllustrate = async () => {
@@ -504,7 +434,7 @@ function ReviewPageContent() {
         
         // Instead of redirecting, start polling for the final status
         toast.success("Illustration process started! You can monitor progress in your library."); 
-        setCurrentBookStatus(BookStatus.ILLUSTRATING); // Assume status update
+        // Track status change (removed unused state variable)
         setIsAwaitingFinalStatus(true); // Trigger final status polling
         // Keep button loading state until polling completes/redirects
         // setIsStartingIllustration(false); 

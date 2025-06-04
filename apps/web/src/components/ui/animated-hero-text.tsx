@@ -26,7 +26,7 @@ interface AnimatedHeroTextProps {
 }
 
 function AnimatedHeroText({ 
-  staticTextBefore = "Turn Memories Into a Picturebook Starring Your Little", 
+  staticTextBefore: _staticTextBefore = "Turn Memories Into a Picturebook Starring Your Little", 
   rotatingWords = ["Hero", "Princess", "Adventurer", "Explorer", "Firefighter"],
   rotatingItems,
   className = "",

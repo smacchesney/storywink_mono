@@ -18,17 +18,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { toast } from 'sonner';
 import { showError, showErrorWithRetry, showSuccess } from '@/lib/toast-utils';
 import { useRouter } from 'next/navigation';
-import { PlusCircle, Filter, SortDesc } from 'lucide-react';
-import Image from 'next/image';
-import { cn } from '@/lib/utils';
+import { PlusCircle, SortDesc } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
+import { BookStatus } from '@prisma/client';
 
-// Define types locally
-type BookStatus = "draft" | "generating" | "completed" | "illustrating" | "failed" | "partial";
+// Remove local BookStatus type - use Prisma enum instead
 
 type LibraryBook = {
   id: string;
@@ -97,8 +94,8 @@ export function LibraryClientView() {
     });
   }, [books, sortBy]);
 
-  const inProgressBooks = sortedBooks.filter(book => book.status !== 'COMPLETED');
-  const completedBooks = sortedBooks.filter(book => book.status === 'COMPLETED');
+  const inProgressBooks = sortedBooks.filter(book => book.status !== BookStatus.COMPLETED && book.status !== BookStatus.PARTIAL);
+  const completedBooks = sortedBooks.filter(book => book.status === BookStatus.COMPLETED || book.status === BookStatus.PARTIAL);
 
   const openDeleteDialog = (book: LibraryBook) => {
     setBookToDelete(book);
@@ -294,13 +291,14 @@ function BookGrid({
       {books.map((book) => (
         <BookCard
           key={book.id}
-          book={{
-            ...book,
-            coverImageUrl: getCoverImageUrl(book),
-            createdAt: new Date(book.createdAt),
-            updatedAt: new Date(book.updatedAt),
-          }}
-          onDelete={() => onDelete(book)}
+          id={book.id}
+          title={book.title}
+          status={book.status}
+          updatedAt={new Date(book.updatedAt)}
+          pages={undefined}
+          coverImageUrl={getCoverImageUrl(book)}
+          onDeleteClick={() => onDelete(book)}
+          onDuplicateClick={() => console.log('Duplicate not implemented')}
         />
       ))}
     </div>

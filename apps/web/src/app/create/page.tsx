@@ -1,16 +1,15 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import PhotoSourceSheet from '@/components/create/PhotoSourceSheet';
 import UploadProgressScreen from '@/components/create/UploadProgressScreen';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@clerk/nextjs';
 
-import { STYLE_LIBRARY } from '@storywink/shared';
 
 // --- Type Definitions --- 
 type Asset = {
@@ -56,7 +55,7 @@ export default function CreateBookPage() {
         throw new Error(response.error || 'Book creation failed');
       }
 
-      return { bookId: response.data.id };
+      return { bookId: (response.data as any).id };
       
     } catch (error) { 
       console.error('Book Creation API Call Failed:', error);

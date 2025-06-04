@@ -5,9 +5,9 @@ import useEmblaCarousel from 'embla-carousel-react';
 import type { EmblaOptionsType, EmblaCarouselType } from 'embla-carousel'; // Import types from base package
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { BookWithStoryboardPages, StoryboardPage } from '@/shared/types'; // <-- Import shared types
+import { BookWithStoryboardPages } from '@/shared/types'; // <-- Import shared types
 
 interface CanvasProps {
   bookData: BookWithStoryboardPages; // <-- Use shared type
@@ -69,7 +69,7 @@ export function Canvas({ bookData, options }: CanvasProps) {
             >
               {(page.asset?.url || page.originalImageUrl) ? (
                 <Image
-                  src={page.asset?.url || page.originalImageUrl}
+                  src={page.asset?.url || page.originalImageUrl || ''}
                   alt={`Page ${displayIndex + 1}`}
                   fill
                   style={{ objectFit: "cover" }}

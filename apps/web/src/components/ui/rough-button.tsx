@@ -48,6 +48,7 @@ const RoughButton: React.FC<RoughButtonProps> = ({
       resizeObserver.observe(containerRef.current);
       return () => resizeObserver.disconnect();
     }
+    return; // Explicit return for when containerRef.current is null
   }, []);
 
   // Draw the rough background

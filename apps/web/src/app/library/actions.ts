@@ -2,7 +2,7 @@
 
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from "@/lib/db"; // Use named import
-import { Prisma, Book, BookStatus, Page } from "@prisma/client"; // Use @prisma/client directly
+import { Prisma, Book, BookStatus } from "@prisma/client"; // Use @prisma/client directly
 import { revalidatePath } from 'next/cache'; // Import for revalidation
 
 // Define the structure of the book data needed by the card
@@ -86,9 +86,8 @@ export async function getUserBooks(): Promise<UserBooksResult> {
 
     // Books are considered "completed" if they have COMPLETED or PARTIAL status
     // PARTIAL means all illustrations are done but some pages might be missing text (which is OK for title pages)
-    const completedStatuses = [BookStatus.COMPLETED, BookStatus.PARTIAL];
-    const inProgressBooks = libraryBooks.filter(book => !completedStatuses.includes(book.status));
-    const completedBooks = libraryBooks.filter(book => completedStatuses.includes(book.status));
+    const inProgressBooks = libraryBooks.filter(book => book.status !== BookStatus.COMPLETED && book.status !== BookStatus.PARTIAL);
+    const completedBooks = libraryBooks.filter(book => book.status === BookStatus.COMPLETED || book.status === BookStatus.PARTIAL);
 
     logger.info({ clerkId, dbUserId: dbUser.id, inProgressCount: inProgressBooks.length, completedCount: completedBooks.length }, "Successfully fetched user books.");
     return { inProgressBooks, completedBooks };

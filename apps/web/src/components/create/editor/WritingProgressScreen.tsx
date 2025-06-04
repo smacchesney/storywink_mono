@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 // import { Loader2 } from 'lucide-react'; // Or a custom doodle SVG
 // import { TextShimmer } from '@/components/ui/text-shimmer'; // Old import

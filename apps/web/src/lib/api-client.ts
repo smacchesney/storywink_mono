@@ -27,7 +27,7 @@ class ApiClient {
     };
 
     // Only set Content-Type if not already set and body is not FormData
-    if (!config.headers?.['Content-Type'] && !(fetchOptions.body instanceof FormData)) {
+    if (!(config.headers as any)?.['Content-Type'] && !(fetchOptions.body instanceof FormData)) {
       config.headers = {
         'Content-Type': 'application/json',
         ...config.headers,

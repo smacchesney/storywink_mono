@@ -26,16 +26,16 @@ interface PageCardProps {
  * Provides editing and confirmation functionality
  */
 const PageCard = ({
-  id,
+  id: _id,
   imageUrl,
   text,
   pageNumber,
   isTitlePage,
   isConfirmed,
   moderationStatus,
-  moderationReason,
+  moderationReason: _moderationReason,
   isSaving,
-  bookId,
+  bookId: _bookId,
   onTextChange,
   onConfirm
 }: PageCardProps) => {

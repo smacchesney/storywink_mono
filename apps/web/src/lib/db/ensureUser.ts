@@ -1,4 +1,3 @@
-import { PrismaClient } from '@storywink/database';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { db as prisma } from '../db';
 

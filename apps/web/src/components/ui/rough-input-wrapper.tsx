@@ -39,6 +39,7 @@ const RoughInputWrapper: React.FC<RoughInputWrapperProps> = ({
       resizeObserver.observe(wrapperRef.current);
       return () => resizeObserver.disconnect();
     }
+    return; // Explicit return for when wrapperRef.current is null
   }, []);
 
   // Default and focus border options (incorporating seed)

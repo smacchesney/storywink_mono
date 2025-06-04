@@ -20,7 +20,7 @@ export function IllustrationProgressScreenSSE({
   onError,
 }: IllustrationProgressScreenSSEProps) {
   
-  const { status, progress, error, isConnected } = useBookStatusStream(bookId, {
+  const { progress, error, isConnected } = useBookStatusStream(bookId, {
     onStatusChange: (newStatus) => {
       console.log(`[SSE] Status changed to: ${newStatus}`);
     },
@@ -75,7 +75,7 @@ export function IllustrationProgressScreenSSE({
       </div>
 
       {/* Progress Bar */}
-      {progress && progress.totalPages > 0 && (
+      {progress && progress.totalPages && progress.totalPages > 0 && (
         <div className="w-full max-w-md mb-4">
           <Progress value={progressPercent} className="h-2" />
           <p className="text-sm text-gray-600 mt-2">

@@ -3,7 +3,7 @@ import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { z } from 'zod';
 import { QueueName, flowProducer } from '@/lib/queue/index';
 import { db as prisma } from '@/lib/db';
-import { BookStatus, Prisma } from '@prisma/client';
+import { BookStatus } from '@prisma/client';
 import logger from '@/lib/logger';
 
 // Define the expected input schema using Zod
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
 
     // Step 3: Create child job definitions for each page
     console.log(`[IllustrationAPI] Creating illustration jobs for each page...`);
-    const pageChildren = book.pages.map((page, index) => {
+    const pageChildren = book.pages.map((page) => {
         const isActualTitlePage = page.assetId === book.coverAssetId;
         
         const illustrationJobData: IllustrationGenerationJobData = {

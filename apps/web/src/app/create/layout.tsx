@@ -1,6 +1,5 @@
 "use client"; // Layouts using context/state need to be client components
 
-import { ReactNode } from 'react';
 // Import ONLY the provider from the new context file
 import { BookCreationProvider } from '@/context/BookCreationContext';
 

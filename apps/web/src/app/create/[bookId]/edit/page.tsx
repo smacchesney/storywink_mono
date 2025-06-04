@@ -3,13 +3,13 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, FileText, HelpCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, HelpCircle } from 'lucide-react';
 import { StoryboardPage, BookWithStoryboardPages } from '@/shared/types'; // <-- Import shared types
 import BottomToolbar, { EditorTab } from '@/components/create/editor/BottomToolbar'; // <-- Import Toolbar
 import PhotoSourceSheet from '@/components/create/PhotoSourceSheet'; // <-- Import Sheet for Add Photo
 import logger from '@/lib/logger';
 import Canvas from '@/components/create/editor/Canvas'; // <-- Import Canvas
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetClose } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import StoryboardGrid from '@/components/create/editor/StoryboardGrid';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,9 +29,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import WritingProgressScreen from '@/components/create/editor/WritingProgressScreen'; // Import Progress Screen
 import AdditionalPhotoUploadProgressScreen from '@/components/create/editor/AdditionalPhotoUploadProgressScreen'; // <-- Import new progress screen
 import useMediaQuery from '@/hooks/useMediaQuery'; // Import the hook
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import Joyride, { Step, ACTIONS, EVENTS, STATUS, CallBackProps } from 'react-joyride'; // <-- Add Joyride imports
+import Joyride, { Step, EVENTS, STATUS, CallBackProps } from 'react-joyride'; // <-- Add Joyride imports
 import { cn } from '@/lib/utils';
 
 export default function EditBookPage() {
@@ -63,7 +61,6 @@ export default function EditBookPage() {
   const [isGeneratingStory, setIsGeneratingStory] = useState(false); // <-- State for generation loading
   const [showGenerationProgress, setShowGenerationProgress] = useState(false); // <-- Add state for progress screen visibility
   // Add saved state trackers
-  const [isAddingPhoto, setIsAddingPhoto] = useState(false); // Loading state for adding photos
   const [showPhotoUploadProgress, setShowPhotoUploadProgress] = useState(false); // <-- New state for photo upload progress screen
 
   // States for the new Details Panel
@@ -225,7 +222,7 @@ export default function EditBookPage() {
   }, [bookData, isDesktop]); 
 
   const handleJoyrideCallback = (data: CallBackProps) => {
-    const { action, index, status, type } = data;
+    const { status, type } = data;
 
     if (type === EVENTS.STEP_AFTER || type === EVENTS.TARGET_NOT_FOUND) {
       // Update the current step index
@@ -566,20 +563,6 @@ export default function EditBookPage() {
     toast.info("Import from Google Photos is coming soon!");
   };
 
-  // --- Calculate Available Assets for Cover Picker ---
-  const availableAssetsForCover = useMemo(() => {
-    if (!bookData) return [];
-    // Get IDs of assets used on NON-COVER pages
-    const usedOnPagesIds = new Set(
-        bookData.pages
-            .filter(p => p.assetId !== bookData.coverAssetId && p.assetId !== null) // Exclude current cover page asset
-            .map(p => p.assetId as string)
-    );
-    // Filter all fetched assets
-    // TODO: This assumes ALL assets for the user are fetched with the book initially - refine if needed
-    const allFetchedAssets = bookData.pages.map(p => p.asset).filter(Boolean) as Asset[]; // Extract assets from pages
-    return allFetchedAssets.filter(asset => !usedOnPagesIds.has(asset.id));
-  }, [bookData]);
   // -----------------------------------------------------
 
   // --- Calculate Derived Data for Panels --- 
@@ -647,7 +630,7 @@ export default function EditBookPage() {
   };
 
   // Callback from WritingProgressScreen on error/timeout
-  const handleGenerationError = (failedBookId: string, errorMsg?: string) => {
+  const handleGenerationError = (_failedBookId: string, errorMsg?: string) => {
       setShowGenerationProgress(false);
       setIsGeneratingStory(false); 
       // Optionally display the error message from the callback
@@ -740,8 +723,6 @@ export default function EditBookPage() {
       case 'pages':
         return <Canvas bookData={bookData} />; // Keep showing canvas behind sheet/drawer
       default:
-        // Ensure exhaustive check or handle default case appropriately
-        const _exhaustiveCheck: never = activeTab;
         return <Canvas bookData={bookData} />; // Default to cover/canvas
     }
   };

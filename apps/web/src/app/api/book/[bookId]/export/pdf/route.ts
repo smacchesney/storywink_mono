@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
@@ -9,7 +9,7 @@ import { Book, Page } from '@prisma/client';
 type BookWithPages = Book & { pages: Page[] };
 
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ bookId: string }> }
 ) {
   const { bookId } = await params;

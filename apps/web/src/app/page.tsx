@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import React, { useRef, useEffect, useState, useContext, createContext, useMemo, memo } from 'react';
+import React, { useRef, useEffect, useState, useContext, createContext, memo } from 'react';
 import { cn } from "@/lib/utils";
 import dynamic from 'next/dynamic';
 import { ChevronDown, ChevronUp } from 'lucide-react';
@@ -112,7 +112,7 @@ interface SynchronizedBeforeAfterPairProps {
 }
 
 const SynchronizedBeforeAfterPair: React.FC<SynchronizedBeforeAfterPairProps> = memo(({ images, showControls = false, carouselId }) => {
-  const { currentIndex, setCurrentIndex, isTransitioning, totalImages } = useCarouselSync();
+  const { currentIndex, setCurrentIndex, totalImages } = useCarouselSync();
 
   if (!images || images.length === 0) return null;
 

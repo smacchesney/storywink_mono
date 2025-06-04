@@ -3,8 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import type { StyleDefinition } from '@storywink/shared';
-import { Loader2 } from 'lucide-react'; // Import Loader2 if needed for loading state
 
 interface ImagePair {
   original: string;
@@ -26,7 +24,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
   showMascot = true, // Default to true
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true); // Track initial loading
+  // const [isLoading, setIsLoading] = useState(true); // Track initial loading - unused
 
   useEffect(() => {
     if (!imagePairs || imagePairs.length === 0) return;
@@ -38,10 +36,10 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
     return () => clearInterval(timer); // Cleanup interval on component unmount
   }, [currentIndex, imagePairs, interval]);
 
-  useEffect(() => {
-    // Reset loading state when images change (optional but good practice)
-    setIsLoading(true);
-  }, [imagePairs]);
+  // useEffect(() => {
+  //   // Reset loading state when images change (optional but good practice)
+  //   setIsLoading(true);
+  // }, [imagePairs]); // Commented out since setIsLoading is unused
 
   if (!imagePairs || imagePairs.length === 0) {
     return null; // Don't render anything if no images are provided

@@ -1,10 +1,6 @@
-import { LibraryClientView } from "./library-client-view"; // Import the original Client Component
-import { getUserBooks } from "./actions";
+import { LibraryClientView } from "./library-client-view-new"; // Import the new Client Component
 
-export default async function LibraryPage() {
-  // Fetch data server-side
-  const initialData = await getUserBooks();
-  
-  // Pass data to client component
-  return <LibraryClientView initialData={initialData} />;
+export default function LibraryPage() {
+  // New component handles data fetching internally
+  return <LibraryClientView />;
 } 

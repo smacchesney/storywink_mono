@@ -5,7 +5,7 @@ import HTMLFlipBook from 'react-pageflip';
 import { Page } from '@prisma/client';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 interface FlipbookViewerProps {
   pages: Page[];
