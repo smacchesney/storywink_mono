@@ -9,12 +9,17 @@
     "types": ["node"],
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "noEmit": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
       "@storywink/shared": ["../../packages/shared/src"],
       "@storywink/database": ["../../packages/database/src"]
     }
   },
-  "include": ["src/**/*", "../../packages/shared/src/**/*", "../../packages/database/src/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
