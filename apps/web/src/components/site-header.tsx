@@ -11,6 +11,9 @@ export function SiteHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  
+  // Check if Clerk is available
+  const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -75,27 +78,40 @@ export function SiteHeader() {
         <div className="flex items-center space-x-3 ml-auto">
           {/* Auth buttons - visible on desktop screens */}
           <div className="hidden md:flex items-center space-x-3">
-             <SignedOut>
-                <Button asChild variant="ghost">
-                  <Link href="/sign-in">Sign In</Link>
-                </Button>
-                <Button asChild>
-                  <Link href="/sign-up">Sign Up</Link>
-                </Button>
-             </SignedOut>
-             <SignedIn>
-                 <Button asChild variant="secondary" size="sm">
+            {hasClerkKey ? (
+              <>
+                <SignedOut>
+                  <Button asChild variant="ghost">
+                    <Link href="/sign-in">Sign In</Link>
+                  </Button>
+                  <Button asChild>
+                    <Link href="/sign-up">Sign Up</Link>
+                  </Button>
+                </SignedOut>
+                <SignedIn>
+                  <Button asChild variant="secondary" size="sm">
                     <Link 
                       href="/library" 
                       className="text-slate-900 dark:text-white transition-colors hover:text-slate-700 dark:hover:text-slate-300"
                     >
                       My Library
                     </Link>
-                 </Button>
-                 <div className="flex items-center ml-2">
-                   <UserButton afterSignOutUrl="/" />
-                 </div>
-             </SignedIn>
+                  </Button>
+                  <div className="flex items-center ml-2">
+                    <UserButton afterSignOutUrl="/" />
+                  </div>
+                </SignedIn>
+              </>
+            ) : (
+              <>
+                <Button asChild variant="ghost">
+                  <Link href="/sign-in">Sign In</Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/sign-up">Sign Up</Link>
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Trigger - only on small screens */}
@@ -119,26 +135,39 @@ export function SiteHeader() {
           className="absolute top-14 left-0 right-0 z-40 bg-white dark:bg-background shadow-md md:hidden"
         >
           <nav className="container flex flex-col space-y-2 p-4">
-            <SignedIn>
-              <Link
-                href="/library"
-                className="text-slate-900 dark:text-white transition-colors hover:text-slate-700 dark:hover:text-slate-300 py-2"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                My Library
-              </Link>
-              <div className="py-2">
-                <UserButton afterSignOutUrl="/" />
-              </div>
-            </SignedIn>
-            <SignedOut>
-              <Button asChild variant="ghost" onClick={() => setIsMobileMenuOpen(false)}>
-                <Link href="/sign-in">Sign In</Link>
-              </Button>
-              <Button asChild onClick={() => setIsMobileMenuOpen(false)}>
-                <Link href="/sign-up">Sign Up</Link>
-              </Button>
-            </SignedOut>
+            {hasClerkKey ? (
+              <>
+                <SignedIn>
+                  <Link
+                    href="/library"
+                    className="text-slate-900 dark:text-white transition-colors hover:text-slate-700 dark:hover:text-slate-300 py-2"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    My Library
+                  </Link>
+                  <div className="py-2">
+                    <UserButton afterSignOutUrl="/" />
+                  </div>
+                </SignedIn>
+                <SignedOut>
+                  <Button asChild variant="ghost" onClick={() => setIsMobileMenuOpen(false)}>
+                    <Link href="/sign-in">Sign In</Link>
+                  </Button>
+                  <Button asChild onClick={() => setIsMobileMenuOpen(false)}>
+                    <Link href="/sign-up">Sign Up</Link>
+                  </Button>
+                </SignedOut>
+              </>
+            ) : (
+              <>
+                <Button asChild variant="ghost" onClick={() => setIsMobileMenuOpen(false)}>
+                  <Link href="/sign-in">Sign In</Link>
+                </Button>
+                <Button asChild onClick={() => setIsMobileMenuOpen(false)}>
+                  <Link href="/sign-up">Sign Up</Link>
+                </Button>
+              </>
+            )}
           </nav>
         </div>
       )}
