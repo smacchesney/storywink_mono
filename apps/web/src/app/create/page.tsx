@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import PhotoSourceSheet from '@/components/create/PhotoSourceSheet';
 import UploadProgressScreen from '@/components/create/UploadProgressScreen';
 import { apiClient } from '@/lib/api-client';
-import { useAuth } from '@clerk/nextjs';
+import { ClerkWrapper } from '@/components/clerk-wrapper';
 
 
 // --- Type Definitions --- 
@@ -20,7 +20,6 @@ type Asset = {
 // Main Page Component
 export default function CreateBookPage() {
   const router = useRouter();
-  const { getToken, isLoaded } = useAuth();
   const [uploadedAssets, setUploadedAssets] = useState<Asset[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -33,7 +32,7 @@ export default function CreateBookPage() {
   const [totalUploadFiles, setTotalUploadFiles] = useState(0);
 
   // Updated function to use the API client
-  const handleCreateBook = async (assetIds: string[]) => {
+  const handleCreateBook = async (assetIds: string[], getToken: () => Promise<string | null>, isLoaded: boolean) => {
     if (!isLoaded) {
       throw new Error('Authentication not loaded');
     }
@@ -64,7 +63,7 @@ export default function CreateBookPage() {
     }
   };
 
-  const handleUploadComplete = async (newAssets: Asset[]) => {
+  const handleUploadComplete = async (newAssets: Asset[], getToken: () => Promise<string | null>, isLoaded: boolean) => {
     const allAssets = [...uploadedAssets, ...newAssets];
     setUploadedAssets(allAssets);
     console.log("Upload complete, total assets:", allAssets);
@@ -77,7 +76,7 @@ export default function CreateBookPage() {
 
     if (allAssets.length > 0) {
       const assetIds = allAssets.map(asset => asset.id);
-      const creationResult = await handleCreateBook(assetIds);
+      const creationResult = await handleCreateBook(assetIds, getToken, isLoaded);
       
       if (creationResult?.bookId) {
         // Navigation will unmount this component, hiding the progress screen
@@ -96,7 +95,7 @@ export default function CreateBookPage() {
   };
 
   // Upload logic (calls API)
-  const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInputChange = (getToken: () => Promise<string | null>, isLoaded: boolean) => async (event: React.ChangeEvent<HTMLInputElement>) => {
      if (event.target.files && event.target.files.length > 0) {
        const files = Array.from(event.target.files);
        
@@ -154,7 +153,7 @@ export default function CreateBookPage() {
 
           if (uploadedAssets.length > 0) {
               // Call completion handler which will then trigger book creation
-              handleUploadComplete(uploadedAssets);
+              handleUploadComplete(uploadedAssets, getToken, isLoaded);
           } else {
               setShowProgressScreen(false); // Hide progress if no assets
               toast.warning("Upload completed, but no assets were returned.");
@@ -187,41 +186,56 @@ export default function CreateBookPage() {
   };
 
   return (
-    <>
-      {showProgressScreen && (
-        <UploadProgressScreen 
-          progress={uploadProgress}
-          currentFile={currentUploadFile}
-          totalFiles={totalUploadFiles}
-        />
-      )}
-      
-      {!showProgressScreen && (
-        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-150px)] px-4 py-8">
-      <input type="file" ref={fileInputRef} onChange={handleFileInputChange} className="hidden" multiple accept="image/jpeg,image/png,image/heic,image/heif" />
+    <ClerkWrapper>
+      {({ getToken, isLoaded }) => {
+        const triggerUploadWithAuth = () => fileInputRef.current?.click();
 
-          <Button 
-            onClick={handleStartCreatingClick}
-            disabled={isUploading}
-            variant="outline" 
-            className="relative bg-white rounded-full w-24 h-24 md:w-40 md:h-40 shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out flex items-center justify-center group"
-          >
-            <Plus className="text-[#F76C5E] w-10 h-10 md:w-16 md:h-16 transition-transform duration-300 ease-in-out group-hover:scale-110" />
-            {/* Loader is removed here as the full screen overlay handles loading state */}
-          </Button>
+        return (
+          <>
+            {showProgressScreen && (
+              <UploadProgressScreen 
+                progress={uploadProgress}
+                currentFile={currentUploadFile}
+                totalFiles={totalUploadFiles}
+              />
+            )}
+            
+            {!showProgressScreen && (
+              <div className="flex flex-col items-center justify-center min-h-[calc(100vh-150px)] px-4 py-8">
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileInputChange(getToken, isLoaded)} 
+                  className="hidden" 
+                  multiple 
+                  accept="image/jpeg,image/png,image/heic,image/heif" 
+                />
 
-          <p className="mt-4 md:mt-6 text-lg md:text-xl text-gray-600 font-medium">
-            Start Creating
-          </p>
-          
-          <PhotoSourceSheet
-            isOpen={isSheetOpen}
-            onOpenChange={setIsSheetOpen}
-            onChooseFromPhone={triggerUpload}
-            onImportFromGooglePhotos={handleImportFromGooglePhotos}
-      />
-    </div>
-      )}
-    </>
+                <Button 
+                  onClick={handleStartCreatingClick}
+                  disabled={isUploading}
+                  variant="outline" 
+                  className="relative bg-white rounded-full w-24 h-24 md:w-40 md:h-40 shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out flex items-center justify-center group"
+                >
+                  <Plus className="text-[#F76C5E] w-10 h-10 md:w-16 md:h-16 transition-transform duration-300 ease-in-out group-hover:scale-110" />
+                  {/* Loader is removed here as the full screen overlay handles loading state */}
+                </Button>
+
+                <p className="mt-4 md:mt-6 text-lg md:text-xl text-gray-600 font-medium">
+                  Start Creating
+                </p>
+                
+                <PhotoSourceSheet
+                  isOpen={isSheetOpen}
+                  onOpenChange={setIsSheetOpen}
+                  onChooseFromPhone={triggerUploadWithAuth}
+                  onImportFromGooglePhotos={handleImportFromGooglePhotos}
+                />
+              </div>
+            )}
+          </>
+        );
+      }}
+    </ClerkWrapper>
   );
 }

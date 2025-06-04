@@ -6,7 +6,7 @@ import React, { useRef, useEffect, useState, useContext, createContext, memo } f
 import { cn } from "@/lib/utils";
 import dynamic from 'next/dynamic';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { useAuth } from "@clerk/nextjs";
+import { ClerkWrapper } from "@/components/clerk-wrapper";
 import { useRouter } from "next/navigation";
 import { AnimatedHeroText } from "@/components/ui/animated-hero-text";
 
@@ -178,29 +178,8 @@ SynchronizedBeforeAfterPair.displayName = 'SynchronizedBeforeAfterPair';
 export default function Home() {
   const firstCarouselImages = carouselImages.slice(0, 3);
   const secondCarouselImages = carouselImagesStyle2.slice(0, 3);
-  const { isLoaded, isSignedIn } = useAuth();
   const router = useRouter();
-  const [isButtonLoading, setIsButtonLoading] = useState(true);
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
-
-  // Handle loading state for the button
-  useEffect(() => {
-    if (isLoaded) {
-      setIsButtonLoading(false);
-    }
-  }, [isLoaded]);
-
-  const handleCreateStorybookClick = () => {
-    if (!isLoaded) {
-      return;
-    }
-
-    if (isSignedIn) {
-      router.push("/create");
-    } else {
-      router.push(`/sign-in?redirect_url=${encodeURIComponent('/create')}`);
-    }
-  };
 
   const toggleFAQ = (index: number) => {
     setExpandedFAQ(expandedFAQ === index ? null : index);
@@ -230,27 +209,42 @@ export default function Home() {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900">
-      <main className="flex-grow container mx-auto px-4 py-6 md:py-8 space-y-6 md:space-y-8">
-        <section className="text-center">
-          <AnimatedHeroText />
-          
-          <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 mb-5 max-w-2xl mx-auto font-sans">
-            Upload photos, and let <span style={{ fontFamily: 'Excalifont' }} className="font-bold">Storywin<span className="text-[#F76C5E]">k.ai</span></span> turn everyday adventures into charming stories.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row justify-center items-center gap-3 mb-6">
-            <Button
-              size="lg"
-              variant="default"
-              className="w-full sm:w-auto px-8 py-3 md:px-10 md:py-4 text-lg md:text-xl bg-[#F76C5E] text-white hover:bg-[#F76C5E]/90 transition-colors rounded-full"
-              onClick={handleCreateStorybookClick}
-              disabled={!isLoaded}
-              style={{ fontFamily: 'Excalifont' }}
-            >
-              {isButtonLoading ? "Loading..." : "✨ Create Your Storybook"}
-            </Button>
-          </div>
+    <ClerkWrapper>
+      {({ isLoaded, isSignedIn }) => {
+        const handleCreateStorybookClick = () => {
+          if (!isLoaded) {
+            return;
+          }
+
+          if (isSignedIn) {
+            router.push("/create");
+          } else {
+            router.push(`/sign-in?redirect_url=${encodeURIComponent('/create')}`);
+          }
+        };
+
+        return (
+          <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900">
+            <main className="flex-grow container mx-auto px-4 py-6 md:py-8 space-y-6 md:space-y-8">
+              <section className="text-center">
+                <AnimatedHeroText />
+                
+                <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 mb-5 max-w-2xl mx-auto font-sans">
+                  Upload photos, and let <span style={{ fontFamily: 'Excalifont' }} className="font-bold">Storywin<span className="text-[#F76C5E]">k.ai</span></span> turn everyday adventures into charming stories.
+                </p>
+                
+                <div className="flex flex-col sm:flex-row justify-center items-center gap-3 mb-6">
+                  <Button
+                    size="lg"
+                    variant="default"
+                    className="w-full sm:w-auto px-8 py-3 md:px-10 md:py-4 text-lg md:text-xl bg-[#F76C5E] text-white hover:bg-[#F76C5E]/90 transition-colors rounded-full"
+                    onClick={handleCreateStorybookClick}
+                    disabled={!isLoaded}
+                    style={{ fontFamily: 'Excalifont' }}
+                  >
+                    {!isLoaded ? "Loading..." : "✨ Create Your Storybook"}
+                  </Button>
+                </div>
           
           <div className="mb-2 mt-3">
             <SynchronizedCarousels imageSets={[firstCarouselImages, secondCarouselImages]} interval={4000}>
@@ -307,8 +301,11 @@ export default function Home() {
               </div>
             ))}
           </div>
-        </section>
-      </main>
-    </div>
+            </section>
+          </main>
+        </div>
+        );
+      }}
+    </ClerkWrapper>
   );
 }
