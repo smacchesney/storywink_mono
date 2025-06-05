@@ -45,10 +45,7 @@ export default function CreateBookPage() {
     
     try {
       const response = await apiClient.createBook({
-        childName: "Your Child", // TODO: Get from form
         assetIds,
-        pageLength: 10,
-        isWinkifyEnabled: false,
       }, token);
 
       if (!response.success || !response.data) {

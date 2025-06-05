@@ -70,7 +70,7 @@ class ApiClient {
   }
 
   async createBook(data: any, token: string) {
-    return this.request('/api/books', {
+    return this.request('/api/book/create', {
       method: 'POST',
       body: JSON.stringify(data),
       token,
