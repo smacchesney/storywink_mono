@@ -127,23 +127,24 @@ export default function CreateBookPage() {
             throw new Error('Not authenticated');
           }
 
-          // Upload files to internal API route
-          const uploadFormData = new FormData();
-          files.forEach((file) => uploadFormData.append('files', file));
+          // Upload files using API client
+          const uploadedAssets = [];
           
-          const uploadResponse = await fetch('/api/upload', {
-            method: 'POST',
-            body: uploadFormData,
-            // Don't set Content-Type header - browser will set it with boundary
-          });
-          
-          if (!uploadResponse.ok) {
-            const errorData = await uploadResponse.json().catch(() => ({ error: 'Upload failed' }));
-            throw new Error(errorData.error || `Upload failed: ${uploadResponse.status}`);
+          // Upload files one by one using the API client
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const response = await apiClient.uploadFile(file, token);
+            
+            if (!response.success || !response.data) {
+              throw new Error(response.error || `Failed to upload ${file.name}`);
+            }
+            
+            uploadedAssets.push(response.data as Asset);
+            
+            // Update progress for each file
+            setCurrentUploadFile(i + 1);
+            setUploadProgress(Math.round(((i + 1) / files.length) * 100));
           }
-          
-          const uploadResult = await uploadResponse.json();
-          const uploadedAssets = uploadResult.assets || [];
           
           clearInterval(progressInterval); // Stop simulation on fetch completion
           setUploadProgress(100); // Ensure progress hits 100%
