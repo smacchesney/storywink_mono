@@ -2,6 +2,8 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
+    "noEmit": false,
+    "skipLibCheck": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
     "target": "ES2022",
@@ -10,11 +12,8 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
-    "paths": {
-      "@storywink/shared": ["../../packages/shared/src"],
-      "@storywink/database": ["../../packages/database/src"]
-    }
+    "rootDir": "./src"
   },
-  "include": ["src/**/*", "../../packages/shared/src/**/*", "../../packages/database/src/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
