@@ -132,48 +132,64 @@ export async function POST(request: Request) {
             // --- End Explicit DB Connection Test ---
 
             // --- Transaction: Create Asset AND potentially Page --- 
-            const createdData = await prisma.$transaction(async (tx) => {
-                // Create Asset - use dbUser.id instead of clerkId
-                const newAsset = await tx.asset.create({
-                    data: {
-                        userId: dbUser.id, // Use database user ID, not Clerk ID
-                        publicId: cloudinaryResult.public_id, 
-                        url: cloudinaryResult.secure_url,       
-                        thumbnailUrl: cloudinary.url(cloudinaryResult.public_id, {
-                            width: 200, height: 200, crop: 'fill', quality: 'auto', fetch_format: 'auto'
-                        }),
-                        fileType: file.type,                   
-                        size: file.size,
-                    },
-                });
-
-                // If bookId was provided, create Page record
-                if (bookId) {
-                    await tx.page.create({
+            console.log(`>>> DEBUG: Starting database transaction for ${file.name}...`);
+            try {
+                const createdData = await prisma.$transaction(async (tx) => {
+                    console.log(`>>> DEBUG: Creating asset record for ${file.name}...`);
+                    // Create Asset - use dbUser.id instead of clerkId
+                    const newAsset = await tx.asset.create({
                         data: {
-                            bookId: bookId,
-                            assetId: newAsset.id,
-                            pageNumber: bookPageCount + 1, // Next page number
-                            index: bookPageCount,       // Next index (0-based)
-                            originalImageUrl: newAsset.thumbnailUrl || newAsset.url, // Use thumb or full url
-                            pageType: PageType.SINGLE, // Default
-                            isTitlePage: false, // New pages added are never title pages initially
-                            // Text, generatedUrl, etc. are null by default
-                        }
+                            userId: dbUser.id, // Use database user ID, not Clerk ID
+                            publicId: cloudinaryResult.public_id, 
+                            url: cloudinaryResult.secure_url,       
+                            thumbnailUrl: cloudinary.url(cloudinaryResult.public_id, {
+                                width: 200, height: 200, crop: 'fill', quality: 'auto', fetch_format: 'auto'
+                            }),
+                            fileType: file.type,                   
+                            size: file.size,
+                        },
                     });
-                    bookPageCount++; // Increment for the next potential file in this batch
-                }
+                    console.log(`>>> DEBUG: Asset created with ID: ${newAsset.id}`);
+
+                    // If bookId was provided, create Page record
+                    if (bookId) {
+                        console.log(`>>> DEBUG: Creating page record for book ${bookId}...`);
+                        await tx.page.create({
+                            data: {
+                                bookId: bookId,
+                                assetId: newAsset.id,
+                                pageNumber: bookPageCount + 1, // Next page number
+                                index: bookPageCount,       // Next index (0-based)
+                                originalImageUrl: newAsset.thumbnailUrl || newAsset.url, // Use thumb or full url
+                                pageType: PageType.SINGLE, // Default
+                                isTitlePage: false, // New pages added are never title pages initially
+                                // Text, generatedUrl, etc. are null by default
+                            }
+                        });
+                        bookPageCount++; // Increment for the next potential file in this batch
+                        console.log(`>>> DEBUG: Page record created for book ${bookId}`);
+                    }
+                    
+                    // Return asset data needed by the frontend
+                    console.log(`>>> DEBUG: Transaction successful for ${file.name}`);
+                    return {
+                        id: newAsset.id,
+                        thumbnailUrl: newAsset.thumbnailUrl,
+                    };
+                });
+                console.log(`>>> DEBUG: Database transaction completed for ${file.name}`);
                 
-                // Return asset data needed by the frontend
-                return {
-                    id: newAsset.id,
-                    thumbnailUrl: newAsset.thumbnailUrl,
-                };
-            });
+                uploadedAssets.push(createdData);
+                console.log(`>>> DEBUG: Added asset to uploadedAssets array, total: ${uploadedAssets.length}`);
+            } catch (dbError) {
+                console.error(`>>> DEBUG: Database transaction failed for ${file.name}:`, dbError);
+                throw new Error(`Database transaction failed for ${file.name}: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`);
+            }
             // --- End Transaction --- 
 
-            uploadedAssets.push(createdData);
         }
+        
+        console.log(`>>> DEBUG: Finished processing all files. Total uploaded: ${uploadedAssets.length}`);
 
         return NextResponse.json({ assets: uploadedAssets }, { status: 201 });
 
