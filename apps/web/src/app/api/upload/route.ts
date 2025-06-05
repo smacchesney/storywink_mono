@@ -23,12 +23,24 @@ cloudinary.config({
 
 // Helper function to upload a buffer to Cloudinary
 async function uploadToCloudinary(buffer: Buffer, options: object): Promise<any> {
+    console.log(">>> DEBUG: Starting Cloudinary upload...");
+    
     return new Promise((resolve, reject) => {
+        // Add timeout to prevent hanging
+        const timeout = setTimeout(() => {
+            console.error(">>> DEBUG: Cloudinary upload timeout after 30 seconds");
+            reject(new Error("Cloudinary upload timeout"));
+        }, 30000);
+        
         cloudinary.uploader.upload_stream(options, (error, result) => {
+            clearTimeout(timeout);
+            
             if (error) {
-                console.error("Cloudinary Upload Error:", error);
+                console.error(">>> DEBUG: Cloudinary Upload Error:", error);
                 return reject(error);
             }
+            
+            console.log(">>> DEBUG: Cloudinary upload successful, public_id:", result?.public_id);
             resolve(result);
         }).end(buffer);
     });
@@ -89,15 +101,18 @@ export async function POST(request: Request) {
             // --- Upload to Cloudinary ---
             let cloudinaryResult;
             try {
+                console.log(`>>> DEBUG: About to upload ${file.name} to Cloudinary...`);
                 cloudinaryResult = await uploadToCloudinary(buffer, {
                     folder: `user_${dbUser.id}/uploads`, // Use database user ID for consistency
+                    resource_type: "auto", // Let Cloudinary detect the type
                 });
 
                 if (!cloudinaryResult || !cloudinaryResult.secure_url) {
                     throw new Error(`Failed to upload ${file.name} to Cloudinary.`);
                 }
+                console.log(`>>> DEBUG: Successfully uploaded ${file.name}, URL: ${cloudinaryResult.secure_url}`);
             } catch (cloudinaryError) {
-                console.error(`Cloudinary upload error for ${file.name}:`, cloudinaryError);
+                console.error(`>>> DEBUG: Cloudinary upload error for ${file.name}:`, cloudinaryError);
                 throw new Error(`Failed to upload ${file.name} to Cloudinary: ${cloudinaryError instanceof Error ? cloudinaryError.message : 'Unknown error'}`);
             }
 
