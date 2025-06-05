@@ -191,7 +191,13 @@ export async function POST(request: Request) {
         
         console.log(`>>> DEBUG: Finished processing all files. Total uploaded: ${uploadedAssets.length}`);
 
-        return NextResponse.json({ assets: uploadedAssets }, { status: 201 });
+        // Since frontend uploads one file at a time, return the single asset
+        if (uploadedAssets.length === 1) {
+            return NextResponse.json(uploadedAssets[0], { status: 201 });
+        } else {
+            // Fallback for multiple files (though frontend sends one at a time)
+            return NextResponse.json({ assets: uploadedAssets }, { status: 201 });
+        }
 
     } catch (error) {
         // Handle authentication errors specifically
