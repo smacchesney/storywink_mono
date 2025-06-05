@@ -76,6 +76,7 @@ export async function POST(request: Request) {
                  console.warn(`Skipping file ${file.name} due to size limit.`);
                  continue; // Skip this file or return error
             }
+            console.log(`Processing file: ${file.name}, type: ${file.type}, size: ${file.size}`);
             if (!['image/jpeg', 'image/png', 'image/heic', 'image/heif', 'image/webp'].includes(file.type)) {
                  console.warn(`Skipping file ${file.name} due to invalid type ${file.type}.`);
                  continue; // Skip this file or return error
@@ -86,12 +87,18 @@ export async function POST(request: Request) {
             const buffer = Buffer.from(bytes);
 
             // --- Upload to Cloudinary ---
-            const cloudinaryResult = await uploadToCloudinary(buffer, {
-                folder: `user_${dbUser.id}/uploads`, // Use database user ID for consistency
-            });
+            let cloudinaryResult;
+            try {
+                cloudinaryResult = await uploadToCloudinary(buffer, {
+                    folder: `user_${dbUser.id}/uploads`, // Use database user ID for consistency
+                });
 
-            if (!cloudinaryResult || !cloudinaryResult.secure_url) {
-                throw new Error(`Failed to upload ${file.name} to Cloudinary.`);
+                if (!cloudinaryResult || !cloudinaryResult.secure_url) {
+                    throw new Error(`Failed to upload ${file.name} to Cloudinary.`);
+                }
+            } catch (cloudinaryError) {
+                console.error(`Cloudinary upload error for ${file.name}:`, cloudinaryError);
+                throw new Error(`Failed to upload ${file.name} to Cloudinary: ${cloudinaryError instanceof Error ? cloudinaryError.message : 'Unknown error'}`);
             }
 
             // --- Explicitly Test DB Connection --- 
