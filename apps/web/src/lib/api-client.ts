@@ -121,7 +121,7 @@ class ApiClient {
   // Upload
   async uploadFile(file: File, token: string) {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('files', file);
 
     return this.request('/api/upload', {
       method: 'POST',
