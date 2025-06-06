@@ -17,8 +17,9 @@ export async function POST(req: NextRequest) {
     let validatedData;
     try {
       const body = await req.json();
+      console.log('>>> DEBUG: Book creation request body:', body);
       validatedData = createBookSchema.parse(body);
-      logger.info({ clerkId, dbUserId: dbUser.id, assetCount: validatedData.assetIds.length }, 'API: Validated book creation request.');
+      logger.info({ clerkId, dbUserId: dbUser.id, assetCount: validatedData.assetIds.length, assetIds: validatedData.assetIds }, 'API: Validated book creation request.');
     } catch (error) {
       logger.warn({ clerkId, dbUserId: dbUser.id, error }, 'API: Invalid book creation request body.');
       if (error instanceof z.ZodError) {
@@ -53,7 +54,8 @@ export async function POST(req: NextRequest) {
       if (assets.length !== assetIds.length) {
           const foundIds = new Set(assets.map(a => a.id));
           const missingIds = assetIds.filter(id => !foundIds.has(id));
-          logger.error({ clerkId, dbUserId: dbUser.id, bookId: '(pending)', missingIds }, 'API: Some assets not found or permission denied during book creation.');
+          logger.error({ clerkId, dbUserId: dbUser.id, bookId: '(pending)', missingIds, requestedIds: assetIds, foundAssets: assets }, 'API: Some assets not found or permission denied during book creation.');
+          console.error(`>>> DEBUG: Asset validation failed. Requested: ${assetIds.join(', ')}, Found: ${assets.map(a => a.id).join(', ')}`);
           throw new Error(`Assets not found or permission denied for IDs: ${missingIds.join(', ')}`);
       }
       logger.info({ clerkId, dbUserId: dbUser.id, assetCount: assets.length }, 'API: Fetched asset URLs within transaction.');
@@ -98,7 +100,11 @@ export async function POST(req: NextRequest) {
       return book; // Return the created book
     });
 
-    return NextResponse.json({ bookId: newBook.id }, { status: 201 }); // 201 Created
+    console.log(`>>> DEBUG: Book creation successful! Book ID: ${newBook.id}`);
+    return NextResponse.json({ 
+      success: true,
+      data: { id: newBook.id, bookId: newBook.id }
+    }, { status: 201 }); // 201 Created
 
   } catch (error) {
     // Handle authentication errors
