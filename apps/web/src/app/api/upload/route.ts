@@ -192,14 +192,20 @@ export async function POST(request: Request) {
         console.log(`>>> DEBUG: Finished processing all files. Total uploaded: ${uploadedAssets.length}`);
         console.log(`>>> DEBUG: Returning response with ${uploadedAssets.length} assets`);
 
-        // Since frontend uploads one file at a time, return the single asset
+        // Return in the format expected by API client
         if (uploadedAssets.length === 1) {
             console.log(`>>> DEBUG: Returning single asset:`, uploadedAssets[0]);
-            return NextResponse.json(uploadedAssets[0], { status: 201 });
+            return NextResponse.json({ 
+                success: true, 
+                data: uploadedAssets[0] 
+            }, { status: 201 });
         } else {
             // This shouldn't happen with current frontend implementation
             console.log(`>>> DEBUG: WARNING: Multiple files in single request (${uploadedAssets.length}), returning array format`);
-            return NextResponse.json({ assets: uploadedAssets }, { status: 201 });
+            return NextResponse.json({ 
+                success: true, 
+                data: { assets: uploadedAssets } 
+            }, { status: 201 });
         }
 
     } catch (error) {
