@@ -171,7 +171,7 @@ export function LibraryClientView() {
 
           {/* Create new book button */}
           <Link href="/create">
-            <Button size="sm" className="w-full sm:w-auto">
+            <Button size="sm" className="w-full sm:w-auto bg-[#F76C5E] hover:bg-[#E55A4C] text-white">
               <PlusCircle className="h-4 w-4 mr-2" />
               Create New Book
             </Button>
