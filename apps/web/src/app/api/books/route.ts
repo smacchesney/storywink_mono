@@ -3,7 +3,7 @@ import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const { dbUser, clerkId } = await getAuthenticatedUser();
     
