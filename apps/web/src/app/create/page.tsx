@@ -7,7 +7,7 @@ import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import PhotoSourceSheet from '@/components/create/PhotoSourceSheet';
 import UploadProgressScreen from '@/components/create/UploadProgressScreen';
-import { CloudinaryUploader } from '@/components/cloudinary-uploader';
+import { CloudinaryUploaderAuto } from '@/components/cloudinary-uploader-auto';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@clerk/nextjs';
 import logger from '@/lib/logger';
@@ -151,6 +151,7 @@ export default function CreateBookPage() {
     setIsUploading(true);
     setShowProgressScreen(true);
     setIsSheetOpen(false);
+    setShowCloudinaryUploader(false);
   };
 
   const handleUploadProgress = (progress: number, currentFile: number, totalFiles: number) => {
@@ -166,7 +167,15 @@ export default function CreateBookPage() {
   
   const handleChooseFromPhone = () => {
     setIsSheetOpen(false);
+    // Show the auto-opening Cloudinary uploader
     setShowCloudinaryUploader(true);
+  };
+
+  const handleUploadCancel = () => {
+    logger.info("Upload cancelled");
+    setShowCloudinaryUploader(false);
+    setIsUploading(false);
+    setShowProgressScreen(false);
   };
 
   const handleImportFromGooglePhotos = () => {
@@ -207,26 +216,14 @@ export default function CreateBookPage() {
         </div>
       )}
 
+      {/* Invisible Cloudinary uploader that auto-opens */}
       {showCloudinaryUploader && !showProgressScreen && (
-        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-150px)] px-4 py-8">
-          <div className="w-full max-w-2xl">
-            <h2 className="text-2xl font-semibold text-center mb-6">Upload Your Photos</h2>
-            <CloudinaryUploader
-              onUploadComplete={handleUploadComplete}
-              onUploadStart={handleUploadStart}
-              onUploadProgress={handleUploadProgress}
-              multiple={true}
-              maxFiles={20}
-            />
-            <Button
-              variant="ghost"
-              onClick={() => setShowCloudinaryUploader(false)}
-              className="mt-4 mx-auto block"
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
+        <CloudinaryUploaderAuto
+          onUploadComplete={handleUploadComplete}
+          onUploadStart={handleUploadStart}
+          onUploadProgress={handleUploadProgress}
+          onCancel={handleUploadCancel}
+        />
       )}
     </>
   );

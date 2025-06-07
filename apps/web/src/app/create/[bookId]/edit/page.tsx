@@ -7,7 +7,7 @@ import { Loader2, CheckCircle2, HelpCircle } from 'lucide-react';
 import { StoryboardPage, BookWithStoryboardPages } from '@/shared/types'; // <-- Import shared types
 import BottomToolbar, { EditorTab } from '@/components/create/editor/BottomToolbar'; // <-- Import Toolbar
 import PhotoSourceSheet from '@/components/create/PhotoSourceSheet'; // <-- Import Sheet for Add Photo
-import { CloudinaryUploader } from '@/components/cloudinary-uploader'; // <-- Import Cloudinary uploader
+import { CloudinaryUploaderAuto } from '@/components/cloudinary-uploader-auto'; // <-- Import auto Cloudinary uploader
 import logger from '@/lib/logger';
 import Canvas from '@/components/create/editor/Canvas'; // <-- Import Canvas
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -572,10 +572,17 @@ export default function EditBookPage() {
   const handleCloudinaryUploadStart = () => {
     setShowPhotoUploadProgress(true);
     setIsPhotoSheetOpen(false);
+    setShowCloudinaryUploader(false);
   };
 
   const handleCloudinaryUploadProgress = (_progress: number, _currentFile: number, _totalFiles: number) => {
     // Progress is handled by the AdditionalPhotoUploadProgressScreen
+  };
+
+  const handleCloudinaryUploadCancel = () => {
+    logger.info({ bookId }, "Additional photo upload cancelled");
+    setShowCloudinaryUploader(false);
+    setShowPhotoUploadProgress(false);
   };
 
   const triggerAddPhotoUpload = () => {
@@ -1115,28 +1122,14 @@ export default function EditBookPage() {
             onImportFromGooglePhotos={handleImportFromGooglePhotos}
           />
 
-          {/* Cloudinary Uploader Modal */}
-          {showCloudinaryUploader && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                <h2 className="text-2xl font-semibold text-center mb-6">Add More Photos</h2>
-                <CloudinaryUploader
-                  onUploadComplete={handleCloudinaryUploadComplete}
-                  onUploadStart={handleCloudinaryUploadStart}
-                  onUploadProgress={handleCloudinaryUploadProgress}
-                  multiple={true}
-                  maxFiles={20}
-                  bookId={bookId}
-                />
-                <Button
-                  variant="ghost"
-                  onClick={() => setShowCloudinaryUploader(false)}
-                  className="mt-4 mx-auto block"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
+          {/* Invisible Cloudinary uploader that auto-opens */}
+          {showCloudinaryUploader && !showPhotoUploadProgress && (
+            <CloudinaryUploaderAuto
+              onUploadComplete={handleCloudinaryUploadComplete}
+              onUploadStart={handleCloudinaryUploadStart}
+              onUploadProgress={handleCloudinaryUploadProgress}
+              onCancel={handleCloudinaryUploadCancel}
+            />
           )}
 
           {/* --- React Joyride Component --- */}

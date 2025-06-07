@@ -7,15 +7,17 @@ import Image from 'next/image';
 import { TextShimmerWave } from '@/components/ui/text-shimmer-wave'; // New import
 
 interface UploadProgressScreenProps {
-  progress?: number; // Optional now since we're not showing progress
-  currentFile?: number; // Made optional
-  totalFiles?: number; // Made optional
+  progress?: number;
+  currentFile?: number;
+  totalFiles?: number;
+  message?: string; // Allow custom message
 }
 
 export function UploadProgressScreen({
-  progress: _progress,
-  currentFile: _currentFile,
-  totalFiles: _totalFiles,
+  progress,
+  currentFile,
+  totalFiles,
+  message = "Uploading your photos...",
 }: UploadProgressScreenProps) {
   return (
     <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-50">
@@ -41,9 +43,24 @@ export function UploadProgressScreen({
           scaleDistance={1.1}
           rotateYDistance={20}       
         >
-          Hatching a story egg...
+          {message}
         </TextShimmerWave>
       </div>
+
+      {/* Optional progress indicator */}
+      {progress !== undefined && totalFiles && currentFile && (
+        <div className="mt-6 text-center">
+          <p className="text-sm text-gray-600 mb-2">
+            Uploading photo {currentFile} of {totalFiles}
+          </p>
+          <div className="w-64 bg-gray-200 rounded-full h-2">
+            <div 
+              className="bg-[#F76C5E] h-2 rounded-full transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
