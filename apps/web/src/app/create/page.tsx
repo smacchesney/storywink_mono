@@ -1,30 +1,41 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import PhotoSourceSheet from '@/components/create/PhotoSourceSheet';
 import UploadProgressScreen from '@/components/create/UploadProgressScreen';
+import { CloudinaryUploader } from '@/components/cloudinary-uploader';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@clerk/nextjs';
+import logger from '@/lib/logger';
 
+// Type for Cloudinary asset from uploader
+interface CloudinaryAsset {
+  publicId: string;
+  url: string;
+  thumbnailUrl: string;
+  format: string;
+  bytes: number;
+  width: number;
+  height: number;
+}
 
-// --- Type Definitions --- 
-type Asset = {
+// Type for database asset
+interface Asset {
   id: string;
   thumbnailUrl: string;
-};
+  url: string;
+}
 
-// Main Page Component
 export default function CreateBookPage() {
   const router = useRouter();
   const { getToken, isLoaded } = useAuth();
-  const [uploadedAssets, setUploadedAssets] = useState<Asset[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [showCloudinaryUploader, setShowCloudinaryUploader] = useState(false);
   
   // State for Progress Screen
   const [showProgressScreen, setShowProgressScreen] = useState(false);
@@ -32,7 +43,37 @@ export default function CreateBookPage() {
   const [currentUploadFile, setCurrentUploadFile] = useState(0);
   const [totalUploadFiles, setTotalUploadFiles] = useState(0);
 
-  // Updated function to use the API client
+  // Handle creation of database records for uploaded assets
+  const createAssetRecords = async (cloudinaryAssets: CloudinaryAsset[]): Promise<Asset[]> => {
+    const token = await getToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    try {
+      const response = await fetch('/api/cloudinary/notify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ assets: cloudinaryAssets }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create asset records');
+      }
+
+      const result = await response.json();
+      return result.data.assets;
+    } catch (error) {
+      logger.error({ error }, "Failed to create asset records");
+      throw error;
+    }
+  };
+
+  // Create book with assets
   const handleCreateBook = async (assetIds: string[]) => {
     if (!isLoaded) {
       throw new Error('Authentication not loaded');
@@ -55,131 +96,79 @@ export default function CreateBookPage() {
       return { bookId: (response.data as any).id };
       
     } catch (error) { 
-      console.error('Book Creation API Call Failed:', error);
+      logger.error({ error }, 'Book Creation API Call Failed');
       toast.error(`Failed to start book creation: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return null;
     }
   };
 
-  const handleUploadComplete = async (newAssets: Asset[]) => {
-    const allAssets = [...uploadedAssets, ...newAssets];
-    setUploadedAssets(allAssets);
-    console.log("Upload complete, total assets:", allAssets);
-
-    // Don't hide progress screen yet
-    // setUploadProgress(0); // Keep progress at 100% visually
-    // setCurrentUploadFile(totalUploadFiles); 
-    // setTotalUploadFiles(0);
-    // setShowProgressScreen(false); // <-- REMOVE THIS HIDE CALL
-
-    if (allAssets.length > 0) {
-      const assetIds = allAssets.map(asset => asset.id);
-      const creationResult = await handleCreateBook(assetIds);
+  // Handle upload completion from Cloudinary
+  const handleUploadComplete = async (cloudinaryAssets: CloudinaryAsset[]) => {
+    logger.info({ count: cloudinaryAssets.length }, "Cloudinary uploads completed");
+    
+    // Keep progress screen visible while creating database records
+    setUploadProgress(90); // Show we're almost done
+    
+    try {
+      // Create database records for the uploaded assets
+      const dbAssets = await createAssetRecords(cloudinaryAssets);
+      logger.info({ count: dbAssets.length }, "Database assets created");
       
-      if (creationResult?.bookId) {
-        // Navigation will unmount this component, hiding the progress screen
-        router.push(`/create/${creationResult.bookId}/edit`); 
+      setUploadProgress(95); // Almost there
+      
+      if (dbAssets.length > 0) {
+        const assetIds = dbAssets.map(asset => asset.id);
+        const creationResult = await handleCreateBook(assetIds);
+        
+        if (creationResult?.bookId) {
+          setUploadProgress(100); // Complete!
+          // Small delay to show 100% before navigation
+          setTimeout(() => {
+            router.push(`/create/${creationResult.bookId}/edit`);
+          }, 500);
+        } else {
+          // Error occurred during handleCreateBook
+          setShowProgressScreen(false);
+          setIsUploading(false);
+          setShowCloudinaryUploader(false);
+        }
       } else {
-        // Error occurred during handleCreateBook (already toasted there)
-        setShowProgressScreen(false); // <-- Hide progress ONLY on failure
-        setIsUploading(false); 
+        toast.warning("No assets were created");
+        setShowProgressScreen(false);
+        setIsUploading(false);
+        setShowCloudinaryUploader(false);
       }
-    } else {
-      toast.warning("No assets uploaded, cannot create book.");
-      setShowProgressScreen(false); // <-- Hide progress if no assets
-      setIsUploading(false); 
+    } catch (error) {
+      logger.error({ error }, "Failed to process uploads");
+      toast.error(`Failed to process uploads: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setShowProgressScreen(false);
+      setIsUploading(false);
+      setShowCloudinaryUploader(false);
     }
-    // setIsUploading is set to false inside handleFileInputChange finally block or on creation failure
   };
 
-  // Upload logic (calls API)
-  const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-     if (event.target.files && event.target.files.length > 0) {
-       const files = Array.from(event.target.files);
-       
-       // Reset state for new upload batch
-       setIsUploading(true);
-       setShowProgressScreen(true);
-       setUploadProgress(0);
-       setCurrentUploadFile(1); // Start with file 1
-       setTotalUploadFiles(files.length);
-       
-       // Simulate Progress (replace with actual progress later)
-       // TODO: Implement real progress tracking (e.g., using XHR events or a library)
-       let simulatedProgress = 0;
-       const progressInterval = setInterval(() => {
-         simulatedProgress += 10;
-         if (simulatedProgress <= 100) {
-           setUploadProgress(simulatedProgress);
-           // Simple simulation of file count increment
-           setCurrentUploadFile(Math.min(totalUploadFiles, Math.ceil(simulatedProgress / (100 / totalUploadFiles)))); 
-         } else {
-           clearInterval(progressInterval);
-         }
-       }, 200); // Update progress every 200ms
-       
-       const formData = new FormData();
-       files.forEach((file) => formData.append('files', file));
-       
-       try {
-          const token = await getToken();
-          if (!token) {
-            throw new Error('Not authenticated');
-          }
+  const handleUploadStart = () => {
+    setIsUploading(true);
+    setShowProgressScreen(true);
+    setIsSheetOpen(false);
+  };
 
-          // Upload files using API client
-          const uploadedAssets = [];
-          
-          // Upload files one by one using the API client
-          for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const response = await apiClient.uploadFile(file, token);
-            
-            if (!response.success || !response.data) {
-              throw new Error(response.error || `Failed to upload ${file.name}`);
-            }
-            
-            uploadedAssets.push(response.data as Asset);
-            
-            // Update progress for each file
-            setCurrentUploadFile(i + 1);
-            setUploadProgress(Math.round(((i + 1) / files.length) * 100));
-          }
-          
-          clearInterval(progressInterval); // Stop simulation on fetch completion
-          setUploadProgress(100); // Ensure progress hits 100%
-          setCurrentUploadFile(totalUploadFiles); // Ensure final file count is shown
+  const handleUploadProgress = (progress: number, currentFile: number, totalFiles: number) => {
+    setUploadProgress(Math.min(progress * 0.9, 90)); // Cap at 90% during upload
+    setCurrentUploadFile(currentFile);
+    setTotalUploadFiles(totalFiles);
+  };
 
-          if (uploadedAssets.length > 0) {
-              // Call completion handler which will then trigger book creation
-              handleUploadComplete(uploadedAssets);
-          } else {
-              setShowProgressScreen(false); // Hide progress if no assets
-              toast.warning("Upload completed, but no assets were returned.");
-          }
-       } catch (error) {
-          clearInterval(progressInterval); // Stop simulation on error
-          setShowProgressScreen(false); // Hide progress on error
-          console.error("File Upload Error:", error);
-          toast.error(`Error uploading files: ${error instanceof Error ? error.message : 'Unknown error'}`);
-       } finally {
-          // Do not hide progress screen here, handleUploadComplete does it
-          setIsUploading(false); // Allow new uploads
-          if (fileInputRef.current) fileInputRef.current.value = '';
-       }
-     }
-   };
-
-  const triggerUpload = () => fileInputRef.current?.click();
-
-  // Modified handler to open the sheet
   const handleStartCreatingClick = () => {
-    console.log("Start Creating clicked - Opening PhotoSourceSheet");
+    logger.info("Start Creating clicked - Opening PhotoSourceSheet");
     setIsSheetOpen(true);
-    // triggerUpload();
   };
   
-  // Placeholder for Google Photos import
+  const handleChooseFromPhone = () => {
+    setIsSheetOpen(false);
+    setShowCloudinaryUploader(true);
+  };
+
   const handleImportFromGooglePhotos = () => {
     toast.info("Import from Google Photos is coming soon!");
   };
@@ -194,10 +183,8 @@ export default function CreateBookPage() {
         />
       )}
       
-      {!showProgressScreen && (
+      {!showProgressScreen && !showCloudinaryUploader && (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-150px)] px-4 py-8">
-          <input type="file" ref={fileInputRef} onChange={handleFileInputChange} className="hidden" multiple accept="image/jpeg,image/png,image/heic,image/heif" />
-
           <Button 
             onClick={handleStartCreatingClick}
             disabled={isUploading}
@@ -205,7 +192,6 @@ export default function CreateBookPage() {
             className="relative bg-white rounded-full w-24 h-24 md:w-40 md:h-40 shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out flex items-center justify-center group"
           >
             <Plus className="text-[#F76C5E] w-10 h-10 md:w-16 md:h-16 transition-transform duration-300 ease-in-out group-hover:scale-110" />
-            {/* Loader is removed here as the full screen overlay handles loading state */}
           </Button>
 
           <p className="mt-4 md:mt-6 text-lg md:text-xl text-gray-600 font-medium">
@@ -215,9 +201,31 @@ export default function CreateBookPage() {
           <PhotoSourceSheet
             isOpen={isSheetOpen}
             onOpenChange={setIsSheetOpen}
-            onChooseFromPhone={triggerUpload}
+            onChooseFromPhone={handleChooseFromPhone}
             onImportFromGooglePhotos={handleImportFromGooglePhotos}
           />
+        </div>
+      )}
+
+      {showCloudinaryUploader && !showProgressScreen && (
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-150px)] px-4 py-8">
+          <div className="w-full max-w-2xl">
+            <h2 className="text-2xl font-semibold text-center mb-6">Upload Your Photos</h2>
+            <CloudinaryUploader
+              onUploadComplete={handleUploadComplete}
+              onUploadStart={handleUploadStart}
+              onUploadProgress={handleUploadProgress}
+              multiple={true}
+              maxFiles={20}
+            />
+            <Button
+              variant="ghost"
+              onClick={() => setShowCloudinaryUploader(false)}
+              className="mt-4 mx-auto block"
+            >
+              Cancel
+            </Button>
+          </div>
         </div>
       )}
     </>

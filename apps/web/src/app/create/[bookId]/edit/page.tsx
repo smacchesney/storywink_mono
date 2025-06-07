@@ -7,6 +7,7 @@ import { Loader2, CheckCircle2, HelpCircle } from 'lucide-react';
 import { StoryboardPage, BookWithStoryboardPages } from '@/shared/types'; // <-- Import shared types
 import BottomToolbar, { EditorTab } from '@/components/create/editor/BottomToolbar'; // <-- Import Toolbar
 import PhotoSourceSheet from '@/components/create/PhotoSourceSheet'; // <-- Import Sheet for Add Photo
+import { CloudinaryUploader } from '@/components/cloudinary-uploader'; // <-- Import Cloudinary uploader
 import logger from '@/lib/logger';
 import Canvas from '@/components/create/editor/Canvas'; // <-- Import Canvas
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -31,10 +32,12 @@ import AdditionalPhotoUploadProgressScreen from '@/components/create/editor/Addi
 import useMediaQuery from '@/hooks/useMediaQuery'; // Import the hook
 import Joyride, { Step, EVENTS, STATUS, CallBackProps } from 'react-joyride'; // <-- Add Joyride imports
 import { cn } from '@/lib/utils';
+import { useAuth } from '@clerk/nextjs';
 
 export default function EditBookPage() {
   const params = useParams();
   const router = useRouter();
+  const { getToken } = useAuth();
   const bookId = params.bookId as string; // Get bookId from dynamic route
   const isDesktop = useMediaQuery('(min-width: 768px)'); // Tailwind md breakpoint
 
@@ -43,7 +46,8 @@ export default function EditBookPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<EditorTab>('details'); // Default to details
   const [isPhotoSheetOpen, setIsPhotoSheetOpen] = useState(false); // <-- State for Add Photo sheet
-  const fileInputRef = useRef<HTMLInputElement>(null); // <-- Need file input ref for adding photos
+  const [showCloudinaryUploader, setShowCloudinaryUploader] = useState(false); // <-- State for Cloudinary uploader
+  const fileInputRef = useRef<HTMLInputElement>(null); // <-- Keep for backwards compatibility
   const [isPagesPanelOpen, setIsPagesPanelOpen] = useState(false); // Unified state for Sheet/Drawer
   const [storyboardOrder, setStoryboardOrder] = useState<StoryboardPage[]>([]); // Use StoryboardPage type
   const [isSavingOrder, setIsSavingOrder] = useState(false); // <-- Add loading state for saving
@@ -499,13 +503,92 @@ export default function EditBookPage() {
     }
   };
 
-  const triggerAddPhotoUpload = () => fileInputRef.current?.click();
+  // Type for Cloudinary asset
+  interface CloudinaryAsset {
+    publicId: string;
+    url: string;
+    thumbnailUrl: string;
+    format: string;
+    bytes: number;
+    width: number;
+    height: number;
+  }
+
+  // Handle creation of database records for uploaded assets with bookId
+  const createAssetRecordsWithBook = async (cloudinaryAssets: CloudinaryAsset[]): Promise<void> => {
+    const token = await getToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    try {
+      const response = await fetch('/api/cloudinary/notify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ assets: cloudinaryAssets, bookId }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create asset records');
+      }
+
+      logger.info({ bookId }, "Asset records created with pages");
+    } catch (error) {
+      logger.error({ error }, "Failed to create asset records");
+      throw error;
+    }
+  };
+
+  // Handle Cloudinary upload completion
+  const handleCloudinaryUploadComplete = async (cloudinaryAssets: CloudinaryAsset[]) => {
+    logger.info({ count: cloudinaryAssets.length, bookId }, "Cloudinary uploads completed for book");
+    
+    try {
+      // Create database records and pages
+      await createAssetRecordsWithBook(cloudinaryAssets);
+      
+      // Reset completion states when new photos are added
+      setPagesResetKey(prev => prev + 1);
+      setPagesConfirmed(false);
+      
+      // Refresh book data
+      await fetchBookData();
+      
+      toast.success(`Successfully added ${cloudinaryAssets.length} photo(s)`);
+      setShowPhotoUploadProgress(false);
+      setShowCloudinaryUploader(false);
+    } catch (error) {
+      logger.error({ error }, "Failed to process additional uploads");
+      toast.error(`Failed to add photos: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setShowPhotoUploadProgress(false);
+      setShowCloudinaryUploader(false);
+    }
+  };
+
+  const handleCloudinaryUploadStart = () => {
+    setShowPhotoUploadProgress(true);
+    setIsPhotoSheetOpen(false);
+  };
+
+  const handleCloudinaryUploadProgress = (_progress: number, _currentFile: number, _totalFiles: number) => {
+    // Progress is handled by the AdditionalPhotoUploadProgressScreen
+  };
+
+  const triggerAddPhotoUpload = () => {
+    setIsPhotoSheetOpen(false);
+    setShowCloudinaryUploader(true);
+  };
 
   const handleAddPhotoClick = () => {
     logger.info({ bookId }, "Add photo clicked");
     setIsPhotoSheetOpen(true);
   };
 
+  // Keep old handler for backwards compatibility but unused
   const handleAddPhotoUploadComplete = () => {
      logger.info({ bookId }, "Additional photos uploaded, refetching book data.");
      // Reset completion states when new photos are added
@@ -1031,6 +1114,30 @@ export default function EditBookPage() {
             onChooseFromPhone={triggerAddPhotoUpload}
             onImportFromGooglePhotos={handleImportFromGooglePhotos}
           />
+
+          {/* Cloudinary Uploader Modal */}
+          {showCloudinaryUploader && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                <h2 className="text-2xl font-semibold text-center mb-6">Add More Photos</h2>
+                <CloudinaryUploader
+                  onUploadComplete={handleCloudinaryUploadComplete}
+                  onUploadStart={handleCloudinaryUploadStart}
+                  onUploadProgress={handleCloudinaryUploadProgress}
+                  multiple={true}
+                  maxFiles={20}
+                  bookId={bookId}
+                />
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowCloudinaryUploader(false)}
+                  className="mt-4 mx-auto block"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* --- React Joyride Component --- */}
           {tourSteps.length > 0 && (
