@@ -63,6 +63,11 @@ const nextConfig = {
     },
   },
   
+  // Environment variables
+  env: {
+    NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'storywink',
+  },
+  
   // Security headers
   async headers() {
     return [
@@ -95,4 +100,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig; 
+export default nextConfig;
