@@ -542,9 +542,13 @@ export default function EditBookPage() {
             throw new Error(errorData.error || `Upload failed: ${response.statusText}`);
           }
           const result = await response.json();
-          if (result.assets && result.assets.length > 0) {
+          // Handle the response format from upload API
+          // API returns { success: true, data: assetData } for single file
+          // or { success: true, data: { assets: [...] } } for multiple files
+          if (result.success && result.data) {
               // Call completion handler which triggers refetch
               handleAddPhotoUploadComplete(); 
+              toast.success(`Successfully uploaded ${files.length} photo(s)`);
           } else {
               toast.warning("Upload completed, but no new assets were processed.");
           }
