@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "@clerk/express";
 import prisma from "../database/index.js";
-import { updatePageSchema } from "../shared/index.js";
+import { updatePageSchema } from "@storywink/shared";
 import {
   ensureDbUser,
   AuthenticatedRequest,

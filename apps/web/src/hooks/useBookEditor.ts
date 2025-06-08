@@ -1,5 +1,5 @@
 import { useReducer, useCallback } from 'react';
-import { BookWithStoryboardPages, StoryboardPage } from '@/shared/types';
+import { BookWithStoryboardPages, StoryboardPage } from '@storywink/shared';
 import { EditorTab } from '@/components/create/editor/BottomToolbar';
 
 // Define the state shape

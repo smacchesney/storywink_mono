@@ -19,7 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Image from 'next/image';
-import { StoryboardPage } from '@/shared/types';
+import { StoryboardPage } from '@storywink/shared';
 import { cn } from '@/lib/utils';
 
 interface StoryboardGridProps {

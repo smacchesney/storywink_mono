@@ -3,19 +3,35 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./src/index.ts",
-      "require": "./src/index.ts",
-      "types": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./prompts": {
+      "types": "./dist/prompts/index.d.ts",
+      "import": "./dist/prompts/index.js"
+    },
+    "./prompts/story": {
+      "types": "./dist/prompts/story.d.ts",
+      "import": "./dist/prompts/story.js"
+    },
+    "./prompts/illustration": {
+      "types": "./dist/prompts/illustration.d.ts",
+      "import": "./dist/prompts/illustration.js"
+    },
+    "./prompts/styles": {
+      "types": "./dist/prompts/styles.d.ts",
+      "import": "./dist/prompts/styles.js"
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --outDir dist --declaration --declarationMap --sourceMap",
+    "dev": "tsc --outDir dist --declaration --watch",
     "check-types": "tsc --noEmit",
-    "clean": "rm -rf node_modules .turbo dist"
+    "clean": "rm -rf dist node_modules .turbo"
   },
   "dependencies": {
     "zod": "^3.24.2"

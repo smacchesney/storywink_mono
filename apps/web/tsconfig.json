@@ -21,9 +21,7 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@storywink/shared": ["../../packages/shared/src"],
-      "@storywink/database": ["../../packages/database/src"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

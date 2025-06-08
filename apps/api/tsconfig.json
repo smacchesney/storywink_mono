@@ -15,10 +15,7 @@
     "sourceMap": false,
     "skipLibCheck": true,
     "baseUrl": ".",
-    "paths": {
-      "@storywink/shared": ["../../packages/shared/src"],
-      "@storywink/database": ["../../packages/database/src"]
-    }
+    "rootDir": "./src"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

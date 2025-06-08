@@ -1,7 +1,7 @@
 import { Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { config } from 'dotenv';
-import { QUEUE_NAMES } from './shared/index.js';
+import { QUEUE_NAMES } from '@storywink/shared';
 import pino from 'pino';
 
 // Load environment variables

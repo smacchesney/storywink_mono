@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import prisma from '../database/index.js';
-import { StoryGenerationJob } from '../shared/index.js';
+import { StoryGenerationJob } from '@storywink/shared';
 import OpenAI from 'openai';
 import pino from 'pino';
 import { 

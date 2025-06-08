@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle2, HelpCircle } from 'lucide-react';
-import { StoryboardPage, BookWithStoryboardPages } from '@/shared/types'; // <-- Import shared types
+import { StoryboardPage, BookWithStoryboardPages } from '@storywink/shared'; // <-- Import shared types
 import BottomToolbar, { EditorTab } from '@/components/create/editor/BottomToolbar'; // <-- Import Toolbar
 import PhotoSourceSheet from '@/components/create/PhotoSourceSheet'; // <-- Import Sheet for Add Photo
 import { CloudinaryUploaderAuto } from '@/components/cloudinary-uploader-auto'; // <-- Import auto Cloudinary uploader

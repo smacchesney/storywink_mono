@@ -5,7 +5,7 @@ import {
   generateStorySchema,
   generateIllustrationSchema,
   QUEUE_NAMES,
-} from "../shared/index.js";
+} from "@storywink/shared";
 import prisma from "../database/index.js";
 import Redis from "ioredis";
 import {

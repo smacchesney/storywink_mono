@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { BookWithStoryboardPages } from '@/shared/types'; // <-- Import shared types
+import { BookWithStoryboardPages } from '@storywink/shared'; // <-- Import shared types
 
 interface CanvasProps {
   bookData: BookWithStoryboardPages; // <-- Use shared type
