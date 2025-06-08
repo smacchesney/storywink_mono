@@ -74,6 +74,34 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
       throw new Error('Book has no story pages (excluding cover)');
     }
 
+    // Diagnostic logging for debugging text assignment issues
+    logger.info({
+      bookId,
+      totalPages: book.pages.length,
+      coverAssetId: book.coverAssetId,
+      storyPagesCount: storyPages.length,
+      expectedPageLength: book.pageLength,
+      actualPageLength: book.pages.length,
+      storyPageDetails: storyPages.map(p => ({ 
+        id: p.id, 
+        index: p.index, 
+        pageNumber: p.pageNumber,
+        assetId: p.assetId,
+        hasExistingText: !!p.text
+      }))
+    }, 'Story generation page analysis');
+
+    // Validate page count
+    if (storyPages.length !== book.pageLength - 1) {
+      logger.warn({
+        bookId,
+        storyPagesCount: storyPages.length,
+        expectedStoryPages: book.pageLength - 1,
+        bookPageLength: book.pageLength,
+        totalPagesInBook: book.pages.length
+      }, 'Page count mismatch - story pages vs expected');
+    }
+
     // Prepare story generation input using advanced prompt structure
     const storyInput: StoryGenerationInput = {
       childName: book.childName || 'the child',
@@ -128,35 +156,32 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
         
         logger.info({ bookId, isWinkifyEnabled: true, responseKeys: Object.keys(winkifyResponse) }, 'Parsing Winkify response');
         
-        updatePromises = Object.entries(winkifyResponse)
-          .map(([pageNum, content]) => {
-            const storyPosition = parseInt(pageNum); // 1-based position
-            const pageIndex = storyPosition - 1; // Convert to 0-based index
-            const page = storyPages[pageIndex];
-            
-            if (page && content) {
-              logger.info({ 
-                bookId, 
-                pageNum, 
-                pageId: page.id, 
-                hasText: !!content.text,
-                hasIllustrationNotes: !!content.illustrationNotes 
-              }, 'Updating page with Winkify content');
-              
-              return prisma.page.update({
-                where: { id: page.id },
-                data: { 
-                  text: content.text?.trim() || '',
-                  illustrationNotes: content.illustrationNotes || null,
-                  textConfirmed: true,
-                },
-              });
-            } else {
-              logger.warn({ bookId, pageNum, storyPosition, pageIndex }, 'No page found for Winkify content');
-              return null;
-            }
-          })
-          .filter((promise) => promise !== null);
+        // Create a map for easier lookup
+        const responseMap = new Map(Object.entries(winkifyResponse));
+        
+        // Ensure all story pages get updated, even if AI didn't generate content for some
+        updatePromises = storyPages.map((page, index) => {
+          const storyPosition = index + 1; // 1-based position
+          const content = responseMap.get(storyPosition.toString());
+          
+          if (!content) {
+            logger.warn({ 
+              bookId, 
+              pageId: page.id, 
+              storyPosition, 
+              pageNumber: page.pageNumber 
+            }, 'No Winkify content generated for this page - using defaults');
+          }
+          
+          return prisma.page.update({
+            where: { id: page.id },
+            data: { 
+              text: content?.text?.trim() || `[Page ${storyPosition} text pending]`,
+              illustrationNotes: content?.illustrationNotes || null,
+              textConfirmed: !!content?.text,
+            },
+          });
+        });
         
       } else {
         // Standard response format: { "1": "text...", "2": "text...", ... }
@@ -164,27 +189,31 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
         
         logger.info({ bookId, isWinkifyEnabled: false, responseKeys: Object.keys(standardResponse) }, 'Parsing standard response');
         
-        updatePromises = Object.entries(standardResponse)
-          .map(([pageNum, text]) => {
-            const storyPosition = parseInt(pageNum); // 1-based position
-            const pageIndex = storyPosition - 1; // Convert to 0-based index
-            const page = storyPages[pageIndex];
-            
-            if (page) {
-              logger.info({ bookId, pageNum, pageId: page.id, textLength: text.trim().length }, 'Updating page with text');
-              return prisma.page.update({
-                where: { id: page.id },
-                data: { 
-                  text: text.trim(),
-                  textConfirmed: true,
-                },
-              });
-            } else {
-              logger.warn({ bookId, pageNum, storyPosition, pageIndex }, 'No page found at story position');
-              return null;
-            }
-          })
-          .filter((promise) => promise !== null);
+        // Create a map for easier lookup
+        const responseMap = new Map(Object.entries(standardResponse));
+        
+        // Ensure all story pages get updated, even if AI didn't generate text for some
+        updatePromises = storyPages.map((page, index) => {
+          const storyPosition = index + 1; // 1-based position
+          const text = responseMap.get(storyPosition.toString()) || '';
+          
+          if (!text) {
+            logger.warn({ 
+              bookId, 
+              pageId: page.id, 
+              storyPosition, 
+              pageNumber: page.pageNumber 
+            }, 'No text generated for this page - using empty string');
+          }
+          
+          return prisma.page.update({
+            where: { id: page.id },
+            data: { 
+              text: text.trim() || `[Page ${storyPosition} text pending]`,
+              textConfirmed: !!text,
+            },
+          });
+        });
       }
     } catch (error) {
       logger.error({ bookId, rawResult, isWinkifyEnabled: book.isWinkifyEnabled }, 'Failed to parse OpenAI response');
@@ -192,6 +221,31 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
     }
 
     await Promise.all(updatePromises);
+
+    // Check if all story pages received text
+    const updatedPageIds = new Set(
+      updatePromises.map(p => p ? Object.values(p)[0] : null).filter(Boolean)
+    );
+    
+    const missingTextPages = storyPages.filter(page => 
+      !updatePromises.some((promise, idx) => {
+        // Check if this page was updated
+        return promise !== null;
+      })
+    );
+
+    if (missingTextPages.length > 0 || updatePromises.length !== storyPages.length) {
+      logger.error({
+        bookId,
+        totalStoryPages: storyPages.length,
+        pagesWithTextUpdates: updatePromises.length,
+        missingTextPageIds: missingTextPages.map(p => p.id),
+        missingTextPageNumbers: missingTextPages.map(p => p.pageNumber),
+        responseKeys: book.isWinkifyEnabled ? 
+          Object.keys(JSON.parse(rawResult)) : 
+          Object.keys(JSON.parse(rawResult))
+      }, 'Some pages did not receive text - potential off-by-one error');
+    }
 
     // Update book status to story ready (not yet illustrating)
     await prisma.book.update({
@@ -202,7 +256,12 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
       },
     });
 
-    logger.info({ bookId, pagesUpdated: updatePromises.length }, 'Story generation completed');
+    logger.info({ 
+      bookId, 
+      pagesUpdated: updatePromises.length,
+      totalStoryPages: storyPages.length,
+      allPagesHaveText: updatePromises.length === storyPages.length
+    }, 'Story generation completed');
     return { success: true, pagesUpdated: updatePromises.length };
     
   } catch (error: any) {
