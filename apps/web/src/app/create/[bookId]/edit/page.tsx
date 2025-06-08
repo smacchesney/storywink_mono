@@ -572,7 +572,8 @@ export default function EditBookPage() {
   const handleCloudinaryUploadStart = (_totalFiles: number) => {
     setShowPhotoUploadProgress(true);
     setIsPhotoSheetOpen(false);
-    setShowCloudinaryUploader(false);
+    // Keep CloudinaryUploader mounted during upload so it can fire completion callback
+    // setShowCloudinaryUploader(false); // DO NOT UNMOUNT during upload!
     // totalFiles available if needed for progress tracking
   };
 
