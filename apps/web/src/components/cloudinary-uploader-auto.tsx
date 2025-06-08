@@ -82,8 +82,12 @@ export function CloudinaryUploaderAuto({
     }
 
     // If this was the last file, trigger completion
-    if (currentFileIndex.current === totalFiles.current) {
-      logger.info({ assetCount: uploadedAssets.current.length }, "All uploads complete");
+    if (currentFileIndex.current === totalFiles.current && totalFiles.current > 0) {
+      logger.info({ 
+        assetCount: uploadedAssets.current.length,
+        currentFileIndex: currentFileIndex.current,
+        totalFiles: totalFiles.current 
+      }, "All uploads complete - calling onUploadComplete");
       onUploadComplete(uploadedAssets.current);
       
       // Reset state for next upload
@@ -114,10 +118,15 @@ export function CloudinaryUploaderAuto({
   }, []);
 
   const handleUploadClose = useCallback(() => {
-    logger.info("Cloudinary widget closed");
+    logger.info({
+      uploadedAssets: uploadedAssets.current.length,
+      currentFileIndex: currentFileIndex.current,
+      totalFiles: totalFiles.current
+    }, "Cloudinary widget closed");
     
     // If no files were uploaded and widget was closed, call cancel
     if (uploadedAssets.current.length === 0 && onCancel) {
+      logger.info("No files uploaded - calling onCancel");
       onCancel();
     }
   }, [onCancel]);

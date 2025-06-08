@@ -151,16 +151,19 @@ export default function CreateBookPage() {
   };
 
   const handleUploadStart = (totalFiles: number) => {
+    logger.info({ totalFiles }, "Upload started");
     setIsUploading(true);
     setShowProgressScreen(true);
     setIsSheetOpen(false);
-    setShowCloudinaryUploader(false);
+    // Keep the Cloudinary uploader mounted during upload!
+    // It will be hidden by handleUploadComplete when done
     setTotalUploadFiles(totalFiles);
     setCurrentUploadFile(0);
     setUploadProgress(0);
   };
 
   const handleUploadProgress = (progress: number, currentFile: number, totalFiles: number) => {
+    logger.info({ progress, currentFile, totalFiles }, "Upload progress update");
     setUploadProgress(Math.min(progress * 0.9, 90)); // Cap at 90% during upload
     setCurrentUploadFile(currentFile);
     setTotalUploadFiles(totalFiles);
@@ -224,12 +227,14 @@ export default function CreateBookPage() {
 
       {/* Invisible Cloudinary uploader that auto-opens */}
       {showCloudinaryUploader && (
-        <CloudinaryUploaderAuto
-          onUploadComplete={handleUploadComplete}
-          onUploadStart={handleUploadStart}
-          onUploadProgress={handleUploadProgress}
-          onCancel={handleUploadCancel}
-        />
+        <div style={{ display: showProgressScreen ? 'none' : 'block' }}>
+          <CloudinaryUploaderAuto
+            onUploadComplete={handleUploadComplete}
+            onUploadStart={handleUploadStart}
+            onUploadProgress={handleUploadProgress}
+            onCancel={handleUploadCancel}
+          />
+        </div>
       )}
     </>
   );

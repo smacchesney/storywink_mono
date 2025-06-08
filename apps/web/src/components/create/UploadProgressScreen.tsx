@@ -48,10 +48,10 @@ export function UploadProgressScreen({
       </div>
 
       {/* Optional progress indicator */}
-      {progress !== undefined && totalFiles && currentFile && (
+      {progress !== undefined && totalFiles !== undefined && (
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600 mb-2">
-            Uploading photo {currentFile} of {totalFiles}
+            {currentFile ? `Uploading photo ${currentFile} of ${totalFiles}` : `Processing ${totalFiles} photo${totalFiles > 1 ? 's' : ''}...`}
           </p>
           <div className="w-64 bg-gray-200 rounded-full h-2">
             <div 
