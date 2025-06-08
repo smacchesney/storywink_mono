@@ -8,7 +8,7 @@ interface PageDisplayProps {
   totalPages: number;
 }
 
-export function PageDisplay({ page, bookCoverAssetId, pageIndex, totalPages }: PageDisplayProps) {
+export function PageDisplay({ page, bookCoverAssetId, pageIndex, totalPages: _totalPages }: PageDisplayProps) {
   const isCoverPage = page.assetId === bookCoverAssetId;
   const displayPageNumber = isCoverPage ? 'Cover' : `Page ${pageIndex}`;
   
