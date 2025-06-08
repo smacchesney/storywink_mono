@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 
 interface CloudinaryUploaderAutoProps {
   onUploadComplete: (assets: CloudinaryAsset[]) => void;
-  onUploadStart?: () => void;
+  onUploadStart?: (totalFiles: number) => void;
   onUploadProgress?: (progress: number, currentFile: number, totalFiles: number) => void;
   onCancel?: () => void;
 }
@@ -50,7 +50,11 @@ export function CloudinaryUploaderAuto({
   const [widgetOpen, setWidgetOpen] = useState<(() => void) | null>(null);
 
   const handleUploadSuccess = useCallback((result: any) => {
-    logger.info({ publicId: result.info.public_id }, "Cloudinary upload success");
+    logger.info({ 
+      publicId: result.info.public_id,
+      currentFileIndex: currentFileIndex.current,
+      totalFiles: totalFiles.current 
+    }, "Cloudinary upload success");
     
     const cloudinaryResult = result.info as CloudinaryResult;
     
@@ -125,7 +129,7 @@ export function CloudinaryUploaderAuto({
     
     // Only call onUploadStart when files are actually being uploaded
     if (result.info.files.length > 0 && onUploadStart) {
-      onUploadStart();
+      onUploadStart(result.info.files.length);
     }
   }, [onUploadStart]);
 

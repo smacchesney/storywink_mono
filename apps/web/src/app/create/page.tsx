@@ -106,6 +106,9 @@ export default function CreateBookPage() {
   const handleUploadComplete = async (cloudinaryAssets: CloudinaryAsset[]) => {
     logger.info({ count: cloudinaryAssets.length }, "Cloudinary uploads completed");
     
+    // Hide the Cloudinary component now that uploads are done
+    setShowCloudinaryUploader(false);
+    
     // Keep progress screen visible while creating database records
     setUploadProgress(90); // Show we're almost done
     
@@ -147,11 +150,14 @@ export default function CreateBookPage() {
     }
   };
 
-  const handleUploadStart = () => {
+  const handleUploadStart = (totalFiles: number) => {
     setIsUploading(true);
     setShowProgressScreen(true);
     setIsSheetOpen(false);
     setShowCloudinaryUploader(false);
+    setTotalUploadFiles(totalFiles);
+    setCurrentUploadFile(0);
+    setUploadProgress(0);
   };
 
   const handleUploadProgress = (progress: number, currentFile: number, totalFiles: number) => {
@@ -217,7 +223,7 @@ export default function CreateBookPage() {
       )}
 
       {/* Invisible Cloudinary uploader that auto-opens */}
-      {showCloudinaryUploader && !showProgressScreen && (
+      {showCloudinaryUploader && (
         <CloudinaryUploaderAuto
           onUploadComplete={handleUploadComplete}
           onUploadStart={handleUploadStart}

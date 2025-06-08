@@ -569,10 +569,11 @@ export default function EditBookPage() {
     }
   };
 
-  const handleCloudinaryUploadStart = () => {
+  const handleCloudinaryUploadStart = (totalFiles: number) => {
     setShowPhotoUploadProgress(true);
     setIsPhotoSheetOpen(false);
     setShowCloudinaryUploader(false);
+    // Store totalFiles if needed for progress tracking
   };
 
   const handleCloudinaryUploadProgress = (_progress: number, _currentFile: number, _totalFiles: number) => {
