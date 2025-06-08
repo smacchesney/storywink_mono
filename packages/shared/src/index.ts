@@ -1,8 +1,8 @@
 // Export all shared types and utilities
-export * from './types';
-export * from './schemas';
-export * from './constants';
-export * from './utils';
-export * from './prompts/story';
-export * from './prompts/styles';
-export * from './prompts/illustration';
+export * from './types.js';
+export * from './schemas.js';
+export * from './constants.js';
+export * from './utils.js';
+export * from './prompts/story.js';
+export * from './prompts/styles.js';
+export * from './prompts/illustration.js';

@@ -1,4 +1,4 @@
-import { StyleKey, getStyleDefinition } from './styles';
+import { StyleKey, getStyleDefinition } from './styles.js';
 
 // ----------------------------------
 // TYPES
