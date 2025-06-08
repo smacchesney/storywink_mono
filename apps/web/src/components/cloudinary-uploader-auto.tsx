@@ -81,7 +81,8 @@ export function CloudinaryUploaderAuto({
       onUploadProgress(progress, currentFileIndex.current, totalFiles.current);
     }
 
-    // If this was the last file, trigger completion
+    // If this was the last file, trigger completion immediately
+    // Note: Some Cloudinary configurations may not fire onClose reliably
     if (currentFileIndex.current === totalFiles.current && totalFiles.current > 0) {
       logger.info({ 
         assetCount: uploadedAssets.current.length,
@@ -124,12 +125,21 @@ export function CloudinaryUploaderAuto({
       totalFiles: totalFiles.current
     }, "Cloudinary widget closed");
     
-    // If no files were uploaded and widget was closed, call cancel
-    if (uploadedAssets.current.length === 0 && onCancel) {
+    // If files were uploaded and we've reached the expected count, trigger completion
+    if (uploadedAssets.current.length > 0 && uploadedAssets.current.length === totalFiles.current) {
+      logger.info("Widget closed after successful uploads - calling onUploadComplete");
+      onUploadComplete(uploadedAssets.current);
+      
+      // Reset state for next upload
+      uploadedAssets.current = [];
+      currentFileIndex.current = 0;
+      totalFiles.current = 0;
+    } else if (uploadedAssets.current.length === 0 && onCancel) {
+      // If no files were uploaded and widget was closed, call cancel
       logger.info("No files uploaded - calling onCancel");
       onCancel();
     }
-  }, [onCancel]);
+  }, [onCancel, onUploadComplete]);
 
   const handleUploadQueuesEnd = useCallback((result: any) => {
     logger.info({ fileCount: result.info.files.length }, "Upload queue started");
