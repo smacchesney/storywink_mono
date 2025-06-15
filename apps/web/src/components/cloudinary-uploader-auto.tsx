@@ -47,7 +47,47 @@ export function CloudinaryUploaderAuto({
   const currentFileIndex = useRef(0);
   const totalFiles = useRef(0);
   const hasOpened = useRef(false);
+  const hasCalledComplete = useRef(false);
   const [widgetOpen, setWidgetOpen] = useState<(() => void) | null>(null);
+
+  // Helper function to check if uploads are complete and trigger callback
+  const checkAndTriggerCompletion = useCallback(() => {
+    // Prevent duplicate calls
+    if (hasCalledComplete.current) {
+      return;
+    }
+
+    const hasUploads = uploadedAssets.current.length > 0;
+    const hasQueueInfo = totalFiles.current > 0;
+    const allUploadsComplete = hasQueueInfo && currentFileIndex.current === totalFiles.current;
+    
+    // Case 1: We have queue info and all uploads are complete
+    if (hasUploads && allUploadsComplete) {
+      logger.info({ 
+        assetCount: uploadedAssets.current.length,
+        currentFileIndex: currentFileIndex.current,
+        totalFiles: totalFiles.current 
+      }, "All uploads complete - calling onUploadComplete");
+      
+      hasCalledComplete.current = true;
+      onUploadComplete(uploadedAssets.current);
+      
+      // Reset state for next upload
+      uploadedAssets.current = [];
+      currentFileIndex.current = 0;
+      totalFiles.current = 0;
+      return;
+    }
+    
+    // Case 2: We have uploads but no queue info (race condition)
+    // This can happen if uploads complete before onQueuesEnd fires
+    if (hasUploads && !hasQueueInfo) {
+      // We'll wait for either the queue info or the widget to close
+      logger.info({ 
+        assetCount: uploadedAssets.current.length 
+      }, "Uploads complete but waiting for queue info");
+    }
+  }, [onUploadComplete]);
 
   const handleUploadSuccess = useCallback((result: any) => {
     logger.info({ 
@@ -81,22 +121,9 @@ export function CloudinaryUploaderAuto({
       onUploadProgress(progress, currentFileIndex.current, totalFiles.current);
     }
 
-    // If this was the last file, trigger completion immediately
-    // Note: Some Cloudinary configurations may not fire onClose reliably
-    if (currentFileIndex.current === totalFiles.current && totalFiles.current > 0) {
-      logger.info({ 
-        assetCount: uploadedAssets.current.length,
-        currentFileIndex: currentFileIndex.current,
-        totalFiles: totalFiles.current 
-      }, "All uploads complete - calling onUploadComplete");
-      onUploadComplete(uploadedAssets.current);
-      
-      // Reset state for next upload
-      uploadedAssets.current = [];
-      currentFileIndex.current = 0;
-      totalFiles.current = 0;
-    }
-  }, [onUploadComplete, onUploadProgress]);
+    // Check if all uploads are complete
+    checkAndTriggerCompletion();
+  }, [checkAndTriggerCompletion, onUploadProgress]);
 
   const handleUploadError = useCallback((error: any) => {
     logger.error({ error }, "Cloudinary upload error");
@@ -122,18 +149,36 @@ export function CloudinaryUploaderAuto({
     logger.info({
       uploadedAssets: uploadedAssets.current.length,
       currentFileIndex: currentFileIndex.current,
-      totalFiles: totalFiles.current
+      totalFiles: totalFiles.current,
+      hasCalledComplete: hasCalledComplete.current
     }, "Cloudinary widget closed");
     
-    // If files were uploaded and we've reached the expected count, trigger completion
-    if (uploadedAssets.current.length > 0 && uploadedAssets.current.length === totalFiles.current) {
-      logger.info("Widget closed after successful uploads - calling onUploadComplete");
-      onUploadComplete(uploadedAssets.current);
-      
-      // Reset state for next upload
-      uploadedAssets.current = [];
-      currentFileIndex.current = 0;
-      totalFiles.current = 0;
+    // If we haven't called complete yet and have uploads
+    if (!hasCalledComplete.current && uploadedAssets.current.length > 0) {
+      // Case 1: We have queue info and counts match
+      if (totalFiles.current > 0 && uploadedAssets.current.length === totalFiles.current) {
+        logger.info("Widget closed after successful uploads - calling onUploadComplete");
+        hasCalledComplete.current = true;
+        onUploadComplete(uploadedAssets.current);
+        
+        // Reset state for next upload
+        uploadedAssets.current = [];
+        currentFileIndex.current = 0;
+        totalFiles.current = 0;
+      } 
+      // Case 2: We have uploads but no queue info (race condition)
+      else if (totalFiles.current === 0) {
+        logger.info({
+          uploadCount: uploadedAssets.current.length
+        }, "Widget closed with uploads but no queue info - calling onUploadComplete anyway");
+        hasCalledComplete.current = true;
+        onUploadComplete(uploadedAssets.current);
+        
+        // Reset state for next upload
+        uploadedAssets.current = [];
+        currentFileIndex.current = 0;
+        totalFiles.current = 0;
+      }
     } else if (uploadedAssets.current.length === 0 && onCancel) {
       // If no files were uploaded and widget was closed, call cancel
       logger.info("No files uploaded - calling onCancel");
@@ -144,13 +189,15 @@ export function CloudinaryUploaderAuto({
   const handleUploadQueuesEnd = useCallback((result: any) => {
     logger.info({ fileCount: result.info.files.length }, "Upload queue started");
     totalFiles.current = result.info.files.length;
-    currentFileIndex.current = 0;
     
     // Only call onUploadStart when files are actually being uploaded
     if (result.info.files.length > 0 && onUploadStart) {
       onUploadStart(result.info.files.length);
     }
-  }, [onUploadStart]);
+    
+    // Check if uploads already completed (race condition)
+    checkAndTriggerCompletion();
+  }, [checkAndTriggerCompletion, onUploadStart]);
 
   // Generate folder path based on user ID
   const folder = user ? `user_${user.id}/uploads` : 'uploads';
@@ -209,6 +256,9 @@ export function CloudinaryUploaderAuto({
   // Auto-open effect
   useEffect(() => {
     if (widgetOpen && !hasOpened.current) {
+      // Reset completion flag when opening a new session
+      hasCalledComplete.current = false;
+      
       // Small delay to ensure component is fully mounted
       const timer = setTimeout(() => {
         widgetOpen();
@@ -217,6 +267,17 @@ export function CloudinaryUploaderAuto({
     }
     return undefined;
   }, [widgetOpen]);
+
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      // Reset all state on unmount
+      uploadedAssets.current = [];
+      currentFileIndex.current = 0;
+      totalFiles.current = 0;
+      hasCalledComplete.current = false;
+    };
+  }, []);
 
   return (
     <CldUploadWidget
