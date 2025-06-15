@@ -223,14 +223,10 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
     await Promise.all(updatePromises);
 
     // Check if all story pages received text
-    const updatedPageIds = new Set(
-      updatePromises.map(p => p ? Object.values(p)[0] : null).filter(Boolean)
-    );
-    
-    const missingTextPages = storyPages.filter(page => 
-      !updatePromises.some((promise, idx) => {
+    const missingTextPages = storyPages.filter(_page => 
+      !updatePromises.some((_promise, _idx) => {
         // Check if this page was updated
-        return promise !== null;
+        return _promise !== null;
       })
     );
 
