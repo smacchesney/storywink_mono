@@ -41,7 +41,7 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
   // Winkify dynamic effects (if enabled and notes provided)
   const winkifyBits = opts.isWinkifyEnabled && opts.illustrationNotes
     ? [
-        'Subtle Dynamic Effects: Enhance the action with effects like zoom lines, sparkles, or motion blur, covering less than 20% of the scene. These effects should NOT alter the core characters, faces, or poses derived from Image 1. Apply effects in the style derived from Image 2.',
+        'Subtle Dynamic Effects: Enhance the action with visual effects like zoom lines, motion blur, confetti bursts, or onomatopoeia text overlays (e.g., "Whoosh!", "Crunch!", "Splash!", "Zoom!"). These effects should cover less than 20% of the scene and must NOT alter the core characters, faces, or poses derived from Image 1. Apply all effects in the artistic style derived from Image 2.',
         `Specific Effect Request: ${opts.illustrationNotes}.`,
       ]
     : [];
@@ -85,7 +85,7 @@ export function buildStyleApplicationSection(styleDescription?: string | null): 
 }
 
 export function buildWinkifySection(illustrationNotes: string): string {
-  return `Subtle Dynamic Effects: Enhance the action with effects like zoom lines, sparkles, or motion blur, covering less than 20% of the scene. These effects should NOT alter the core characters, faces, or poses derived from Image 1. Apply effects in the style derived from Image 2. Specific Effect Request: ${illustrationNotes}.`;
+  return `Subtle Dynamic Effects: Enhance the action with visual effects like zoom lines, motion blur, confetti bursts, or onomatopoeia text overlays (e.g., "Whoosh!", "Crunch!", "Splash!", "Zoom!"). These effects should cover less than 20% of the scene and must NOT alter the core characters, faces, or poses derived from Image 1. Apply all effects in the artistic style derived from Image 2. Specific Effect Request: ${illustrationNotes}.`;
 }
 
 export function buildTextSection(isTitlePage: boolean, text: string | null, bookTitle: string | null): string {

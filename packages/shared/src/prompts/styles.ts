@@ -3,30 +3,10 @@
 // ----------------------------------
 
 export const STYLE_LIBRARY = {
-  anime: {
-    label: 'Anime',
-    referenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1746284318/Anime_USETHIS_qmgm0i.png',
-  },
-  pen: {
-    label: 'Pen',
-    referenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1746283996/pen_USETHIS_nqfnel.png',
-  },
-  watercolor: {
-    label: 'Watercolor',
-    referenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1746284308/Watercolor_USETHIS3_n2giqf.png',
-  },
-  modern: {
-    label: 'Modern',
-    referenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1746283996/modern_USETHIS_dukxgz.png',
-  },
-  pencil: {
-    label: 'Pencil',
-    referenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1746283997/pencil_USEHTIS_htcslm.png',
-  },
-  bwPlusOne: {
-    label: 'B&W +1 Color',
-    referenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1746283997/bw_1col_USETHIS_pvbovo.png',
-    description: "As per the reference image, black and white EXCEPT exactly one prominent object (not people) of the model's choosing",
+  vignette: {
+    label: 'Vignette',
+    referenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1750348290/Pencil_Vignette_Style_vF_e89xiy.png',
+    description: "Follow the reference image exactly: create a vignette-style illustration with approximately 40% white space around the image borders. The main illustration should be centered within this whitespace frame, maintaining the same compositional balance, text positioning, and spatial relationships as shown in the reference image.",
   },
 } as const;
 
