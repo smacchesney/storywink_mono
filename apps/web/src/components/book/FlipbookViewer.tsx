@@ -6,6 +6,7 @@ import { Page } from '@prisma/client';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
+import { coolifyImageUrl } from '@storywink/shared';
 
 interface FlipbookViewerProps {
   pages: Page[];
@@ -193,7 +194,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
               {page.generatedImageUrl ? (
                 <div className="relative w-full h-full">
                    <Image
-                     src={page.generatedImageUrl}
+                     src={coolifyImageUrl(page.generatedImageUrl)}
                      alt={`Page ${page.pageNumber}`}
                      fill
                      sizes={`(max-width: 768px) 90vw, ${pageWidth}px`}

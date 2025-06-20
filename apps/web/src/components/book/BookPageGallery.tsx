@@ -4,7 +4,8 @@ import React, { useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { Page, BookStatus } from '@prisma/client';
 import { Loader2, AlertTriangle } from 'lucide-react';
-import { cn } from '@/lib/utils'; // Assuming you have a utility for class names
+import { cn } from '@/lib/utils';
+import { coolifyImageUrl } from '@storywink/shared'; // Assuming you have a utility for class names
 
 interface BookPageGalleryProps {
   pages: Page[];
@@ -90,7 +91,7 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
               >
                 {hasImage && (
                   <Image
-                    src={page.generatedImageUrl!}
+                    src={coolifyImageUrl(page.generatedImageUrl!)}
                     alt={`Page ${page.pageNumber}`}
                     fill
                     sizes="(max-width: 768px) 64px, 80px"

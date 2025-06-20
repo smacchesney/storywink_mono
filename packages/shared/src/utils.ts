@@ -32,3 +32,8 @@ export function getTitlePage<T extends { assetId: string | null }>(
 ): T | null {
   return pages.find(page => isTitlePage(page.assetId, bookCoverAssetId)) || null;
 }
+
+/**
+ * Re-export image utilities
+ */
+export * from './utils/images';

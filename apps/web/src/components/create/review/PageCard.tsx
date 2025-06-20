@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Loader2, Pencil, Check, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { coolifyImageUrl } from '@storywink/shared';
 
 interface PageCardProps {
   id: string | undefined;
@@ -70,7 +71,7 @@ const PageCard = ({
       <div className="image-container h-[35vh] relative bg-muted rounded-md mb-4">
         {imageUrl ? (
           <Image 
-            src={imageUrl}
+            src={coolifyImageUrl(imageUrl)}
             alt={isTitlePage ? 'Title Page' : `Page ${pageNumber}`}
             fill
             className="object-contain"

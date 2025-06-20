@@ -1,5 +1,6 @@
 import puppeteer from 'puppeteer';
 import { Book, Page } from '@storywink/database';
+import { coolifyImageUrl } from '@storywink/shared';
 import logger from '../logger'; // Use relative import
 
 // Define the expected input type (Book with Pages)
@@ -57,7 +58,7 @@ function generatePageHtml(page: Page, _bookTitle: string): string {
   return `
     <div class="page" style="${pageStyle}">
       ${page.generatedImageUrl 
-        ? `<img src="${page.generatedImageUrl}" alt="Page ${page.pageNumber} Illustration" style="${imageStyle}" />` 
+        ? `<img src="${coolifyImageUrl(page.generatedImageUrl)}" alt="Page ${page.pageNumber} Illustration" style="${imageStyle}" />` 
         : '<div style="display:flex; align-items:center; justify-content:center; height:100%;">Image not generated</div>'}
     </div>
   `;

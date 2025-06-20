@@ -23,6 +23,7 @@ import {
 import { MoreHorizontal, Trash2, Copy, Pencil, Eye, Loader2, BookOpen, Clock, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { coolifyImageUrl } from '@storywink/shared';
 
 // Define the props for BookCard, ensuring all needed fields are present
 // We might need to adjust this if LibraryBook from actions.ts has a different structure
@@ -131,7 +132,7 @@ const BookCard: React.FC<BookCardProps> = ({
         <div className="relative w-28 h-28 sm:w-full sm:h-auto sm:aspect-video flex-shrink-0 sm:rounded-none bg-muted overflow-hidden">
           {displayImageUrl ? (
             <Image
-              src={displayImageUrl}
+              src={coolifyImageUrl(displayImageUrl)}
               alt={`${title || 'Book'} cover`}
               fill
               sizes="(max-width: 640px) 112px, (max-width: 1024px) 45vw, 25vw"
