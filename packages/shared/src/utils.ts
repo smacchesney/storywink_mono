@@ -34,11 +34,17 @@ export function getTitlePage<T extends { assetId: string | null }>(
 }
 
 /**
- * Applies a cooler color temperature to Cloudinary image URLs
- * Reduces yellow cast in generated images by applying temperature adjustment
- * Currently set to -100 for testing (extreme blue tint)
+ * Applies professional color correction to Cloudinary image URLs using LUT
+ * Only applies to generated images with standard Cloudinary upload URLs
+ * Uses storywink-LUT.cube for consistent color grading
  */
 export function coolifyImageUrl(url: string | null | undefined): string {
   if (!url) return '';
-  return url.replace('/upload/', '/upload/e_temperature:-100/');
+  
+  // Only transform Cloudinary URLs with /image/upload/ pattern
+  if (!url.includes('/image/upload/')) {
+    return url; // Return unchanged if not a standard Cloudinary upload URL
+  }
+  
+  return url.replace('/image/upload/', '/image/upload/l_lut:storywink-LUT.cube/');
 }
