@@ -36,7 +36,7 @@ export function getTitlePage<T extends { assetId: string | null }>(
 /**
  * Applies professional color correction to Cloudinary image URLs using LUT
  * Only applies to generated images with standard Cloudinary upload URLs
- * Uses storywink-LUT.cube for consistent color grading
+ * Uses storywink-LUT-better.cube for consistent color grading
  */
 export function coolifyImageUrl(url: string | null | undefined): string {
   if (!url) return '';
@@ -46,5 +46,5 @@ export function coolifyImageUrl(url: string | null | undefined): string {
     return url; // Return unchanged if not a standard Cloudinary upload URL
   }
   
-  return url.replace('/image/upload/', '/image/upload/l_lut:storywink-LUT.cube/');
+  return url.replace('/image/upload/', '/image/upload/l_lut:storywink-LUT-better.cube/');
 }
