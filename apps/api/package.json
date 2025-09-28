@@ -12,7 +12,7 @@
     "clean": "rm -rf dist node_modules .turbo"
   },
   "dependencies": {
-    "@clerk/express": "^1.0.0",
+    "@clerk/express": "^1.7.34",
     "@storywink/database": "*",
     "@storywink/shared": "*",
     "bullmq": "^5.48.1",
