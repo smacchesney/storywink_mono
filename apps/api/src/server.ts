@@ -86,4 +86,5 @@ app.listen(PORT, () => {
   console.log(`Test endpoint: /api/test`);
   console.log(`DATABASE_URL configured: ${!!process.env.DATABASE_URL}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
+  console.log(`🔄 Deployment: ${new Date().toISOString()}`);
 });
