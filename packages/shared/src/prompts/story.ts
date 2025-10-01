@@ -1,6 +1,8 @@
 // ----------------------------------
-// TYPES
+// IMPORTS & TYPES
 // ----------------------------------
+
+import { convertHeicToJpeg } from '../utils.js';
 
 type MessageContentPart =
   | { type: 'text'; text: string }
@@ -54,9 +56,11 @@ export function createVisionStoryGenerationPrompt(
   input.storyPages.forEach((page) => {
     msg.push({ type: 'text', text: `--- Page ${page.pageNumber} ---` });
     if (page.originalImageUrl) {
+      // Convert HEIC to JPEG for OpenAI compatibility
+      const convertedUrl = convertHeicToJpeg(page.originalImageUrl);
       msg.push({
         type: 'image_url',
-        image_url: { url: page.originalImageUrl, detail: 'high' },
+        image_url: { url: convertedUrl, detail: 'high' },
       });
     } else {
       msg.push({

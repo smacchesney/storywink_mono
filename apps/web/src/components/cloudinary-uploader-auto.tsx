@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { CldUploadWidget } from 'next-cloudinary';
 import { useUser } from '@clerk/nextjs';
 import logger from '@/lib/logger';
@@ -48,7 +48,7 @@ export function CloudinaryUploaderAuto({
   const totalFiles = useRef(0);
   const hasOpened = useRef(false);
   const hasCalledComplete = useRef(false);
-  const [widgetOpen, setWidgetOpen] = useState<(() => void) | null>(null);
+  const openFunctionRef = useRef<(() => void) | null>(null);
 
   // Helper function to check if uploads are complete and trigger callback
   const checkAndTriggerCompletion = useCallback(() => {
@@ -209,7 +209,8 @@ export function CloudinaryUploaderAuto({
     sources: ['local', 'camera'] as ('local' | 'camera')[],
     multiple: true,
     maxFiles: 20,
-    clientAllowedFormats: ['jpg', 'jpeg', 'png', 'heic', 'heif', 'webp'],
+    // Only allow formats that OpenAI Vision API supports (no HEIC/HEIF)
+    clientAllowedFormats: ['jpg', 'jpeg', 'png', 'webp'],
     maxFileSize: 10485760, // 10MB
     showAdvancedOptions: false,
     showCompletedButton: true,
@@ -253,21 +254,6 @@ export function CloudinaryUploaderAuto({
     }
   };
 
-  // Auto-open effect
-  useEffect(() => {
-    if (widgetOpen && !hasOpened.current) {
-      // Reset completion flag when opening a new session
-      hasCalledComplete.current = false;
-      
-      // Small delay to ensure component is fully mounted
-      const timer = setTimeout(() => {
-        widgetOpen();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [widgetOpen]);
-
   // Cleanup effect
   useEffect(() => {
     return () => {
@@ -277,6 +263,21 @@ export function CloudinaryUploaderAuto({
       totalFiles.current = 0;
       hasCalledComplete.current = false;
     };
+  }, []);
+
+  // Store open function in a layout effect to trigger auto-open
+  const storeOpenFunction = useCallback((open: () => void) => {
+    if (!openFunctionRef.current) {
+      openFunctionRef.current = open;
+
+      // Trigger auto-open after a small delay
+      if (!hasOpened.current) {
+        hasCalledComplete.current = false;
+        setTimeout(() => {
+          openFunctionRef.current?.();
+        }, 100);
+      }
+    }
   }, []);
 
   return (
@@ -290,12 +291,15 @@ export function CloudinaryUploaderAuto({
       onQueuesEnd={handleUploadQueuesEnd}
     >
       {({ open, widget }) => {
-        // Store widget reference and open function
+        // Store widget reference
         widgetRef.current = widget;
-        if (!widgetOpen) {
-          setWidgetOpen(() => open);
+
+        // Store open function on first render only
+        if (open && !openFunctionRef.current) {
+          // Use queueMicrotask to defer until after render
+          queueMicrotask(() => storeOpenFunction(open));
         }
-        
+
         // Return empty fragment since we don't want to render anything
         return <></>;
       }}

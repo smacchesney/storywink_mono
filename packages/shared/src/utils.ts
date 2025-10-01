@@ -34,17 +34,34 @@ export function getTitlePage<T extends { assetId: string | null }>(
 }
 
 /**
- * Applies professional color correction to Cloudinary image URLs using LUT
- * Only applies to generated images with standard Cloudinary upload URLs
- * Uses canva_edit_LUT.cube for consistent color grading
+ * Converts HEIC images to JPEG format using Cloudinary transformation
+ * OpenAI Vision API only supports: png, jpeg, gif, webp (NOT heic)
+ * This function automatically converts HEIC to JPEG for AI model compatibility
+ *
+ * Note: First-time HEIC conversions may be slow. Consider:
+ * 1. Using eager transformations in Cloudinary upload preset
+ * 2. Blocking HEIC uploads in favor of JPEG/PNG
+ * 3. Pre-converting HEIC files on the client before upload
+ */
+export function convertHeicToJpeg(url: string | null | undefined): string {
+  if (!url) return '';
+
+  // Check if URL contains .heic extension (case insensitive)
+  const isHeic = url.toLowerCase().includes('.heic');
+
+  if (isHeic) {
+    // Cloudinary transformation: f_jpg,fl_force_strip converts HEIC to JPEG
+    // fl_force_strip removes all metadata to speed up conversion
+    return url.replace('/upload/', '/upload/f_jpg,fl_force_strip/');
+  }
+
+  return url;
+}
+
+/**
+ * Safely handles image URLs, returning empty string for null/undefined values
  */
 export function coolifyImageUrl(url: string | null | undefined): string {
   if (!url) return '';
-  
-  // Only transform Cloudinary URLs with /image/upload/ pattern
-  if (!url.includes('/image/upload/')) {
-    return url; // Return unchanged if not a standard Cloudinary upload URL
-  }
-  
-  return url.replace('/image/upload/', '/image/upload/l_lut:canva_edit_LUT.cube/');
+  return url;
 }

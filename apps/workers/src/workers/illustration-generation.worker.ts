@@ -1,8 +1,7 @@
 import { Job } from 'bullmq';
 import prisma from '../database/index.js';
 import { IllustrationGenerationJob } from '@storywink/shared';
-import OpenAI, { toFile } from 'openai';
-import { FileLike } from 'openai/uploads';
+import { GoogleGenAI } from '@google/genai';
 import { v2 as cloudinary } from 'cloudinary';
 import pino from 'pino';
 import { createIllustrationPrompt, IllustrationPromptOptions, STYLE_LIBRARY, StyleKey } from '@storywink/shared';
@@ -22,28 +21,28 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
   
   try {
     // Validate prerequisites
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('OpenAI API key not configured');
+    if (!process.env.GOOGLE_API_KEY) {
+      throw new Error('Google API key not configured');
     }
-    
+
     if (!process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET || !process.env.CLOUDINARY_CLOUD_NAME) {
       throw new Error('Cloudinary API credentials not configured');
     }
-    
+
     // Configure Cloudinary inside function to ensure env vars are loaded
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
       api_key: process.env.CLOUDINARY_API_KEY,
       api_secret: process.env.CLOUDINARY_API_SECRET,
     });
-    
+
     if (!bookId || !pageId || !userId) {
       throw new Error('Missing required job data: bookId, pageId, or userId');
     }
 
-    // Initialize OpenAI
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+    // Initialize Google AI
+    const ai = new GoogleGenAI({
+      apiKey: process.env.GOOGLE_API_KEY,
     });
     
     logger.info({ 
@@ -169,69 +168,67 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     console.log(`  - Prompt length: ${textPrompt.length} chars`);
     console.log(`  - First 100 chars: ${textPrompt.substring(0, 100)}...`);
 
-    const contentFileExt = contentImageMimeType?.split('/')[1] || 'jpg';
-    const contentFileName = `page_${pageNumber}_content.${contentFileExt}`;
-    const contentImageFile = await toFile(
-        contentImageBuffer,
-        contentFileName,
-        { type: contentImageMimeType }
-    );
-    logger.info({ jobId: job.id, pageId, pageNumber }, 'Prepared content image file for API.');
+    // Convert images to base64 for Gemini API
+    const contentImageBase64 = contentImageBuffer.toString('base64');
+    const styleReferenceBase64 = styleReferenceBuffer.toString('base64');
 
-    const styleFileExt = styleReferenceMimeType?.split('/')[1] || 'jpg';
-    const styleFileName = `${styleKey}_ref.${styleFileExt}`;
-    const styleReferenceImageFile = await toFile(
-        styleReferenceBuffer,
-        styleFileName,
-        { type: styleReferenceMimeType }
-    );
-    logger.info({ jobId: job.id, pageId, pageNumber }, 'Prepared style reference image file for API.');
-
-    const imageInputArray: FileLike[] = [contentImageFile, styleReferenceImageFile];
+    logger.info({ jobId: job.id, pageId, pageNumber }, 'Prepared images as base64 for Gemini API.');
 
     let generatedImageBase64: string | null = null;
     let moderationBlocked = false;
     let moderationReasonText: string | null = null;
-    
-    try {
-       logger.info({ jobId: job.id, pageId, pageNumber }, 'Calling OpenAI gpt-image-1 API...');
-       console.log(`[IllustrationWorker] Calling OpenAI API for page ${pageNumber}...`);
 
-       const result = await openai.images.edit({
-           model: "gpt-image-1",
-           image: imageInputArray as any, // Array of up to 10 images supported by gpt-image-1
-           prompt: textPrompt, 
-           n: 1,
-           size: "1024x1024"
-           // Note: gpt-image-1 returns base64 by default, no response_format needed
+    try {
+       logger.info({ jobId: job.id, pageId, pageNumber }, 'Calling Gemini 2.5 Flash Image API...');
+       console.log(`[IllustrationWorker] Calling Gemini API for page ${pageNumber}...`);
+
+       // Build multi-image prompt for Gemini
+       const prompt = [
+           {
+               inlineData: {
+                   mimeType: contentImageMimeType,
+                   data: contentImageBase64,
+               },
+           },
+           {
+               inlineData: {
+                   mimeType: styleReferenceMimeType,
+                   data: styleReferenceBase64,
+               },
+           },
+           {
+               text: textPrompt
+           }
+       ];
+
+       const result = await ai.models.generateContent({
+           model: "gemini-2.5-flash-image-preview",
+           contents: prompt,
        });
 
-       logger.info({ jobId: job.id, pageId, pageNumber }, 'Received response from OpenAI.');
-       console.log(`[IllustrationWorker] OpenAI API response received for page ${pageNumber}`);
+       logger.info({ jobId: job.id, pageId, pageNumber }, 'Received response from Gemini.');
+       console.log(`[IllustrationWorker] Gemini API response received for page ${pageNumber}`);
 
-        if (result?.data?.[0]?.revised_prompt && result.data[0].revised_prompt !== textPrompt) {
-            logger.warn({ jobId: job.id, pageId, pageNumber, originalLength: textPrompt.length, revisedLength: result.data[0].revised_prompt?.length }, 'OpenAI revised the prompt.');
-        }
-
-        const b64ImageData = result?.data?.[0]?.b64_json;
-        if (b64ImageData) {
-            generatedImageBase64 = b64ImageData;
-            logger.info({ jobId: job.id, pageId, pageNumber }, 'Extracted generated image data (b64_json).');
+        // Extract image data from Gemini response
+        const imagePart = result?.candidates?.[0]?.content?.parts?.find((part: any) => part.inlineData);
+        if (imagePart?.inlineData?.data) {
+            generatedImageBase64 = imagePart.inlineData.data;
+            logger.info({ jobId: job.id, pageId, pageNumber }, 'Extracted generated image data from Gemini response.');
         } else {
             moderationBlocked = true;
-            moderationReasonText = "Image generation failed or blocked by content policy (no b64_json data)."; 
-            logger.warn({ jobId: job.id, pageId, pageNumber, response: JSON.stringify(result) }, 'OpenAI response did not contain b64_json image data.');
+            moderationReasonText = "Image generation failed or blocked by content policy (no image data in response).";
+            logger.warn({ jobId: job.id, pageId, pageNumber, response: JSON.stringify(result) }, 'Gemini response did not contain image data.');
         }
 
     } catch (apiError: any) {
-        logger.error({ 
-            jobId: job.id, 
-            pageId, 
-            pageNumber, 
+        logger.error({
+            jobId: job.id,
+            pageId,
+            pageNumber,
             error: apiError instanceof Error ? apiError.message : String(apiError),
-            ...(apiError?.response?.data && { responseData: apiError.response.data }) 
-        }, 'Error calling OpenAI gpt-image-1 API.');
-        console.error(`[IllustrationWorker] OpenAI API error for page ${pageNumber}:`, apiError.message);
+            ...(apiError?.response?.data && { responseData: apiError.response.data })
+        }, 'Error calling Gemini 2.5 Flash Image API.');
+        console.error(`[IllustrationWorker] Gemini API error for page ${pageNumber}:`, apiError.message);
         moderationBlocked = true;
         moderationReasonText = apiError instanceof Error ? apiError.message : String(apiError);
     }
@@ -312,30 +309,54 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     };
     
   } catch (error: any) {
-    logger.error({ 
+    // Enhanced error logging with more context
+    const errorContext = {
       bookId, 
       pageId, 
       error: error.message,
+      errorStack: error.stack,
       pageNumber,
       jobId: job.id,
-      attemptsMade: job.attemptsMade 
-    }, 'Illustration generation failed');
+      attemptsMade: job.attemptsMade,
+      maxAttempts: job.opts?.attempts || 'unknown',
+      parentJobId: job.parent?.id,
+      isTitlePage,
+      artStyle,
+      isWinkifyEnabled,
+      hasText: !!text,
+      textLength: text?.length || 0,
+      // Add more diagnostic info
+      failureStage: error.message.includes('Gemini') || error.message.includes('Google') ? 'ai_generation' :
+                   error.message.includes('Cloudinary') ? 'image_upload' :
+                   error.message.includes('fetch') ? 'image_fetch' :
+                   error.message.includes('database') ? 'database_update' : 'unknown'
+    };
+    
+    logger.error(errorContext, 'Illustration generation failed');
     
     console.error(`[IllustrationWorker] Job ${job.id} FAILED for page ${pageNumber}:`);
+    console.error(`  - Book: ${bookId}`);
     console.error(`  - Error: ${error.message}`);
-    console.error(`  - Attempts: ${job.attemptsMade}/${job.opts.attempts}`);
+    console.error(`  - Failure Stage: ${errorContext.failureStage}`);
+    console.error(`  - Attempts: ${job.attemptsMade}/${job.opts?.attempts || 'unknown'}`);
+    console.error(`  - Parent Job: ${job.parent?.id || 'None'}`);
+    console.error(`  - Is Title Page: ${isTitlePage}`);
+    console.error(`  - Has Text: ${!!text} (${text?.length || 0} chars)`);
+    console.error(`  - Art Style: ${artStyle}`);
     
-    // Mark page as failed
+    // Mark page as failed with enhanced error info
     try {
       await prisma.page.update({
         where: { id: pageId },
         data: { 
           moderationStatus: 'FAILED',
-          moderationReason: `Job failed: ${error.message}`.slice(0, 1000),
+          moderationReason: `Job failed (${errorContext.failureStage}): ${error.message}`.slice(0, 1000),
         },
       });
+      console.error(`[IllustrationWorker] Page ${pageNumber} marked as FAILED in database`);
     } catch (updateError: any) {
        logger.error({ jobId: job.id, bookId, error: updateError.message }, 'Failed to update page status to FAILED after job error.');
+       console.error(`[IllustrationWorker] WARNING: Could not mark page ${pageNumber} as failed in database: ${updateError.message}`);
     }
     
     throw error;

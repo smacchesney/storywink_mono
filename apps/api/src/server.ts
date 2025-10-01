@@ -1,7 +1,10 @@
+// Load environment variables FIRST - before any other imports that might use them
+import { config } from "dotenv";
+config();
+
 import express from "express";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
-import { config } from "dotenv";
 import { clerkMiddleware } from "@clerk/express";
 import "express-async-errors";
 
@@ -17,9 +20,6 @@ import { generateRouter } from "./routes/generate.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { notFound } from "./middleware/not-found.js";
 import { corsMiddleware } from "./middleware/cors.js";
-
-// Load environment variables
-config();
 
 const app = express();
 const PORT = process.env.PORT || 8080;

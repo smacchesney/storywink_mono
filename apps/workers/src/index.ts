@@ -109,21 +109,33 @@ illustrationWorker.on('completed', (job) => {
 });
 
 illustrationWorker.on('failed', (job, err) => {
+  const failureStage = err.message.includes('OpenAI') ? 'ai_generation' :
+                      err.message.includes('Cloudinary') ? 'image_upload' :
+                      err.message.includes('fetch') ? 'image_fetch' :
+                      err.message.includes('database') ? 'database_update' : 'unknown';
+                      
   logger.error({ 
     jobId: job?.id, 
     error: err.message,
+    errorStack: err.stack,
     pageId: job?.data?.pageId,
     pageNumber: job?.data?.pageNumber,
     bookId: job?.data?.bookId,
     parentJobId: job?.parent?.id,
-    attempts: job?.attemptsMade
+    attempts: job?.attemptsMade,
+    maxAttempts: job?.opts?.attempts,
+    failureStage,
+    willRetry: (job?.attemptsMade || 0) < (job?.opts?.attempts || 1)
   }, 'Illustration generation failed');
+  
   console.error(`[IllustrationWorker] FAILED job ${job?.id}:`)
   console.error(`  - Book: ${job?.data?.bookId}`)
   console.error(`  - Page: ${job?.data?.pageNumber}`)
   console.error(`  - Parent Job: ${job?.parent?.id || 'None'}`)
   console.error(`  - Error: ${err.message}`)
-  console.error(`  - Attempts: ${job?.attemptsMade}`)
+  console.error(`  - Failure Stage: ${failureStage}`)
+  console.error(`  - Attempts: ${job?.attemptsMade}/${job?.opts?.attempts || 'unknown'}`)
+  console.error(`  - Will Retry: ${(job?.attemptsMade || 0) < (job?.opts?.attempts || 1)}`)
 });
 
 finalizeWorker.on('active', (job) => {

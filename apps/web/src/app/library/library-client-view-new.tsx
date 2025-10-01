@@ -23,9 +23,9 @@ import { useRouter } from 'next/navigation';
 import { PlusCircle, SortDesc } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
-import { BookStatus } from '@prisma/client';
 
-// Remove local BookStatus type - use Prisma enum instead
+// Define BookStatus inline (can't import from Prisma in client components)
+type BookStatus = "DRAFT" | "GENERATING" | "STORY_READY" | "ILLUSTRATING" | "COMPLETED" | "FAILED" | "PARTIAL";
 
 type LibraryBook = {
   id: string;
@@ -94,8 +94,8 @@ export function LibraryClientView() {
     });
   }, [books, sortBy]);
 
-  const inProgressBooks = sortedBooks.filter(book => book.status !== BookStatus.COMPLETED && book.status !== BookStatus.PARTIAL);
-  const completedBooks = sortedBooks.filter(book => book.status === BookStatus.COMPLETED || book.status === BookStatus.PARTIAL);
+  const inProgressBooks = sortedBooks.filter(book => book.status !== 'COMPLETED' && book.status !== 'PARTIAL');
+  const completedBooks = sortedBooks.filter(book => book.status === 'COMPLETED' || book.status === 'PARTIAL');
 
   const openDeleteDialog = (book: LibraryBook) => {
     setBookToDelete(book);

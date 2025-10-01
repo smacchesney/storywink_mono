@@ -4,6 +4,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 interface RequestOptions extends RequestInit {
   token?: string;
+  baseUrl?: string; // Allow overriding baseUrl for Next.js API routes
 }
 
 class ApiClient {
@@ -17,7 +18,8 @@ class ApiClient {
     endpoint: string,
     options: RequestOptions = {}
   ): Promise<ApiResponse<T>> {
-    const { token, ...fetchOptions } = options;
+    const { token, baseUrl, ...fetchOptions } = options;
+    const finalBaseUrl = baseUrl !== undefined ? baseUrl : this.baseUrl;
 
     const config: RequestInit = {
       ...fetchOptions,
@@ -43,7 +45,7 @@ class ApiClient {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}${endpoint}`, config);
+      const response = await fetch(`${finalBaseUrl}${endpoint}`, config);
       const data = await response.json();
 
       if (!response.ok) {
@@ -71,10 +73,12 @@ class ApiClient {
   }
 
   async createBook(data: any, token: string) {
+    // This is a Next.js API route, call it directly without the Express API baseUrl
     return this.request('/api/book/create', {
       method: 'POST',
       body: JSON.stringify(data),
       token,
+      baseUrl: '', // Override to use relative path for Next.js API routes
     });
   }
 

@@ -4,8 +4,8 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: shaunyas
+      POSTGRES_USER: storywink
+      POSTGRES_PASSWORD: storywink123
       POSTGRES_DB: storywink
     ports:
       - "5432:5432"
@@ -14,6 +14,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    command: redis-server --maxmemory-policy noeviction
     ports:
       - "6379:6379"
     volumes:

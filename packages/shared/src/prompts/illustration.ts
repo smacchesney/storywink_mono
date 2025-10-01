@@ -24,35 +24,37 @@ const MAX_PROMPT_CHARS = 30000;
 // ----------------------------------
 
 /**
- * Creates a prompt for the gpt-image-1 model to apply artistic style to content images
- * Note: gpt-image-1 uses image inputs directly, not URLs in the prompt
+ * Creates a prompt for the Gemini 2.5 Flash Image model to apply artistic style to content images
+ * Note: Gemini accepts multiple images as input and uses natural language instructions
  */
 export function createIllustrationPrompt(opts: IllustrationPromptOptions): string {
   const styleDefinition = getStyleDefinition(opts.style);
   const styleDescription = styleDefinition?.description;
 
-  // Base instructions for style transfer
+  // Core transformation instruction - style takes priority
   const base = [
-    `Task: Apply the artistic style from the second input image (Style Reference) to the content of the first input image (Content Source).`,
-    `Content Source (Image 1): Use this image EXCLUSIVELY for all content elements: characters, objects, faces, poses, and the overall background layout. Preserve these content elements and their composition exactly as they appear in Image 1. Do not add, remove, or significantly alter any content from Image 1.`,
-    `Style Source (Image 2): Use this image PURELY as the visual reference for the artistic style. Apply its color palette, texture, line work, shading, rendering techniques, and overall aesthetic faithfully to the content derived from Image 1. DO NOT ADD COMPOSITION ELEMENTS FROM IMAGE 2. The style should ONLY come from Image 2.${styleDescription ? ` Specific Style Notes: ${styleDescription}` : ''}`,
+    `Create a children's picture book illustration by transforming the first image using the artistic style from the second image.`,
+
+    `STYLE APPLICATION (Primary): Fully transform the first image into an illustration. Apply the complete artistic style from the second image: its color palette, textures, brush strokes, line work, shading techniques, lighting style, and overall aesthetic. The result should look like a hand-drawn/painted illustration, not a photo with filters. Remove all photographic elements - realistic lighting, camera effects, textures should be replaced with illustrated equivalents.${styleDescription ? ` Emphasize these style characteristics: ${styleDescription}` : ''}`,
+
+    `CONTENT PRESERVATION (Secondary): While transforming into illustration style, preserve these key elements from the first image: the identity and pose of all people/characters (especially faces - keep them recognizable as the same person but in illustrated form), the main objects and their spatial arrangement, and the general composition. Simplify and abstract background details into clean illustrated elements (e.g., dirt becomes simple ground texture, cluttered areas become simplified shapes) while keeping key recognizable features that establish the setting.`,
   ];
 
-  // Winkify dynamic effects (if enabled and notes provided)
+  // Winkify dynamic effects
   const winkifyBits = opts.isWinkifyEnabled && opts.illustrationNotes
     ? [
-        'Subtle Dynamic Effects: Enhance the action with visual effects like zoom lines, motion blur, confetti bursts, or onomatopoeia text overlays (e.g., "Whoosh!", "Crunch!", "Splash!", "Zoom!"). These effects should cover less than 20% of the scene and must NOT alter the core characters, faces, or poses derived from Image 1. Apply all effects in the artistic style derived from Image 2.',
-        `Specific Effect Request: ${opts.illustrationNotes}.`,
+        `Add subtle dynamic visual effects to enhance the action: motion lines, zoom effects, sparkles, confetti, or comic-style text (like "Whoosh!", "Splash!", "Zoom!"). Keep effects minimal (under 20% of image) and ensure they match the illustration style. Do not alter character faces or poses with these effects.`,
+        `Specific effect to add: ${opts.illustrationNotes}`,
       ]
     : [];
 
-  // Title page vs story page text handling
+  // Text handling with consistency emphasis
   const titleBits = opts.isTitlePage
     ? [
-        `Book Title Integration: Integrate the book title "${opts.bookTitle}" naturally within the scene. Ensure it is highly legible and does not obscure key details from Image 1 content. The title's visual style (font, color, placement) should be inspired by text elements or the overall aesthetic found in the Style Source (Image 2).`,
+        `Add the book title: "${opts.bookTitle}". Use a font style that matches the second image's text aesthetic. Position it naturally without covering important subjects. Make the text clearly readable and appropriately sized (approximately 5-7% of image height).`,
       ]
     : [
-        `Text Rendering: Render the following text exactly once within the image: "${(opts.pageText ?? '').trim()}". Replicate the exact font style, size, color, and positioning characteristics demonstrated by the text elements present in the Style Source (Image 2). Ensure all provided text is fully visible and not cut off.`,
+        `Add this text: "${(opts.pageText ?? '').trim()}". Render it exactly once using the same font style, weight, and sizing as shown in the second image. Maintain consistent text size across pages (approximately 5-7% of image height). Position text naturally, ensure it's fully visible and not cut off. The text should integrate with the illustration style.`,
       ];
 
   // Combine all parts
@@ -73,25 +75,25 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
 // ----------------------------------
 
 export function buildTaskSection(): string {
-  return `Task: Apply the artistic style from the second input image (Style Reference) to the content of the first input image (Content Source).`;
+  return `Transform the first image by applying the artistic style from the second image.`;
 }
 
 export function buildContentPreservationSection(): string {
-  return `Content Source (Image 1): Use this image EXCLUSIVELY for all content elements: characters, objects, faces, poses, and the overall background layout. Preserve these content elements and their composition exactly as they appear in Image 1. Do not add, remove, or significantly alter any content from Image 1.`;
+  return `Preserve all content from the first image: Keep all characters, people, faces, objects, poses, and the background layout exactly as they appear. Do not add, remove, or change any subjects or elements from the first image.`;
 }
 
 export function buildStyleApplicationSection(styleDescription?: string | null): string {
-  return `Style Source (Image 2): Use this image PURELY as the visual reference for the artistic style. Apply its color palette, texture, line work, shading, rendering techniques, and overall aesthetic faithfully to the content derived from Image 1. DO NOT ADD COMPOSITION ELEMENTS FROM IMAGE 2. The style should ONLY come from Image 2.${styleDescription ? ` Specific Style Notes: ${styleDescription}` : ''}`;
+  return `Apply the style from the second image: Transfer its color palette, textures, brush strokes, line work, shading techniques, and overall artistic aesthetic to the content from the first image. Only the visual style should come from the second image, not its composition or content.${styleDescription ? ` Style characteristics to emphasize: ${styleDescription}` : ''}`;
 }
 
 export function buildWinkifySection(illustrationNotes: string): string {
-  return `Subtle Dynamic Effects: Enhance the action with visual effects like zoom lines, motion blur, confetti bursts, or onomatopoeia text overlays (e.g., "Whoosh!", "Crunch!", "Splash!", "Zoom!"). These effects should cover less than 20% of the scene and must NOT alter the core characters, faces, or poses derived from Image 1. Apply all effects in the artistic style derived from Image 2. Specific Effect Request: ${illustrationNotes}.`;
+  return `Add subtle dynamic visual effects to enhance the action, such as: motion lines, zoom effects, sparkles, confetti, or comic-style text (like "Whoosh!", "Splash!", "Zoom!"). Keep these effects minimal (under 20% of the image) and ensure they do not change the people, faces, or poses from the first image. All effects should match the artistic style from the second image. Specific effect to add: ${illustrationNotes}`;
 }
 
 export function buildTextSection(isTitlePage: boolean, text: string | null, bookTitle: string | null): string {
   if (isTitlePage) {
-    return `Book Title Integration: Integrate the book title "${bookTitle}" naturally within the scene. Ensure it is highly legible and does not obscure key details from Image 1 content. The title's visual style (font, color, placement) should be inspired by text elements or the overall aesthetic found in the Style Source (Image 2).`;
+    return `Include the book title in the image: "${bookTitle}". Make it clearly readable and position it naturally within the scene without covering important elements from the first image. Style the text to match the aesthetic of the second image.`;
   } else {
-    return `Text Rendering: Render the following text exactly once within the image: "${(text ?? '').trim()}". Replicate the exact font style, size, color, and positioning characteristics demonstrated by the text elements present in the Style Source (Image 2). Ensure all provided text is fully visible and not cut off.`;
+    return `Add this text to the image: "${(text ?? '').trim()}". Render it exactly once, using a font style, size, color, and position that matches any text shown in the second image. Ensure the entire text is visible and not cut off.`;
   }
 }

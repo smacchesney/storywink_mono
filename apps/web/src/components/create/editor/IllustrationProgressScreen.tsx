@@ -87,7 +87,7 @@ export function IllustrationProgressScreen({
           scaleDistance={1.1}
           rotateYDistance={20}
         >
-          Creating Your Story 🎨
+          Creating Your Story ✨
         </TextShimmerWave>
       </div>
       <p className="text-sm text-gray-500">
