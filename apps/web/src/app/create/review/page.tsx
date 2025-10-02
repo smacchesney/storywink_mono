@@ -70,6 +70,9 @@ function ReviewPageContent() {
       if (finalStatusPollingIntervalRef.current) {
         clearInterval(finalStatusPollingIntervalRef.current);
       }
+      // Ensure scroll is unlocked when component unmounts (navigation, etc.)
+      document.body.style.removeProperty('overflow');
+      document.documentElement.style.removeProperty('overflow');
     };
   }, []);
 

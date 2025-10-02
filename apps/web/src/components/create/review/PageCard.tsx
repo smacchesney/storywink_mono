@@ -59,7 +59,7 @@ const PageCard = ({
   };
 
   return (
-    <div className="page-card flex-1 flex flex-col p-4 bg-white rounded-md shadow-sm overflow-hidden">
+    <div className="page-card flex flex-col p-4 bg-white rounded-md shadow-sm">
       {/* Page Label - Centered above image */}
       <div className="text-center mb-3">
         <h3 className="text-sm font-medium text-[#F76C5E]">

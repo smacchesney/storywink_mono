@@ -221,16 +221,44 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         }
 
     } catch (apiError: any) {
+        // Extract detailed error information from Google API response
+        const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
+        const errorCode = apiError?.code || apiError?.response?.status;
+        const errorDetails = apiError?.response?.data || apiError?.details;
+
+        // Check for specific error types
+        const isSafetyBlock = errorMessage.toLowerCase().includes('safety') ||
+                              errorMessage.toLowerCase().includes('blocked') ||
+                              errorMessage.toLowerCase().includes('content policy');
+        const isCopyrightIssue = errorMessage.toLowerCase().includes('copyright') ||
+                                 errorMessage.toLowerCase().includes('proprietary') ||
+                                 errorMessage.toLowerCase().includes('trademark');
+        const isQuotaIssue = errorMessage.toLowerCase().includes('quota') ||
+                             errorMessage.toLowerCase().includes('rate limit');
+
         logger.error({
             jobId: job.id,
             pageId,
             pageNumber,
-            error: apiError instanceof Error ? apiError.message : String(apiError),
-            ...(apiError?.response?.data && { responseData: apiError.response.data })
+            error: errorMessage,
+            errorCode,
+            errorDetails,
+            isSafetyBlock,
+            isCopyrightIssue,
+            isQuotaIssue,
+            fullError: JSON.stringify(apiError, null, 2)
         }, 'Error calling Gemini 2.5 Flash Image API.');
-        console.error(`[IllustrationWorker] Gemini API error for page ${pageNumber}:`, apiError.message);
+
+        console.error(`[IllustrationWorker] Gemini API error for page ${pageNumber}:`);
+        console.error(`  - Error: ${errorMessage}`);
+        console.error(`  - Error Code: ${errorCode || 'N/A'}`);
+        if (isSafetyBlock) console.error(`  - Type: SAFETY/CONTENT POLICY BLOCK`);
+        if (isCopyrightIssue) console.error(`  - Type: COPYRIGHT/PROPRIETARY ISSUE`);
+        if (isQuotaIssue) console.error(`  - Type: QUOTA/RATE LIMIT`);
+        if (errorDetails) console.error(`  - Details: ${JSON.stringify(errorDetails)}`);
+
         moderationBlocked = true;
-        moderationReasonText = apiError instanceof Error ? apiError.message : String(apiError);
+        moderationReasonText = `${errorMessage}${errorCode ? ` (Code: ${errorCode})` : ''}${isSafetyBlock ? ' [SAFETY]' : ''}${isCopyrightIssue ? ' [COPYRIGHT]' : ''}`;
     }
     
     let finalImageUrl: string | undefined = undefined;

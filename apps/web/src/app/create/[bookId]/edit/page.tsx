@@ -127,10 +127,15 @@ export default function EditBookPage() {
     fetchBookData();
   }, [fetchBookData]);
   
-  // Mount/unmount ref effect
+  // Mount/unmount ref effect + scroll unlock cleanup
   useEffect(() => {
     isMountedRef.current = true;
-    return () => { isMountedRef.current = false; };
+    return () => {
+      isMountedRef.current = false;
+      // Ensure scroll is unlocked when component unmounts (navigation, etc.)
+      document.body.style.removeProperty('overflow');
+      document.documentElement.style.removeProperty('overflow');
+    };
   }, []);
 
   // Update storyboardOrder state when the underlying bookData changes OR cover changes
@@ -1003,8 +1008,8 @@ export default function EditBookPage() {
           </div>
 
           {/* 2. Main Content Area - Removed flex-grow and items-center */}
-          <div className="overflow-auto p-4"> 
-             {renderContent()} 
+          <div className="flex-1 overflow-auto p-4">
+             {renderContent()}
           </div>
 
           {/* 3. Bottom Toolbar */}
