@@ -21,6 +21,11 @@ out
 !.vscode/css_custom_data.json
 .idea
 
+# Claude Code settings (keep local overrides private)
+.claude/*
+!.claude/settings.json
+.claude/settings.local.json
+
 # Debug
 npm-debug.log*
 yarn-debug.log*
@@ -56,6 +61,16 @@ logs
 # Railway
 railway.json
 
-# Documentation (except README.md)
+# Documentation (except README.md and project docs)
 *.md
 !README.md
+!CLAUDE.md
+!ARCHITECTURE_ANALYSIS.md
+!ARCHITECTURE_IMPROVEMENTS.md
+!CLOUDINARY_DIRECT_UPLOAD_PLAN.md
+!MONOREPO_IMPORT_CLEANUP_PLAN.md
+!OPTIMIZATION_PLAN.md
+!OPTIMIZATION_PROGRESS.md
+!OPTIMIZATIONS_June8.md
+!PAGE_ORDERING_ARCHITECTURE.md
+!REORDER_TEXT_FIX_PLAN.md

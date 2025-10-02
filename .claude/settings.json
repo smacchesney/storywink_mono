@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(npm run:*)",
+      "Bash(touch:*)",
+      "Bash(lsof:*)",
+      "Bash(kill:*)",
+      "Bash(grep:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(true)",
+      "Bash(npm install)",
+      "Bash(docker exec:*)",
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(npm install:*)",
+      "Bash(cd:*)",
+      "WebFetch(domain:dev.to)",
+      "WebSearch",
+      "WebFetch(domain:ai.google.dev)",
+      "WebFetch(domain:www.npmjs.com)"
+    ]
+  },
+  "enableAllProjectMcpServers": false
+}
