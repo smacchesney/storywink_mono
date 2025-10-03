@@ -1022,10 +1022,10 @@ export default function EditBookPage() {
           
           {/* ---- Conditionally Render Panels based on activeTab AND isDesktop ---- */} 
           
-          {/* Details Panel (New) */} 
+          {/* Details Panel (New) */}
           {activeTab === 'details' && (
             isDesktop ? (
-              <Drawer open={isDetailsPanelOpen} onOpenChange={setIsDetailsPanelOpen}>
+              <Drawer open={isDetailsPanelOpen} onOpenChange={setIsDetailsPanelOpen} modal={false} shouldScaleBackground={false}>
                 <DrawerContent className="h-full w-[380px] mt-0 fixed left-0 rounded-none border-r"> 
                   <DrawerHeader><DrawerTitle>Book Details</DrawerTitle></DrawerHeader>
                   <DetailsEditorPanel 
@@ -1057,10 +1057,10 @@ export default function EditBookPage() {
             )
           )}
 
-          {/* Cover Panel */} 
+          {/* Cover Panel */}
           {activeTab === 'cover' && (
             isDesktop ? (
-              <Drawer open={isCoverPanelOpen} onOpenChange={setIsCoverPanelOpen}>
+              <Drawer open={isCoverPanelOpen} onOpenChange={setIsCoverPanelOpen} modal={false} shouldScaleBackground={false}>
                 <DrawerContent className="h-full w-[380px] mt-0 fixed left-0 rounded-none border-r"> 
                   <DrawerHeader><DrawerTitle>Select your front cover</DrawerTitle></DrawerHeader>
                   {CoverPanelContent} 
@@ -1076,10 +1076,10 @@ export default function EditBookPage() {
             )
           )}
 
-          {/* Pages Panel */} 
+          {/* Pages Panel */}
           {activeTab === 'pages' && (
             isDesktop ? (
-              <Drawer open={isPagesPanelOpen} onOpenChange={setIsPagesPanelOpen}>
+              <Drawer open={isPagesPanelOpen} onOpenChange={setIsPagesPanelOpen} modal={false} shouldScaleBackground={false}>
                 <DrawerContent className="h-full w-[380px] mt-0 fixed left-0 rounded-none border-r"> 
                   <DrawerHeader>
                       <DrawerTitle>Pages Overview</DrawerTitle>
@@ -1101,10 +1101,10 @@ export default function EditBookPage() {
             )
           )}
 
-          {/* Art Style Panel */} 
+          {/* Art Style Panel */}
           {activeTab === 'artStyle' && (
             isDesktop ? (
-              <Drawer open={isArtStylePanelOpen} onOpenChange={setIsArtStylePanelOpen}>
+              <Drawer open={isArtStylePanelOpen} onOpenChange={setIsArtStylePanelOpen} modal={false} shouldScaleBackground={false}>
                 <DrawerContent className="h-full w-[380px] mt-0 fixed left-0 rounded-none border-r"> 
                   <DrawerHeader><DrawerTitle>Choose Art Style</DrawerTitle></DrawerHeader>
                   {ArtStylePanelContent} 
