@@ -152,7 +152,13 @@ export function CloudinaryUploaderAuto({
       totalFiles: totalFiles.current,
       hasCalledComplete: hasCalledComplete.current
     }, "Cloudinary widget closed");
-    
+
+    // CRITICAL: Remove any scroll locks that Cloudinary widget may have applied
+    // This fixes production scroll lock issues after upload
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('position');
+    document.documentElement.style.removeProperty('overflow');
+
     // If we haven't called complete yet and have uploads
     if (!hasCalledComplete.current && uploadedAssets.current.length > 0) {
       // Case 1: We have queue info and counts match
