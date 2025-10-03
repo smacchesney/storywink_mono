@@ -68,7 +68,7 @@ export default function EditBookPage() {
   const [showPhotoUploadProgress, setShowPhotoUploadProgress] = useState(false); // <-- New state for photo upload progress screen
 
   // States for the new Details Panel
-  const [isDetailsPanelOpen, setIsDetailsPanelOpen] = useState(false); // Changed to false
+  const [isDetailsPanelOpen, setIsDetailsPanelOpen] = useState(true); // Start open since activeTab defaults to 'details'
   const [isSavingDetails, setIsSavingDetails] = useState(false);
 
   // --- Step Completion Tracking ---
