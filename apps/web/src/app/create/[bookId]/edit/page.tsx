@@ -256,7 +256,13 @@ export default function EditBookPage() {
     setIsArtStylePanelOpen(tab === 'artStyle');
     setIsCoverPanelOpen(tab === 'cover');
     setIsDetailsPanelOpen(tab === 'details'); // Control Details panel
-    
+
+    // CRITICAL: Force unlock scroll whenever panels close
+    // This prevents Vaul's scroll lock from persisting
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('position');
+    document.documentElement.style.removeProperty('overflow');
+
     // No need to specifically set storyboardOrder here, useEffect handles it
 
     if (tab === 'artStyle') {
@@ -315,11 +321,16 @@ export default function EditBookPage() {
       if (!response.ok) throw new Error(result.error || `Failed to save page order: ${response.statusText}`);
        
        // Update main bookData state
-       setBookData(prevData => prevData ? { 
-           ...prevData, 
+       setBookData(prevData => prevData ? {
+           ...prevData,
            pages: finalOrderedPages // Update with the full list that includes cover at index 0
          } : null);
-         
+
+       // Force unlock scroll when closing panel
+       document.body.style.removeProperty('overflow');
+       document.body.style.removeProperty('position');
+       document.documentElement.style.removeProperty('overflow');
+
        setIsPagesPanelOpen(false); // Close panel
        setPagesConfirmed(true); // Mark pages as confirmed by user
     } catch (error) {
@@ -384,7 +395,12 @@ export default function EditBookPage() {
             ...(updatePayload.isWinkifyEnabled !== undefined && { isWinkifyEnabled: updatePayload.isWinkifyEnabled })
         };
       });
-         
+
+       // Force unlock scroll when closing panel
+       document.body.style.removeProperty('overflow');
+       document.body.style.removeProperty('position');
+       document.documentElement.style.removeProperty('overflow');
+
        setIsArtStylePanelOpen(false); // Close panel on success
 
     } catch (error) {
@@ -446,7 +462,12 @@ export default function EditBookPage() {
          setPagesResetKey(prev => prev + 1);
          setPagesConfirmed(false); // Reset pages confirmation when cover changes
        }
-         
+
+       // Force unlock scroll when closing panel
+       document.body.style.removeProperty('overflow');
+       document.body.style.removeProperty('position');
+       document.documentElement.style.removeProperty('overflow');
+
        setIsCoverPanelOpen(false); // Close panel on success
     } catch (error) {
       logger.error({ bookId, error }, "Failed to save cover details");
@@ -498,7 +519,12 @@ export default function EditBookPage() {
             ...(updatePayload.childName !== undefined && { childName: updatePayload.childName }),
         };
       });
-         
+
+       // Force unlock scroll when closing panel
+       document.body.style.removeProperty('overflow');
+       document.body.style.removeProperty('position');
+       document.documentElement.style.removeProperty('overflow');
+
        setIsDetailsPanelOpen(false);
     } catch (error) {
       logger.error({ bookId, error }, "Failed to save book details");
