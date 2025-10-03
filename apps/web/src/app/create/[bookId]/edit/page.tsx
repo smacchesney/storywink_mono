@@ -29,6 +29,7 @@ import { Asset } from '@prisma/client'; // Import Asset for filtering
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'; // Import Tooltip
 import WritingProgressScreen from '@/components/create/editor/WritingProgressScreen'; // Import Progress Screen
 import AdditionalPhotoUploadProgressScreen from '@/components/create/editor/AdditionalPhotoUploadProgressScreen'; // <-- Import new progress screen
+import UploadProgressScreen from '@/components/create/UploadProgressScreen'; // Import upload progress screen for initial load
 import useMediaQuery from '@/hooks/useMediaQuery'; // Import the hook
 import Joyride, { Step, EVENTS, STATUS, CallBackProps } from 'react-joyride'; // <-- Add Joyride imports
 import { cn } from '@/lib/utils';
@@ -803,9 +804,10 @@ export default function EditBookPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-[#F76C5E]" />
-      </div>
+      <UploadProgressScreen
+        message="Preparing your storybook..."
+        progress={undefined}
+      />
     );
   }
 
@@ -1097,22 +1099,22 @@ export default function EditBookPage() {
           {activeTab === 'pages' && (
             isDesktop ? (
               <Drawer open={isPagesPanelOpen} onOpenChange={setIsPagesPanelOpen} modal={false} shouldScaleBackground={false}>
-                <DrawerContent className="h-full w-[380px] mt-0 fixed left-0 rounded-none border-r"> 
+                <DrawerContent className="h-full w-[380px] mt-0 fixed left-0 rounded-none border-r">
                   <DrawerHeader>
                       <DrawerTitle>Pages Overview</DrawerTitle>
                       <DrawerDescription>Drag photos to rearrange pages.</DrawerDescription>
                   </DrawerHeader>
-                  {StoryboardPanelContent} 
+                  {StoryboardPanelContent}
                 </DrawerContent>
               </Drawer>
             ) : (
               <Sheet open={isPagesPanelOpen} onOpenChange={setIsPagesPanelOpen}>
-                 <SheetContent side="bottom" className="h-screen flex flex-col"> 
+                 <SheetContent side="bottom" className="h-[85vh] flex flex-col">
                    <SheetHeader>
                        <SheetTitle>Pages Overview</SheetTitle>
-                       <DrawerDescription>Drag photos to rearrange pages.</DrawerDescription> 
+                       <DrawerDescription>Drag photos to rearrange pages.</DrawerDescription>
                    </SheetHeader>
-                   {StoryboardPanelContent} 
+                   {StoryboardPanelContent}
                  </SheetContent>
               </Sheet>
             )
@@ -1122,16 +1124,16 @@ export default function EditBookPage() {
           {activeTab === 'artStyle' && (
             isDesktop ? (
               <Drawer open={isArtStylePanelOpen} onOpenChange={setIsArtStylePanelOpen} modal={false} shouldScaleBackground={false}>
-                <DrawerContent className="h-full w-[380px] mt-0 fixed left-0 rounded-none border-r"> 
+                <DrawerContent className="h-full w-[380px] mt-0 fixed left-0 rounded-none border-r">
                   <DrawerHeader><DrawerTitle>Choose Art Style</DrawerTitle></DrawerHeader>
-                  {ArtStylePanelContent} 
+                  {ArtStylePanelContent}
                 </DrawerContent>
               </Drawer>
             ) : (
               <Sheet open={isArtStylePanelOpen} onOpenChange={setIsArtStylePanelOpen}>
-                 <SheetContent side="bottom" className="h-screen flex flex-col"> 
+                 <SheetContent side="bottom" className="h-[85vh] flex flex-col">
                    <SheetHeader><SheetTitle>Choose Art Style</SheetTitle></SheetHeader>
-                   {ArtStylePanelContent} 
+                   {ArtStylePanelContent}
                  </SheetContent>
               </Sheet>
             )

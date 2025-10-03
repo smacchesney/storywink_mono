@@ -105,30 +105,29 @@ export default function CreateBookPage() {
   // Handle upload completion from Cloudinary
   const handleUploadComplete = async (cloudinaryAssets: CloudinaryAsset[]) => {
     logger.info({ count: cloudinaryAssets.length }, "Cloudinary uploads completed");
-    
+
     // Hide the Cloudinary component now that uploads are done
     setShowCloudinaryUploader(false);
-    
+
     // Keep progress screen visible while creating database records
     setUploadProgress(90); // Show we're almost done
-    
+
     try {
       // Create database records for the uploaded assets
       const dbAssets = await createAssetRecords(cloudinaryAssets);
       logger.info({ count: dbAssets.length }, "Database assets created");
-      
+
       setUploadProgress(95); // Almost there
-      
+
       if (dbAssets.length > 0) {
         const assetIds = dbAssets.map(asset => asset.id);
         const creationResult = await handleCreateBook(assetIds);
-        
+
         if (creationResult?.bookId) {
-          setUploadProgress(100); // Complete!
-          // Small delay to show 100% before navigation
-          setTimeout(() => {
-            router.push(`/create/${creationResult.bookId}/edit`);
-          }, 500);
+          setUploadProgress(98); // Show progress but keep screen until navigation completes
+          // Navigate immediately - let the edit page handle its own loading
+          // Progress screen will stay visible until the new page mounts
+          router.push(`/create/${creationResult.bookId}/edit`);
         } else {
           // Error occurred during handleCreateBook
           setShowProgressScreen(false);
@@ -170,10 +169,11 @@ export default function CreateBookPage() {
   };
 
   const handleStartCreatingClick = () => {
-    logger.info("Start Creating clicked - Opening PhotoSourceSheet");
-    setIsSheetOpen(true);
+    logger.info("Start Creating clicked - Directly opening Cloudinary uploader");
+    // Skip the PhotoSourceSheet and directly trigger Cloudinary uploader
+    setShowCloudinaryUploader(true);
   };
-  
+
   const handleChooseFromPhone = () => {
     setIsSheetOpen(false);
     // Show the auto-opening Cloudinary uploader
