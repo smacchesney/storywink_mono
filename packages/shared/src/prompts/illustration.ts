@@ -31,38 +31,35 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
   const styleDefinition = getStyleDefinition(opts.style);
   const styleDescription = styleDefinition?.description;
 
-  // Core transformation instruction - style takes priority
   const base = [
-    `Create a children's picture book illustration by transforming the first image using the artistic style from the second image.`,
+    `Create a children's picture book illustration using the two images provided. The first image shows the scene/subjects, the second image shows the artistic style to apply.`,
 
-    `STYLE APPLICATION (Primary): Fully transform the first image into an illustration. Apply the complete artistic style from the second image: its color palette, textures, brush strokes, line work, shading techniques, lighting style, and overall aesthetic. The result should look like a hand-drawn/painted illustration, not a photo with filters. Remove all photographic elements - realistic lighting, camera effects, textures should be replaced with illustrated equivalents.${styleDescription ? ` Emphasize these style characteristics: ${styleDescription}` : ''}`,
+    `ARTISTIC STYLE (Primary directive): Fully transform this into a hand-drawn/painted children's book illustration matching the style from the second image. Apply its complete aesthetic: color palette, brush techniques, line work, textures, shading, and lighting approach. The final image must look like it was illustrated from imagination, not like a filtered photograph. Replace all photographic elements (realistic textures, camera lighting, photo grain) with illustrated equivalents. Backgrounds should be simplified into clean illustrated shapes and forms.${styleDescription ? ` Style emphasis: ${styleDescription}` : ''}`,
 
-    `CONTENT PRESERVATION (Secondary): While transforming into illustration style, preserve these key elements from the first image: the identity and pose of all people/characters (especially faces - keep them recognizable as the same person but in illustrated form), the main objects and their spatial arrangement, and the general composition. Simplify and abstract background details into clean illustrated elements (e.g., dirt becomes simple ground texture, cluttered areas become simplified shapes) while keeping key recognizable features that establish the setting.`,
+    `SCENE INTERPRETATION (Secondary directive): Use the first image as reference for: character/subject identity and their pose, the spatial layout and composition, key recognizable objects that establish the setting. Translate these elements into illustration form - a wooden fence becomes illustrated wood with simple line work, not photographic grain; metal becomes clean illustrated surfaces with simple highlights, not realistic reflections. Simplify complex backgrounds into essential illustrated elements while keeping the scene recognizable.`,
+
+    `CHARACTER CONSISTENCY: Maintain the same illustrated appearance of people across all pages - consistent face shape, hair style, skin tone, and proportions in the illustrated style. The child should be immediately recognizable as the same character throughout the book.`,
   ];
 
-  // Winkify dynamic effects
   const winkifyBits = opts.isWinkifyEnabled && opts.illustrationNotes
     ? [
-        `Add subtle dynamic visual effects to enhance the action: motion lines, zoom effects, sparkles, confetti, or comic-style text (like "Whoosh!", "Splash!", "Zoom!"). Keep effects minimal (under 20% of image) and ensure they match the illustration style. Do not alter character faces or poses with these effects.`,
-        `Specific effect to add: ${opts.illustrationNotes}`,
+        `Dynamic effects: Add subtle visual enhancement like motion lines, sparkles, or comic-style text ("Whoosh!", "Splash!"). Keep minimal (under 20% of image), matching the illustration style. Do not alter character faces or poses.`,
+        `Effect note: ${opts.illustrationNotes}`,
       ]
     : [];
 
-  // Text handling with consistency emphasis
   const titleBits = opts.isTitlePage
     ? [
-        `Add the book title: "${opts.bookTitle}". Use a font style that matches the second image's text aesthetic. Position it naturally without covering important subjects. Make the text clearly readable and appropriately sized (approximately 5-7% of image height).`,
+        `Text: Add the title "${opts.bookTitle}" in a readable font matching the second image's text style. Position naturally without covering important subjects. Size appropriately (5-7% of image height).`,
       ]
     : [
-        `Add this text: "${(opts.pageText ?? '').trim()}". Render it exactly once using the same font style, weight, and sizing as shown in the second image. Maintain consistent text size across pages (approximately 5-7% of image height). Position text naturally, ensure it's fully visible and not cut off. The text should integrate with the illustration style.`,
+        `Text: Add this text once: "${(opts.pageText ?? '').trim()}". Use the same font style and size as the second image (approximately 5-7% of image height for consistency across pages). Match the text aesthetic from the second image. Position text naturally, ensure fully visible and readable.`,
       ];
 
-  // Combine all parts
   const prompt = [...base, ...winkifyBits, ...titleBits]
     .filter(Boolean)
     .join(' ');
 
-  // Ensure prompt doesn't exceed max length
   const finalPrompt = prompt.length > MAX_PROMPT_CHARS
     ? prompt.slice(0, MAX_PROMPT_CHARS - 1) + '…'
     : prompt;
