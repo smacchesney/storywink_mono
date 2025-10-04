@@ -76,6 +76,7 @@ export default function EditBookPage() {
   const [completedSteps, setCompletedSteps] = useState<Set<EditorTab>>(new Set());
   const [pagesResetKey, setPagesResetKey] = useState(0); // Key to track when pages are added/changed
   const [pagesConfirmed, setPagesConfirmed] = useState(false); // Track if user has confirmed page order
+  const [coverConfirmed, setCoverConfirmed] = useState(false); // Track if user has confirmed cover selection
 
   // --- React Joyride State ---
   const [runTour, setRunTour] = useState(false); // <-- Initialize to false, tour won't start automatically
@@ -432,10 +433,11 @@ export default function EditBookPage() {
 
     if (Object.keys(updatePayload).length === 0) {
       // logger.info({ bookId }, "No changes detected in cover details."); // Title/ChildName removed
-      logger.info({ bookId }, "No changes detected in cover photo.");
+      logger.info({ bookId }, "No changes detected in cover photo - marking as confirmed.");
       setIsSavingCover(false);
       setIsCoverPanelOpen(false);
-      return; 
+      setCoverConfirmed(true); // Mark as confirmed even if no changes (user reviewed it)
+      return;
     }
 
     try {
@@ -464,7 +466,8 @@ export default function EditBookPage() {
          setPagesResetKey(prev => prev + 1);
          setPagesConfirmed(false); // Reset pages confirmation when cover changes
        }
-         
+
+       setCoverConfirmed(true); // Mark cover as confirmed after successful save
        setIsCoverPanelOpen(false); // Close panel on success
     } catch (error) {
       logger.error({ bookId, error }, "Failed to save cover details");
@@ -769,8 +772,8 @@ export default function EditBookPage() {
       newCompletedSteps.add('details');
     }
 
-    // Cover: completed if coverAssetId is set
-    if (bookData.coverAssetId) {
+    // Cover: completed if coverAssetId is set AND user has confirmed the selection
+    if (bookData.coverAssetId && coverConfirmed) {
       newCompletedSteps.add('cover');
     }
 
@@ -788,7 +791,7 @@ export default function EditBookPage() {
     }
 
     setCompletedSteps(newCompletedSteps);
-  }, [bookData, pagesResetKey, pagesConfirmed]);
+  }, [bookData, pagesResetKey, pagesConfirmed, coverConfirmed]);
 
   // Reset completion tracking when significant changes occur
   // The pagesResetKey is incremented when:
@@ -805,7 +808,7 @@ export default function EditBookPage() {
   if (isLoading) {
     return (
       <UploadProgressScreen
-        message="Preparing your storybook..."
+        message="Uploading your photos..."
         progress={undefined}
       />
     );
