@@ -164,20 +164,21 @@ generateRouter.post(
       } else {
         // Process all pages that need illustrations
         // Include title pages (they don't need text) and story pages with text
+        // Use page.isTitlePage field for consistency
         pagesToIllustrate = book.pages.filter((p) => {
-          const isTitle = isTitlePage(p.assetId, book.coverAssetId);
+          const isTitle = p.isTitlePage;
           const hasText = !!(p.text && p.text.trim());
           const hasExistingImage = !!p.generatedImageUrl;
-          
+
           // Include if: (title page OR has text) AND no existing image
           const shouldInclude = (isTitle || hasText) && !hasExistingImage;
-          
+
           console.log(`[Express API] Page ${p.pageNumber} analysis:`);
-          console.log(`    - Is Title Page: ${isTitle}`);
+          console.log(`    - Is Title Page: ${isTitle} (using page.isTitlePage field)`);
           console.log(`    - Has Text: ${hasText} (${p.text?.length || 0} chars)`);
           console.log(`    - Has Existing Image: ${hasExistingImage}`);
           console.log(`    - Will Process: ${shouldInclude}`);
-          
+
           return shouldInclude;
         });
       }
@@ -196,8 +197,9 @@ generateRouter.post(
 
       // Create child job definitions for each page (matching Next.js API pattern)
       const pageChildren = pagesToIllustrate.map((page) => {
-        const isActualTitlePage = isTitlePage(page.assetId, book.coverAssetId);
-        
+        // Use page.isTitlePage field for consistency
+        const isActualTitlePage = page.isTitlePage;
+
         const illustrationJobData: IllustrationGenerationJobData = {
           userId,
           bookId,
@@ -210,11 +212,11 @@ generateRouter.post(
           isTitlePage: isActualTitlePage,
           illustrationNotes: page.illustrationNotes,
         };
-        
+
         const jobName = `generate-illustration-${bookId}-p${page.pageNumber}`;
         console.log(`[Express API] Creating job: ${jobName}`);
         console.log(`    - Page ID: ${page.id}`);
-        console.log(`    - Is Title: ${isActualTitlePage}`);
+        console.log(`    - Is Title: ${isActualTitlePage} (using page.isTitlePage field)`);
         console.log(`    - Has Text: ${!!page.text} (${page.text?.length || 0} chars)`);
         
         return {

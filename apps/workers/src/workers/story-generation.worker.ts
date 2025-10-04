@@ -67,11 +67,12 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
       throw new Error('Book not found');
     }
 
-    // Filter out cover page to get story pages with their assets
-    const storyPages = book.pages.filter(page => page.assetId !== book.coverAssetId);
+    // Filter out title page to get story pages with their assets
+    // Use page.isTitlePage field for consistency with reorder API
+    const storyPages = book.pages.filter(page => !page.isTitlePage);
 
     if (!storyPages || storyPages.length === 0) {
-      throw new Error('Book has no story pages (excluding cover)');
+      throw new Error('Book has no story pages (excluding title page)');
     }
 
     // Diagnostic logging for debugging text assignment issues
@@ -82,14 +83,22 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
       storyPagesCount: storyPages.length,
       expectedPageLength: book.pageLength,
       actualPageLength: book.pages.length,
-      storyPageDetails: storyPages.map(p => ({ 
-        id: p.id, 
-        index: p.index, 
+      allPagesWithTitleFlag: book.pages.map(p => ({
+        id: p.id,
+        index: p.index,
         pageNumber: p.pageNumber,
+        isTitlePage: p.isTitlePage,
+        assetId: p.assetId
+      })),
+      storyPageDetails: storyPages.map(p => ({
+        id: p.id,
+        index: p.index,
+        pageNumber: p.pageNumber,
+        isTitlePage: p.isTitlePage,
         assetId: p.assetId,
         hasExistingText: !!p.text
       }))
-    }, 'Story generation page analysis');
+    }, 'Story generation page analysis - using isTitlePage field for filtering');
 
     // Validate page count
     if (storyPages.length !== book.pageLength - 1) {
