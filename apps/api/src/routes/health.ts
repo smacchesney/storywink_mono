@@ -6,7 +6,19 @@ export const healthRouter = Router();
 healthRouter.get("/", async (_req, res) => {
   // Basic health check - just verify server is running
   // Don't fail on database/redis issues during startup
-  const health = {
+  const health: {
+    success: boolean;
+    status: string;
+    timestamp: string;
+    service: string;
+    version: string;
+    env: {
+      DATABASE_URL: boolean;
+      REDIS_URL: boolean;
+      CLERK_SECRET_KEY: boolean;
+    };
+    database?: string;
+  } = {
     success: true,
     status: "healthy",
     timestamp: new Date().toISOString(),
