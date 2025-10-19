@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
           childName: '', // Start with empty child name as per new requirements
           status: BookStatus.DRAFT,
           pageLength: assetIds.length, // Set page length based on provided assets
+          coverAssetId: assetIds[0], // First photo becomes the cover
           // Other fields like artStyle will be set later in the editor
           isWinkifyEnabled: true, // Default to enabled
         },
