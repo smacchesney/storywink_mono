@@ -137,7 +137,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o', // gpt-4o supports vision
       messages: messages as any,
-      max_tokens: 3000, // Increased to support up to 12 pages (250 tokens/page avg with Winkify)
+      max_tokens: 4000, // Increased safety margin for 8+ page books with Winkify
       temperature: 0.7,
       response_format: { type: 'json_object' },
     });
@@ -147,39 +147,60 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
       throw new Error('OpenAI returned empty response');
     }
 
+    // Log raw response for debugging
+    logger.info({ bookId, rawResponse: rawResult }, 'Raw OpenAI response received');
+
     // Parse the response based on Winkify mode
     let updatePromises: any[] = [];
-    
+
     try {
       if (book.isWinkifyEnabled) {
         // Winkify response format: { "1": { "text": "...", "illustrationNotes": "..." }, ... }
         const winkifyResponse: WinkifyStoryResponse = JSON.parse(rawResult);
-        
+
         logger.info({ bookId, isWinkifyEnabled: true, responseKeys: Object.keys(winkifyResponse) }, 'Parsing Winkify response');
-        
+
+        // Validate that all expected pages are present in response
+        const expectedPageNumbers = storyPages.map((_, i) => (i + 1).toString());
+        const receivedPageNumbers = Object.keys(winkifyResponse);
+        const missingPages = expectedPageNumbers.filter(p => !receivedPageNumbers.includes(p));
+
+        if (missingPages.length > 0) {
+          logger.warn({
+            bookId,
+            missingPages,
+            expectedCount: expectedPageNumbers.length,
+            receivedCount: receivedPageNumbers.length
+          }, 'Some pages missing from GPT response');
+        }
+
         // Create a map for easier lookup
         const responseMap = new Map(Object.entries(winkifyResponse));
-        
+
         // Ensure all story pages get updated, even if AI didn't generate content for some
         updatePromises = storyPages.map((page, index) => {
           const storyPosition = index + 1; // 1-based position
           const content = responseMap.get(storyPosition.toString());
-          
+
           if (!content) {
-            logger.warn({ 
-              bookId, 
-              pageId: page.id, 
-              storyPosition, 
-              pageNumber: page.pageNumber 
+            logger.warn({
+              bookId,
+              pageId: page.id,
+              storyPosition,
+              pageNumber: page.pageNumber
             }, 'No Winkify content generated for this page - using defaults');
           }
-          
+
+          // Fix for empty string bug: check if text exists AND is not empty after trim
+          const trimmedText = content?.text?.trim() || '';
+          const finalText = trimmedText.length > 0 ? trimmedText : `[Page ${storyPosition} text pending]`;
+
           return prisma.page.update({
             where: { id: page.id },
-            data: { 
-              text: content?.text?.trim() || `[Page ${storyPosition} text pending]`,
+            data: {
+              text: finalText,
               illustrationNotes: content?.illustrationNotes || null,
-              textConfirmed: !!content?.text,
+              textConfirmed: trimmedText.length > 0,
             },
           });
         });
@@ -187,31 +208,49 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
       } else {
         // Standard response format: { "1": "text...", "2": "text...", ... }
         const standardResponse: StandardStoryResponse = JSON.parse(rawResult);
-        
+
         logger.info({ bookId, isWinkifyEnabled: false, responseKeys: Object.keys(standardResponse) }, 'Parsing standard response');
-        
+
+        // Validate that all expected pages are present in response
+        const expectedPageNumbers = storyPages.map((_, i) => (i + 1).toString());
+        const receivedPageNumbers = Object.keys(standardResponse);
+        const missingPages = expectedPageNumbers.filter(p => !receivedPageNumbers.includes(p));
+
+        if (missingPages.length > 0) {
+          logger.warn({
+            bookId,
+            missingPages,
+            expectedCount: expectedPageNumbers.length,
+            receivedCount: receivedPageNumbers.length
+          }, 'Some pages missing from GPT response');
+        }
+
         // Create a map for easier lookup
         const responseMap = new Map(Object.entries(standardResponse));
-        
+
         // Ensure all story pages get updated, even if AI didn't generate text for some
         updatePromises = storyPages.map((page, index) => {
           const storyPosition = index + 1; // 1-based position
           const text = responseMap.get(storyPosition.toString()) || '';
-          
+
           if (!text) {
-            logger.warn({ 
-              bookId, 
-              pageId: page.id, 
-              storyPosition, 
-              pageNumber: page.pageNumber 
-            }, 'No text generated for this page - using empty string');
+            logger.warn({
+              bookId,
+              pageId: page.id,
+              storyPosition,
+              pageNumber: page.pageNumber
+            }, 'No text generated for this page - using fallback');
           }
-          
+
+          // Fix for empty string bug: check if text exists AND is not empty after trim
+          const trimmedText = text.trim();
+          const finalText = trimmedText.length > 0 ? trimmedText : `[Page ${storyPosition} text pending]`;
+
           return prisma.page.update({
             where: { id: page.id },
-            data: { 
-              text: text.trim() || `[Page ${storyPosition} text pending]`,
-              textConfirmed: !!text,
+            data: {
+              text: finalText,
+              textConfirmed: trimmedText.length > 0,
             },
           });
         });
