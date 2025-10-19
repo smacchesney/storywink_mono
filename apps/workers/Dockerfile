@@ -31,15 +31,19 @@ WORKDIR /app
 # (needed because Turbo builds web service as dependency)
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 ARG NEXT_PUBLIC_API_URL
+ARG RAILWAY_GIT_COMMIT_SHA
 
 # Set environment variables for build time
 ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # Copy node_modules from deps stage
-COPY --from=deps /app ./
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/package.json ./package.json
+COPY --from=deps /app/package-lock.json ./package-lock.json
+COPY --from=deps /app/turbo.json ./turbo.json
 
-# Copy all source files
+# Copy all source files (including the fixed source code)
 COPY . .
 
 # Build the workers app
