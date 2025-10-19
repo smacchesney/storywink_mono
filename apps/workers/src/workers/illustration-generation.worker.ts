@@ -119,8 +119,20 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     let styleReferenceBuffer: Buffer | null = null;
     let styleReferenceMimeType: string | null = null;
     const styleKey = artStyle as StyleKey;
+
+    // Defensive check: Ensure STYLE_LIBRARY is loaded (prevent race condition on module import)
+    if (!STYLE_LIBRARY || Object.keys(STYLE_LIBRARY).length === 0) {
+      logger.error({ jobId: job.id, pageId, pageNumber }, 'STYLE_LIBRARY not loaded - module import race condition detected');
+      throw new Error('STYLE_LIBRARY not loaded - please retry');
+    }
+
     const styleData = STYLE_LIBRARY[styleKey];
-    const styleReferenceUrl = styleData?.referenceImageUrl;
+    if (!styleData) {
+      logger.error({ jobId: job.id, pageId, pageNumber, styleKey, availableStyles: Object.keys(STYLE_LIBRARY) }, 'Invalid style key - not found in STYLE_LIBRARY');
+      throw new Error(`Invalid style key: ${styleKey}. Available styles: ${Object.keys(STYLE_LIBRARY).join(', ')}`);
+    }
+
+    const styleReferenceUrl = styleData.referenceImageUrl;
 
     if (styleReferenceUrl) {
          try {
@@ -139,11 +151,8 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
             logger.info({ jobId: job.id, pageNumber }, `Fetched style reference image (${styleReferenceMimeType}).`);
         } catch (fetchError: any) {
             logger.error({ jobId: job.id, pageId, pageNumber, styleKey, error: fetchError.message }, 'Failed to fetch style reference image.');
-            throw fetchError; 
+            throw fetchError;
         }
-    } else {
-         logger.error({ jobId: job.id, pageId, pageNumber, styleKey }, 'Style reference image URL is missing for the selected style.');
-         throw new Error(`Missing referenceImageUrl for style: ${styleKey}`);
     }
     
     if (!styleReferenceBuffer || !styleReferenceMimeType) {
