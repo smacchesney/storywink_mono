@@ -137,7 +137,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o', // gpt-4o supports vision
       messages: messages as any,
-      max_tokens: 1500,
+      max_tokens: 3000, // Increased to support up to 12 pages (250 tokens/page avg with Winkify)
       temperature: 0.7,
       response_format: { type: 'json_object' },
     });
