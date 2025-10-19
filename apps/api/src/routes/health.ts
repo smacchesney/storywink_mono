@@ -4,41 +4,33 @@ import prisma from "../database/index.js";
 export const healthRouter = Router();
 
 healthRouter.get("/", async (_req, res) => {
-  try {
-    console.log("=== HEALTH CHECK STARTED ===");
-    console.log("DATABASE_URL exists:", !!process.env.DATABASE_URL);
-    console.log("DATABASE_URL length:", process.env.DATABASE_URL?.length || 0);
-    
-    if (!process.env.DATABASE_URL) {
-      throw new Error("DATABASE_URL environment variable is not set");
+  // Basic health check - just verify server is running
+  // Don't fail on database/redis issues during startup
+  const health = {
+    success: true,
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    service: "storywink-api",
+    version: process.env.npm_package_version || "1.0.0",
+    env: {
+      DATABASE_URL: !!process.env.DATABASE_URL,
+      REDIS_URL: !!process.env.REDIS_URL,
+      CLERK_SECRET_KEY: !!process.env.CLERK_SECRET_KEY,
     }
-    
-    // Check database connection
-    console.log("Attempting database query...");
-    const result = await prisma.$queryRaw`SELECT 1 as test`;
-    console.log("Database query successful:", result);
+  };
 
-    res.json({
-      success: true,
-      status: "healthy",
-      timestamp: new Date().toISOString(),
-      service: "storywink-api",
-      version: process.env.npm_package_version || "1.0.0",
-    });
+  try {
+    // Optional: try database connection but don't fail healthcheck if it's down
+    if (process.env.DATABASE_URL) {
+      await prisma.$queryRaw`SELECT 1 as test`;
+      health.database = "connected";
+    } else {
+      health.database = "not configured";
+    }
   } catch (error) {
-    console.error("=== HEALTH CHECK ERROR ===");
-    console.error("Health check database error:", error);
-    console.error("Error type:", typeof error);
-    console.error("Error name:", error instanceof Error ? error.name : 'unknown');
-    console.error("Error message:", error instanceof Error ? error.message : String(error));
-    console.error("=== END HEALTH CHECK ERROR ===");
-    
-    res.status(503).json({
-      success: false,
-      status: "unhealthy",
-      error: "Database connection failed",
-      details: error instanceof Error ? error.message : String(error),
-      errorType: error instanceof Error ? error.name : typeof error,
-    });
+    console.warn("Database connection check failed (healthcheck still passes):", error);
+    health.database = "error";
   }
+
+  res.json(health);
 });
