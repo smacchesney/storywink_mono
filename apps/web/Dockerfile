@@ -17,14 +17,11 @@ COPY apps/workers/package.json ./apps/workers/
 COPY packages/database/package.json ./packages/database/
 COPY packages/shared/package.json ./packages/shared/
 
-# Install dependencies
-RUN npm ci
-
-# Copy Prisma schema for generation
+# Copy Prisma schema BEFORE npm ci (postinstall hook needs it)
 COPY packages/database/prisma ./packages/database/prisma
 
-# Generate Prisma Client
-RUN npm run db:generate
+# Install dependencies (postinstall will run prisma generate)
+RUN npm ci
 
 # Rebuild the source code only when needed
 FROM base AS builder
