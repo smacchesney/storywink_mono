@@ -40,6 +40,34 @@ import { processStoryGeneration } from './workers/story-generation.worker.js';
 import { processIllustrationGeneration } from './workers/illustration-generation.worker.js';
 import { processBookFinalize } from './workers/book-finalize.worker.js';
 
+// CRITICAL: Pre-load and validate STYLE_LIBRARY before processing any jobs
+// This prevents race conditions where workers access STYLE_LIBRARY before it's fully loaded
+import { STYLE_LIBRARY } from '@storywink/shared/prompts/styles';
+
+// Validate STYLE_LIBRARY is properly loaded at startup
+function validateStyleLibrary() {
+  console.log('[Startup] Validating STYLE_LIBRARY...');
+
+  if (!STYLE_LIBRARY || Object.keys(STYLE_LIBRARY).length === 0) {
+    console.error('[Startup] FATAL: STYLE_LIBRARY is not loaded!');
+    process.exit(1);
+  }
+
+  // Validate each style has required properties
+  for (const [key, value] of Object.entries(STYLE_LIBRARY)) {
+    if (!value.referenceImageUrl) {
+      console.error(`[Startup] FATAL: Style "${key}" missing referenceImageUrl`);
+      process.exit(1);
+    }
+    console.log(`[Startup] ✓ Style "${key}" loaded with referenceImageUrl: ${value.referenceImageUrl}`);
+  }
+
+  console.log(`[Startup] ✓ STYLE_LIBRARY validated successfully (${Object.keys(STYLE_LIBRARY).length} styles)`);
+}
+
+// Run validation immediately at module load
+validateStyleLibrary();
+
 // Create workers
 const storyWorker = new Worker(
   QUEUE_NAMES.STORY_GENERATION,

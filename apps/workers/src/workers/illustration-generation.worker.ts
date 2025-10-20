@@ -136,25 +136,37 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
 
     const styleReferenceUrl = styleData.referenceImageUrl;
 
-    if (styleReferenceUrl) {
-         try {
-            logger.info({ jobId: job.id, pageNumber }, `Fetching style reference image from ${styleReferenceUrl}`);
-            const styleResponse = await fetch(styleReferenceUrl);
-            if (!styleResponse.ok) {
-                throw new Error(`Failed to fetch style image: ${styleResponse.status} ${styleResponse.statusText}`);
-            }
-            const styleContentTypeHeader = styleResponse.headers.get('content-type');
-            styleReferenceMimeType = styleContentTypeHeader?.startsWith('image/') 
-                ? styleContentTypeHeader 
-                : (styleReferenceUrl.endsWith('.png') ? 'image/png' : 'image/jpeg');
+    // CRITICAL: Explicit validation that referenceImageUrl exists
+    if (!styleReferenceUrl || styleReferenceUrl.trim().length === 0) {
+      logger.error({
+        jobId: job.id,
+        pageId,
+        pageNumber,
+        styleKey,
+        styleData: JSON.stringify(styleData),
+        styleDataKeys: Object.keys(styleData)
+      }, 'CRITICAL: referenceImageUrl is missing or empty from styleData');
+      throw new Error(`Missing referenceImageUrl for style: ${styleKey}. This indicates STYLE_LIBRARY was not fully initialized. Style data: ${JSON.stringify(styleData)}`);
+    }
+
+    // Fetch style reference image (we know styleReferenceUrl exists from validation above)
+    try {
+      logger.info({ jobId: job.id, pageNumber }, `Fetching style reference image from ${styleReferenceUrl}`);
+      const styleResponse = await fetch(styleReferenceUrl);
+      if (!styleResponse.ok) {
+        throw new Error(`Failed to fetch style image: ${styleResponse.status} ${styleResponse.statusText}`);
+      }
+      const styleContentTypeHeader = styleResponse.headers.get('content-type');
+      styleReferenceMimeType = styleContentTypeHeader?.startsWith('image/')
+        ? styleContentTypeHeader
+        : (styleReferenceUrl.endsWith('.png') ? 'image/png' : 'image/jpeg');
             
-            const styleArrayBuffer = await styleResponse.arrayBuffer();
-            styleReferenceBuffer = Buffer.from(styleArrayBuffer);
-            logger.info({ jobId: job.id, pageNumber }, `Fetched style reference image (${styleReferenceMimeType}).`);
-        } catch (fetchError: any) {
-            logger.error({ jobId: job.id, pageId, pageNumber, styleKey, error: fetchError.message }, 'Failed to fetch style reference image.');
-            throw fetchError;
-        }
+      const styleArrayBuffer = await styleResponse.arrayBuffer();
+      styleReferenceBuffer = Buffer.from(styleArrayBuffer);
+      logger.info({ jobId: job.id, pageNumber }, `Fetched style reference image (${styleReferenceMimeType}).`);
+    } catch (fetchError: any) {
+      logger.error({ jobId: job.id, pageId, pageNumber, styleKey, error: fetchError.message }, 'Failed to fetch style reference image.');
+      throw fetchError;
     }
     
     if (!styleReferenceBuffer || !styleReferenceMimeType) {
