@@ -4,7 +4,9 @@ import { IllustrationGenerationJob } from '@storywink/shared';
 import { GoogleGenAI } from '@google/genai';
 import { v2 as cloudinary } from 'cloudinary';
 import pino from 'pino';
-import { createIllustrationPrompt, IllustrationPromptOptions, STYLE_LIBRARY, StyleKey } from '@storywink/shared';
+import { createIllustrationPrompt, IllustrationPromptOptions } from '@storywink/shared';
+// Import STYLE_LIBRARY directly from styles module to avoid barrel export race condition
+import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
