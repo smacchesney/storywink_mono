@@ -57,6 +57,31 @@ export async function POST(
       return NextResponse.json({ error: 'Book not found or you do not have permission.' }, { status: 403 }); // Forbidden or 404
     }
 
+    // Fetch current page state before reordering
+    const currentPages = await prisma.page.findMany({
+      where: { bookId },
+      select: {
+        id: true,
+        index: true,
+        pageNumber: true,
+        isTitlePage: true,
+        assetId: true,
+      },
+      orderBy: { index: 'asc' }
+    });
+
+    logger.info({
+      clerkId,
+      dbUserId: dbUser.id,
+      bookId,
+      beforeState: currentPages.map(p => ({
+        id: p.id,
+        index: p.index,
+        pageNumber: p.pageNumber,
+        isTitlePage: p.isTitlePage
+      }))
+    }, 'API: Page state before reorder');
+
     // Use a transaction to update all page indices atomically
     await prisma.$transaction(async (tx) => {
       logger.info({ clerkId, dbUserId: dbUser.id, bookId }, 'API: Starting page reorder transaction.');
@@ -85,6 +110,46 @@ export async function POST(
          // Rollback happens automatically due to the error
          throw new Error('Failed to update one or more pages during reorder. Mismatched page IDs or book association?');
       }
+
+      // Fetch and log new state
+      const afterPages = await tx.page.findMany({
+        where: { bookId },
+        select: {
+          id: true,
+          index: true,
+          pageNumber: true,
+          isTitlePage: true,
+        },
+        orderBy: { index: 'asc' }
+      });
+
+      // Detect which pages changed isTitlePage status
+      const titlePageChanges = currentPages
+        .map(before => {
+          const after = afterPages.find(a => a.id === before.id);
+          if (after && before.isTitlePage !== after.isTitlePage) {
+            return {
+              pageId: before.id,
+              wasTitlePage: before.isTitlePage,
+              nowTitlePage: after.isTitlePage
+            };
+          }
+          return null;
+        })
+        .filter(Boolean);
+
+      logger.info({
+        clerkId,
+        dbUserId: dbUser.id,
+        bookId,
+        afterState: afterPages.map(p => ({
+          id: p.id,
+          index: p.index,
+          pageNumber: p.pageNumber,
+          isTitlePage: p.isTitlePage
+        })),
+        titlePageChanges: titlePageChanges.length > 0 ? titlePageChanges : 'none'
+      }, 'API: Page state after reorder');
 
       logger.info({ clerkId, dbUserId: dbUser.id, bookId, updatedCount: results.length }, 'API: Page reorder transaction committed.');
     });

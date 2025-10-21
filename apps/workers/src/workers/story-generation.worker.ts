@@ -11,7 +11,7 @@ import {
   StandardStoryResponse
 } from '@storywink/shared';
 
-const logger = pino({ level: process.env.LOG_LEVEL || 'warn' });
+const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
 export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
   // Wrap everything in try-catch to catch early errors
@@ -195,6 +195,19 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
           const trimmedText = content?.text?.trim() || '';
           const finalText = trimmedText.length > 0 ? trimmedText : `[Page ${storyPosition} text pending]`;
 
+          logger.info({
+            bookId,
+            pageId: page.id,
+            pageNumber: page.pageNumber,
+            index: page.index,
+            storyPosition,
+            finalTextLength: finalText.length,
+            hadContent: !!content,
+            usedFallback: !content || trimmedText.length === 0,
+            textPreview: finalText.substring(0, 50),
+            hasIllustrationNotes: !!content?.illustrationNotes
+          }, 'Winkify: Prepared page update');
+
           return prisma.page.update({
             where: { id: page.id },
             data: {
@@ -246,6 +259,18 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
           const trimmedText = text.trim();
           const finalText = trimmedText.length > 0 ? trimmedText : `[Page ${storyPosition} text pending]`;
 
+          logger.info({
+            bookId,
+            pageId: page.id,
+            pageNumber: page.pageNumber,
+            index: page.index,
+            storyPosition,
+            finalTextLength: finalText.length,
+            hadContent: !!text,
+            usedFallback: trimmedText.length === 0,
+            textPreview: finalText.substring(0, 50)
+          }, 'Standard: Prepared page update');
+
           return prisma.page.update({
             where: { id: page.id },
             data: {
@@ -260,7 +285,28 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
       throw new Error('Invalid JSON response from OpenAI');
     }
 
-    await Promise.all(updatePromises);
+    logger.info({
+      bookId,
+      totalUpdatePromises: updatePromises.length,
+      expectedStoryPages: storyPages.length,
+      matches: updatePromises.length === storyPages.length
+    }, 'Executing batch page updates');
+
+    try {
+      const results = await Promise.all(updatePromises);
+      logger.info({
+        bookId,
+        successfulUpdates: results.length,
+        totalExpected: storyPages.length
+      }, 'Batch update completed');
+    } catch (error) {
+      logger.error({
+        bookId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        updateCount: updatePromises.length
+      }, 'Batch update failed');
+      throw error;
+    }
 
     // Check if all story pages received text
     const missingTextPages = storyPages.filter(_page => 

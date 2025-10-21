@@ -109,6 +109,33 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
+    // If coverAssetId is being changed, log before/after
+    if (validatedData.coverAssetId !== undefined) {
+      const currentBook = await prisma.book.findUnique({
+        where: { id: bookId },
+        select: {
+          coverAssetId: true,
+          pages: {
+            where: { isTitlePage: true },
+            select: { id: true, assetId: true }
+          }
+        }
+      });
+
+      logger.info({
+        clerkId,
+        dbUserId: dbUser.id,
+        bookId,
+        oldCoverAssetId: currentBook?.coverAssetId,
+        newCoverAssetId: validatedData.coverAssetId,
+        currentTitlePages: currentBook?.pages.map(p => p.id),
+        willAffectPages: currentBook?.pages.filter(
+          p => p.assetId === validatedData.coverAssetId ||
+               p.assetId === currentBook.coverAssetId
+        ).length
+      }, 'API: Cover asset is being changed');
+    }
+
     // Use updateMany to ensure user owns the book AND the book exists
     const updateResult = await prisma.book.updateMany({
       where: {
