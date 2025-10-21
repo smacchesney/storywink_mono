@@ -3,6 +3,7 @@ import Redis from 'ioredis';
 import { config } from 'dotenv';
 import { QUEUE_NAMES } from '@storywink/shared';
 import pino from 'pino';
+import crypto from 'crypto';
 
 // Load environment variables
 // In a monorepo setup with Turbo, the working directory is set to the package directory
@@ -67,6 +68,46 @@ function validateStyleLibrary() {
 
 // Run validation immediately at module load
 validateStyleLibrary();
+
+// ============================================================================
+// DIAGNOSTIC: Deep freeze STYLE_LIBRARY to detect mutations
+// ============================================================================
+// This freezes the object and all nested objects. If any code tries to modify
+// STYLE_LIBRARY at runtime, it will throw an error immediately, helping us
+// identify if mutation is the root cause.
+
+function deepFreeze(obj: any): void {
+  // Freeze the top-level object
+  Object.freeze(obj);
+
+  // Recursively freeze all nested objects
+  Object.values(obj).forEach(value => {
+    if (typeof value === 'object' && value !== null) {
+      deepFreeze(value);
+    }
+  });
+}
+
+// Apply deep freeze to prevent any mutations
+deepFreeze(STYLE_LIBRARY);
+
+// Generate SHA256 hash of the STYLE_LIBRARY for verification
+// This lets us confirm all containers are running the same code
+const styleLibraryHash = crypto
+  .createHash('sha256')
+  .update(JSON.stringify(STYLE_LIBRARY))
+  .digest('hex');
+
+console.log('='.repeat(80));
+console.log('[DIAGNOSTIC] STYLE_LIBRARY Protection Applied');
+console.log('='.repeat(80));
+console.log(`[Startup] STYLE_LIBRARY frozen and verified`);
+console.log(`[Startup] SHA256 Hash: ${styleLibraryHash}`);
+console.log(`[Startup] Process PID: ${process.pid}`);
+console.log(`[Startup] Hostname: ${process.env.HOSTNAME || 'unknown'}`);
+console.log(`[Startup] Railway Commit: ${process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown'}`);
+console.log(`[Startup] Git Commit: ${process.env.GIT_COMMIT_SHA || 'unknown'}`);
+console.log('='.repeat(80));
 
 // Create workers
 const storyWorker = new Worker(

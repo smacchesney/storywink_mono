@@ -4,11 +4,19 @@ import { IllustrationGenerationJob } from '@storywink/shared';
 import { GoogleGenAI } from '@google/genai';
 import { v2 as cloudinary } from 'cloudinary';
 import pino from 'pino';
+import util from 'util';
 import { createIllustrationPrompt, IllustrationPromptOptions } from '@storywink/shared';
 // Import STYLE_LIBRARY directly from styles module to avoid barrel export race condition
 import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+
+// ============================================================================
+// DIAGNOSTIC: Track first job execution for detailed logging
+// ============================================================================
+// This flag ensures we only log detailed diagnostics once per worker process,
+// avoiding log spam while still capturing critical runtime information.
+let firstJobExecuted = false;
 
 export async function processIllustrationGeneration(job: Job<IllustrationGenerationJob>) {
   
@@ -122,6 +130,39 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     let styleReferenceMimeType: string | null = null;
     const styleKey = artStyle as StyleKey;
 
+    // ============================================================================
+    // DIAGNOSTIC: First-job property descriptor logging
+    // ============================================================================
+    // On the very first job, log the complete internal structure of the
+    // STYLE_LIBRARY object. This will show us:
+    // - What properties actually exist
+    // - Whether they're getters/setters or plain values
+    // - The prototype chain
+    // - Hidden or enumerable properties
+    if (!firstJobExecuted) {
+      firstJobExecuted = true;
+
+      console.log('='.repeat(80));
+      console.log('[DIAGNOSTIC] First Job Execution - STYLE_LIBRARY Inspection');
+      console.log('='.repeat(80));
+
+      console.log('[FirstJob] Full STYLE_LIBRARY object:');
+      console.log(util.inspect(STYLE_LIBRARY, { depth: 5, showHidden: true, colors: false }));
+
+      console.log('\n[FirstJob] Property descriptors for vignette style:');
+      console.log(util.inspect(
+        Object.getOwnPropertyDescriptors(STYLE_LIBRARY.vignette),
+        { depth: null, colors: false }
+      ));
+
+      console.log('\n[FirstJob] Container Information:');
+      console.log(`  - Process PID: ${process.pid}`);
+      console.log(`  - Hostname: ${process.env.HOSTNAME || 'unknown'}`);
+      console.log(`  - Railway Commit: ${process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown'}`);
+      console.log(`  - Git Commit: ${process.env.GIT_COMMIT_SHA || 'unknown'}`);
+      console.log('='.repeat(80));
+    }
+
     // Defensive check: Ensure STYLE_LIBRARY is loaded (prevent race condition on module import)
     if (!STYLE_LIBRARY || Object.keys(STYLE_LIBRARY).length === 0) {
       logger.error({ jobId: job.id, pageId, pageNumber }, 'STYLE_LIBRARY not loaded - module import race condition detected');
@@ -136,17 +177,68 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
 
     const styleReferenceUrl = styleData.referenceImageUrl;
 
-    // CRITICAL: Explicit validation that referenceImageUrl exists
+    // ============================================================================
+    // DIAGNOSTIC: Enhanced validation with full object inspection
+    // ============================================================================
+    // If referenceImageUrl is missing, capture EVERYTHING about the object's
+    // state to help diagnose the root cause.
     if (!styleReferenceUrl || styleReferenceUrl.trim().length === 0) {
+      // Log to structured logger (for Railway logs)
       logger.error({
         jobId: job.id,
         pageId,
         pageNumber,
         styleKey,
-        styleData: JSON.stringify(styleData),
-        styleDataKeys: Object.keys(styleData)
+        processPid: process.pid,
+        hostname: process.env.HOSTNAME || 'unknown',
+        railwayCommit: process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown',
+        gitCommit: process.env.GIT_COMMIT_SHA || 'unknown',
+
+        // Object inspection
+        styleDataInspect: util.inspect(styleData, { depth: 5, showHidden: true }),
+        styleDataKeys: Object.keys(styleData),
+        styleDataValues: Object.values(styleData),
+        styleDataOwnPropertyNames: Object.getOwnPropertyNames(styleData),
+        styleDataDescriptors: Object.getOwnPropertyDescriptors(styleData),
+
+        // Check if the property exists at all
+        hasReferenceImageUrl: 'referenceImageUrl' in styleData,
+        referenceImageUrlType: typeof styleData.referenceImageUrl,
+        referenceImageUrlValue: styleData.referenceImageUrl,
       }, 'CRITICAL: referenceImageUrl is missing or empty from styleData');
-      throw new Error(`Missing referenceImageUrl for style: ${styleKey}. This indicates STYLE_LIBRARY was not fully initialized. Style data: ${JSON.stringify(styleData)}`);
+
+      // Also log to console for easier reading
+      console.error('='.repeat(80));
+      console.error('[CRITICAL FAILURE] referenceImageUrl Missing - Full Diagnostic Dump');
+      console.error('='.repeat(80));
+      console.error('\nContainer Information:');
+      console.error(`  - Process PID: ${process.pid}`);
+      console.error(`  - Hostname: ${process.env.HOSTNAME || 'unknown'}`);
+      console.error(`  - Railway Commit: ${process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown'}`);
+      console.error(`  - Git Commit: ${process.env.GIT_COMMIT_SHA || 'unknown'}`);
+
+      console.error('\nJob Information:');
+      console.error(`  - Job ID: ${job.id}`);
+      console.error(`  - Page ID: ${pageId}`);
+      console.error(`  - Page Number: ${pageNumber}`);
+      console.error(`  - Style Key: ${styleKey}`);
+
+      console.error('\nObject State Analysis:');
+      console.error('  - Property exists:', 'referenceImageUrl' in styleData);
+      console.error('  - Property type:', typeof styleData.referenceImageUrl);
+      console.error('  - Property value:', styleData.referenceImageUrl);
+      console.error('  - Object keys:', Object.keys(styleData));
+      console.error('  - Object values:', Object.values(styleData));
+
+      console.error('\nFull Object Inspection (util.inspect):');
+      console.error(util.inspect(styleData, { depth: 5, showHidden: true, colors: false }));
+
+      console.error('\nProperty Descriptors:');
+      console.error(util.inspect(Object.getOwnPropertyDescriptors(styleData), { depth: 3, colors: false }));
+
+      console.error('='.repeat(80));
+
+      throw new Error(`Missing referenceImageUrl for style: ${styleKey}. This indicates STYLE_LIBRARY was not fully initialized. See diagnostic dump above.`);
     }
 
     // Fetch style reference image (we know styleReferenceUrl exists from validation above)

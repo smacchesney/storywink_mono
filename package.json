@@ -10,6 +10,8 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "build:clean": "turbo run build --force",
+    "build:verify": "node -e \"const fs=require('fs'); const crypto=require('crypto'); const content=fs.readFileSync('packages/shared/dist/prompts/styles.js','utf8'); console.log('SHA256 of styles.js:', crypto.createHash('sha256').update(content).digest('hex'));\"",
     "start": "echo 'Please specify a service: npm run start:web, start:api, or start:workers'",
     "start:web": "cd apps/web && npm run start",
     "start:api": "cd apps/api && npm run start",
