@@ -68,6 +68,8 @@ function validateStyleLibrary() {
 
 // Run validation immediately at module load
 validateStyleLibrary();
+console.log('[Startup] styles module URL:', import.meta.url);
+console.log('[Startup] referenceImageUrl snapshot:', STYLE_LIBRARY.vignette?.referenceImageUrl);
 
 // ============================================================================
 // DIAGNOSTIC: Deep freeze STYLE_LIBRARY to detect mutations

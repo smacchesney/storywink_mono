@@ -146,6 +146,9 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       console.log('[DIAGNOSTIC] First Job Execution - STYLE_LIBRARY Inspection');
       console.log('='.repeat(80));
 
+      console.log('[FirstJob] styles module URL:', import.meta.url);
+      console.log('[FirstJob] referenceImageUrl snapshot:', STYLE_LIBRARY.vignette?.referenceImageUrl);
+
       console.log('[FirstJob] Full STYLE_LIBRARY object:');
       console.log(util.inspect(STYLE_LIBRARY, { depth: 5, showHidden: true, colors: false }));
 
@@ -183,62 +186,85 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     // If referenceImageUrl is missing, capture EVERYTHING about the object's
     // state to help diagnose the root cause.
     if (!styleReferenceUrl || styleReferenceUrl.trim().length === 0) {
-      // Log to structured logger (for Railway logs)
-      logger.error({
-        jobId: job.id,
-        pageId,
-        pageNumber,
-        styleKey,
-        processPid: process.pid,
-        hostname: process.env.HOSTNAME || 'unknown',
-        railwayCommit: process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown',
-        gitCommit: process.env.GIT_COMMIT_SHA || 'unknown',
+      try {
+        // Check if we're looking at the same instance
+        const styleDataDescriptors = Object.getOwnPropertyDescriptors(styleData);
+        const isSameInstance = Object.is(styleData, STYLE_LIBRARY[styleKey]);
 
-        // Object inspection
-        styleDataInspect: util.inspect(styleData, { depth: 5, showHidden: true }),
-        styleDataKeys: Object.keys(styleData),
-        styleDataValues: Object.values(styleData),
-        styleDataOwnPropertyNames: Object.getOwnPropertyNames(styleData),
-        styleDataDescriptors: Object.getOwnPropertyDescriptors(styleData),
+        // Log to structured logger (for Railway logs)
+        logger.error({
+          jobId: job.id,
+          pageId,
+          pageNumber,
+          styleKey,
+          processPid: process.pid,
+          hostname: process.env.HOSTNAME || 'unknown',
+          railwayCommit: process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown',
+          gitCommit: process.env.GIT_COMMIT_SHA || 'unknown',
 
-        // Check if the property exists at all
-        hasReferenceImageUrl: 'referenceImageUrl' in styleData,
-        referenceImageUrlType: typeof styleData.referenceImageUrl,
-        referenceImageUrlValue: styleData.referenceImageUrl,
-      }, 'CRITICAL: referenceImageUrl is missing or empty from styleData');
+          // Instance comparison
+          isSameInstance,
 
-      // Also log to console for easier reading
-      console.error('='.repeat(80));
-      console.error('[CRITICAL FAILURE] referenceImageUrl Missing - Full Diagnostic Dump');
-      console.error('='.repeat(80));
-      console.error('\nContainer Information:');
-      console.error(`  - Process PID: ${process.pid}`);
-      console.error(`  - Hostname: ${process.env.HOSTNAME || 'unknown'}`);
-      console.error(`  - Railway Commit: ${process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown'}`);
-      console.error(`  - Git Commit: ${process.env.GIT_COMMIT_SHA || 'unknown'}`);
+          // Object inspection
+          styleDataInspect: util.inspect(styleData, { depth: 5, showHidden: true }),
+          styleDataKeys: Object.keys(styleData),
+          styleDataValues: Object.values(styleData),
+          styleDataOwnPropertyNames: Object.getOwnPropertyNames(styleData),
+          styleDataDescriptors,
 
-      console.error('\nJob Information:');
-      console.error(`  - Job ID: ${job.id}`);
-      console.error(`  - Page ID: ${pageId}`);
-      console.error(`  - Page Number: ${pageNumber}`);
-      console.error(`  - Style Key: ${styleKey}`);
+          // Check if the property exists at all
+          hasReferenceImageUrl: 'referenceImageUrl' in styleData,
+          referenceImageUrlType: typeof styleData.referenceImageUrl,
+          referenceImageUrlValue: styleData.referenceImageUrl,
+        }, 'CRITICAL: referenceImageUrl is missing or empty from styleData');
 
-      console.error('\nObject State Analysis:');
-      console.error('  - Property exists:', 'referenceImageUrl' in styleData);
-      console.error('  - Property type:', typeof styleData.referenceImageUrl);
-      console.error('  - Property value:', styleData.referenceImageUrl);
-      console.error('  - Object keys:', Object.keys(styleData));
-      console.error('  - Object values:', Object.values(styleData));
+        // Also log to console for easier reading
+        console.error('='.repeat(80));
+        console.error('[CRITICAL FAILURE] referenceImageUrl Missing - Full Diagnostic Dump');
+        console.error('='.repeat(80));
+        console.error('\nContainer Information:');
+        console.error(`  - Process PID: ${process.pid}`);
+        console.error(`  - Hostname: ${process.env.HOSTNAME || 'unknown'}`);
+        console.error(`  - Railway Commit: ${process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown'}`);
+        console.error(`  - Git Commit: ${process.env.GIT_COMMIT_SHA || 'unknown'}`);
 
-      console.error('\nFull Object Inspection (util.inspect):');
-      console.error(util.inspect(styleData, { depth: 5, showHidden: true, colors: false }));
+        console.error('\nJob Information:');
+        console.error(`  - Job ID: ${job.id}`);
+        console.error(`  - Page ID: ${pageId}`);
+        console.error(`  - Page Number: ${pageNumber}`);
+        console.error(`  - Style Key: ${styleKey}`);
 
-      console.error('\nProperty Descriptors:');
-      console.error(util.inspect(Object.getOwnPropertyDescriptors(styleData), { depth: 3, colors: false }));
+        console.error('\nObject State Analysis:');
+        console.error('  - isSameInstance:', isSameInstance);
+        console.error('  - Property exists:', 'referenceImageUrl' in styleData);
+        console.error('  - Property type:', typeof styleData.referenceImageUrl);
+        console.error('  - Property value:', styleData.referenceImageUrl);
+        console.error('  - Object keys:', Object.keys(styleData));
+        console.error('  - Object values:', Object.values(styleData));
 
-      console.error('='.repeat(80));
+        console.error('\nFull Object Inspection (util.inspect):');
+        console.error(util.inspect(styleData, { depth: 5, showHidden: true, colors: false }));
 
-      throw new Error(`Missing referenceImageUrl for style: ${styleKey}. This indicates STYLE_LIBRARY was not fully initialized. See diagnostic dump above.`);
+        console.error('\nProperty Descriptors:');
+        console.error(util.inspect(styleDataDescriptors, { depth: 3, colors: false }));
+
+        // Fresh import comparison
+        try {
+          const freshStyles = await import('@storywink/shared/prompts/styles');
+          const freshUrl = freshStyles.STYLE_LIBRARY?.[styleKey]?.referenceImageUrl;
+          console.error('\n[Critical] Fresh import referenceImageUrl:', freshUrl);
+          console.error('[Critical] Fresh import module URL:', freshStyles?.STYLE_LIBRARY ? freshStyles.STYLE_LIBRARY : 'N/A');
+        } catch (importError) {
+          console.error('[Critical] Failed to re-import styles module:', importError);
+        }
+
+        console.error('='.repeat(80));
+
+        throw new Error(`Missing referenceImageUrl for style: ${styleKey}. This indicates STYLE_LIBRARY was not fully initialized. See diagnostic dump above.`);
+      } catch (diagnosticError) {
+        console.error('[Critical] Diagnostic logging threw:', diagnosticError);
+        throw diagnosticError;
+      }
     }
 
     // Fetch style reference image (we know styleReferenceUrl exists from validation above)
