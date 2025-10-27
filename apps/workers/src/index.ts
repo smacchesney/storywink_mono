@@ -95,6 +95,8 @@ deepFreeze(STYLE_LIBRARY);
 
 // Generate unique instance ID to track which worker processes which job
 const INSTANCE_ID = crypto.randomUUID();
+// Make it available as env var for diagnostic logging
+process.env.INSTANCE_ID = INSTANCE_ID;
 
 // Generate SHA256 hash of the STYLE_LIBRARY for verification
 // This lets us confirm all containers are running the same code

@@ -126,3 +126,47 @@ model UserProfile {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// Worker diagnostic logging table
+// Captures failure details that survive process crashes
+model WorkerDiagnostic {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  // Job identification
+  jobId       String
+  jobType     String // 'story', 'illustration', 'finalize'
+  attemptNum  Int // Current attempt number (1-5)
+  maxAttempts Int // Total attempts allowed
+
+  // Book/Page context
+  bookId     String?
+  pageId     String?
+  pageNumber Int?
+
+  // Error details
+  errorType    String // 'missing_reference_url', 'gemini_error', 'fetch_error', etc.
+  errorMessage String @db.Text
+  errorStage   String // Where in the process it failed
+
+  // STYLE_LIBRARY diagnostics (for missing referenceImageUrl errors)
+  styleKey                  String?
+  styleExists               Boolean?
+  hasReferenceImageUrl      Boolean?
+  referenceImageUrlType     String?
+  referenceImageUrlValue    String?
+  availableStyleKeys        String? // JSON array of keys
+
+  // Container/environment info
+  instanceId     String
+  processId      Int
+  hostname       String?
+  railwayCommit  String?
+  nodeVersion    String?
+
+  @@index([jobId])
+  @@index([bookId])
+  @@index([pageId])
+  @@index([errorType])
+  @@index([createdAt])
+}
+

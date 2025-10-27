@@ -181,11 +181,44 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     const styleReferenceUrl = styleData.referenceImageUrl;
 
     // ============================================================================
-    // DIAGNOSTIC: Simplified validation to prevent log truncation
+    // DIAGNOSTIC: Database-persisted logging to survive process crashes
     // ============================================================================
-    // CRITICAL: Previous diagnostic logging was too verbose (1000+ lines with util.inspect)
-    // causing Railway to truncate/drop logs. Simplified to essential information only.
+    // CRITICAL: Console logs are being lost due to process crashes/termination.
+    // Write diagnostic data to database FIRST, then log to console.
     if (!styleReferenceUrl || styleReferenceUrl.trim().length === 0) {
+      // Write to database IMMEDIATELY - survives even SIGKILL
+      try {
+        await prisma.workerDiagnostic.create({
+          data: {
+            jobId: job.id,
+            jobType: 'illustration',
+            attemptNum: job.attemptsMade + 1,
+            maxAttempts: job.opts?.attempts || 5,
+            bookId,
+            pageId,
+            pageNumber,
+            errorType: 'missing_reference_url',
+            errorMessage: `Missing referenceImageUrl for style: ${styleKey}`,
+            errorStage: 'style_library_lookup',
+            styleKey,
+            styleExists: !!styleData,
+            hasReferenceImageUrl: 'referenceImageUrl' in styleData,
+            referenceImageUrlType: typeof styleData.referenceImageUrl,
+            referenceImageUrlValue: String(styleData.referenceImageUrl || 'undefined'),
+            availableStyleKeys: JSON.stringify(Object.keys(styleData)),
+            instanceId: process.env.INSTANCE_ID || 'unknown',
+            processId: process.pid,
+            hostname: process.env.HOSTNAME || 'unknown',
+            railwayCommit: process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown',
+            nodeVersion: process.version,
+          },
+        });
+      } catch (dbError) {
+        // If database write fails, at least try to log it
+        console.error('[CRITICAL] Failed to write diagnostic to database:', dbError);
+      }
+
+      // Now log to console (may be lost if process crashes)
       console.error('='.repeat(80));
       console.error('[CRITICAL FAILURE] referenceImageUrl Missing');
       console.error('='.repeat(80));
@@ -200,6 +233,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       console.error(`  - Value: ${styleData.referenceImageUrl}`);
       console.error(`  - Available keys: ${Object.keys(styleData).join(', ')}`);
       console.error('='.repeat(80));
+      console.error('[DIAGNOSTIC] Wrote failure details to WorkerDiagnostic table - query with MCP');
 
       // Force log flush with small delay to ensure Railway captures output
       await new Promise(resolve => setTimeout(resolve, 500));
