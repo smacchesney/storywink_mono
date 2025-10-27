@@ -181,90 +181,30 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     const styleReferenceUrl = styleData.referenceImageUrl;
 
     // ============================================================================
-    // DIAGNOSTIC: Enhanced validation with full object inspection
+    // DIAGNOSTIC: Simplified validation to prevent log truncation
     // ============================================================================
-    // If referenceImageUrl is missing, capture EVERYTHING about the object's
-    // state to help diagnose the root cause.
+    // CRITICAL: Previous diagnostic logging was too verbose (1000+ lines with util.inspect)
+    // causing Railway to truncate/drop logs. Simplified to essential information only.
     if (!styleReferenceUrl || styleReferenceUrl.trim().length === 0) {
-      try {
-        // Check if we're looking at the same instance
-        const styleDataDescriptors = Object.getOwnPropertyDescriptors(styleData);
-        const isSameInstance = Object.is(styleData, STYLE_LIBRARY[styleKey]);
+      console.error('='.repeat(80));
+      console.error('[CRITICAL FAILURE] referenceImageUrl Missing');
+      console.error('='.repeat(80));
+      console.error(`Job: ${job.id} | Page: ${pageNumber} | Style: ${styleKey}`);
+      console.error(`Process PID: ${process.pid} | Hostname: ${process.env.HOSTNAME || 'unknown'}`);
+      console.error(`Attempt: ${job.attemptsMade + 1}/${job.opts?.attempts || 'unknown'}`);
+      console.error(`Railway Commit: ${process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown'}`);
+      console.error(`\nSTYLE_LIBRARY state:`);
+      console.error(`  - Style exists: ${!!styleData}`);
+      console.error(`  - Has referenceImageUrl property: ${'referenceImageUrl' in styleData}`);
+      console.error(`  - Value type: ${typeof styleData.referenceImageUrl}`);
+      console.error(`  - Value: ${styleData.referenceImageUrl}`);
+      console.error(`  - Available keys: ${Object.keys(styleData).join(', ')}`);
+      console.error('='.repeat(80));
 
-        // Log to structured logger (for Railway logs)
-        logger.error({
-          jobId: job.id,
-          pageId,
-          pageNumber,
-          styleKey,
-          processPid: process.pid,
-          hostname: process.env.HOSTNAME || 'unknown',
-          railwayCommit: process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown',
-          gitCommit: process.env.GIT_COMMIT_SHA || 'unknown',
+      // Force log flush with small delay to ensure Railway captures output
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-          // Instance comparison
-          isSameInstance,
-
-          // Object inspection
-          styleDataInspect: util.inspect(styleData, { depth: 5, showHidden: true }),
-          styleDataKeys: Object.keys(styleData),
-          styleDataValues: Object.values(styleData),
-          styleDataOwnPropertyNames: Object.getOwnPropertyNames(styleData),
-          styleDataDescriptors,
-
-          // Check if the property exists at all
-          hasReferenceImageUrl: 'referenceImageUrl' in styleData,
-          referenceImageUrlType: typeof styleData.referenceImageUrl,
-          referenceImageUrlValue: styleData.referenceImageUrl,
-        }, 'CRITICAL: referenceImageUrl is missing or empty from styleData');
-
-        // Also log to console for easier reading
-        console.error('='.repeat(80));
-        console.error('[CRITICAL FAILURE] referenceImageUrl Missing - Full Diagnostic Dump');
-        console.error('='.repeat(80));
-        console.error('\nContainer Information:');
-        console.error(`  - Process PID: ${process.pid}`);
-        console.error(`  - Hostname: ${process.env.HOSTNAME || 'unknown'}`);
-        console.error(`  - Railway Commit: ${process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown'}`);
-        console.error(`  - Git Commit: ${process.env.GIT_COMMIT_SHA || 'unknown'}`);
-
-        console.error('\nJob Information:');
-        console.error(`  - Job ID: ${job.id}`);
-        console.error(`  - Page ID: ${pageId}`);
-        console.error(`  - Page Number: ${pageNumber}`);
-        console.error(`  - Style Key: ${styleKey}`);
-
-        console.error('\nObject State Analysis:');
-        console.error('  - isSameInstance:', isSameInstance);
-        console.error('  - Property exists:', 'referenceImageUrl' in styleData);
-        console.error('  - Property type:', typeof styleData.referenceImageUrl);
-        console.error('  - Property value:', styleData.referenceImageUrl);
-        console.error('  - Object keys:', Object.keys(styleData));
-        console.error('  - Object values:', Object.values(styleData));
-
-        console.error('\nFull Object Inspection (util.inspect):');
-        console.error(util.inspect(styleData, { depth: 5, showHidden: true, colors: false }));
-
-        console.error('\nProperty Descriptors:');
-        console.error(util.inspect(styleDataDescriptors, { depth: 3, colors: false }));
-
-        // Fresh import comparison
-        try {
-          const freshStyles = await import('@storywink/shared/prompts/styles');
-          const freshUrl = freshStyles.STYLE_LIBRARY?.[styleKey]?.referenceImageUrl;
-          console.error('\n[Critical] Fresh import referenceImageUrl:', freshUrl);
-          console.error('[Critical] Fresh import module URL:', freshStyles?.STYLE_LIBRARY ? freshStyles.STYLE_LIBRARY : 'N/A');
-        } catch (importError) {
-          console.error('[Critical] Failed to re-import styles module:', importError);
-        }
-
-        console.error('='.repeat(80));
-
-        throw new Error(`Missing referenceImageUrl for style: ${styleKey}. This indicates STYLE_LIBRARY was not fully initialized. See diagnostic dump above.`);
-      } catch (diagnosticError) {
-        console.error('[Critical] Diagnostic logging threw:', diagnosticError);
-        throw diagnosticError;
-      }
+      throw new Error(`Missing referenceImageUrl for style: ${styleKey}. Attempt ${job.attemptsMade + 1}/${job.opts?.attempts || 'unknown'}`);
     }
 
     // Fetch style reference image (we know styleReferenceUrl exists from validation above)
@@ -502,22 +442,22 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     };
     
     logger.error(errorContext, 'Illustration generation failed');
-    
+
     console.error(`[IllustrationWorker] Job ${job.id} FAILED for page ${pageNumber}:`);
     console.error(`  - Book: ${bookId}`);
     console.error(`  - Error: ${error.message}`);
     console.error(`  - Failure Stage: ${errorContext.failureStage}`);
-    console.error(`  - Attempts: ${job.attemptsMade}/${job.opts?.attempts || 'unknown'}`);
+    console.error(`  - Attempts: ${job.attemptsMade + 1}/${job.opts?.attempts || 'unknown'}`);
     console.error(`  - Parent Job: ${job.parent?.id || 'None'}`);
     console.error(`  - Is Title Page: ${isTitlePage}`);
     console.error(`  - Has Text: ${!!text} (${text?.length || 0} chars)`);
     console.error(`  - Art Style: ${artStyle}`);
-    
+
     // Mark page as failed with enhanced error info
     try {
       await prisma.page.update({
         where: { id: pageId },
-        data: { 
+        data: {
           moderationStatus: 'FAILED',
           moderationReason: `Job failed (${errorContext.failureStage}): ${error.message}`.slice(0, 1000),
         },
@@ -527,7 +467,10 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
        logger.error({ jobId: job.id, bookId, error: updateError.message }, 'Failed to update page status to FAILED after job error.');
        console.error(`[IllustrationWorker] WARNING: Could not mark page ${pageNumber} as failed in database: ${updateError.message}`);
     }
-    
+
+    // Force log flush delay before throwing to ensure Railway captures logs
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     throw error;
   }
 }

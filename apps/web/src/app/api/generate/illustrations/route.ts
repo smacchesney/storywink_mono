@@ -156,13 +156,13 @@ export async function POST(request: Request) {
             name: jobName,
             queueName: QueueName.IllustrationGeneration,
             data: illustrationJobData,
-            opts: { 
-                attempts: 3,
-                backoff: { type: 'exponential', delay: 10000 }, 
+            opts: {
+                attempts: 5, // Increased from 3 to give more chances for transient failures
+                backoff: { type: 'exponential', delay: 10000 },
                 removeOnComplete: { count: 1000 },
                 removeOnFail: { count: 5000 },
-                failParentOnFailure: false, 
-                removeDependencyOnFailure: true 
+                failParentOnFailure: false,
+                removeDependencyOnFailure: true
             }
         };
     });

@@ -222,7 +222,7 @@ generateRouter.post(
           queueName: QUEUE_NAMES.ILLUSTRATION_GENERATION,
           data: illustrationJobData,
           opts: {
-            attempts: 3,
+            attempts: 5, // Increased from 3 to give more chances for transient failures
             backoff: { type: 'exponential', delay: 10000 },
             removeOnComplete: { count: 1000 },
             removeOnFail: { count: 5000 },
