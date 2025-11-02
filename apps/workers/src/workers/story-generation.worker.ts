@@ -308,25 +308,67 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
       throw error;
     }
 
-    // Check if all story pages received text
-    const missingTextPages = storyPages.filter(_page => 
-      !updatePromises.some((_promise, _idx) => {
-        // Check if this page was updated
-        return _promise !== null;
-      })
-    );
+    // Verify all story pages actually received text in the database
+    const pagesAfterUpdate = await prisma.page.findMany({
+      where: {
+        bookId,
+        isTitlePage: false
+      },
+      select: {
+        id: true,
+        pageNumber: true,
+        index: true,
+        text: true
+      },
+      orderBy: { index: 'asc' }
+    });
 
-    if (missingTextPages.length > 0 || updatePromises.length !== storyPages.length) {
+    const pagesWithoutText = pagesAfterUpdate.filter(p => !p.text || p.text.trim().length === 0);
+
+    if (pagesWithoutText.length > 0) {
       logger.error({
         bookId,
-        totalStoryPages: storyPages.length,
-        pagesWithTextUpdates: updatePromises.length,
-        missingTextPageIds: missingTextPages.map(p => p.id),
-        missingTextPageNumbers: missingTextPages.map(p => p.pageNumber),
-        responseKeys: book.isWinkifyEnabled ? 
-          Object.keys(JSON.parse(rawResult)) : 
+        totalStoryPages: pagesAfterUpdate.length,
+        pagesWithoutText: pagesWithoutText.length,
+        missingPageNumbers: pagesWithoutText.map(p => p.pageNumber),
+        missingPageIndices: pagesWithoutText.map(p => p.index),
+        updatePromisesCreated: updatePromises.length,
+        expectedStoryPages: storyPages.length,
+        gptResponseKeys: book.isWinkifyEnabled ?
+          Object.keys(JSON.parse(rawResult)) :
           Object.keys(JSON.parse(rawResult))
-      }, 'Some pages did not receive text - potential off-by-one error');
+      }, 'CRITICAL: Some pages missing text after batch update - applying fallback');
+
+      // Fix pages that didn't get text
+      const fixPromises = pagesWithoutText.map((page, idx) => {
+        const fallbackText = `[Page ${page.pageNumber} text pending - please regenerate]`;
+        logger.warn({
+          bookId,
+          pageId: page.id,
+          pageNumber: page.pageNumber,
+          fallbackText
+        }, 'Applying fallback text to page that was missed');
+
+        return prisma.page.update({
+          where: { id: page.id },
+          data: {
+            text: fallbackText,
+            textConfirmed: false
+          }
+        });
+      });
+
+      await Promise.all(fixPromises);
+      logger.info({
+        bookId,
+        fixedPages: fixPromises.length
+      }, 'Applied fallback text to pages that were missed');
+    } else {
+      logger.info({
+        bookId,
+        totalStoryPages: pagesAfterUpdate.length,
+        allPagesHaveText: true
+      }, 'Verification passed: All story pages have text');
     }
 
     // Update book status to story ready (not yet illustrating)
