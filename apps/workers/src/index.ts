@@ -1,3 +1,21 @@
+// ============================================================================
+// CRITICAL: Force unbuffered I/O for Railway real-time logging
+// ============================================================================
+// Node.js buffers stdout/stderr by default, causing logs from fast-failing
+// jobs to be lost when the process terminates before the buffer flushes.
+// This forces synchronous, unbuffered writes so Railway captures all logs.
+// Must be set BEFORE any imports that might write to stdout/stderr.
+// ============================================================================
+if (process.stdout._handle?.setBlocking) {
+  process.stdout._handle.setBlocking(true);
+}
+if (process.stderr._handle?.setBlocking) {
+  process.stderr._handle.setBlocking(true);
+}
+
+// Disable Pino's internal buffering for immediate log writes
+process.env.PINO_NO_BUFFER = 'true';
+
 import { Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { config } from 'dotenv';

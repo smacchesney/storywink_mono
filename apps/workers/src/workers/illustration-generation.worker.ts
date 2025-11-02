@@ -19,16 +19,48 @@ const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 let firstJobExecuted = false;
 
 export async function processIllustrationGeneration(job: Job<IllustrationGenerationJob>) {
-  
+
+  // ============================================================================
+  // DIAGNOSTIC: Write job start entry IMMEDIATELY (before ANY processing)
+  // ============================================================================
+  // This ensures we capture that the job actually started executing, even if
+  // it fails immediately. Database writes are committed before logs, so this
+  // survives even if the process crashes before stdout buffers flush.
+  // ============================================================================
+  try {
+    await prisma.workerDiagnostic.create({
+      data: {
+        jobId: job.id || 'unknown',
+        jobType: 'illustration',
+        attemptNum: (job.attemptsMade || 0) + 1,
+        maxAttempts: job.opts?.attempts || 5,
+        bookId: job.data?.bookId || 'unknown',
+        pageId: job.data?.pageId || 'unknown',
+        pageNumber: job.data?.pageNumber || 0,
+        errorType: 'job_started',
+        errorMessage: 'Job execution started - processing illustration',
+        errorStage: 'initialization',
+        instanceId: process.env.INSTANCE_ID || 'unknown',
+        processId: process.pid,
+        hostname: process.env.HOSTNAME || 'unknown',
+        railwayCommit: process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown',
+        nodeVersion: process.version,
+      },
+    });
+  } catch (dbError) {
+    // If diagnostic write fails, don't block the job - just log the error
+    console.error('[DIAGNOSTIC] Failed to write job start diagnostic:', dbError);
+  }
+
   const { bookId, pageId, userId, pageNumber, artStyle, isWinkifyEnabled, illustrationNotes, isTitlePage, bookTitle, text } = job.data;
-  
+
   console.log(`[IllustrationWorker] Starting job ${job.id} for page ${pageNumber} of book ${bookId}`);
   console.log(`  - PageId: ${pageId}`);
   console.log(`  - Is Title Page: ${isTitlePage}`);
   console.log(`  - Art Style: ${artStyle}`);
   console.log(`  - Has Text: ${!!text} (${text?.length || 0} chars)`);
   console.log(`  - Winkify Enabled: ${isWinkifyEnabled}`);
-  
+
   try {
     // Validate prerequisites
     if (!process.env.GOOGLE_API_KEY) {
