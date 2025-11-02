@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --packages=external",
-    "start": "npm run migrate:deploy --workspace=@storywink/database && node dist/index.js",
-    "migrate:deploy": "npm run db:migrate:deploy --workspace=@storywink/database",
+    "start": "npm run db:migrate:deploy --workspace=@storywink/database && node dist/index.js",
     "lint": "eslint src --fix",
     "check-types": "tsc --noEmit",
     "clean": "rm -rf dist node_modules .turbo"
