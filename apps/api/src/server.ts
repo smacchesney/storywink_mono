@@ -81,7 +81,7 @@ app.get("/api/test", (_req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 API server running on port ${PORT}`);
+  console.log(`🚀 API server v2.1.0 running on port ${PORT}`);
   console.log(`Health check endpoint: /api/health`);
   console.log(`Test endpoint: /api/test`);
   console.log(`DATABASE_URL configured: ${!!process.env.DATABASE_URL}`);
