@@ -336,7 +336,7 @@ const shutdown = async () => {
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
-logger.info('Workers started successfully');
+logger.info('Workers started successfully - v2.1.0');
 console.log('='.repeat(80));
 console.log('[Workers] All workers started and listening for jobs');
 console.log('='.repeat(80));
