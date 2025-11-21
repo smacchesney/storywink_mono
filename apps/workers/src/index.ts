@@ -163,6 +163,8 @@ const illustrationWorker = new Worker(
   {
     connection: redis,
     concurrency: ILLUSTRATION_CONCURRENCY,
+    lockDuration: 120000,  // 2 minutes (default 30s is too short for Gemini API)
+    maxStalledCount: 0,    // Disable auto-retry on stall (prevents duplicate processing)
   }
 );
 
