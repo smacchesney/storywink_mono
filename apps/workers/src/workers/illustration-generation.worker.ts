@@ -326,8 +326,8 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     let moderationReasonText: string | null = null;
 
     try {
-       logger.info({ jobId: job.id, pageId, pageNumber }, 'Calling Gemini 2.5 Flash Image API...');
-       console.log(`[IllustrationWorker] Calling Gemini API for page ${pageNumber}...`);
+       logger.info({ jobId: job.id, pageId, pageNumber }, 'Calling Gemini 3 Pro Image API...');
+       console.log(`[IllustrationWorker] Calling Gemini 3 Pro API for page ${pageNumber}...`);
 
        // Build multi-image prompt for Gemini
        const prompt = [
@@ -349,8 +349,15 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
        ];
 
        const result = await ai.models.generateContent({
-           model: "gemini-2.5-flash-image-preview",
+           model: "gemini-3-pro-image-preview",
            contents: prompt,
+           config: {
+               responseModalities: ['TEXT', 'IMAGE'],
+               imageConfig: {
+                   aspectRatio: '1:1',
+                   imageSize: '2K',
+               },
+           },
        });
 
        logger.info({ jobId: job.id, pageId, pageNumber }, 'Received response from Gemini.');
@@ -394,7 +401,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
             isCopyrightIssue,
             isQuotaIssue,
             fullError: JSON.stringify(apiError, null, 2)
-        }, 'Error calling Gemini 2.5 Flash Image API.');
+        }, 'Error calling Gemini 3 Pro Image API.');
 
         console.error(`[IllustrationWorker] Gemini API error for page ${pageNumber}:`);
         console.error(`  - Error: ${errorMessage}`);

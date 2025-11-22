@@ -12,7 +12,7 @@
     "clean": "rm -rf dist node_modules .turbo"
   },
   "dependencies": {
-    "@google/genai": "^1.21.0",
+    "@google/genai": "^1.30.0",
     "@storywink/database": "*",
     "@storywink/shared": "*",
     "bullmq": "^5.48.1",

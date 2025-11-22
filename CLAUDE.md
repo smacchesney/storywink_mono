@@ -293,20 +293,20 @@ Brand primary color: coral: #F76C5E
 
 ## Recent Changes (October 1, 2025)
 
-### Migration: OpenAI → Google Gemini 2.5 Flash Image
+### Migration: OpenAI → Google Gemini 3 Pro Image
 
 **Completed Migration**
-- **Illustration API**: Migrated from OpenAI `gpt-image-1` to Google Gemini 2.5 Flash Image (`gemini-2.5-flash-image-preview`)
+- **Illustration API**: Migrated from OpenAI `gpt-image-1` to Google Gemini 3 Pro Image (`gemini-3-pro-image-preview`)
 - **Story API**: Still using OpenAI GPT-4o Vision (no changes)
-- **Cost**: $0.039/image vs OpenAI's previous pricing
-- **Quality**: Top-rated image editing model per LMArena benchmarks
+- **Quality**: Google's SOTA image generation model with "Thinking" mode for better composition
+- **Resolution**: Supports up to 4K output via `imageSize: '2K'` or `'4K'`
 
 **Technical Changes**
-- **Package**: Replaced `openai@^4.93.0` with `@google/genai@^1.21.0` in `apps/workers`
-- **Environment**: Added `GOOGLE_API_KEY` to workers environment
-- **API Call**: Changed from `openai.images.edit()` to `ai.models.generateContent()`
-- **Image Format**: Converted from `toFile()` format to base64 `inlineData` structure
-- **Response Parsing**: Updated to extract from `candidates[0].content.parts[0].inlineData.data`
+- **Package**: Using `@google/genai@^1.30.0` in `apps/workers`
+- **Environment**: `GOOGLE_API_KEY` required in workers environment
+- **API Call**: Uses `ai.models.generateContent()` with `responseModalities: ['TEXT', 'IMAGE']`
+- **Image Config**: Supports `imageConfig: { aspectRatio: '1:1', imageSize: '2K' }`
+- **Response Parsing**: Extract from `candidates[0].content.parts[0].inlineData.data`
 - **Prompts**: Adapted illustration prompts for Gemini's natural language interpretation style
 
 **Files Modified**
@@ -320,7 +320,7 @@ Brand primary color: coral: #F76C5E
 The system still uses dual-image style transfer:
 1. **Content Image** (user photo) - provides subjects, poses, composition
 2. **Style Reference** (from style library) - provides artistic style, colors, textures
-3. **Gemini 2.5 Flash Image** - blends them together with text overlay
+3. **Gemini 3 Pro Image** - blends them together with text overlay (upgraded from Gemini 2.5 Flash Image)
 
 ### Bug Fixes
 
