@@ -139,7 +139,7 @@ console.log('='.repeat(80));
 // Concurrency configuration - can be overridden via environment variables
 // Set ILLUSTRATION_CONCURRENCY=1 for debugging to ensure single worker processes all jobs
 const STORY_CONCURRENCY = parseInt(process.env.STORY_CONCURRENCY || '2', 10);
-const ILLUSTRATION_CONCURRENCY = parseInt(process.env.ILLUSTRATION_CONCURRENCY || '5', 10);
+const ILLUSTRATION_CONCURRENCY = parseInt(process.env.ILLUSTRATION_CONCURRENCY || '3', 10);
 const FINALIZE_CONCURRENCY = parseInt(process.env.FINALIZE_CONCURRENCY || '2', 10);
 
 console.log(`[Startup] Concurrency settings:`);

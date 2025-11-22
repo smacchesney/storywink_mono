@@ -5,7 +5,7 @@ import { GoogleGenAI } from '@google/genai';
 import { v2 as cloudinary } from 'cloudinary';
 import pino from 'pino';
 import util from 'util';
-import { createIllustrationPrompt, IllustrationPromptOptions } from '@storywink/shared';
+import { createIllustrationPrompt, IllustrationPromptOptions } from '@storywink/shared/prompts/illustration';
 // Import STYLE_LIBRARY directly from styles module to avoid barrel export race condition
 import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
 
