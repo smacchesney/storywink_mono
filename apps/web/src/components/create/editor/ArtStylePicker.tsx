@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Info } from 'lucide-react';
-import { STYLE_LIBRARY } from '@storywink/shared';
+import { STYLE_LIBRARY } from '@storywink/shared/prompts/styles';
 
 interface StyleDefinition {
   label: string;
