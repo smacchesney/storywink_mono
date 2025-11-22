@@ -15,7 +15,7 @@ interface IllustrationProgressScreenProps {
 }
 
 const POLLING_INTERVAL = 5000; // Check status every 5 seconds
-const MAX_POLLS = 36; // Timeout after 3 minutes (36 * 5 seconds) for illustration
+const MAX_POLLS = 180; // Timeout after 15 minutes (180 * 5 seconds) for illustration
 
 export function IllustrationProgressScreen({
   bookId,
