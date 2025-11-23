@@ -1,15 +1,15 @@
 import { Job } from 'bullmq';
 import prisma from '../database/index.js';
-import { StoryGenerationJob } from '@storywink/shared';
+import { StoryGenerationJob } from '@storywink/shared/types';
 import OpenAI from 'openai';
 import pino from 'pino';
-import { 
-  createVisionStoryGenerationPrompt, 
+import {
+  createVisionStoryGenerationPrompt,
   StoryGenerationInput,
   STORY_GENERATION_SYSTEM_PROMPT,
   WinkifyStoryResponse,
   StandardStoryResponse
-} from '@storywink/shared';
+} from '@storywink/shared/prompts/story';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 

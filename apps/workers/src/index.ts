@@ -19,7 +19,7 @@ process.env.PINO_NO_BUFFER = 'true';
 import { Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { config } from 'dotenv';
-import { QUEUE_NAMES } from '@storywink/shared';
+import { QUEUE_NAMES } from '@storywink/shared/constants';
 import pino from 'pino';
 import crypto from 'crypto';
 

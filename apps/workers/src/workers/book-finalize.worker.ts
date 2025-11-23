@@ -1,6 +1,7 @@
 import { Job } from 'bullmq';
 import prisma from '../database/index.js';
-import { BookFinalizeJob, categorizePages, isTitlePage } from '@storywink/shared';
+import { BookFinalizeJob } from '@storywink/shared/types';
+import { categorizePages, isTitlePage } from '@storywink/shared/utils';
 import pino from 'pino';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });

@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import prisma from '../database/index.js';
-import { IllustrationGenerationJob } from '@storywink/shared';
+import { IllustrationGenerationJob } from '@storywink/shared/types';
 import { GoogleGenAI } from '@google/genai';
 import { v2 as cloudinary } from 'cloudinary';
 import pino from 'pino';
