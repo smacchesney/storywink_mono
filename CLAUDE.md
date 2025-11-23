@@ -150,6 +150,7 @@ Configure your Clerk webhook to point to the Next.js API route:
 - **Direct Cloudinary uploads**: Browser-to-Cloudinary with no server involvement
 - **Auto-opening file picker**: Better UX with immediate file selection dialog
 - **Monorepo imports**: All shared code imported from `@storywink/shared` (no local duplicates)
+- **Direct imports for critical modules**: `STYLE_LIBRARY` uses direct path `@storywink/shared/prompts/styles` to prevent barrel import race conditions
 
 ### Environment Variables
 Create `.env` files in each app directory:
@@ -321,6 +322,56 @@ The system still uses dual-image style transfer:
 1. **Content Image** (user photo) - provides subjects, poses, composition
 2. **Style Reference** (from style library) - provides artistic style, colors, textures
 3. **Gemini 3 Pro Image** - blends them together with text overlay (upgraded from Gemini 2.5 Flash Image)
+
+## Production Performance & Reliability Fixes (November 2025)
+
+### Timeout & Concurrency Optimizations
+
+**Problem**: Gemini 3 Pro Image API has slower response times (40-60s) compared to previous models, causing job failures and premature UI timeouts.
+
+**Solutions Implemented**:
+
+1. **Backend Lock Duration**: Increased from 30s → **5 minutes (300000ms)**
+   - **File**: `apps/workers/src/index.ts`
+   - **Why**: Prevents BullMQ from marking jobs as stalled while waiting for slow Gemini API responses
+   - **Configuration**: `lockDuration: 300000` in `illustrationWorker`
+
+2. **Frontend Polling Timeout**: Increased from 3 min → **15 minutes**
+   - **File**: `apps/web/src/components/create/editor/IllustrationProgressScreen.tsx`
+   - **Why**: Prevents UI from timing out before backend completes processing
+   - **Configuration**: `MAX_POLLS = 180` (180 × 5s = 15 minutes)
+
+3. **Worker Concurrency**: Reduced to **3 parallel workers**
+   - **File**: `apps/workers/src/index.ts`
+   - **Why**: Sweet spot between performance and stability; prevents CPU/memory pressure
+   - **Configuration**: `ILLUSTRATION_CONCURRENCY || '3'`
+
+### STYLE_LIBRARY Race Condition Fix (Nuclear Fix)
+
+**Problem**: Intermittent "Missing referenceImageUrl for style: vignette" errors affecting ~33% of pages in production, despite working locally.
+
+**Root Cause**: Circular dependency in barrel export (`packages/shared/src/index.ts`) causing `STYLE_LIBRARY` to load as empty object `{}` during parallel module resolution in esbuild production builds.
+
+**Solution**: Physical removal of barrel export path to eliminate circular dependency.
+
+**Changes**:
+1. **Removed barrel export** (`packages/shared/src/index.ts`):
+   ```typescript
+   // REMOVED: export * from './prompts/styles.js';
+   ```
+
+2. **Fixed all imports to use direct path**:
+   - `apps/workers/src/workers/illustration-generation.worker.ts`
+   - `apps/web/src/components/create/editor/ArtStylePicker.tsx`
+   - Pattern: `import { STYLE_LIBRARY } from '@storywink/shared/prompts/styles'`
+
+3. **Result**: Compile-time safety - any future barrel imports will fail TypeScript build
+
+**Why This Works**:
+- Eliminates circular dependency at source
+- Forces all imports to load `styles.ts` as isolated module
+- Prevents race condition during parallel module loading
+- Provides fail-fast behavior if incorrect import used
 
 ### Bug Fixes
 
