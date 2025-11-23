@@ -323,13 +323,15 @@ The system still uses dual-image style transfer:
 2. **Style Reference** (from style library) - provides artistic style, colors, textures
 3. **Gemini 3 Pro Image** - blends them together with text overlay (upgraded from Gemini 2.5 Flash Image)
 
-## Production Performance & Reliability Fixes (November 2025)
+## Production Performance & Reliability Issues (November 2025)
 
-### Timeout & Concurrency Optimizations
+⚠️ **STATUS: UNRESOLVED** - The following fixes were attempted but have NOT resolved the production failures.
+
+### Timeout & Concurrency Optimizations (ATTEMPTED - DID NOT FIX ISSUE)
 
 **Problem**: Gemini 3 Pro Image API has slower response times (40-60s) compared to previous models, causing job failures and premature UI timeouts.
 
-**Solutions Implemented**:
+**Solutions Attempted**:
 
 1. **Backend Lock Duration**: Increased from 30s → **5 minutes (300000ms)**
    - **File**: `apps/workers/src/index.ts`
@@ -346,13 +348,15 @@ The system still uses dual-image style transfer:
    - **Why**: Sweet spot between performance and stability; prevents CPU/memory pressure
    - **Configuration**: `ILLUSTRATION_CONCURRENCY || '3'`
 
-### STYLE_LIBRARY Race Condition Fix (Nuclear Fix)
+### STYLE_LIBRARY Race Condition Fix Attempt (ATTEMPTED - DID NOT FIX ISSUE)
 
 **Problem**: Intermittent "Missing referenceImageUrl for style: vignette" errors affecting ~33% of pages in production, despite working locally.
 
-**Root Cause**: Circular dependency in barrel export (`packages/shared/src/index.ts`) causing `STYLE_LIBRARY` to load as empty object `{}` during parallel module resolution in esbuild production builds.
+**Hypothesis**: Circular dependency in barrel export (`packages/shared/src/index.ts`) causing `STYLE_LIBRARY` to load as empty object `{}` during parallel module resolution in esbuild production builds.
 
-**Solution**: Physical removal of barrel export path to eliminate circular dependency.
+**Solution Attempted**: Physical removal of barrel export path to eliminate circular dependency.
+
+⚠️ **Result**: Issue persists in production despite this fix. Root cause remains unknown.
 
 **Changes**:
 1. **Removed barrel export** (`packages/shared/src/index.ts`):
@@ -367,11 +371,17 @@ The system still uses dual-image style transfer:
 
 3. **Result**: Compile-time safety - any future barrel imports will fail TypeScript build
 
-**Why This Works**:
-- Eliminates circular dependency at source
-- Forces all imports to load `styles.ts` as isolated module
-- Prevents race condition during parallel module loading
+**Theoretical Benefits** (not realized in practice):
+- Should eliminate circular dependency at source
+- Should force all imports to load `styles.ts` as isolated module
+- Should prevent race condition during parallel module loading
 - Provides fail-fast behavior if incorrect import used
+
+**Actual Outcome**: Despite these changes, production continues to experience the same "Missing referenceImageUrl" errors at approximately the same failure rate (~33%). This suggests:
+- The root cause is not the barrel import pattern
+- Issue may be related to Railway deployment/build process
+- Possible module bundling issue with esbuild in production
+- May require investigation into Railway environment-specific behavior
 
 ### Bug Fixes
 
