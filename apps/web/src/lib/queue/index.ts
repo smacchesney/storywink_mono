@@ -1,21 +1,18 @@
 import { Queue, WorkerOptions } from 'bullmq';
 import IORedis from 'ioredis';
 import { FlowProducer } from 'bullmq';
+import { createBullMQConnection } from '@storywink/shared/redis';
 
 // Lazy initialization variables
 let connectionOptions: { connection: IORedis } | null = null;
 let flowProducerInstance: FlowProducer | null = null;
 
 // Function to get or create connection options
+// Uses family: 0 for IPv6 support on Railway private networking
 function getConnectionOptions(): { connection: IORedis } {
   if (!connectionOptions) {
-    if (!process.env.REDIS_URL) {
-      throw new Error('Missing REDIS_URL environment variable');
-    }
     connectionOptions = {
-      connection: new IORedis(process.env.REDIS_URL, {
-        maxRetriesPerRequest: null, // Needed for BullMQ
-      }),
+      connection: new IORedis(createBullMQConnection()),
     };
   }
   return connectionOptions;

@@ -41,6 +41,10 @@
     "./prompts/styles": {
       "types": "./dist/prompts/styles.d.ts",
       "import": "./dist/prompts/styles.js"
+    },
+    "./redis": {
+      "types": "./dist/redis.d.ts",
+      "import": "./dist/redis.js"
     }
   },
   "scripts": {

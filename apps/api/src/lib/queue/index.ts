@@ -1,6 +1,7 @@
 import { Queue, WorkerOptions } from "bullmq";
 import IORedis from "ioredis";
 import { FlowProducer } from "bullmq";
+import { createBullMQConnection } from "@storywink/shared/redis";
 
 // Ensure Redis URL is provided via environment variables
 if (!process.env.REDIS_URL) {
@@ -8,10 +9,9 @@ if (!process.env.REDIS_URL) {
 }
 
 // Reusable connection options
+// Uses family: 0 for IPv6 support on Railway private networking
 const connectionOptions = {
-  connection: new IORedis(process.env.REDIS_URL, {
-    maxRetriesPerRequest: null, // Needed for BullMQ
-  }),
+  connection: new IORedis(createBullMQConnection()),
 };
 
 // Create and export a single FlowProducer instance

@@ -6,6 +6,7 @@ import {
   generateIllustrationSchema,
   QUEUE_NAMES,
 } from "@storywink/shared";
+import { createBullMQConnection } from "@storywink/shared/redis";
 import prisma from "../database/index.js";
 import Redis from "ioredis";
 import {
@@ -15,7 +16,8 @@ import {
 import { flowProducer } from "../lib/queue/index.js";
 
 // Create Redis connection
-const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
+// Uses family: 0 for IPv6 support on Railway private networking
+const redis = new Redis(createBullMQConnection());
 
 // Create queues
 const storyQueue = new Queue(QUEUE_NAMES.STORY_GENERATION, {

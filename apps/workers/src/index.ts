@@ -20,6 +20,7 @@ import { Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { config } from 'dotenv';
 import { QUEUE_NAMES } from '@storywink/shared/constants';
+import { createBullMQConnection } from '@storywink/shared/redis';
 import pino from 'pino';
 import crypto from 'crypto';
 
@@ -49,10 +50,8 @@ const logger = pino({
 });
 
 // Create Redis connection with BullMQ-specific options
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-  maxRetriesPerRequest: null, // Required for BullMQ
-  enableReadyCheck: false,
-});
+// Uses family: 0 for IPv6 support on Railway private networking
+const redis = new Redis(createBullMQConnection());
 
 // Import worker processors
 import { processStoryGeneration } from './workers/story-generation.worker.js';
