@@ -150,8 +150,14 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
     // Log raw response for debugging
     logger.info({ bookId, rawResponse: rawResult }, 'Raw OpenAI response received');
 
-    // Parse the response based on Winkify mode
-    let updatePromises: any[] = [];
+    // Parse the response and prepare update data (not promises yet)
+    interface PageUpdateData {
+      pageId: string;
+      text: string;
+      illustrationNotes: string | null;
+      textConfirmed: boolean;
+    }
+    let pageUpdates: PageUpdateData[] = [];
 
     try {
       if (book.isWinkifyEnabled) {
@@ -177,8 +183,8 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
         // Create a map for easier lookup
         const responseMap = new Map(Object.entries(winkifyResponse));
 
-        // Ensure all story pages get updated, even if AI didn't generate content for some
-        updatePromises = storyPages.map((page, index) => {
+        // Prepare update data for all story pages
+        pageUpdates = storyPages.map((page, index) => {
           const storyPosition = index + 1; // 1-based position
           const content = responseMap.get(storyPosition.toString());
 
@@ -208,16 +214,14 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
             hasIllustrationNotes: !!content?.illustrationNotes
           }, 'Winkify: Prepared page update');
 
-          return prisma.page.update({
-            where: { id: page.id },
-            data: {
-              text: finalText,
-              illustrationNotes: content?.illustrationNotes || null,
-              textConfirmed: trimmedText.length > 0,
-            },
-          });
+          return {
+            pageId: page.id,
+            text: finalText,
+            illustrationNotes: content?.illustrationNotes || null,
+            textConfirmed: trimmedText.length > 0,
+          };
         });
-        
+
       } else {
         // Standard response format: { "1": "text...", "2": "text...", ... }
         const standardResponse: StandardStoryResponse = JSON.parse(rawResult);
@@ -241,8 +245,8 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
         // Create a map for easier lookup
         const responseMap = new Map(Object.entries(standardResponse));
 
-        // Ensure all story pages get updated, even if AI didn't generate text for some
-        updatePromises = storyPages.map((page, index) => {
+        // Prepare update data for all story pages
+        pageUpdates = storyPages.map((page, index) => {
           const storyPosition = index + 1; // 1-based position
           const text = responseMap.get(storyPosition.toString()) || '';
 
@@ -271,13 +275,12 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
             textPreview: finalText.substring(0, 50)
           }, 'Standard: Prepared page update');
 
-          return prisma.page.update({
-            where: { id: page.id },
-            data: {
-              text: finalText,
-              textConfirmed: trimmedText.length > 0,
-            },
-          });
+          return {
+            pageId: page.id,
+            text: finalText,
+            illustrationNotes: null,
+            textConfirmed: trimmedText.length > 0,
+          };
         });
       }
     } catch (error) {
@@ -287,13 +290,29 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
 
     logger.info({
       bookId,
-      totalUpdatePromises: updatePromises.length,
+      totalPageUpdates: pageUpdates.length,
       expectedStoryPages: storyPages.length,
-      matches: updatePromises.length === storyPages.length
-    }, 'Executing batch page updates');
+      matches: pageUpdates.length === storyPages.length
+    }, 'Executing batch page updates via transaction');
 
     try {
-      const results = await Promise.all(updatePromises);
+      // Use $transaction with a callback to execute updates sequentially
+      // This avoids SIGSEGV crashes from too many parallel Prisma queries
+      const results = await prisma.$transaction(async (tx) => {
+        const updateResults = [];
+        for (const update of pageUpdates) {
+          const result = await tx.page.update({
+            where: { id: update.pageId },
+            data: {
+              text: update.text,
+              illustrationNotes: update.illustrationNotes,
+              textConfirmed: update.textConfirmed,
+            },
+          });
+          updateResults.push(result);
+        }
+        return updateResults;
+      });
       logger.info({
         bookId,
         successfulUpdates: results.length,
@@ -303,7 +322,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
       logger.error({
         bookId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        updateCount: updatePromises.length
+        updateCount: pageUpdates.length
       }, 'Batch update failed');
       throw error;
     }
@@ -332,7 +351,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
         pagesWithoutText: pagesWithoutText.length,
         missingPageNumbers: pagesWithoutText.map(p => p.pageNumber),
         missingPageIndices: pagesWithoutText.map(p => p.index),
-        updatePromisesCreated: updatePromises.length,
+        pageUpdatesCreated: pageUpdates.length,
         expectedStoryPages: storyPages.length,
         gptResponseKeys: book.isWinkifyEnabled ?
           Object.keys(JSON.parse(rawResult)) :
@@ -380,13 +399,13 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
       },
     });
 
-    logger.info({ 
-      bookId, 
-      pagesUpdated: updatePromises.length,
+    logger.info({
+      bookId,
+      pagesUpdated: pageUpdates.length,
       totalStoryPages: storyPages.length,
-      allPagesHaveText: updatePromises.length === storyPages.length
+      allPagesHaveText: pageUpdates.length === storyPages.length
     }, 'Story generation completed');
-    return { success: true, pagesUpdated: updatePromises.length };
+    return { success: true, pagesUpdated: pageUpdates.length };
     
   } catch (error: any) {
     logger.error({ 
