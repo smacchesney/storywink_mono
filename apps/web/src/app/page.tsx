@@ -24,18 +24,16 @@ interface CarouselImage {
 
 // Placeholder data for the first carousel (first 3 images for top display)
 const carouselImages = [
-  { original: "https://res.cloudinary.com/storywink/image/upload/v1746287470/lwyxy1knvyqvvgch2aor_us7fdd.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1746287481/page_0_ub5h7f.png", alt: "Anime, Title" },
-  { original: "https://res.cloudinary.com/storywink/image/upload/v1746287475/euly0y2fcctrcnnmjcq2_qognmp.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1746287482/page_1_cwhtjo.png", alt: "Anime, Pg 1" },
-  { original: "https://res.cloudinary.com/storywink/image/upload/v1746287474/wjz3h46y2mt06vnq47n9_mzpmoy.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1746287483/page_2_vp0r7f.png", alt: "Anime, Pg 1" },
-  // Keep remaining images if needed for other parts, or trim if only first 3 are used for these carousels
+  { original: "https://res.cloudinary.com/storywink/image/upload/v1764315536/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/IMG_3244_rwy5uf.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1764315803/storywink/cmiijx5dg004vmr0diwd3t9w8/generated/page_8.jpg", alt: "Photo 1" },
+  { original: "https://res.cloudinary.com/storywink/image/upload/v1764315538/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/IMG_3269_tcrmzo.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1764315829/storywink/cmiijx5dg004vmr0diwd3t9w8/generated/page_10.jpg", alt: "Photo 2" },
+  { original: "https://res.cloudinary.com/storywink/image/upload/v1764315531/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/IMG_3336_ilx9fd.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1764315742/storywink/cmiijx5dg004vmr0diwd3t9w8/generated/page_4.jpg", alt: "Photo 3" },
 ];
 
 // Placeholder data for the second carousel (first 3 images for top display)
 const carouselImagesStyle2 = [
-  { original: "https://res.cloudinary.com/storywink/image/upload/v1746288814/x8oks0akdtyukbltfbyw_snzc3q.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1746288830/page_0_hchiwz.png", alt: "Title" },
-  { original: "https://res.cloudinary.com/storywink/image/upload/v1746288815/yp1gixdr0dy1e9j91h9d_xvfb56.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1746288831/page_1_tce8np.png", alt: "pg 1" },
-  { original: "https://res.cloudinary.com/storywink/image/upload/v1746288816/veqfxfgb4z0nxk9bjiuu_umdhjk.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1746288819/page_2_xieetj.png", alt: "pg 2" },
-  // Keep remaining images if needed for other parts, or trim if only first 3 are used for these carousels
+  { original: "https://res.cloudinary.com/storywink/image/upload/v1764255047/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/WhatsApp_Image_2025-10-19_at_13.41.03_1_cprzju.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1764255352/storywink/cmihjwm8l002bmr0dp7lhdvx2/generated/page_2.jpg", alt: "Photo 4" },
+  { original: "https://res.cloudinary.com/storywink/image/upload/v1764255046/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/WhatsApp_Image_2025-10-19_at_13.41.04_2_moijbz.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1764255446/storywink/cmihjwm8l002bmr0dp7lhdvx2/generated/page_9.jpg", alt: "Photo 5" },
+  { original: "https://res.cloudinary.com/storywink/image/upload/v1764253791/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/WhatsApp_Image_2025-10-19_at_13.41.03_h21hc7.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1764255443/storywink/cmihjwm8l002bmr0dp7lhdvx2/generated/page_7.jpg", alt: "Photo 6" },
 ];
 
 interface CarouselSyncContextType {
