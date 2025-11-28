@@ -194,7 +194,7 @@ CLOUDINARY_URL=
 - `@storywink/shared` is built to `packages/shared/dist/`
 - Turbo handles build order automatically (shared builds before apps)
 - Import from `@storywink/shared`, not relative paths
-- Exports available: main, `/prompts`, `/prompts/story`, `/prompts/illustration`, `/prompts/styles`
+- Exports available: main, `/constants`, `/schemas`, `/utils`, `/types`, `/redis`, `/prompts`, `/prompts/story`, `/prompts/illustration`, `/prompts/styles`
 - Package uses simplified tsconfig.json (doesn't extend root) to avoid baseUrl conflicts
 - All shared types, schemas, constants, and utils are centralized here
 
@@ -204,6 +204,7 @@ CLOUDINARY_URL=
 import { BookStatus, STATUS_MESSAGES } from '@storywink/shared';
 import { createVisionStoryGenerationPrompt } from '@storywink/shared/prompts/story';
 import { STYLE_LIBRARY } from '@storywink/shared/prompts/styles';
+import { createBullMQConnection } from '@storywink/shared/redis';
 
 // ❌ Never use these patterns
 import { BookStatus } from '../shared';  // No relative imports
@@ -323,65 +324,88 @@ The system still uses dual-image style transfer:
 2. **Style Reference** (from style library) - provides artistic style, colors, textures
 3. **Gemini 3 Pro Image** - blends them together with text overlay (upgraded from Gemini 2.5 Flash Image)
 
-## Production Performance & Reliability Issues (November 2025)
+## Production Fixes (November 2025)
 
-⚠️ **STATUS: UNRESOLVED** - The following fixes were attempted but have NOT resolved the production failures.
+✅ **STATUS: RESOLVED** - All production issues have been fixed. Books now generate successfully.
 
-### Timeout & Concurrency Optimizations (ATTEMPTED - DID NOT FIX ISSUE)
+### Railway Redis IPv6 Private Networking
 
-**Problem**: Gemini 3 Pro Image API has slower response times (40-60s) compared to previous models, causing job failures and premature UI timeouts.
+**Problem**: Redis connections failing with `ENOTFOUND redis.railway.internal` when using Railway's internal Redis.
 
-**Solutions Attempted**:
+**Root Cause**: Railway's private network uses IPv6 only, but ioredis defaults to IPv4.
 
-1. **Backend Lock Duration**: Increased from 30s → **5 minutes (300000ms)**
+**Solution**: Added `family: 0` to all Redis connections via a shared helper function.
+
+**Implementation**:
+- **New File**: `packages/shared/src/redis.ts` - `createBullMQConnection()` helper
+- **Export**: Available via `@storywink/shared/redis`
+- **Key Setting**: `family: 0` enables both IPv4 and IPv6
+
+**Files Modified**:
+- `apps/workers/src/index.ts`
+- `apps/api/src/lib/queue/index.ts`
+- `apps/api/src/routes/generate.ts`
+- `apps/web/src/lib/queue/index.ts`
+
+```typescript
+// Usage pattern
+import { createBullMQConnection } from '@storywink/shared/redis';
+const redis = new Redis(createBullMQConnection());
+```
+
+### Prisma SIGSEGV Crash Fix
+
+**Problem**: Worker crashing with SIGSEGV (segmentation fault) during story generation batch updates.
+
+**Root Cause**: `Promise.all()` executing 8+ parallel Prisma queries overwhelmed the query engine.
+
+**Solution**: Replaced `Promise.all()` with `prisma.$transaction()` callback for sequential updates.
+
+**File**: `apps/workers/src/workers/story-generation.worker.ts`
+
+```typescript
+// Before (crashed)
+const results = await Promise.all(updatePromises);
+
+// After (stable)
+const results = await prisma.$transaction(async (tx) => {
+  const updateResults = [];
+  for (const update of pageUpdates) {
+    const result = await tx.page.update({ ... });
+    updateResults.push(result);
+  }
+  return updateResults;
+});
+```
+
+### Timeout & Concurrency Optimizations
+
+**Problem**: Gemini 3 Pro Image API has slower response times (40-60s) compared to previous models.
+
+**Solutions Applied**:
+
+1. **Backend Lock Duration**: 30s → **5 minutes (300000ms)**
    - **File**: `apps/workers/src/index.ts`
-   - **Why**: Prevents BullMQ from marking jobs as stalled while waiting for slow Gemini API responses
    - **Configuration**: `lockDuration: 300000` in `illustrationWorker`
 
-2. **Frontend Polling Timeout**: Increased from 3 min → **15 minutes**
+2. **Frontend Polling Timeout**: 3 min → **15 minutes**
    - **File**: `apps/web/src/components/create/editor/IllustrationProgressScreen.tsx`
-   - **Why**: Prevents UI from timing out before backend completes processing
    - **Configuration**: `MAX_POLLS = 180` (180 × 5s = 15 minutes)
 
-3. **Worker Concurrency**: Reduced to **3 parallel workers**
+3. **Worker Concurrency**: **3 parallel workers**
    - **File**: `apps/workers/src/index.ts`
-   - **Why**: Sweet spot between performance and stability; prevents CPU/memory pressure
    - **Configuration**: `ILLUSTRATION_CONCURRENCY || '3'`
 
-### STYLE_LIBRARY Race Condition Fix Attempt (ATTEMPTED - DID NOT FIX ISSUE)
+### STYLE_LIBRARY Protection
 
-**Problem**: Intermittent "Missing referenceImageUrl for style: vignette" errors affecting ~33% of pages in production, despite working locally.
+**Problem**: Intermittent "Missing referenceImageUrl for style: vignette" errors in production.
 
-**Hypothesis**: Circular dependency in barrel export (`packages/shared/src/index.ts`) causing `STYLE_LIBRARY` to load as empty object `{}` during parallel module resolution in esbuild production builds.
+**Solution**: Multiple layers of protection applied:
 
-**Solution Attempted**: Physical removal of barrel export path to eliminate circular dependency.
-
-⚠️ **Result**: Issue persists in production despite this fix. Root cause remains unknown.
-
-**Changes**:
-1. **Removed barrel export** (`packages/shared/src/index.ts`):
-   ```typescript
-   // REMOVED: export * from './prompts/styles.js';
-   ```
-
-2. **Fixed all imports to use direct path**:
-   - `apps/workers/src/workers/illustration-generation.worker.ts`
-   - `apps/web/src/components/create/editor/ArtStylePicker.tsx`
-   - Pattern: `import { STYLE_LIBRARY } from '@storywink/shared/prompts/styles'`
-
-3. **Result**: Compile-time safety - any future barrel imports will fail TypeScript build
-
-**Theoretical Benefits** (not realized in practice):
-- Should eliminate circular dependency at source
-- Should force all imports to load `styles.ts` as isolated module
-- Should prevent race condition during parallel module loading
-- Provides fail-fast behavior if incorrect import used
-
-**Actual Outcome**: Despite these changes, production continues to experience the same "Missing referenceImageUrl" errors at approximately the same failure rate (~33%). This suggests:
-- The root cause is not the barrel import pattern
-- Issue may be related to Railway deployment/build process
-- Possible module bundling issue with esbuild in production
-- May require investigation into Railway environment-specific behavior
+1. **Direct imports only** - Removed barrel export from `packages/shared/src/index.ts`
+2. **Startup validation** - Workers validate STYLE_LIBRARY at startup, exit if empty
+3. **Deep freeze** - STYLE_LIBRARY frozen to detect any runtime mutations
+4. **Diagnostic logging** - SHA256 hash logged to verify all containers run same code
 
 ### Bug Fixes
 
