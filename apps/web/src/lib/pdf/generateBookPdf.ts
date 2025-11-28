@@ -1,4 +1,5 @@
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 import { Book, Page } from '@storywink/database';
 import { coolifyImageUrl } from '@storywink/shared';
 import logger from '../logger'; // Use relative import
@@ -100,11 +101,12 @@ export async function generateBookPdf(bookData: BookWithPages): Promise<Buffer> 
       </html>
     `;
 
-    // Launch Puppeteer
-    // Use puppeteer-core and provide executable path in production/serverless
+    // Launch Puppeteer with @sparticuz/chromium for serverless/containerized environments
     browser = await puppeteer.launch({
-         headless: true, // Use true for server
-         args: ['--no-sandbox', '--disable-setuid-sandbox'] // Common args for server environments
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
     });
     const page = await browser.newPage();
 
@@ -127,7 +129,12 @@ export async function generateBookPdf(bookData: BookWithPages): Promise<Buffer> 
     return pdfBuffer;
 
   } catch (error: any) {
-    logger.error({ bookId: bookData.id, error: error.message }, "Error during PDF generation");
+    logger.error({
+      bookId: bookData.id,
+      errorMessage: error.message,
+      errorStack: error.stack,
+      errorName: error.name
+    }, "Error during PDF generation");
     throw new Error(`Failed to generate PDF: ${error.message}`);
   } finally {
     if (browser) {

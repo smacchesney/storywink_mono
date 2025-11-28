@@ -83,7 +83,14 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    logger.error({ bookId, error }, "Error generating PDF.");
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+
+    logger.error({
+      bookId,
+      errorMessage,
+      errorStack
+    }, "Error generating PDF.");
     return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });
   }
 } 
