@@ -42,7 +42,8 @@ COPY --from=deps /app/package.json ./package.json
 COPY --from=deps /app/package-lock.json ./package-lock.json
 COPY --from=deps /app/turbo.json ./turbo.json
 
-# Copy all source files (including the fixed source code)
+# Copy all source files
+# Cache bust: 2025-11-28
 COPY . .
 
 # Build the web app
