@@ -51,7 +51,7 @@ export function LibraryClientView() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [bookToDelete, setBookToDelete] = useState<LibraryBook | null>(null);
   const [isDeleting, startDeleteTransition] = useTransition();
-  const [activeTab, setActiveTab] = useState<string>("in-progress");
+  const [activeTab, setActiveTab] = useState<string>("completed");
   const router = useRouter();
 
   // Fetch books from API
@@ -179,46 +179,25 @@ export function LibraryClientView() {
         </div>
       </div>
 
-      {/* Mobile Tabs */}
-      <div className="block md:hidden mb-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="in-progress">
-              In Progress ({inProgressBooks.length})
-            </TabsTrigger>
-            <TabsTrigger value="completed">
-              Completed ({completedBooks.length})
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="in-progress">
-            <BookGrid books={inProgressBooks} onDelete={openDeleteDialog} getCoverImageUrl={getCoverImageUrl} />
-          </TabsContent>
-          
-          <TabsContent value="completed">
-            <BookGrid books={completedBooks} onDelete={openDeleteDialog} getCoverImageUrl={getCoverImageUrl} />
-          </TabsContent>
-        </Tabs>
-      </div>
+      {/* Tabs - unified for mobile and desktop */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-2 md:w-auto md:inline-flex mb-6">
+          <TabsTrigger value="completed">
+            Completed ({completedBooks.length})
+          </TabsTrigger>
+          <TabsTrigger value="in-progress">
+            In Progress ({inProgressBooks.length})
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Desktop Layout */}
-      <div className="hidden md:block space-y-8">
-        {/* In Progress Books */}
-        <BookSection 
-          title="In Progress" 
-          books={inProgressBooks} 
-          onDelete={openDeleteDialog}
-          getCoverImageUrl={getCoverImageUrl}
-        />
-        
-        {/* Completed Books */}
-        <BookSection 
-          title="Completed" 
-          books={completedBooks} 
-          onDelete={openDeleteDialog}
-          getCoverImageUrl={getCoverImageUrl}
-        />
-      </div>
+        <TabsContent value="in-progress">
+          <BookGrid books={inProgressBooks} onDelete={openDeleteDialog} getCoverImageUrl={getCoverImageUrl} />
+        </TabsContent>
+
+        <TabsContent value="completed">
+          <BookGrid books={completedBooks} onDelete={openDeleteDialog} getCoverImageUrl={getCoverImageUrl} />
+        </TabsContent>
+      </Tabs>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -246,27 +225,6 @@ export function LibraryClientView() {
 }
 
 // Helper Components
-function BookSection({ 
-  title, 
-  books, 
-  onDelete, 
-  getCoverImageUrl 
-}: { 
-  title: string; 
-  books: LibraryBook[]; 
-  onDelete: (book: LibraryBook) => void;
-  getCoverImageUrl: (book: LibraryBook) => string | null;
-}) {
-  return (
-    <section>
-      <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">
-        {title} ({books.length})
-      </h2>
-      <BookGrid books={books} onDelete={onDelete} getCoverImageUrl={getCoverImageUrl} />
-    </section>
-  );
-}
-
 function BookGrid({ 
   books, 
   onDelete, 
