@@ -55,6 +55,18 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Install Chromium and dependencies for PDF generation
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont
+
+# Point Puppeteer to system Chromium
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
 # Copy entire monorepo structure (needed for workspace dependencies)
 COPY --from=builder /app ./
 

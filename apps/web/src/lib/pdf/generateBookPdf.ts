@@ -101,12 +101,20 @@ export async function generateBookPdf(bookData: BookWithPages): Promise<Buffer> 
       </html>
     `;
 
-    // Launch Puppeteer with @sparticuz/chromium for serverless/containerized environments
+    // Launch Puppeteer - use system Chromium if available (via env var), otherwise @sparticuz/chromium
+    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || await chromium.executablePath();
+
+    logger.info({ bookId: bookData.id, executablePath }, "Launching browser...");
+
     browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ],
+      executablePath,
+      headless: true,
     });
     const page = await browser.newPage();
 
