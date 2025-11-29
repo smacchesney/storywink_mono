@@ -268,7 +268,7 @@ export default function Home() {
           </div>
           
           <div className="mb-2 mt-3">
-            <SynchronizedCarousels imageSets={[firstCarouselImages, secondCarouselImages]} interval={4000}>
+            <SynchronizedCarousels imageSets={[firstCarouselImages, secondCarouselImages]} interval={6000}>
               <div className="grid grid-cols-1 gap-6 md:gap-8 items-start">
                 <SynchronizedBeforeAfterPair images={firstCarouselImages} showControls={false} carouselId="carousel1" />
                 <SynchronizedBeforeAfterPair images={secondCarouselImages} carouselId="carousel2" />
