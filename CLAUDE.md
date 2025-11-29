@@ -247,36 +247,30 @@ All AI prompts are centralized in the shared package for consistency:
   - Type-safe style keys and validation functions
   - Reference images hosted on Cloudinary
 
-## Color Correction System
-Professional color grading is automatically applied to all AI-generated illustrations using LUT (Look-Up Table) transformation:
+## Cloudinary Image Optimization
+All Cloudinary images are automatically optimized using `f_auto,q_auto` transformations:
 
 ### Implementation
-- **LUT File**: `storywink-LUT-better.cube` hosted on Cloudinary
-- **Function**: `coolifyImageUrl()` in `packages/shared/src/utils.ts`
-- **URL Transformation**: `/image/upload/` → `/image/upload/l_lut:storywink-LUT-better.cube/`
+- **Function**: `optimizeCloudinaryUrl()` in `packages/shared/src/utils.ts`
+- **Alias**: `coolifyImageUrl()` (legacy name, same function)
+- **URL Transformation**: `/image/upload/` → `/image/upload/f_auto,q_auto/`
 
-### Smart Image Detection
-- **Generated images**: URLs containing `/image/upload/` get LUT applied automatically
-- **User uploaded photos**: URLs without `/image/upload/` pass through unchanged
-- **Zero storage cost**: Real-time URL transformation via Cloudinary
+### What These Parameters Do
+- **f_auto**: Automatically delivers WebP, AVIF, or JPEG based on browser support (30-50% smaller)
+- **q_auto**: Intelligent quality compression with no visible quality loss (20-40% smaller)
+- **Combined**: 30-60% file size reduction
 
-### Application Contexts
-Color correction is applied across all image display locations:
-- **FlipbookViewer**: Main story reading experience
-- **BookPageGallery**: Page navigation thumbnails
-- **BookCard**: Library cover thumbnails (completed books only)
-- **PageCard**: Review page image display
-- **PDF Generation**: Both web and API export include color correction
+### PDF Export
+For print quality, PDF generation uses `q_auto:best` instead of `q_auto` for higher fidelity output.
 
 ### URL Examples
 ```typescript
-// Generated illustration (gets LUT applied)
+// Web display (f_auto,q_auto)
 // Before: https://res.cloudinary.com/storywink/image/upload/v123/page.jpg
-// After:  https://res.cloudinary.com/storywink/image/upload/l_lut:storywink-LUT-better.cube/v123/page.jpg
+// After:  https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto/v123/page.jpg
 
-// User uploaded photo (passes through unchanged)
-// Before: https://res.cloudinary.com/storywink/video/upload/v123/photo.jpg
-// After:  https://res.cloudinary.com/storywink/video/upload/v123/photo.jpg
+// PDF export (f_auto,q_auto:best)
+// After:  https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto:best/v123/page.jpg
 ```
 
 ## Testing Approach

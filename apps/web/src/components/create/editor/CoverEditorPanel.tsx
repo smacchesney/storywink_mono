@@ -3,8 +3,9 @@
 import React from 'react';
 import Image from 'next/image';
 import { Asset } from '@prisma/client';
-import { Check } from 'lucide-react'; // Import Check icon
-import { cn } from '@/lib/utils'; // Import cn if not already there
+import { Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { optimizeCloudinaryUrl } from '@storywink/shared';
 
 interface CoverEditorPanelProps {
   allBookAssets: Asset[]; // Renamed from availableAssets
@@ -48,12 +49,13 @@ export function CoverEditorPanel({
                             )}
                             aria-pressed={isSelected}
                         >
-                            <Image 
-                                src={asset.thumbnailUrl || asset.url} 
+                            <Image
+                                src={asset.thumbnailUrl || optimizeCloudinaryUrl(asset.url)}
                                 alt={`Asset ${asset.id}`}
                                 fill
+                                sizes="(max-width: 768px) 33vw, 100px"
                                 style={{ objectFit: "cover" }}
-                                className={cn(isSelected ? "opacity-80" : "opacity-100")} // Slightly dim selected image
+                                className={cn(isSelected ? "opacity-80" : "opacity-100")}
                             />
                             {isSelected && (
                                 <div className="absolute bottom-1 right-1 z-10 bg-[#F76C5E] rounded-full p-0.5">

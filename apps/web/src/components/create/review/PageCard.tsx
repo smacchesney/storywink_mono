@@ -70,10 +70,11 @@ const PageCard = ({
       {/* Image Container */}
       <div className="image-container h-[35vh] relative bg-muted rounded-md mb-4">
         {imageUrl ? (
-          <Image 
+          <Image
             src={coolifyImageUrl(imageUrl)}
             alt={isTitlePage ? 'Title Page' : `Page ${pageNumber}`}
             fill
+            sizes="(max-width: 768px) 100vw, 50vh"
             className="object-contain"
             priority={pageNumber < 3}
           />

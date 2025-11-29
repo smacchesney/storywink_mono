@@ -59,9 +59,47 @@ export function convertHeicToJpeg(url: string | null | undefined): string {
 }
 
 /**
- * Safely handles image URLs, returning empty string for null/undefined values
+ * Optimizes Cloudinary image URLs by adding automatic format and quality transformations.
+ *
+ * Applies `f_auto,q_auto` which:
+ * - f_auto: Automatically delivers WebP, AVIF, or JPEG based on browser support
+ * - q_auto: Automatically adjusts quality for optimal file size/quality balance
+ *
+ * Expected file size reduction: 30-60%
+ *
+ * @param url - Cloudinary image URL (or null/undefined)
+ * @param options - Optional configuration
+ * @returns Optimized URL or empty string if input is falsy
  */
-export function coolifyImageUrl(url: string | null | undefined): string {
+export function optimizeCloudinaryUrl(
+  url: string | null | undefined,
+  options?: {
+    /** Skip optimization (useful when you need the original) */
+    skipOptimization?: boolean;
+    /** Additional transformations to prepend (e.g., 'c_fill,w_200,h_200') */
+    additionalTransforms?: string;
+  }
+): string {
   if (!url) return '';
-  return url;
+  if (options?.skipOptimization) return url;
+
+  // Only process Cloudinary URLs with /image/upload/ pattern
+  // This excludes user-uploaded photos (which may use /video/upload/ for raw storage)
+  // and non-Cloudinary URLs
+  if (!url.includes('/image/upload/')) {
+    return url;
+  }
+
+  const baseTransform = 'f_auto,q_auto';
+  const transforms = options?.additionalTransforms
+    ? `${options.additionalTransforms},${baseTransform}`
+    : baseTransform;
+
+  return url.replace('/upload/', `/upload/${transforms}/`);
 }
+
+/**
+ * Alias for optimizeCloudinaryUrl for backward compatibility
+ * @deprecated Use optimizeCloudinaryUrl instead
+ */
+export const coolifyImageUrl = optimizeCloudinaryUrl;

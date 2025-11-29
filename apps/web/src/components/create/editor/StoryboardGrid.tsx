@@ -19,7 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Image from 'next/image';
-import { StoryboardPage } from '@storywink/shared';
+import { StoryboardPage, optimizeCloudinaryUrl } from '@storywink/shared';
 import { cn } from '@/lib/utils';
 
 interface StoryboardGridProps {
@@ -59,12 +59,13 @@ function SortablePageItem({ id, page, visualIndex }: { id: string; page: Storybo
         "ease-in-out"
       )}
     >
-      {/* Use thumbnail, fallback to full url */}
+      {/* Use thumbnail, fallback to full url with optimization */}
       {page.asset?.thumbnailUrl || page.asset?.url ? (
-        <Image 
-          src={page.asset.thumbnailUrl || page.asset.url}
+        <Image
+          src={page.asset.thumbnailUrl || optimizeCloudinaryUrl(page.asset.url)}
           alt={`Page ${visualIndex + 1}`}
           fill
+          sizes="(max-width: 768px) 33vw, 120px"
           style={{ objectFit: "cover" }}
           className="pointer-events-none"
         />

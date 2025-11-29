@@ -9,6 +9,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { AnimatedHeroText } from "@/components/ui/animated-hero-text";
+import { optimizeCloudinaryUrl } from '@storywink/shared';
 
 // Lazy load components
 const StatsCounter = dynamic(() => import("@/components/landing-page/stats-counter"), {
@@ -24,16 +25,16 @@ interface CarouselImage {
 
 // Placeholder data for the first carousel (first 3 images for top display)
 const carouselImages = [
-  { original: "https://res.cloudinary.com/storywink/image/upload/v1764315536/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/IMG_3244_rwy5uf.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1764315803/storywink/cmiijx5dg004vmr0diwd3t9w8/generated/page_8.jpg", alt: "Photo 1" },
-  { original: "https://res.cloudinary.com/storywink/image/upload/v1764315538/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/IMG_3269_tcrmzo.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1764315829/storywink/cmiijx5dg004vmr0diwd3t9w8/generated/page_10.jpg", alt: "Photo 2" },
-  { original: "https://res.cloudinary.com/storywink/image/upload/v1764315531/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/IMG_3336_ilx9fd.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1764315742/storywink/cmiijx5dg004vmr0diwd3t9w8/generated/page_4.jpg", alt: "Photo 3" },
+  { original: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764315536/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/IMG_3244_rwy5uf.jpg"), illustrated: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764315803/storywink/cmiijx5dg004vmr0diwd3t9w8/generated/page_8.jpg"), alt: "Photo 1" },
+  { original: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764315538/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/IMG_3269_tcrmzo.jpg"), illustrated: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764315829/storywink/cmiijx5dg004vmr0diwd3t9w8/generated/page_10.jpg"), alt: "Photo 2" },
+  { original: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764315531/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/IMG_3336_ilx9fd.jpg"), illustrated: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764315742/storywink/cmiijx5dg004vmr0diwd3t9w8/generated/page_4.jpg"), alt: "Photo 3" },
 ];
 
 // Placeholder data for the second carousel (first 3 images for top display)
 const carouselImagesStyle2 = [
-  { original: "https://res.cloudinary.com/storywink/image/upload/v1764255047/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/WhatsApp_Image_2025-10-19_at_13.41.03_1_cprzju.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1764255352/storywink/cmihjwm8l002bmr0dp7lhdvx2/generated/page_2.jpg", alt: "Photo 4" },
-  { original: "https://res.cloudinary.com/storywink/image/upload/v1764255046/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/WhatsApp_Image_2025-10-19_at_13.41.04_2_moijbz.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1764255446/storywink/cmihjwm8l002bmr0dp7lhdvx2/generated/page_9.jpg", alt: "Photo 5" },
-  { original: "https://res.cloudinary.com/storywink/image/upload/v1764253791/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/WhatsApp_Image_2025-10-19_at_13.41.03_h21hc7.jpg", illustrated: "https://res.cloudinary.com/storywink/image/upload/v1764255443/storywink/cmihjwm8l002bmr0dp7lhdvx2/generated/page_7.jpg", alt: "Photo 6" },
+  { original: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764255047/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/WhatsApp_Image_2025-10-19_at_13.41.03_1_cprzju.jpg"), illustrated: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764255352/storywink/cmihjwm8l002bmr0dp7lhdvx2/generated/page_2.jpg"), alt: "Photo 4" },
+  { original: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764255046/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/WhatsApp_Image_2025-10-19_at_13.41.04_2_moijbz.jpg"), illustrated: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764255446/storywink/cmihjwm8l002bmr0dp7lhdvx2/generated/page_9.jpg"), alt: "Photo 5" },
+  { original: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764253791/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/WhatsApp_Image_2025-10-19_at_13.41.03_h21hc7.jpg"), illustrated: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764255443/storywink/cmihjwm8l002bmr0dp7lhdvx2/generated/page_7.jpg"), alt: "Photo 6" },
 ];
 
 interface CarouselSyncContextType {
@@ -112,9 +113,23 @@ interface SynchronizedBeforeAfterPairProps {
 const SynchronizedBeforeAfterPair: React.FC<SynchronizedBeforeAfterPairProps> = memo(({ images, showControls = false, carouselId }) => {
   const { currentIndex, setCurrentIndex, totalImages } = useCarouselSync();
 
+  // Preload next image pair before carousel transitions
+  useEffect(() => {
+    const nextIndex = (currentIndex + 1) % images.length;
+    const nextImage = images[nextIndex];
+
+    if (nextImage && typeof window !== 'undefined') {
+      const preloadOriginal = new window.Image();
+      preloadOriginal.src = nextImage.original;
+      const preloadIllustrated = new window.Image();
+      preloadIllustrated.src = nextImage.illustrated;
+    }
+  }, [currentIndex, images]);
+
   if (!images || images.length === 0) return null;
 
   const currentImagePair = images[currentIndex % images.length]; // Use modulo for safety if lengths differ despite totalImages
+  const isFirstImage = currentIndex === 0;
 
   return (
     <div className={cn("relative w-full max-w-sm mx-auto flex flex-col items-center")} style={{ maxWidth: '24rem' }}>
@@ -131,8 +146,9 @@ const SynchronizedBeforeAfterPair: React.FC<SynchronizedBeforeAfterPairProps> = 
                 src={currentImagePair.original}
                 alt={`${currentImagePair.alt} - Original`}
                 fill
+                sizes="(max-width: 640px) 50vw, 192px"
                 className="object-cover"
-                priority={true}
+                priority={isFirstImage}
               />
             </div>
           </div>
@@ -142,8 +158,9 @@ const SynchronizedBeforeAfterPair: React.FC<SynchronizedBeforeAfterPairProps> = 
                 src={currentImagePair.illustrated}
                 alt={`${currentImagePair.alt} - Illustrated`}
                 fill
+                sizes="(max-width: 640px) 50vw, 192px"
                 className="object-cover"
-                priority={true}
+                priority={isFirstImage}
               />
             </div>
           </div>

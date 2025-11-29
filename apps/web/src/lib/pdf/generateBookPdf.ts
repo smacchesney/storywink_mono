@@ -1,8 +1,17 @@
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { Book, Page } from '@storywink/database';
-import { coolifyImageUrl } from '@storywink/shared';
 import logger from '../logger'; // Use relative import
+
+/**
+ * Optimizes Cloudinary image URL for print quality.
+ * Uses q_auto:best for higher quality compression suitable for print.
+ */
+function optimizeForPrint(url: string | null | undefined): string {
+  if (!url) return '';
+  if (!url.includes('/image/upload/')) return url;
+  return url.replace('/upload/', '/upload/f_auto,q_auto:best/');
+}
 
 // Define the expected input type (Book with Pages)
 type BookWithPages = Book & { pages: Page[] };
@@ -58,8 +67,8 @@ function generatePageHtml(page: Page, _bookTitle: string): string {
 
   return `
     <div class="page" style="${pageStyle}">
-      ${page.generatedImageUrl 
-        ? `<img src="${coolifyImageUrl(page.generatedImageUrl)}" alt="Page ${page.pageNumber} Illustration" style="${imageStyle}" />` 
+      ${page.generatedImageUrl
+        ? `<img src="${optimizeForPrint(page.generatedImageUrl)}" alt="Page ${page.pageNumber} Illustration" style="${imageStyle}" />`
         : '<div style="display:flex; align-items:center; justify-content:center; height:100%;">Image not generated</div>'}
     </div>
   `;

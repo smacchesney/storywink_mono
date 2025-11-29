@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { BookWithStoryboardPages } from '@storywink/shared'; // <-- Import shared types
+import { BookWithStoryboardPages, optimizeCloudinaryUrl } from '@storywink/shared';
 
 interface CanvasProps {
   bookData: BookWithStoryboardPages; // <-- Use shared type
@@ -69,9 +69,10 @@ export function Canvas({ bookData, options }: CanvasProps) {
             >
               {(page.asset?.url || page.originalImageUrl) ? (
                 <Image
-                  src={page.asset?.url || page.originalImageUrl || ''}
+                  src={optimizeCloudinaryUrl(page.asset?.url || page.originalImageUrl || '')}
                   alt={`Page ${displayIndex + 1}`}
                   fill
+                  sizes="(max-width: 768px) 100vw, 448px"
                   style={{ objectFit: "cover" }}
                   priority={displayIndex < 2}
                 />

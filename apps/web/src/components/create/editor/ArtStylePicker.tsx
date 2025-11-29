@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Info } from 'lucide-react';
 import { STYLE_LIBRARY } from '@storywink/shared/prompts/styles';
+import { optimizeCloudinaryUrl } from '@storywink/shared';
 
 interface StyleDefinition {
   label: string;
@@ -45,11 +46,11 @@ export function ArtStylePicker({
               )}
             >
               <CardContent className="p-0 aspect-square relative max-h-[120px]">
-                <Image 
-                  src={style.referenceImageUrl} 
+                <Image
+                  src={optimizeCloudinaryUrl(style.referenceImageUrl)}
                   alt={style.label}
                   fill
-                  sizes="(max-width: 768px) 50vw, 33vw" // Provide sizes for optimization
+                  sizes="(max-width: 768px) 50vw, 33vw"
                   style={{ objectFit: "cover" }}
                 />
                 <div 
