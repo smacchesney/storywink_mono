@@ -6,6 +6,7 @@ import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import Image from "next/image";
 import { MenuIcon } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { NotificationBell } from "@/components/notification-bell";
 
 export function SiteHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -85,21 +86,25 @@ export function SiteHeader() {
              </SignedOut>
              <SignedIn>
                  <Button asChild variant="secondary" size="sm">
-                    <Link 
-                      href="/library" 
+                    <Link
+                      href="/library"
                       className="text-slate-900 dark:text-white transition-colors hover:text-slate-700 dark:hover:text-slate-300"
                     >
                       My Library
                     </Link>
                  </Button>
+                 <NotificationBell />
                  <div className="flex items-center ml-2">
                    <UserButton afterSignOutUrl="/" />
                  </div>
              </SignedIn>
           </div>
 
-          {/* Mobile Menu Trigger - only on small screens */}
-          <div className="md:hidden">
+          {/* Mobile: Notification Bell + Menu Trigger */}
+          <div className="flex items-center md:hidden">
+            <SignedIn>
+              <NotificationBell />
+            </SignedIn>
             <Button
               variant="ghost"
               size="icon"

@@ -95,12 +95,40 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
     // Update book status
     await prisma.book.update({
       where: { id: bookId },
-      data: { 
+      data: {
         status: finalStatus,
         updatedAt: new Date(),
       },
     });
-    
+
+    // Create notification for book completion
+    const notificationMessages = {
+      COMPLETED: {
+        title: `${book.title} is ready!`,
+        message: `Your book "${book.title}" has been illustrated and is ready to view.`,
+      },
+      PARTIAL: {
+        title: `${book.title} is partially ready`,
+        message: `Your book "${book.title}" has been partially completed. Some pages may need attention.`,
+      },
+      FAILED: {
+        title: `${book.title} needs attention`,
+        message: `There was an issue creating your book "${book.title}". Please try again.`,
+      },
+    };
+
+    const notification = notificationMessages[finalStatus];
+    await prisma.notification.create({
+      data: {
+        userId,
+        bookId,
+        type: `BOOK_${finalStatus}`,
+        title: notification.title,
+        message: notification.message,
+      },
+    });
+    logger.info({ bookId, userId, type: `BOOK_${finalStatus}` }, 'Created notification for book completion');
+
     logger.info({ 
       bookId, 
       finalStatus,

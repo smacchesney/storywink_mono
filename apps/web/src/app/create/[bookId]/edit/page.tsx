@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle2, HelpCircle } from 'lucide-react';
 import { StoryboardPage, BookWithStoryboardPages } from '@storywink/shared'; // <-- Import shared types
+import { BookStatus } from '@prisma/client';
 import BottomToolbar, { EditorTab } from '@/components/create/editor/BottomToolbar'; // <-- Import Toolbar
 import PhotoSourceSheet from '@/components/create/PhotoSourceSheet'; // <-- Import Sheet for Add Photo
 import { CloudinaryUploaderAuto } from '@/components/cloudinary-uploader-auto'; // <-- Import auto Cloudinary uploader
@@ -108,7 +109,15 @@ export default function EditBookPage() {
         throw new Error(errorMsg);
       }
       const data: BookWithStoryboardPages = await response.json();
-      if (!isMountedRef.current) return; 
+      if (!isMountedRef.current) return;
+
+      // Route guard: Redirect completed books to preview page
+      if (data.status === BookStatus.COMPLETED || data.status === BookStatus.PARTIAL) {
+        console.log(`[Edit Page] Book ${bookId} is already ${data.status}, redirecting to preview`);
+        router.replace(`/book/${bookId}/preview`);
+        return;
+      }
+
       setBookData(data);
     } catch (err) {
       console.error("Error fetching book:", err);

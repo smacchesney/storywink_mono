@@ -106,7 +106,13 @@ function ReviewPageContent() {
         }
 
         console.log("Review Page: Fetched Full Book Data:", fetchedBook);
-        // Store fetched book data (removed unused state variables)
+
+        // Route guard: Redirect completed books to preview page
+        if (fetchedBook.status === BookStatus.COMPLETED || fetchedBook.status === BookStatus.PARTIAL) {
+          console.log(`[Review Page] Book ${bookIdToFetch} is already ${fetchedBook.status}, redirecting to preview`);
+          router.replace(`/book/${bookIdToFetch}/preview`);
+          return;
+        }
 
         const sortedPages = [...fetchedBook.pages].sort((a, b) => a.index - b.index);
 

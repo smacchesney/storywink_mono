@@ -143,6 +143,18 @@ generateRouter.post(
         return;
       }
 
+      // Prevent re-illustration of already completed books
+      if (book.status === 'COMPLETED' || book.status === 'PARTIAL') {
+        console.warn(`[Express API] Rejected illustration request for already-completed book ${bookId} (status: ${book.status})`);
+        res.status(409).json({
+          success: false,
+          error: "Book already illustrated",
+          message: "This book has already been illustrated and cannot be re-illustrated.",
+          status: book.status,
+        });
+        return;
+      }
+
       console.log(`[Express API] Book found: ${book.title}`);
       console.log(`  - Total Pages: ${book.pages.length}`);
       console.log(`  - Current Status: ${book.status}`);

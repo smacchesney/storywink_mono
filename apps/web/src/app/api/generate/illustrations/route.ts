@@ -83,9 +83,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Book not found or access denied.' }, { status: 404 });
     }
 
-    if (book.status !== BookStatus.STORY_READY && book.status !== BookStatus.COMPLETED) {
+    // Prevent re-illustration of already completed books
+    if (book.status === BookStatus.COMPLETED || book.status === BookStatus.PARTIAL) {
+      logger.warn({ clerkId, dbUserId: dbUser.id, bookId: requestData.bookId, status: book.status }, 'Rejected illustration request for already-completed book.');
+      return NextResponse.json({
+        error: 'Book already illustrated',
+        message: 'This book has already been illustrated and cannot be re-illustrated.',
+        status: book.status
+      }, { status: 409 });
+    }
+
+    // Book must be in STORY_READY state to start illustration
+    if (book.status !== BookStatus.STORY_READY) {
       logger.warn({ clerkId, dbUserId: dbUser.id, bookId: requestData.bookId, status: book.status }, 'Book not in correct state for illustration generation.');
-      return NextResponse.json({ error: `Book must be in STORY_READY or COMPLETED state to start illustration (current: ${book.status})` }, { status: 409 }); // Conflict status
+      return NextResponse.json({ error: `Book must be in STORY_READY state to start illustration (current: ${book.status})` }, { status: 409 });
     }
 
     if (!book.pages || book.pages.length === 0) {

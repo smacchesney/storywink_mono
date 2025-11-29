@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-// import { Loader2 } from 'lucide-react';
-// import { TextShimmer } from '@/components/ui/text-shimmer'; // Old import
-import { TextShimmerWave } from '@/components/ui/text-shimmer-wave'; // New import
-// import { toast } from 'sonner'; // Removed - progress already shown in UI
+import Link from 'next/link';
+import { Bell } from 'lucide-react';
+import { TextShimmerWave } from '@/components/ui/text-shimmer-wave';
+import { Button } from '@/components/ui/button';
 import { BookStatus } from '@prisma/client';
 
 interface IllustrationProgressScreenProps {
@@ -65,34 +65,50 @@ export function IllustrationProgressScreen({
 
   return (
     <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-50 p-4 text-center">
-      {/* Kai the Dino Illustrating Mascot - No effects */}
-      <div className="mb-8 transform-none">
+      {/* Kai the Dino Illustrating Mascot */}
+      <div className="mb-6 transform-none">
         <Image
           src="/images/mascot/kai the dino illustrating.png"
           alt="Kai the Dino creating illustrations"
           width={200}
           height={200}
-          className="w-20 h-20 md:w-28 md:h-28 object-contain"
+          className="w-24 h-24 md:w-32 md:h-32 object-contain"
           priority
         />
       </div>
 
-      {/* Text with Shimmer Effect - Properly contained */}
-      <div className="isolate">
-        <TextShimmerWave 
-          className="text-lg md:text-xl font-medium mb-4 [--base-color:#374151] [--base-gradient-color:#F76C5E] dark:[--base-color:#D1D5DB] dark:[--base-gradient-color:#F76C5E]"
+      {/* Text with Shimmer Effect */}
+      <div className="isolate mb-4">
+        <TextShimmerWave
+          className="text-xl md:text-2xl font-semibold [--base-color:#374151] [--base-gradient-color:#F76C5E] dark:[--base-color:#D1D5DB] dark:[--base-gradient-color:#F76C5E]"
           duration={1}
           spread={1}
           zDistance={1}
           scaleDistance={1.1}
           rotateYDistance={20}
         >
-          Creating Your Story ✨
+          Kai is illustrating your book!
         </TextShimmerWave>
       </div>
-      <p className="text-sm text-gray-500">
-        Feel free to navigate away, and check back "My Library" later
-      </p>
+
+      {/* Time estimate and notification info */}
+      <div className="max-w-xs md:max-w-sm space-y-3 mb-6">
+        <p className="text-sm md:text-base text-gray-600">
+          This usually takes <span className="font-medium text-gray-700">10-15 minutes</span>.
+        </p>
+        <p className="text-sm text-gray-500 flex items-center justify-center gap-1.5">
+          We&apos;ll ping you via the
+          <Bell className="inline h-4 w-4 text-gray-500" />
+          when it&apos;s ready!
+        </p>
+      </div>
+
+      {/* CTA Button */}
+      <Button asChild variant="secondary" size="lg" className="font-medium">
+        <Link href="/library">
+          Go to My Library
+        </Link>
+      </Button>
     </div>
   );
 }
