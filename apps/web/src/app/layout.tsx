@@ -87,6 +87,14 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
+        <head>
+          {/* Preload Cloudinary upload widget script to prevent race condition on /create page */}
+          <link
+            rel="preload"
+            href="https://upload-widget.cloudinary.com/global/all.js"
+            as="script"
+          />
+        </head>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
         >

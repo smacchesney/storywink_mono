@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { CldUploadWidget } from 'next-cloudinary';
 import { useUser } from '@clerk/nextjs';
 import logger from '@/lib/logger';
@@ -49,6 +49,8 @@ export function CloudinaryUploaderAuto({
   const hasOpened = useRef(false);
   const hasCalledComplete = useRef(false);
   const openFunctionRef = useRef<(() => void) | null>(null);
+  const [widgetIsLoading, setWidgetIsLoading] = useState(true);
+  const wasLoadingRef = useRef(true);
 
   // Helper function to check if uploads are complete and trigger callback
   const checkAndTriggerCompletion = useCallback(() => {
@@ -265,20 +267,23 @@ export function CloudinaryUploaderAuto({
     };
   }, []);
 
-  // Store open function in a layout effect to trigger auto-open
+  // Store open function - auto-open is now handled by the useEffect that watches widgetIsLoading
   const storeOpenFunction = useCallback((open: () => void) => {
     if (!openFunctionRef.current) {
       openFunctionRef.current = open;
-
-      // Trigger auto-open after a small delay
-      if (!hasOpened.current) {
-        hasCalledComplete.current = false;
-        setTimeout(() => {
-          openFunctionRef.current?.();
-        }, 100);
-      }
+      // Auto-open is triggered by the isLoading effect below, not here
     }
   }, []);
+
+  // Auto-open when widget transitions from loading to ready
+  useEffect(() => {
+    if (wasLoadingRef.current && !widgetIsLoading && openFunctionRef.current && !hasOpened.current) {
+      logger.info("Cloudinary widget ready - auto-opening");
+      hasCalledComplete.current = false;
+      openFunctionRef.current();
+    }
+    wasLoadingRef.current = widgetIsLoading;
+  }, [widgetIsLoading]);
 
   return (
     <CldUploadWidget
@@ -290,9 +295,16 @@ export function CloudinaryUploaderAuto({
       onClose={handleUploadClose}
       onQueuesEnd={handleUploadQueuesEnd}
     >
-      {({ open, widget }) => {
+      {({ open, widget, isLoading }) => {
         // Store widget reference
         widgetRef.current = widget;
+
+        // Sync isLoading to state (must be done outside render via queueMicrotask)
+        // isLoading can be undefined initially, so default to true
+        const currentLoadingState = isLoading ?? true;
+        if (currentLoadingState !== widgetIsLoading) {
+          queueMicrotask(() => setWidgetIsLoading(currentLoadingState));
+        }
 
         // Store open function on first render only
         if (open && !openFunctionRef.current) {
