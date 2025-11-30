@@ -11,6 +11,42 @@ import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
+/**
+ * Detect transient errors that should trigger automatic retry.
+ * Content policy errors are NOT transient - they won't resolve on retry.
+ */
+function isTransientError(error: Error): boolean {
+  const message = error.message.toLowerCase();
+  const transientPatterns = [
+    'fetch failed',
+    'etimedout',
+    'econnreset',
+    'econnrefused',
+    'enotfound',
+    'socket hang up',
+    'network error',
+    'timeout',
+    'aborted',
+    'unavailable',
+    '503',
+    'internal error',
+    'deadline exceeded',
+    'rate limit',
+    '429',
+    'quota exceeded',
+    'resource exhausted',
+  ];
+  return transientPatterns.some(pattern => message.includes(pattern));
+}
+
+/**
+ * Check if this is the last retry attempt for a job.
+ */
+function isLastAttempt(job: Job): boolean {
+  const maxAttempts = job.opts?.attempts || 1;
+  return (job.attemptsMade + 1) >= maxAttempts;
+}
+
 // ============================================================================
 // DIAGNOSTIC: Track first job execution for detailed logging
 // ============================================================================
@@ -387,8 +423,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         const isCopyrightIssue = errorMessage.toLowerCase().includes('copyright') ||
                                  errorMessage.toLowerCase().includes('proprietary') ||
                                  errorMessage.toLowerCase().includes('trademark');
-        const isQuotaIssue = errorMessage.toLowerCase().includes('quota') ||
-                             errorMessage.toLowerCase().includes('rate limit');
+        const isContentPolicyBlock = isSafetyBlock || isCopyrightIssue;
 
         logger.error({
             jobId: job.id,
@@ -399,20 +434,29 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
             errorDetails,
             isSafetyBlock,
             isCopyrightIssue,
-            isQuotaIssue,
+            isContentPolicyBlock,
             fullError: JSON.stringify(apiError, null, 2)
         }, 'Error calling Gemini 3 Pro Image API.');
 
         console.error(`[IllustrationWorker] Gemini API error for page ${pageNumber}:`);
         console.error(`  - Error: ${errorMessage}`);
         console.error(`  - Error Code: ${errorCode || 'N/A'}`);
+        console.error(`  - Is Content Policy Block: ${isContentPolicyBlock}`);
         if (isSafetyBlock) console.error(`  - Type: SAFETY/CONTENT POLICY BLOCK`);
         if (isCopyrightIssue) console.error(`  - Type: COPYRIGHT/PROPRIETARY ISSUE`);
-        if (isQuotaIssue) console.error(`  - Type: QUOTA/RATE LIMIT`);
         if (errorDetails) console.error(`  - Details: ${JSON.stringify(errorDetails)}`);
 
-        moderationBlocked = true;
-        moderationReasonText = `${errorMessage}${errorCode ? ` (Code: ${errorCode})` : ''}${isSafetyBlock ? ' [SAFETY]' : ''}${isCopyrightIssue ? ' [COPYRIGHT]' : ''}`;
+        // Content policy violations are PERMANENT - mark as FLAGGED, complete job successfully (no retry)
+        if (isContentPolicyBlock) {
+            moderationBlocked = true;
+            moderationReasonText = `${errorMessage}${errorCode ? ` (Code: ${errorCode})` : ''}${isSafetyBlock ? ' [SAFETY]' : ''}${isCopyrightIssue ? ' [COPYRIGHT]' : ''}`;
+            console.log(`[IllustrationWorker] Content policy block - marking as FLAGGED, job will complete successfully (no retry)`);
+            // Don't throw - let job complete successfully with FLAGGED status
+        } else {
+            // Other API errors (possibly transient) - re-throw to trigger outer catch block retry logic
+            console.log(`[IllustrationWorker] API error (possibly transient) - re-throwing for retry logic`);
+            throw apiError;
+        }
     }
     
     let finalImageUrl: string | undefined = undefined;
@@ -491,48 +535,63 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     };
     
   } catch (error: any) {
-    // Enhanced error logging with more context
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const transient = isTransientError(error);
+    const lastAttempt = isLastAttempt(job);
+    const willRetry = transient && !lastAttempt;
+
+    // Enhanced error logging with retry context
     const errorContext = {
-      bookId, 
-      pageId, 
-      error: error.message,
+      bookId,
+      pageId,
+      error: errorMessage,
       errorStack: error.stack,
       pageNumber,
       jobId: job.id,
       attemptsMade: job.attemptsMade,
-      maxAttempts: job.opts?.attempts || 'unknown',
+      maxAttempts: job.opts?.attempts || 5,
+      isTransient: transient,
+      isLastAttempt: lastAttempt,
+      willRetry,
       parentJobId: job.parent?.id,
       isTitlePage,
       artStyle,
       isWinkifyEnabled,
       hasText: !!text,
       textLength: text?.length || 0,
-      // Add more diagnostic info
-      failureStage: error.message.includes('Gemini') || error.message.includes('Google') ? 'ai_generation' :
-                   error.message.includes('Cloudinary') ? 'image_upload' :
-                   error.message.includes('fetch') ? 'image_fetch' :
-                   error.message.includes('database') ? 'database_update' : 'unknown'
+      failureStage: errorMessage.includes('Gemini') || errorMessage.includes('Google') ? 'ai_generation' :
+                   errorMessage.includes('Cloudinary') ? 'image_upload' :
+                   errorMessage.includes('fetch') ? 'image_fetch' :
+                   errorMessage.includes('database') ? 'database_update' : 'unknown'
     };
-    
-    logger.error(errorContext, 'Illustration generation failed');
 
-    console.error(`[IllustrationWorker] Job ${job.id} FAILED for page ${pageNumber}:`);
+    logger.error(errorContext, 'Illustration generation error');
+
+    console.error(`[IllustrationWorker] Job ${job.id} ERROR for page ${pageNumber}:`);
     console.error(`  - Book: ${bookId}`);
-    console.error(`  - Error: ${error.message}`);
+    console.error(`  - Error: ${errorMessage}`);
     console.error(`  - Failure Stage: ${errorContext.failureStage}`);
-    console.error(`  - Attempts: ${job.attemptsMade + 1}/${job.opts?.attempts || 'unknown'}`);
-    console.error(`  - Parent Job: ${job.parent?.id || 'None'}`);
-    console.error(`  - Is Title Page: ${isTitlePage}`);
-    console.error(`  - Has Text: ${!!text} (${text?.length || 0} chars)`);
-    console.error(`  - Art Style: ${artStyle}`);
+    console.error(`  - Transient Error: ${transient}`);
+    console.error(`  - Attempt: ${job.attemptsMade + 1}/${job.opts?.attempts || 5}`);
+    console.error(`  - Will Retry: ${willRetry}`);
 
-    // Mark page as failed with enhanced error info
+    // TRANSIENT + NOT LAST ATTEMPT: Re-throw WITHOUT updating page status
+    // BullMQ will retry automatically with exponential backoff
+    if (willRetry) {
+      console.log(`[IllustrationWorker] Transient error detected - BullMQ will retry automatically`);
+      await new Promise(resolve => setTimeout(resolve, 100)); // Flush logs
+      throw error;
+    }
+
+    // PERMANENT ERROR or LAST ATTEMPT: Mark page as FAILED
+    console.error(`[IllustrationWorker] Marking page ${pageNumber} as FAILED (permanent error or final attempt)`);
+
     try {
       await prisma.page.update({
         where: { id: pageId },
         data: {
           moderationStatus: 'FAILED',
-          moderationReason: `Job failed (${errorContext.failureStage}): ${error.message}`.slice(0, 1000),
+          moderationReason: `Job failed (${errorContext.failureStage}): ${errorMessage}`.slice(0, 1000),
         },
       });
       console.error(`[IllustrationWorker] Page ${pageNumber} marked as FAILED in database`);

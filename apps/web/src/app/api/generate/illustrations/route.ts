@@ -72,7 +72,9 @@ export async function POST(request: Request) {
             illustrationNotes: true,
             assetId: true,
             index: true,
-            pageNumber: true
+            pageNumber: true,
+            moderationStatus: true,
+            generatedImageUrl: true,
           }
         }
       }
@@ -110,6 +112,87 @@ export async function POST(request: Request) {
        return NextResponse.json({ error: 'Cannot illustrate a book with no pages.' }, { status: 400 });
     }
 
+    // Smart Retry: Only process pages that need illustration
+    const isRetry = book.status === BookStatus.PARTIAL || book.status === BookStatus.FAILED;
+
+    let pagesToProcess = book.pages;
+    if (isRetry) {
+      pagesToProcess = book.pages.filter((page) => {
+        // Skip pages with successful illustrations (OK status)
+        if (page.moderationStatus === 'OK' && page.generatedImageUrl) {
+          return false;
+        }
+        // Skip pages flagged by content policy (retrying won't help)
+        if (page.moderationStatus === 'FLAGGED') {
+          return false;
+        }
+        // Include pages with FAILED status (transient errors) or missing illustrations
+        return true;
+      });
+
+      const skippedOk = book.pages.filter(p => p.moderationStatus === 'OK' && p.generatedImageUrl).length;
+      const skippedFlagged = book.pages.filter(p => p.moderationStatus === 'FLAGGED').length;
+
+      logger.info({
+        clerkId,
+        dbUserId: dbUser.id,
+        bookId: book.id,
+        totalPages: book.pages.length,
+        pagesToRetry: pagesToProcess.length,
+        skippedOk,
+        skippedFlagged
+      }, 'Smart retry - filtering to failed/missing pages only');
+
+      console.log(`[IllustrationAPI] Smart Retry Mode:`);
+      console.log(`  - Total Pages: ${book.pages.length}`);
+      console.log(`  - Pages to Retry: ${pagesToProcess.length}`);
+      console.log(`  - Skipped (OK): ${skippedOk}`);
+      console.log(`  - Skipped (FLAGGED - content policy): ${skippedFlagged}`);
+    }
+
+    // Handle edge case: no pages to retry
+    if (isRetry && pagesToProcess.length === 0) {
+      const flaggedCount = book.pages.filter(p => p.moderationStatus === 'FLAGGED').length;
+      const okCount = book.pages.filter(p => p.moderationStatus === 'OK' && p.generatedImageUrl).length;
+
+      if (flaggedCount > 0 && okCount === book.pages.length - flaggedCount) {
+        // All non-flagged pages succeeded, but some are flagged
+        // Keep as PARTIAL - user needs to address flagged content (Phase 2)
+        logger.info({
+          clerkId,
+          dbUserId: dbUser.id,
+          bookId: book.id,
+          flaggedCount,
+          okCount
+        }, 'No pages to retry - all remaining are FLAGGED by content policy');
+
+        return NextResponse.json({
+          message: `${flaggedCount} page(s) were flagged by content policy and cannot be retried. Please edit your book to remove flagged photos.`,
+          bookId: book.id,
+          flaggedCount,
+          status: 'PARTIAL'
+        }, { status: 200 });
+      }
+
+      // All pages succeeded - update to COMPLETED
+      await prisma.book.update({
+        where: { id: book.id },
+        data: { status: BookStatus.COMPLETED }
+      });
+
+      logger.info({
+        clerkId,
+        dbUserId: dbUser.id,
+        bookId: book.id
+      }, 'All pages already have successful illustrations - marking as COMPLETED');
+
+      return NextResponse.json({
+        message: 'All pages already have successful illustrations.',
+        bookId: book.id,
+        status: 'COMPLETED'
+      }, { status: 200 });
+    }
+
     logger.info({ 
       clerkId, 
       dbUserId: dbUser.id, 
@@ -133,9 +216,9 @@ export async function POST(request: Request) {
     });
     logger.info({ clerkId, dbUserId: dbUser.id, bookId: book.id }, 'Book status updated to ILLUSTRATING.');
 
-    // Step 3: Create child job definitions for each page
-    console.log(`[IllustrationAPI] Creating illustration jobs for each page...`);
-    const pageChildren = book.pages.map((page) => {
+    // Step 3: Create child job definitions for pages that need illustration
+    console.log(`[IllustrationAPI] Creating illustration jobs for ${pagesToProcess.length} page(s)...`);
+    const pageChildren = pagesToProcess.map((page) => {
         const isActualTitlePage = page.assetId === book.coverAssetId;
         
         const illustrationJobData: IllustrationGenerationJobData = {
