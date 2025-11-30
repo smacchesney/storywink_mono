@@ -94,7 +94,7 @@ export async function POST(request: Request) {
     }
 
     // Book must be in STORY_READY, PARTIAL, or FAILED state to start/retry illustration
-    const allowedStatuses = [BookStatus.STORY_READY, BookStatus.PARTIAL, BookStatus.FAILED];
+    const allowedStatuses: BookStatus[] = [BookStatus.STORY_READY, BookStatus.PARTIAL, BookStatus.FAILED];
     if (!allowedStatuses.includes(book.status)) {
       logger.warn({ clerkId, dbUserId: dbUser.id, bookId: requestData.bookId, status: book.status }, 'Book not in correct state for illustration generation.');
       return NextResponse.json({ error: `Book must be in STORY_READY, PARTIAL, or FAILED state to start illustration (current: ${book.status})` }, { status: 409 });

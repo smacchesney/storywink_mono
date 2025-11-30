@@ -38,7 +38,7 @@ export interface BookCardProps {
 const BookCard: React.FC<BookCardProps> = ({
   id,
   title,
-  updatedAt,
+  updatedAt: _updatedAt,
   status,
   pages: _pages,
   coverImageUrl,
@@ -65,7 +65,6 @@ const BookCard: React.FC<BookCardProps> = ({
     }
   };
 
-  const isCompleted = status === BookStatus.COMPLETED;
   const isIllustrating = status === BookStatus.ILLUSTRATING;
   const isError = status === BookStatus.FAILED || status === BookStatus.PARTIAL;
 
