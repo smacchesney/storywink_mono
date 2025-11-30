@@ -2,16 +2,16 @@
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-// import { useBookCreation } from '@/context/BookCreationContext'; // Unused
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
-import { BookStatus, Page, Book } from '@prisma/client'; // Use direct prisma client types
+import { BookStatus, Page, Book } from '@prisma/client';
+import Image from 'next/image';
 
 // Import the new components
 import PageTracker from '@/components/create/review/PageTracker';
 import PageCard from '@/components/create/review/PageCard';
 import NavigationControls from '@/components/create/review/NavigationControls';
-import IllustrationProgressScreen from '@/components/create/editor/IllustrationProgressScreen';
+import { TextShimmerWave } from '@/components/ui/text-shimmer-wave';
 
 // Define PageData with necessary fields from BookData context or fetched data
 type PageData = {
@@ -415,18 +415,20 @@ function ReviewPageContent() {
   // Regenerate Story handler
   // This function has been removed as it was unused and causing TypeScript errors
 
-  // --- Illustrate Book Handler (MODIFIED FOR POLLING) ---
+  // State for showing Kai redirect confirmation
+  const [showRedirectConfirmation, setShowRedirectConfirmation] = useState(false);
+
+  // --- Illustrate Book Handler ---
   const handleIllustrate = async () => {
     const bookIdToUse = bookIdFromUrl;
     if (!bookIdToUse || !allConfirmed || isLoadingText) {
        toast.warning("Cannot start illustration. Ensure all pages are confirmed and story text is loaded.");
        return;
      }
-     if (isStartingIllustration || isAwaitingFinalStatus) return; // Prevent if already starting or polling final status
-     
+     if (isStartingIllustration || isAwaitingFinalStatus) return;
+
      console.log("Attempting to start illustration process...");
      setIsStartingIllustration(true);
-     toast.info("Sending request to start illustration generation..."); 
 
      try {
         const response = await fetch('/api/generate/illustrations', {
@@ -440,47 +442,25 @@ function ReviewPageContent() {
         }
         const result = await response.json().catch(() => ({}));
         console.log("Illustration Job Request Result:", result);
-        
-        // Instead of redirecting, start polling for the final status
-        toast.success("Illustration process started! You can monitor progress in your library."); 
-        // Track status change (removed unused state variable)
-        setIsAwaitingFinalStatus(true); // Trigger final status polling
-        // Keep button loading state until polling completes/redirects
-        // setIsStartingIllustration(false); 
+
+        // Show Kai-themed confirmation overlay and redirect to library
+        setShowRedirectConfirmation(true);
+
+        // Redirect to library after 2.5 seconds
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            router.push('/library');
+          }
+        }, 2500);
 
      } catch (error) {
         console.error("Error initiating illustration generation:", error);
         if (isMountedRef.current) {
            toast.error(`Error starting illustration: ${error instanceof Error ? error.message : String(error)}`);
-           setIsStartingIllustration(false); // Reset button loading on error
+           setIsStartingIllustration(false);
         }
-     } 
-     // No finally block needed here for resetting state if polling takes over
+     }
   };
-
-  const handleIllustrationError = useCallback((_bookId: string, errorMsg?: string) => {
-    if (!isMountedRef.current) return;
-    setIsAwaitingFinalStatus(false); // Stop showing the progress screen
-    setIsStartingIllustration(false); // Reset button state
-    toast.error(errorMsg || "An unknown error occurred during illustration.");
-    // Optionally, navigate to an error state or back to the editor
-    // router.push(`/create?bookId=${bookIdFromUrl}&error=illustration`);
-  }, [bookIdFromUrl, router]);
-
-  const handleIllustrationComplete = useCallback((_bookId: string, finalStatus: BookStatus) => {
-    if (!isMountedRef.current) return;
-    setIsAwaitingFinalStatus(false); // Stop showing the progress screen
-    setIsStartingIllustration(false); // Reset button state
-
-    if (finalStatus === BookStatus.COMPLETED || finalStatus === BookStatus.PARTIAL) {
-      // PARTIAL means all illustrations are done (title pages without text are OK)
-      // toast.success is already shown by IllustrationProgressScreen
-      router.push(`/book/${_bookId}/preview`);
-    } else { // FAILED
-      // toast.error is already shown by IllustrationProgressScreen
-      router.push(`/create?bookId=${_bookId}&fix=1`);
-    }
-  }, [router]);
 
   // Keyboard arrow navigation
   useEffect(() => {
@@ -501,15 +481,49 @@ function ReviewPageContent() {
   if (isFetchingInitialData) {
       return <div className="p-6 flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin mr-2" /> Loading review data...</div>;
   }
-  
-  // Render IllustrationProgressScreen if awaiting final status
-  if (isAwaitingFinalStatus && bookIdFromUrl) {
+
+  // Show Kai-themed redirect confirmation
+  if (showRedirectConfirmation) {
     return (
-      <IllustrationProgressScreen 
-        bookId={bookIdFromUrl} 
-        onComplete={handleIllustrationComplete} 
-        onError={handleIllustrationError} 
-      />
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+        <div className="flex flex-col items-center text-center px-6">
+          {/* Kai mascot */}
+          <div className="relative w-48 h-48 mb-6">
+            <Image
+              src="/images/mascot/kai the dino illustrating.png"
+              alt="Kai the Dino is on it!"
+              fill
+              className="object-contain"
+              priority
+            />
+          </div>
+
+          {/* Animated message */}
+          <TextShimmerWave
+            className="text-xl sm:text-2xl font-bold mb-4 [--base-color:#374151] [--base-gradient-color:#F76C5E]"
+            duration={1}
+            spread={1}
+            zDistance={1}
+            scaleDistance={1.1}
+            rotateYDistance={20}
+          >
+            Kai is on it!
+          </TextShimmerWave>
+
+          <p className="text-slate-600 dark:text-slate-300 text-base sm:text-lg mb-2">
+            Heading to your library...
+          </p>
+
+          <p className="text-slate-400 dark:text-slate-500 text-sm">
+            Your book will appear there when it&apos;s ready!
+          </p>
+
+          {/* Loading indicator */}
+          <div className="mt-8">
+            <Loader2 className="h-6 w-6 animate-spin text-[#F76C5E]" />
+          </div>
+        </div>
+      </div>
     );
   }
 

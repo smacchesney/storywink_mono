@@ -143,8 +143,8 @@ generateRouter.post(
         return;
       }
 
-      // Prevent re-illustration of already completed books
-      if (book.status === 'COMPLETED' || book.status === 'PARTIAL') {
+      // Prevent re-illustration of already completed books (but allow retry for PARTIAL/FAILED)
+      if (book.status === 'COMPLETED') {
         console.warn(`[Express API] Rejected illustration request for already-completed book ${bookId} (status: ${book.status})`);
         res.status(409).json({
           success: false,
@@ -153,6 +153,22 @@ generateRouter.post(
           status: book.status,
         });
         return;
+      }
+
+      // Allow retry for PARTIAL/FAILED books
+      const allowedStatuses = ['STORY_READY', 'PARTIAL', 'FAILED'];
+      if (!allowedStatuses.includes(book.status)) {
+        console.warn(`[Express API] Book ${bookId} not in correct state for illustration (status: ${book.status})`);
+        res.status(409).json({
+          success: false,
+          error: `Book must be in STORY_READY, PARTIAL, or FAILED state to start illustration (current: ${book.status})`,
+        });
+        return;
+      }
+
+      // Log if this is a retry
+      if (book.status === 'PARTIAL' || book.status === 'FAILED') {
+        console.log(`[Express API] Retrying illustration for failed/partial book ${bookId}`);
       }
 
       console.log(`[Express API] Book found: ${book.title}`);

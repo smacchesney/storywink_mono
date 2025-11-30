@@ -83,8 +83,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Book not found or access denied.' }, { status: 404 });
     }
 
-    // Prevent re-illustration of already completed books
-    if (book.status === BookStatus.COMPLETED || book.status === BookStatus.PARTIAL) {
+    // Prevent re-illustration of already completed books (but allow retry for PARTIAL/FAILED)
+    if (book.status === BookStatus.COMPLETED) {
       logger.warn({ clerkId, dbUserId: dbUser.id, bookId: requestData.bookId, status: book.status }, 'Rejected illustration request for already-completed book.');
       return NextResponse.json({
         error: 'Book already illustrated',
@@ -93,10 +93,16 @@ export async function POST(request: Request) {
       }, { status: 409 });
     }
 
-    // Book must be in STORY_READY state to start illustration
-    if (book.status !== BookStatus.STORY_READY) {
+    // Book must be in STORY_READY, PARTIAL, or FAILED state to start/retry illustration
+    const allowedStatuses = [BookStatus.STORY_READY, BookStatus.PARTIAL, BookStatus.FAILED];
+    if (!allowedStatuses.includes(book.status)) {
       logger.warn({ clerkId, dbUserId: dbUser.id, bookId: requestData.bookId, status: book.status }, 'Book not in correct state for illustration generation.');
-      return NextResponse.json({ error: `Book must be in STORY_READY state to start illustration (current: ${book.status})` }, { status: 409 });
+      return NextResponse.json({ error: `Book must be in STORY_READY, PARTIAL, or FAILED state to start illustration (current: ${book.status})` }, { status: 409 });
+    }
+
+    // Log if this is a retry
+    if (book.status === BookStatus.PARTIAL || book.status === BookStatus.FAILED) {
+      logger.info({ clerkId, dbUserId: dbUser.id, bookId: requestData.bookId, status: book.status }, 'Retrying illustration for failed/partial book.');
     }
 
     if (!book.pages || book.pages.length === 0) {

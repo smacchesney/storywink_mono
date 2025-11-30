@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useTransition, useEffect } from 'react';
+import React, { useState, useMemo, useTransition, useEffect, useCallback, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
@@ -21,11 +21,16 @@ import {
 import { showError, showErrorWithRetry, showSuccess } from '@/lib/toast-utils';
 import { useRouter } from 'next/navigation';
 import { PlusCircle, SortDesc } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
+
+// Polling interval for checking illustration status (5 seconds)
+const POLLING_INTERVAL = 5000;
 
 // Define BookStatus inline (can't import from Prisma in client components)
 type BookStatus = "DRAFT" | "GENERATING" | "STORY_READY" | "ILLUSTRATING" | "COMPLETED" | "FAILED" | "PARTIAL";
+
+// Statuses that should be visible in the library
+const VISIBLE_STATUSES: BookStatus[] = ['ILLUSTRATING', 'COMPLETED', 'PARTIAL', 'FAILED'];
 
 type LibraryBook = {
   id: string;
@@ -51,51 +56,77 @@ export function LibraryClientView() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [bookToDelete, setBookToDelete] = useState<LibraryBook | null>(null);
   const [isDeleting, startDeleteTransition] = useTransition();
-  const [activeTab, setActiveTab] = useState<string>("completed");
+  const [isRetrying, setIsRetrying] = useState<string | null>(null); // Track which book is being retried
   const router = useRouter();
+  const tokenRef = useRef<string | null>(null);
 
   // Fetch books from API
-  useEffect(() => {
-    async function fetchBooks() {
-      if (!isLoaded) return;
-      
-      try {
-        const token = await getToken();
-        if (!token) {
-          router.push('/sign-in');
-          return;
-        }
+  const fetchBooks = useCallback(async (showLoadingState = true) => {
+    if (!isLoaded) return;
 
-        const response = await apiClient.getBooks(token);
-        if (response.success && response.data) {
-          setBooks(response.data as LibraryBook[]);
-        } else {
-          showError(response.error || 'Failed to load books', 'Unable to load your library');
-        }
-      } catch (error) {
-        console.error('Error fetching books:', error);
+    try {
+      const token = await getToken();
+      if (!token) {
+        router.push('/sign-in');
+        return;
+      }
+
+      // Store token for polling
+      tokenRef.current = token;
+
+      const response = await apiClient.getBooks(token);
+      if (response.success && response.data) {
+        setBooks(response.data as LibraryBook[]);
+      } else if (showLoadingState) {
+        showError(response.error || 'Failed to load books', 'Unable to load your library');
+      }
+    } catch (error) {
+      console.error('Error fetching books:', error);
+      if (showLoadingState) {
         showErrorWithRetry(error, 'Unable to load your library', () => window.location.reload());
-      } finally {
+      }
+    } finally {
+      if (showLoadingState) {
         setIsLoading(false);
       }
     }
-
-    fetchBooks();
   }, [isLoaded, getToken, router]);
 
-  // Sort books
+  // Initial fetch
+  useEffect(() => {
+    fetchBooks();
+  }, [fetchBooks]);
+
+  // Filter to only show visible statuses and sort
+  const visibleBooks = useMemo(() => {
+    return books.filter(book => VISIBLE_STATUSES.includes(book.status));
+  }, [books]);
+
   const sortedBooks = useMemo(() => {
-    return [...books].sort((a, b) => {
+    return [...visibleBooks].sort((a, b) => {
       if (sortBy === 'title') {
         return a.title.localeCompare(b.title);
       }
       // Sort by updatedAt (most recent first)
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
-  }, [books, sortBy]);
+  }, [visibleBooks, sortBy]);
 
-  const inProgressBooks = sortedBooks.filter(book => book.status !== 'COMPLETED' && book.status !== 'PARTIAL');
-  const completedBooks = sortedBooks.filter(book => book.status === 'COMPLETED' || book.status === 'PARTIAL');
+  // Check if any books are currently illustrating
+  const hasIllustratingBooks = useMemo(() => {
+    return books.some(book => book.status === 'ILLUSTRATING');
+  }, [books]);
+
+  // Poll for updates when there are illustrating books
+  useEffect(() => {
+    if (!hasIllustratingBooks || !isLoaded) return;
+
+    const intervalId = setInterval(() => {
+      fetchBooks(false); // Silent fetch (no loading state)
+    }, POLLING_INTERVAL);
+
+    return () => clearInterval(intervalId);
+  }, [hasIllustratingBooks, isLoaded, fetchBooks]);
 
   const openDeleteDialog = (book: LibraryBook) => {
     setBookToDelete(book);
@@ -128,10 +159,42 @@ export function LibraryClientView() {
 
   const getCoverImageUrl = (book: LibraryBook): string | null => {
     // Find the first page with an image
-    const pageWithImage = book.pages.find(page => 
+    const pageWithImage = book.pages.find(page =>
       page.generatedImageUrl || page.originalImageUrl
     );
     return pageWithImage?.generatedImageUrl || pageWithImage?.originalImageUrl || null;
+  };
+
+  // Handle retry for failed/partial books
+  const handleRetryIllustrations = async (bookId: string) => {
+    setIsRetrying(bookId);
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      const response = await fetch('/api/generate/illustrations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ bookId }),
+      });
+
+      if (response.ok) {
+        showSuccess('Retrying illustrations...');
+        // Refresh books to get updated status
+        await fetchBooks(false);
+      } else {
+        const errorData = await response.json();
+        showError(errorData.error || 'Failed to retry illustrations', 'Retry failed');
+      }
+    } catch (error) {
+      console.error('Error retrying illustrations:', error);
+      showError('Failed to retry illustrations', 'Retry failed');
+    } finally {
+      setIsRetrying(null);
+    }
   };
 
   if (isLoading) {
@@ -179,25 +242,14 @@ export function LibraryClientView() {
         </div>
       </div>
 
-      {/* Tabs - unified for mobile and desktop */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 md:w-auto md:inline-flex mb-6">
-          <TabsTrigger value="completed">
-            Completed ({completedBooks.length})
-          </TabsTrigger>
-          <TabsTrigger value="in-progress">
-            In Progress ({inProgressBooks.length})
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="in-progress">
-          <BookGrid books={inProgressBooks} onDelete={openDeleteDialog} getCoverImageUrl={getCoverImageUrl} />
-        </TabsContent>
-
-        <TabsContent value="completed">
-          <BookGrid books={completedBooks} onDelete={openDeleteDialog} getCoverImageUrl={getCoverImageUrl} />
-        </TabsContent>
-      </Tabs>
+      {/* Single unified book grid */}
+      <BookGrid
+        books={sortedBooks}
+        onDelete={openDeleteDialog}
+        getCoverImageUrl={getCoverImageUrl}
+        onRetry={handleRetryIllustrations}
+        isRetrying={isRetrying}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -225,20 +277,24 @@ export function LibraryClientView() {
 }
 
 // Helper Components
-function BookGrid({ 
-  books, 
-  onDelete, 
-  getCoverImageUrl 
-}: { 
-  books: LibraryBook[]; 
+function BookGrid({
+  books,
+  onDelete,
+  getCoverImageUrl,
+  onRetry,
+  isRetrying,
+}: {
+  books: LibraryBook[];
   onDelete: (book: LibraryBook) => void;
   getCoverImageUrl: (book: LibraryBook) => string | null;
+  onRetry: (bookId: string) => void;
+  isRetrying: string | null;
 }) {
   if (books.length === 0) {
     return (
       <Card className="p-8 text-center">
         <CardContent>
-          <p className="text-slate-500 dark:text-slate-400">No books found.</p>
+          <p className="text-slate-500 dark:text-slate-400">No books yet. Create your first storybook!</p>
         </CardContent>
       </Card>
     );
@@ -256,7 +312,8 @@ function BookGrid({
           pages={undefined}
           coverImageUrl={getCoverImageUrl(book)}
           onDeleteClick={() => onDelete(book)}
-          onDuplicateClick={() => console.log('Duplicate not implemented')}
+          onRetryClick={() => onRetry(book.id)}
+          isRetrying={isRetrying === book.id}
         />
       ))}
     </div>

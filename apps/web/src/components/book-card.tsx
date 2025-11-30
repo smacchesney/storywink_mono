@@ -1,78 +1,39 @@
-"use client"; // Add this directive
+"use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
-import { BookStatus, Page } from '@prisma/client'; // Import BookStatus and Page
+import { BookStatus, Page } from '@prisma/client';
 import {
   Card,
-  CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Trash2, Copy, Pencil, Eye, Loader2, BookOpen, Clock, CheckCircle } from 'lucide-react';
+} from "@/components/ui/dropdown-menu";
+import { MoreHorizontal, Trash2, Eye, Loader2, AlertTriangle, RefreshCw, Download } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { cn } from '@/lib/utils';
 import { coolifyImageUrl } from '@storywink/shared';
+import { TextShimmerWave } from '@/components/ui/text-shimmer-wave';
 
-// Define the props for BookCard, ensuring all needed fields are present
-// We might need to adjust this if LibraryBook from actions.ts has a different structure
 export interface BookCardProps {
   id: string;
-  title: string | null; // Allow null titles
+  title: string | null;
   status: BookStatus;
-  updatedAt?: Date | null; // Make updatedAt optional
-  pages?: Page[]; // Make pages optional
-  coverImageUrl?: string | null; // Allow null cover image
+  updatedAt?: Date | null;
+  pages?: Page[];
+  coverImageUrl?: string | null;
   onDeleteClick: () => void;
-  onDuplicateClick: () => void;
+  onRetryClick?: () => void;
   isDeleting?: boolean;
-  isDuplicating?: boolean;
+  isRetrying?: boolean;
 }
-
-// Helper function to get status badge variant (can be moved to utils if used elsewhere)
-const getStatusVariant = (status: BookStatus): "default" | "secondary" | "destructive" | "outline" => {
-  switch (status) {
-    case BookStatus.COMPLETED:
-      return 'default';
-    case BookStatus.ILLUSTRATING:
-    case BookStatus.GENERATING:
-      return 'secondary';
-    case BookStatus.STORY_READY:
-      return 'default'; // Story ready - positive state
-    case BookStatus.FAILED:
-      return 'destructive';
-    case BookStatus.DRAFT:
-    default:
-      return 'outline';
-  }
-};
-
-// Helper function to get status icon
-const getStatusIcon = (status: BookStatus) => {
-  switch (status) {
-    case BookStatus.COMPLETED:
-      return <CheckCircle className="h-4 w-4 mr-1.5" />;
-    case BookStatus.ILLUSTRATING:
-    case BookStatus.GENERATING:
-      return <Clock className="h-4 w-4 mr-1.5" />;
-    case BookStatus.STORY_READY:
-      return <CheckCircle className="h-4 w-4 mr-1.5" />; // Story complete - checkmark
-    case BookStatus.DRAFT:
-    default:
-      return <BookOpen className="h-4 w-4 mr-1.5" />;
-  }
-};
 
 const BookCard: React.FC<BookCardProps> = ({
   id,
@@ -82,60 +43,113 @@ const BookCard: React.FC<BookCardProps> = ({
   pages: _pages,
   coverImageUrl,
   onDeleteClick,
-  onDuplicateClick,
+  onRetryClick,
   isDeleting = false,
-  isDuplicating = false,
+  isRetrying = false,
 }) => {
   const router = useRouter();
+  const [isExporting, setIsExporting] = useState(false);
 
-  const handleEditClick = () => {
-    // Navigate to the correct editor step based on book status
-    switch (status) {
-      case BookStatus.DRAFT:
-        router.push(`/create/${id}/edit`);
-        break;
-      case BookStatus.GENERATING: // Text generation in progress
-      case BookStatus.STORY_READY: // Story ready for review
-      case BookStatus.ILLUSTRATING: // Illustration generation in progress
-      case BookStatus.PARTIAL: // Some illustrations failed or were flagged
-      case BookStatus.FAILED: // Text or illustration generation failed
-        router.push(`/create/review?bookId=${id}`);
-        break;
-      // For COMPLETED status, the "View" button is shown instead of "Edit",
-      // so no explicit case is needed here for navigation.
-      // If an "Edit" button were to be shown for COMPLETED books for some reason,
-      // it would likely go to /create/[bookId]/edit or a specific "post-completion editor".
-      default:
-        // Fallback to the main editor page if status is unknown or not handled above
-        router.push(`/create/${id}/edit`);
-        break;
-    }
-  };
-  
   const handleViewClick = () => {
-    // Navigate to book preview
     router.push(`/book/${id}/preview`);
   };
 
-  const isCompleted = status === BookStatus.COMPLETED;
-  const isProcessing = status === BookStatus.GENERATING || status === BookStatus.ILLUSTRATING;
+  const handleExportPdf = async () => {
+    setIsExporting(true);
+    try {
+      // Open PDF in new tab - the API handles the download
+      window.open(`/api/book/${id}/export/pdf`, '_blank');
+    } finally {
+      // Reset after a short delay
+      setTimeout(() => setIsExporting(false), 1000);
+    }
+  };
 
-  // Determine the image URL to display based on the coverImageUrl prop
-  // The logic to select between original/generated based on status is now handled in library/actions.ts
+  const isCompleted = status === BookStatus.COMPLETED;
+  const isIllustrating = status === BookStatus.ILLUSTRATING;
+  const isError = status === BookStatus.FAILED || status === BookStatus.PARTIAL;
+
   const displayImageUrl = coverImageUrl;
 
-  // Mobile-friendly card layout for all devices
-  return (
-    <Card className="flex flex-col hover:shadow-md transition-shadow overflow-hidden">
-      <div className="flex flex-row sm:flex-col">
-        {/* Image thumbnail - larger on mobile, takes left side */}
-        <div className="relative w-28 h-28 sm:w-full sm:h-auto sm:aspect-video flex-shrink-0 sm:rounded-none bg-muted overflow-hidden">
+  // ILLUSTRATING STATE - Consistent layout with completed cards
+  if (isIllustrating) {
+    return (
+      <Card className="flex flex-col hover:shadow-md transition-shadow overflow-hidden">
+        {/* Image area with blur and shimmer overlay */}
+        <div className="relative w-full aspect-video bg-muted overflow-hidden">
           {displayImageUrl ? (
             <Image
               src={coolifyImageUrl(displayImageUrl)}
               alt={`${title || 'Book'} cover`}
               fill
-              sizes="(max-width: 640px) 112px, (max-width: 1024px) 45vw, 25vw"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 45vw, 25vw"
+              className="object-cover blur-sm scale-105"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800" />
+          )}
+          {/* Dark overlay */}
+          <div className="absolute inset-0 bg-black/40" />
+
+          {/* Centered shimmer text and time estimate on image */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <TextShimmerWave
+              className="text-lg font-semibold [--base-color:#e2e8f0] [--base-gradient-color:#F76C5E]"
+              duration={1}
+              spread={1}
+              zDistance={1}
+              scaleDistance={1.1}
+              rotateYDistance={20}
+            >
+              Creating illustrations...
+            </TextShimmerWave>
+            <p className="text-sm text-white/70 mt-2">
+              This may take 3-5 minutes
+            </p>
+          </div>
+        </div>
+
+        {/* Content below image - matches completed card structure */}
+        <CardHeader className="pb-2 pt-4 px-4">
+          <CardTitle className="text-lg truncate text-center">{title || 'Untitled Book'}</CardTitle>
+        </CardHeader>
+
+        {/* Footer with disabled buttons */}
+        <CardFooter className="flex flex-col items-stretch pt-2 px-4 pb-3 gap-2">
+          <div className="flex justify-between items-center w-full">
+            <Button
+              disabled
+              size="sm"
+              className="flex-grow mr-2 bg-slate-300 hover:bg-slate-300 text-slate-500 cursor-not-allowed"
+            >
+              <Eye className="h-4 w-4 mr-1.5" />
+              View Preview
+            </Button>
+            <Button variant="outline" size="icon" disabled className="cursor-not-allowed">
+              <MoreHorizontal className="h-4 w-4" />
+              <span className="sr-only">Book Actions</span>
+            </Button>
+          </div>
+          <p className="text-xs text-slate-400 text-center">
+            Available when illustrations complete
+          </p>
+        </CardFooter>
+      </Card>
+    );
+  }
+
+  // ERROR STATE - Consistent layout with completed cards
+  if (isError) {
+    return (
+      <Card className="flex flex-col hover:shadow-md transition-shadow overflow-hidden border-red-200 dark:border-red-900">
+        {/* Image */}
+        <div className="relative w-full aspect-video bg-muted overflow-hidden">
+          {displayImageUrl ? (
+            <Image
+              src={coolifyImageUrl(displayImageUrl)}
+              alt={`${title || 'Book'} cover`}
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 45vw, 25vw"
               className="object-cover"
             />
           ) : (
@@ -144,126 +158,93 @@ const BookCard: React.FC<BookCardProps> = ({
             </div>
           )}
         </div>
-        
-        {/* Content on the right side for mobile, underneath for desktop */}
-        <div className="flex flex-col flex-grow p-3 sm:p-0">
-          <CardHeader className="p-3 sm:pb-2 sm:pt-4 flex-shrink-0">
-            <CardTitle className="text-base sm:text-lg truncate">{title || 'Untitled Book'}</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">
-              Last updated: {updatedAt ? new Date(updatedAt).toLocaleDateString() : 'N/A'}
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent className="hidden sm:flex flex-col p-3 pt-0 flex-grow">
-            {/* Status badge displayed on desktop at the bottom of content */}
-            <div className="mt-auto">
-              <Badge 
-                variant={getStatusVariant(status)}
-                className={cn(
-                  "inline-flex items-center",
-                  status === BookStatus.COMPLETED && "bg-[#F76C5E]"
-                )}
-              >
-                {getStatusIcon(status)}
-                {status}
-              </Badge>
-            </div>
-          </CardContent>
-          
-          {/* Mobile-only status badge */}
-          <div className="sm:hidden px-3 pb-2">
-            <Badge 
-              variant={getStatusVariant(status)}
-              className={cn(
-                "inline-flex items-center text-xs",
-                status === BookStatus.COMPLETED && "bg-[#F76C5E]"
-              )}
-            >
-              {getStatusIcon(status)}
-              {status}
-            </Badge>
+
+        {/* Content below image */}
+        <CardHeader className="pb-2 pt-4 px-4">
+          <CardTitle className="text-lg truncate text-center">{title || 'Untitled Book'}</CardTitle>
+          <div className="flex items-center justify-center gap-1.5 text-red-600 dark:text-red-400 mt-1">
+            <AlertTriangle className="h-4 w-4" />
+            <span className="text-sm">
+              {status === BookStatus.FAILED ? 'Illustration failed' : 'Some illustrations failed'}
+            </span>
           </div>
-          
-          {/* Primary actions for mobile - larger touch targets */}
-          <div className="flex mt-auto p-3 pt-0 sm:hidden">
-            {isCompleted ? (
-              <Button 
-                onClick={handleViewClick} 
-                size="sm" 
-                className="mr-2 flex-grow"
-                style={{ backgroundColor: '#F76C5E' }}
-              >
-                <Eye className="h-4 w-4 mr-1.5" />
-                View
-              </Button>
-            ) : (
-              <Button 
-                onClick={handleEditClick} 
-                size="sm" 
-                className="mr-2 flex-grow"
-                disabled={isProcessing}
-                style={!isProcessing ? { backgroundColor: '#F76C5E' } : {}}
-              >
-                <Pencil className="h-4 w-4 mr-1.5" />
-                Edit
-              </Button>
-            )}
-            
-            {/* More actions dropdown - mobile */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" disabled={isDeleting || isDuplicating}>
-                  {isDeleting || isDuplicating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <MoreHorizontal className="h-4 w-4" />
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={onDuplicateClick} disabled={isDuplicating}>
-                  <Copy className="mr-2 h-4 w-4" /> Duplicate
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={onDeleteClick} disabled={isDeleting}>
-                  <Trash2 className="mr-2 h-4 w-4" /> Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      </div>
-            
-      {/* Desktop-only footer with actions */}
-      <CardFooter className="hidden sm:flex justify-between items-center pt-2 px-4 pb-3 flex-shrink-0">
-        {isCompleted ? (
-          <Button 
-            onClick={handleViewClick} 
-            size="sm" 
-            style={{ backgroundColor: '#F76C5E' }}
-            className="flex-grow mr-2"
-          >
-            <Eye className="h-4 w-4 mr-1.5" />
-            View Preview
-          </Button>
-        ) : (
-          <Button 
-            onClick={handleEditClick} 
+        </CardHeader>
+
+        {/* Footer with retry and delete buttons - aligned with completed cards */}
+        <CardFooter className="flex justify-between items-center pt-2 px-4 pb-3">
+          <Button
+            onClick={onRetryClick}
             size="sm"
-            style={!isProcessing ? { backgroundColor: '#F76C5E' } : {}}
-            className="flex-grow mr-2"
-            disabled={isProcessing}
+            className="flex-grow mr-2 bg-[#F76C5E] hover:bg-[#E55A4C]"
+            disabled={isRetrying}
           >
-            <Pencil className="h-4 w-4 mr-1.5" />
-            Edit
+            {isRetrying ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-1.5" />
+            )}
+            {isRetrying ? 'Retrying...' : 'Retry Illustrations'}
           </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onDeleteClick}
+            disabled={isDeleting}
+            className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
+          >
+            {isDeleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+            <span className="sr-only">Delete</span>
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
+
+  // COMPLETED STATE - Simplified card without status badge
+  return (
+    <Card className="flex flex-col hover:shadow-md transition-shadow overflow-hidden">
+      {/* Image */}
+      <div className="relative w-full aspect-video bg-muted overflow-hidden">
+        {displayImageUrl ? (
+          <Image
+            src={coolifyImageUrl(displayImageUrl)}
+            alt={`${title || 'Book'} cover`}
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 45vw, 25vw"
+            className="object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <span className="text-xs text-muted-foreground">No Preview</span>
+          </div>
         )}
-        
-        {/* Dropdown menu for secondary actions */}
+      </div>
+
+      {/* Content below image */}
+      <CardHeader className="pb-2 pt-4 px-4">
+        <CardTitle className="text-lg truncate text-center">{title || 'Untitled Book'}</CardTitle>
+      </CardHeader>
+
+      {/* Footer with View and dropdown */}
+      <CardFooter className="flex justify-between items-center pt-2 px-4 pb-3">
+        <Button
+          onClick={handleViewClick}
+          size="sm"
+          className="flex-grow mr-2 bg-[#F76C5E] hover:bg-[#E55A4C]"
+        >
+          <Eye className="h-4 w-4 mr-1.5" />
+          View Preview
+        </Button>
+
+        {/* Dropdown menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" disabled={isDeleting || isDuplicating}>
-              {isDeleting || isDuplicating ? (
+            <Button variant="outline" size="icon" disabled={isDeleting || isExporting}>
+              {isDeleting || isExporting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <MoreHorizontal className="h-4 w-4" />
@@ -272,11 +253,15 @@ const BookCard: React.FC<BookCardProps> = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onDuplicateClick} disabled={isDuplicating}>
-              <Copy className="mr-2 h-4 w-4" /> Duplicate
+            <DropdownMenuItem onClick={handleExportPdf} disabled={isExporting}>
+              <Download className="mr-2 h-4 w-4" /> Export PDF
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={onDeleteClick} disabled={isDeleting}>
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive focus:bg-destructive/10"
+              onClick={onDeleteClick}
+              disabled={isDeleting}
+            >
               <Trash2 className="mr-2 h-4 w-4" /> Delete
             </DropdownMenuItem>
           </DropdownMenuContent>

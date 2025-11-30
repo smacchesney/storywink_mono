@@ -104,15 +104,15 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
     // Create notification for book completion
     const notificationMessages = {
       COMPLETED: {
-        title: `${book.title} is ready!`,
+        title: `"${book.title}" is ready!`,
         message: `Your book "${book.title}" has been illustrated and is ready to view.`,
       },
       PARTIAL: {
-        title: `${book.title} is partially ready`,
+        title: `"${book.title}" is partially ready`,
         message: `Your book "${book.title}" has been partially completed. Some pages may need attention.`,
       },
       FAILED: {
-        title: `${book.title} needs attention`,
+        title: `"${book.title}" needs attention`,
         message: `There was an issue creating your book "${book.title}". Please try again.`,
       },
     };
