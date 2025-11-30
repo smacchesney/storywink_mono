@@ -1,4 +1,5 @@
 // Load environment variables FIRST - before any other imports that might use them
+// Build trigger: 2024-11-30
 import { config } from "dotenv";
 config();
 

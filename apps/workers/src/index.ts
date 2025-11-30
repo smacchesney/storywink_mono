@@ -1,5 +1,6 @@
 // ============================================================================
 // CRITICAL: Force unbuffered I/O for Railway real-time logging
+// Build trigger: 2024-11-30
 // ============================================================================
 // Node.js buffers stdout/stderr by default, causing logs from fast-failing
 // jobs to be lost when the process terminates before the buffer flushes.
