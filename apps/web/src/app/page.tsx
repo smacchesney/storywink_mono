@@ -250,18 +250,17 @@ export default function Home() {
         <section className="text-center">
           <AnimatedHeroText />
           
-          <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 mb-5 max-w-2xl mx-auto font-sans">
-            Upload photos, and let <span style={{ fontFamily: 'Excalifont' }} className="font-bold">Storywin<span className="text-[#F76C5E]">k.ai</span></span> turn everyday adventures into charming stories.
+          <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 mb-5 max-w-2xl mx-auto">
+            Upload photos, and let <span className="font-bold font-playful">Storywin<span className="text-[#F76C5E]">k.ai</span></span> turn everyday adventures into charming stories.
           </p>
           
           <div className="flex flex-col sm:flex-row justify-center items-center gap-3 mb-6">
             <Button
               size="lg"
               variant="default"
-              className="w-full sm:w-auto px-8 py-3 md:px-10 md:py-4 text-lg md:text-xl bg-[#F76C5E] text-white hover:bg-[#F76C5E]/90 transition-colors rounded-full"
+              className="w-full sm:w-auto px-8 py-3 md:px-10 md:py-4 text-lg md:text-xl bg-[#F76C5E] text-white hover:bg-[#F76C5E]/90 transition-colors rounded-full font-playful"
               onClick={handleCreateStorybookClick}
               disabled={!isLoaded}
-              style={{ fontFamily: 'Excalifont' }}
             >
               {isButtonLoading ? "Loading..." : "✨ Create Your Storybook"}
             </Button>
@@ -276,7 +275,7 @@ export default function Home() {
             </SynchronizedCarousels>
           </div>
           
-          <StatsCounter count={1234} text="stories created" className="mt-5 text-sm font-sans text-slate-500" />
+          <StatsCounter count={1234} text="stories created" className="mt-5 text-sm text-slate-500" />
         </section>
 
         {/* FAQ Section */}
@@ -290,7 +289,7 @@ export default function Home() {
                 height={60}
                 className="h-12 w-12 md:h-15 md:w-15"
               />
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 dark:text-white font-sans">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 dark:text-white">
                 Frequently Asked Questions
               </h2>
             </div>
@@ -303,7 +302,7 @@ export default function Home() {
                   onClick={() => toggleFAQ(index)}
                   className="w-full p-6 text-left flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white font-sans pr-4">
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white pr-4">
                     {item.question}
                   </h3>
                   {expandedFAQ === index ? (
@@ -314,7 +313,7 @@ export default function Home() {
                 </button>
                 {expandedFAQ === index && (
                   <div className="px-6 pb-6">
-                    <p className="text-slate-600 dark:text-slate-300 font-sans leading-relaxed">
+                    <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
                       {item.answer}
                     </p>
                   </div>

@@ -124,7 +124,7 @@ function AnimatedHeroText({
           <AnimatePresence mode="wait">
             <motion.span
               key={currentIndex}
-              className="inline-block font-bold"
+              className="inline-block font-bold font-playful"
               style={{ color: '#F76C5E' }}
               initial={{ opacity: 0, y: 30, scale: 0.8 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -138,7 +138,7 @@ function AnimatedHeroText({
             </motion.span>
           </AnimatePresence>
         ) : (
-          <span className="inline-block font-bold" style={{ color: '#F76C5E' }}>
+          <span className="inline-block font-bold font-playful" style={{ color: '#F76C5E' }}>
             {currentItem.word}
           </span>
         )}
@@ -191,7 +191,7 @@ function AnimatedHeroText({
 
   return (
     <div className={`text-center ${className}`}>
-      <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-slate-900 dark:text-white mb-2 font-sans leading-tight px-2">
+      <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-slate-900 dark:text-white mb-2 leading-tight px-2">
         <span className="block sm:inline">Turn Memories Into a</span>{' '}
         <span className="block sm:inline">Picturebook Starring</span>{' '}
         <span className="whitespace-nowrap">Your Little</span>
@@ -202,7 +202,7 @@ function AnimatedHeroText({
       </div>
       
       {showBottomText && (
-        <p className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white font-sans">
+        <p className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
           in Their Own Storybook
         </p>
       )}

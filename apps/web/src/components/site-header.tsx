@@ -50,8 +50,8 @@ export function SiteHeader() {
               height={40}
               className="h-10 w-10"
             />
-            <span className="hidden font-bold text-3xl sm:inline-block text-slate-900 dark:text-white">
-              Storywin<span className="text-[#F76C5E]" >k.ai</span>
+            <span className="hidden font-bold text-3xl sm:inline-block text-slate-900 dark:text-white font-playful">
+              Storywin<span className="text-[#F76C5E]">k.ai</span>
             </span>
           </Link>
         </div>
@@ -66,7 +66,7 @@ export function SiteHeader() {
               height={32}
               className="h-8 w-8"
             />
-            <span className="font-bold text-2xl sm:inline-block text-slate-900 dark:text-white">
+            <span className="font-bold text-2xl sm:inline-block text-slate-900 dark:text-white font-playful">
               Storywin<span className="text-[#F76C5E]">k.ai</span>
             </span>
           </Link>

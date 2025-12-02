@@ -133,9 +133,13 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* Apply ONLY Excalifont again for debugging */
-    font-family: 'Excalifont'; 
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
   }
+}
+
+/* Accent font utility class - use sparingly for logo, CTA, hero words */
+.font-playful {
+  font-family: 'Excalifont', cursive;
 }
 
 /* Hide scrollbar but keep functionality */

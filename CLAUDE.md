@@ -216,10 +216,59 @@ import { BookStatus } from '@/shared';   // No path aliases to shared
 - **DRAFT**: Initial book creation, user uploading photos
 - **GENERATING**: Story generation in progress (GPT-4o Vision analyzing photos)
 - **STORY_READY**: Story generation complete, ready for illustrations
-- **ILLUSTRATING**: Illustration generation in progress (image1 api)
+- **ILLUSTRATING**: Illustration generation in progress (Gemini 3 Pro Image)
 - **COMPLETED**: All story and illustration generation successful
-- **PARTIAL**: Some content generated but not complete
+- **PARTIAL**: Some content generated but not complete (some pages OK, some FAILED/FLAGGED)
 - **FAILED**: Critical errors prevented completion
+
+## Illustration Failure Handling (December 2025)
+
+### Page Moderation Status
+Each page has a `moderationStatus` field tracking illustration generation outcome:
+- **PENDING**: Not yet processed
+- **OK**: Illustration generated successfully
+- **FLAGGED**: Blocked by Gemini's content policy (safety, copyright) - permanent, cannot retry
+- **FAILED**: Transient error (network, timeout, API error) - can be retried
+
+### Error Classification & Retry Logic
+
+| Error Type | Page Status | Job Result | BullMQ Retry | User Can Retry |
+|------------|-------------|------------|--------------|----------------|
+| Content policy (safety/copyright) | `FLAGGED` | Success | No | No - must edit book |
+| Transient (network/timeout/503) | Unchanged until last attempt | Failure | Yes (up to 5x) | Yes |
+| Permanent error on last attempt | `FAILED` | Failure | No (exhausted) | Yes |
+
+**Transient Error Patterns** (auto-retry):
+- `fetch failed`, `ETIMEDOUT`, `ECONNRESET`, `ECONNREFUSED`
+- `socket hang up`, `network error`, `timeout`, `aborted`
+- `503`, `unavailable`, `internal error`, `deadline exceeded`
+- `rate limit`, `429`, `quota exceeded`, `resource exhausted`
+
+**Content Policy Errors** (no retry - marks as FLAGGED):
+- `safety`, `blocked`, `content policy`
+- `copyright`, `proprietary`, `trademark`
+
+### Smart Retry (User-Initiated)
+
+When user clicks "Retry Illustrations" on a PARTIAL or FAILED book:
+
+1. **Pages with `OK` status + `generatedImageUrl`** → SKIPPED (already succeeded)
+2. **Pages with `FLAGGED` status** → SKIPPED (content policy, retry won't help)
+3. **Pages with `FAILED` status or missing illustration** → RETRIED
+
+**Edge Cases**:
+- If all remaining pages are FLAGGED → Returns message: "X page(s) were flagged by content policy and cannot be retried. Please edit your book to remove flagged photos."
+- If all pages already succeeded → Updates book status to COMPLETED
+
+### Implementation Files
+- **Smart retry logic**: `apps/web/src/app/api/generate/illustrations/route.ts`
+- **Error classification**: `apps/workers/src/workers/illustration-generation.worker.ts`
+- **Helper functions**: `isTransientError()`, `isLastAttempt()` in illustration worker
+
+### Future Phase 2 (Not Yet Implemented)
+- Return user to `/edit` page with flagged photos marked for deletion
+- Add "remove photo" option in edit interface
+- Re-generate story text after photo removal (since story is cohesive across all images)
 
 ## Title Page System
 The system uses centralized logic for title page detection:
