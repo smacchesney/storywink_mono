@@ -53,6 +53,19 @@
 
 :root {
   --radius: 0.625rem;
+
+  /* Storywink Playful Color Palette */
+  --coral-primary: #F76C5E;        /* Brand - CTAs, key accents */
+  --coral-light: #FFAA9F;          /* Lighter coral for hover states */
+  --mint-soft: #B8E4DC;            /* Soft mint green */
+  --sky-soft: #A8D5E5;             /* Soft sky blue */
+  --cream-yellow: #FFF5D6;         /* Warm cream/yellow */
+  --lavender-soft: #D4C4E8;        /* Soft lavender */
+  --peach-soft: #FFDAB3;           /* Soft peach */
+
+  /* Playful background variants */
+  --bg-playful: #FFFBF5;           /* Warm off-white base */
+  --bg-section-alt: #FFF8F0;       /* Alternating section background */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);

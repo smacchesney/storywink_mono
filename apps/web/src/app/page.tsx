@@ -245,41 +245,55 @@ export default function Home() {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900">
-      <main className="flex-grow container mx-auto px-4 py-6 md:py-8 space-y-6 md:space-y-8">
-        <section className="text-center">
-          <AnimatedHeroText />
-          
-          <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 mb-5 max-w-2xl mx-auto">
-            Upload photos, and let <span className="font-bold font-playful">Storywin<span className="text-[#F76C5E]">k.ai</span></span> turn everyday adventures into charming stories.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row justify-center items-center gap-3 mb-6">
-            <Button
-              size="lg"
-              variant="default"
-              className="w-full sm:w-auto px-8 py-3 md:px-10 md:py-4 text-lg md:text-xl bg-[#F76C5E] text-white hover:bg-[#F76C5E]/90 transition-colors rounded-full font-playful"
-              onClick={handleCreateStorybookClick}
-              disabled={!isLoaded}
-            >
-              {isButtonLoading ? "Loading..." : "✨ Create Your Storybook"}
-            </Button>
+    <div className="flex flex-col min-h-screen" style={{ backgroundColor: 'var(--bg-playful)' }}>
+      <main className="flex-grow">
+        {/* Hero Section */}
+        <section className="text-center px-4 py-8 md:py-12 relative">
+          {/* Mascot - positioned to the right on desktop, hidden on small mobile */}
+          <div className="hidden sm:block absolute right-4 md:right-8 lg:right-16 top-8 md:top-12">
+            <Image
+              src="/images/mascot/kai the dino waving.png"
+              alt="Kai the Dino waving"
+              width={80}
+              height={80}
+              className="w-16 h-16 md:w-20 md:h-20 lg:w-24 lg:h-24"
+            />
           </div>
-          
-          <div className="mb-2 mt-3">
-            <SynchronizedCarousels imageSets={[firstCarouselImages, secondCarouselImages]} interval={6000}>
-              <div className="grid grid-cols-1 gap-6 md:gap-8 items-start">
-                <SynchronizedBeforeAfterPair images={firstCarouselImages} showControls={false} carouselId="carousel1" />
-                <SynchronizedBeforeAfterPair images={secondCarouselImages} carouselId="carousel2" />
-              </div>
-            </SynchronizedCarousels>
+
+          <div className="max-w-4xl mx-auto">
+            <AnimatedHeroText />
+
+            <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 mb-5 max-w-2xl mx-auto">
+              Upload photos, and let <span className="font-bold font-playful">Storywin<span className="text-[#F76C5E]">k.ai</span></span> turn everyday adventures into charming stories.
+            </p>
+
+            <div className="flex flex-col sm:flex-row justify-center items-center gap-3 mb-6">
+              <Button
+                size="lg"
+                variant="default"
+                className="w-full sm:w-auto px-8 py-3 md:px-10 md:py-4 text-lg md:text-xl bg-[#F76C5E] text-white hover:bg-[#F76C5E]/90 transition-colors rounded-full font-playful"
+                onClick={handleCreateStorybookClick}
+                disabled={!isLoaded}
+              >
+                {isButtonLoading ? "Loading..." : "✨ Create Your Storybook"}
+              </Button>
+            </div>
+
+            <div className="mb-2 mt-3">
+              <SynchronizedCarousels imageSets={[firstCarouselImages, secondCarouselImages]} interval={6000}>
+                <div className="grid grid-cols-1 gap-6 md:gap-8 items-start">
+                  <SynchronizedBeforeAfterPair images={firstCarouselImages} showControls={false} carouselId="carousel1" />
+                  <SynchronizedBeforeAfterPair images={secondCarouselImages} carouselId="carousel2" />
+                </div>
+              </SynchronizedCarousels>
+            </div>
+
+            <StatsCounter count={1234} text="stories created" className="mt-5 text-sm text-slate-500" />
           </div>
-          
-          <StatsCounter count={1234} text="stories created" className="mt-5 text-sm text-slate-500" />
         </section>
 
         {/* FAQ Section */}
-        <section className="py-12 md:py-16">
+        <section className="py-12 md:py-16 px-4" style={{ backgroundColor: 'var(--bg-section-alt)' }}>
           <div className="text-center mb-8 md:mb-12">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-4">
               <Image
