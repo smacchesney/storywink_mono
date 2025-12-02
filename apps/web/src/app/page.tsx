@@ -10,6 +10,7 @@ import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { AnimatedHeroText } from "@/components/ui/animated-hero-text";
 import { optimizeCloudinaryUrl } from '@storywink/shared';
+import StorybookFrame from "@/components/ui/storybook-frame";
 
 // Lazy load components
 const StatsCounter = dynamic(() => import("@/components/landing-page/stats-counter"), {
@@ -132,52 +133,55 @@ const SynchronizedBeforeAfterPair: React.FC<SynchronizedBeforeAfterPairProps> = 
   const isFirstImage = currentIndex === 0;
 
   return (
-    <div className={cn("relative w-full max-w-sm mx-auto flex flex-col items-center")} style={{ maxWidth: '24rem' }}>
-      <div className={cn(
-          "w-full overflow-hidden rounded-2xl shadow-sm bg-[#FFF8E1] relative",
-        )}
-        style={{ maxWidth: '24rem' }}
+    <div className={cn("relative w-full max-w-md mx-auto flex flex-col items-center")} style={{ maxWidth: '28rem' }}>
+      {/* Storybook-style frame with hand-drawn border */}
+      <StorybookFrame
+        className="w-full shadow-md"
+        borderColor="var(--coral-primary)"
+        backgroundColor="var(--cream-yellow)"
         key={`${carouselId}-${currentIndex}`}
       >
-        <div className="flex flex-row w-full">
+        <div className="flex flex-row w-full gap-3">
+          {/* Original photo side */}
           <div className="w-1/2 relative">
-            <div className="aspect-square w-full relative bg-muted">
+            <div className="aspect-square w-full relative rounded-lg overflow-hidden shadow-sm">
               <Image
                 src={currentImagePair.original}
                 alt={`${currentImagePair.alt} - Original`}
                 fill
-                sizes="(max-width: 640px) 50vw, 192px"
+                sizes="(max-width: 640px) 45vw, 180px"
                 className="object-cover"
                 priority={isFirstImage}
               />
             </div>
           </div>
+          {/* Illustrated side */}
           <div className="w-1/2 relative">
-            <div className="aspect-square w-full relative bg-muted">
+            <div className="aspect-square w-full relative rounded-lg overflow-hidden shadow-sm">
               <Image
                 src={currentImagePair.illustrated}
                 alt={`${currentImagePair.alt} - Illustrated`}
                 fill
-                sizes="(max-width: 640px) 50vw, 192px"
+                sizes="(max-width: 640px) 45vw, 180px"
                 className="object-cover"
                 priority={isFirstImage}
               />
             </div>
           </div>
         </div>
-      </div>
+      </StorybookFrame>
 
       {showControls && totalImages > 1 && (
-        <div className="flex items-center justify-center mt-2 space-x-1.5">
+        <div className="flex items-center justify-center mt-3 space-x-2">
           {Array.from({ length: totalImages }).map((_, idx) => (
             <button
               key={idx}
               onClick={() => setCurrentIndex(idx)}
               className={cn(
-                "h-[5px] w-[5px] rounded-full transition-colors",
-                currentIndex === idx 
-                  ? "bg-[#FF6B6B]" 
-                  : "bg-[#D9D9D9]"
+                "h-2 w-2 rounded-full transition-all duration-200",
+                currentIndex === idx
+                  ? "bg-[var(--coral-primary)] scale-110"
+                  : "bg-[#D9D9D9] hover:bg-[#BFBFBF]"
               )}
               aria-label={`Image ${idx + 1}`}
             />
