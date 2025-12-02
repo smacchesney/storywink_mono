@@ -299,9 +299,9 @@ export default function Home() {
               <Image
                 src="/images/mascot/kai the dino FAQ.png"
                 alt="Kai the Dino FAQ"
-                width={60}
-                height={60}
-                className="h-12 w-12 md:h-15 md:w-15"
+                width={80}
+                height={80}
+                className="h-16 w-16 md:h-20 md:w-20"
               />
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 dark:text-white">
                 Frequently Asked Questions
@@ -309,24 +309,28 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="max-w-3xl mx-auto space-y-3">
+          <div className="max-w-3xl mx-auto space-y-4">
             {faqItems.map((item, index) => (
-              <div key={index} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div
+                key={index}
+                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border-l-4 overflow-hidden"
+                style={{ borderLeftColor: 'var(--coral-primary)' }}
+              >
                 <button
                   onClick={() => toggleFAQ(index)}
-                  className="w-full p-6 text-left flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className="w-full p-5 md:p-6 text-left flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white pr-4">
+                  <h3 className="text-base md:text-lg font-semibold text-slate-900 dark:text-white pr-4">
                     {item.question}
                   </h3>
                   {expandedFAQ === index ? (
-                    <ChevronUp className="h-5 w-5 text-slate-500 flex-shrink-0" />
+                    <ChevronUp className="h-5 w-5 flex-shrink-0" style={{ color: 'var(--coral-primary)' }} />
                   ) : (
-                    <ChevronDown className="h-5 w-5 text-slate-500 flex-shrink-0" />
+                    <ChevronDown className="h-5 w-5 text-slate-400 flex-shrink-0" />
                   )}
                 </button>
                 {expandedFAQ === index && (
-                  <div className="px-6 pb-6">
+                  <div className="px-5 md:px-6 pb-5 md:pb-6">
                     <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
                       {item.answer}
                     </p>
