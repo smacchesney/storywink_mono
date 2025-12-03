@@ -290,7 +290,7 @@ export default function Home() {
         </section>
 
         {/* FAQ Section */}
-        <section className="py-12 md:py-16 px-4" style={{ backgroundColor: 'var(--bg-section-alt)' }}>
+        <section className="py-12 md:py-16 px-4">
           <div className="text-center mb-8 md:mb-12">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-4">
               <Image
