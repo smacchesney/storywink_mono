@@ -138,7 +138,7 @@ const SynchronizedBeforeAfterPair: React.FC<SynchronizedBeforeAfterPairProps> = 
       {/* Storybook-style frame with hand-drawn border */}
       <StorybookFrame
         className="w-full shadow-md"
-        borderColor="var(--coral-primary)"
+        borderColor="var(--mint-soft)"
         backgroundColor="var(--cream-yellow)"
         key={`${carouselId}-${currentIndex}`}
       >
