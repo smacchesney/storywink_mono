@@ -34,6 +34,61 @@ interface CloudinaryResult {
   eager?: Array<{ secure_url: string }>;
 }
 
+/**
+ * Classifies upload errors and returns user-friendly messages with guidance
+ */
+const getUploadErrorMessage = (error: any): { title: string; description: string } => {
+  const message = error?.message?.toLowerCase() || '';
+  const statusText = error?.statusText?.toLowerCase() || '';
+  const combined = `${message} ${statusText}`;
+
+  // Timeout errors - likely cloud-backed photos
+  if (combined.includes('timeout') || combined.includes('timed out') || combined.includes('aborted')) {
+    return {
+      title: 'Upload timed out',
+      description: 'Some photos may be stored in iCloud or Google Photos. Please open them in your Photos app first to download them, then try again.'
+    };
+  }
+
+  // Network errors
+  if (combined.includes('network') || combined.includes('fetch') || combined.includes('connection') || combined.includes('offline')) {
+    return {
+      title: 'Network error',
+      description: 'Please check your internet connection and try again.'
+    };
+  }
+
+  // File access errors - could indicate cloud placeholder
+  if (combined.includes('access') || combined.includes('permission') || combined.includes('read') || combined.includes('denied')) {
+    return {
+      title: 'Could not access photo',
+      description: 'This photo may be stored in the cloud. Please open it in your Photos app first to download it locally.'
+    };
+  }
+
+  // File size errors
+  if (combined.includes('size') || combined.includes('large') || combined.includes('limit') || combined.includes('exceed')) {
+    return {
+      title: 'Photo too large',
+      description: 'Please select a smaller photo (max 10MB).'
+    };
+  }
+
+  // Format errors
+  if (combined.includes('format') || combined.includes('type') || combined.includes('unsupported') || combined.includes('invalid')) {
+    return {
+      title: 'Unsupported format',
+      description: 'Please use JPG, PNG, or WebP photos.'
+    };
+  }
+
+  // Generic fallback with helpful hint about cloud photos
+  return {
+    title: 'Upload failed',
+    description: 'If you\'re uploading older photos, try opening them in your Photos app first to ensure they\'re downloaded from iCloud or Google Photos.'
+  };
+};
+
 // This component automatically opens the Cloudinary widget when mounted
 export function CloudinaryUploaderAuto({
   onUploadComplete,
@@ -128,14 +183,28 @@ export function CloudinaryUploaderAuto({
   }, [checkAndTriggerCompletion, onUploadProgress]);
 
   const handleUploadError = useCallback((error: any) => {
-    logger.error({ error }, "Cloudinary upload error");
-    toast.error(`Upload failed: ${error.message || 'Unknown error'}`);
-    
+    // Enhanced logging for debugging
+    logger.error({
+      error,
+      errorMessage: error?.message,
+      statusText: error?.statusText,
+      errorCode: error?.code
+    }, "Cloudinary upload error");
+
+    // Get user-friendly error message with guidance
+    const { title, description } = getUploadErrorMessage(error);
+
+    // Show toast with title and description for better user guidance
+    toast.error(title, {
+      description,
+      duration: 8000, // Longer duration so users can read the guidance
+    });
+
     // Reset state
     uploadedAssets.current = [];
     currentFileIndex.current = 0;
     totalFiles.current = 0;
-    
+
     // Call cancel callback
     if (onCancel) {
       onCancel();
@@ -187,6 +256,15 @@ export function CloudinaryUploaderAuto({
       onCancel();
     }
   }, [onCancel, onUploadComplete]);
+
+  const handleUploadAdded = useCallback((result: any) => {
+    // Log file info for debugging upload issues
+    logger.info({
+      fileName: result?.info?.original_filename,
+      fileSize: result?.info?.bytes,
+      fileType: result?.info?.type,
+    }, "File added to upload queue");
+  }, []);
 
   const handleUploadQueuesEnd = useCallback((result: any) => {
     logger.info({ fileCount: result.info.files.length }, "Upload queue started");
@@ -294,6 +372,7 @@ export function CloudinaryUploaderAuto({
       onOpen={handleUploadOpen}
       onClose={handleUploadClose}
       onQueuesEnd={handleUploadQueuesEnd}
+      onUploadAdded={handleUploadAdded}
     >
       {({ open, widget, isLoading }) => {
         // Store widget reference
