@@ -38,7 +38,7 @@ export function SiteHeader() {
   }, [isMobileMenuOpen]);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-[#FFFFFF] dark:bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b border-border/20 bg-white/70 dark:bg-background/80 backdrop-blur-md">
       <div className="w-full flex h-14 items-center px-6 md:px-8 justify-between max-w-none">
         {/* Desktop Logo and Nav */}
         <div className="hidden md:flex items-center">

@@ -65,7 +65,7 @@
 
   /* Playful background variants */
   --bg-playful: #FFFBF5;           /* Warm off-white base */
-  --bg-section-alt: #FFF8F0;       /* Alternating section background */
+  --bg-section-alt: #F0F7F5;       /* Soft mint - distinct from main bg */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);

@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { AnimatedHeroText } from "@/components/ui/animated-hero-text";
 import { optimizeCloudinaryUrl } from '@storywink/shared';
 import StorybookFrame from "@/components/ui/storybook-frame";
+import PlayfulBackground from "@/components/ui/playful-background";
 
 // Lazy load components
 const StatsCounter = dynamic(() => import("@/components/landing-page/stats-counter"), {
@@ -249,8 +250,11 @@ export default function Home() {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen" style={{ backgroundColor: 'var(--bg-playful)' }}>
-      <main className="flex-grow">
+    <div className="flex flex-col min-h-screen relative" style={{ backgroundColor: 'var(--bg-playful)' }}>
+      {/* Whimsical background decorations */}
+      <PlayfulBackground variant="default" showCornerDoodles />
+
+      <main className="flex-grow relative z-10">
         {/* Hero Section */}
         <section className="text-center px-4 py-8 md:py-12 relative">
           {/* Mascot - positioned to the right on desktop, hidden on small mobile */}
