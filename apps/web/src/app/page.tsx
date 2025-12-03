@@ -252,7 +252,7 @@ export default function Home() {
   return (
     <div className="flex flex-col min-h-screen relative" style={{ backgroundColor: 'var(--bg-playful)' }}>
       {/* Whimsical background decorations */}
-      <PlayfulBackground variant="default" showCornerDoodles />
+      <PlayfulBackground variant="default" showCornerDoodles={false} />
 
       <main className="flex-grow relative z-10">
         {/* Hero Section */}

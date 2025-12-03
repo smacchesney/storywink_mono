@@ -80,51 +80,75 @@ const PlayfulBackground: React.FC<PlayfulBackgroundProps> = ({
   showCornerDoodles = true,
   className,
 }) => {
-  // Element counts based on variant
+  // Element counts based on variant - increased density
   const counts = {
-    minimal: { stars: 3, hearts: 2, circles: 2, clouds: 1 },
-    default: { stars: 6, hearts: 3, circles: 4, clouds: 2 },
-    dense: { stars: 10, hearts: 5, circles: 6, clouds: 3 },
+    minimal: { stars: 5, hearts: 3, circles: 3, clouds: 3 },
+    default: { stars: 10, hearts: 5, circles: 6, clouds: 6 },
+    dense: { stars: 16, hearts: 8, circles: 10, clouds: 10 },
   };
 
   const count = counts[variant];
 
   // Generate scattered positions with some randomness but stable per-render
-  // Using predetermined positions for consistency
+  // Using predetermined positions for consistency - increased density
   const scatteredElements = [
-    // Stars - scattered across the page
-    { type: 'star', top: '8%', left: '5%', size: 16, opacity: 0.08, rotate: 15 },
-    { type: 'star', top: '15%', right: '12%', size: 14, opacity: 0.1, rotate: -20 },
-    { type: 'star', top: '35%', left: '8%', size: 12, opacity: 0.06, rotate: 30 },
-    { type: 'star', top: '55%', right: '6%', size: 18, opacity: 0.08, rotate: -10 },
-    { type: 'star', top: '70%', left: '15%', size: 14, opacity: 0.07, rotate: 45 },
-    { type: 'star', top: '85%', right: '20%', size: 16, opacity: 0.09, rotate: -35 },
-    // Extra stars for dense
-    { type: 'star', top: '25%', left: '25%', size: 10, opacity: 0.05, rotate: 60 },
-    { type: 'star', top: '45%', right: '25%', size: 12, opacity: 0.06, rotate: -60 },
-    { type: 'star', top: '60%', left: '35%', size: 11, opacity: 0.05, rotate: 90 },
-    { type: 'star', top: '78%', right: '35%', size: 13, opacity: 0.06, rotate: -90 },
+    // Stars - scattered across the page (more of them)
+    { type: 'star', top: '5%', left: '5%', size: 16, opacity: 0.1, rotate: 15 },
+    { type: 'star', top: '12%', right: '8%', size: 14, opacity: 0.12, rotate: -20 },
+    { type: 'star', top: '18%', left: '18%', size: 12, opacity: 0.08, rotate: 30 },
+    { type: 'star', top: '25%', right: '22%', size: 18, opacity: 0.1, rotate: -10 },
+    { type: 'star', top: '32%', left: '3%', size: 14, opacity: 0.09, rotate: 45 },
+    { type: 'star', top: '40%', right: '5%', size: 16, opacity: 0.11, rotate: -35 },
+    { type: 'star', top: '48%', left: '12%', size: 13, opacity: 0.08, rotate: 60 },
+    { type: 'star', top: '55%', right: '15%', size: 15, opacity: 0.1, rotate: -60 },
+    { type: 'star', top: '62%', left: '6%', size: 11, opacity: 0.09, rotate: 90 },
+    { type: 'star', top: '70%', right: '3%', size: 17, opacity: 0.11, rotate: -90 },
+    { type: 'star', top: '78%', left: '20%', size: 14, opacity: 0.08, rotate: 25 },
+    { type: 'star', top: '85%', right: '18%', size: 12, opacity: 0.1, rotate: -45 },
+    { type: 'star', top: '92%', left: '8%', size: 15, opacity: 0.09, rotate: 70 },
+    { type: 'star', top: '35%', left: '28%', size: 10, opacity: 0.07, rotate: -15 },
+    { type: 'star', top: '58%', right: '28%', size: 11, opacity: 0.07, rotate: 40 },
+    { type: 'star', top: '88%', right: '10%', size: 13, opacity: 0.08, rotate: -70 },
 
-    // Hearts - fewer, more spread out
-    { type: 'heart', top: '20%', left: '3%', size: 14, opacity: 0.08, rotate: -15 },
-    { type: 'heart', top: '50%', right: '4%', size: 12, opacity: 0.07, rotate: 20 },
-    { type: 'heart', top: '75%', left: '10%', size: 16, opacity: 0.09, rotate: -25 },
-    { type: 'heart', top: '40%', right: '15%', size: 10, opacity: 0.06, rotate: 15 },
-    { type: 'heart', top: '88%', right: '8%', size: 14, opacity: 0.08, rotate: -10 },
+    // Hearts - spread across the page
+    { type: 'heart', top: '8%', left: '3%', size: 14, opacity: 0.1, rotate: -15 },
+    { type: 'heart', top: '22%', right: '4%', size: 12, opacity: 0.09, rotate: 20 },
+    { type: 'heart', top: '38%', left: '10%', size: 16, opacity: 0.11, rotate: -25 },
+    { type: 'heart', top: '52%', right: '8%', size: 13, opacity: 0.08, rotate: 15 },
+    { type: 'heart', top: '68%', left: '4%', size: 14, opacity: 0.1, rotate: -10 },
+    { type: 'heart', top: '82%', right: '6%', size: 11, opacity: 0.09, rotate: 25 },
+    { type: 'heart', top: '45%', left: '25%', size: 10, opacity: 0.07, rotate: -20 },
+    { type: 'heart', top: '75%', right: '25%', size: 12, opacity: 0.08, rotate: 30 },
 
     // Circles - soft colored dots
-    { type: 'circle', top: '12%', left: '20%', size: 10, opacity: 0.06, color: '#B8E4DC' },
-    { type: 'circle', top: '30%', right: '18%', size: 8, opacity: 0.07, color: '#D4C4E8' },
-    { type: 'circle', top: '65%', left: '22%', size: 12, opacity: 0.05, color: '#A8D5E5' },
-    { type: 'circle', top: '82%', right: '22%', size: 9, opacity: 0.06, color: '#FFDAB3' },
-    { type: 'circle', top: '45%', left: '4%', size: 11, opacity: 0.05, color: '#B8E4DC' },
-    { type: 'circle', top: '58%', right: '3%', size: 10, opacity: 0.06, color: '#D4C4E8' },
+    { type: 'circle', top: '10%', left: '15%', size: 10, opacity: 0.08, color: '#B8E4DC' },
+    { type: 'circle', top: '20%', right: '12%', size: 8, opacity: 0.09, color: '#D4C4E8' },
+    { type: 'circle', top: '30%', left: '7%', size: 12, opacity: 0.07, color: '#A8D5E5' },
+    { type: 'circle', top: '42%', right: '20%', size: 9, opacity: 0.08, color: '#FFDAB3' },
+    { type: 'circle', top: '55%', left: '18%', size: 11, opacity: 0.07, color: '#B8E4DC' },
+    { type: 'circle', top: '65%', right: '10%', size: 10, opacity: 0.08, color: '#D4C4E8' },
+    { type: 'circle', top: '78%', left: '12%', size: 9, opacity: 0.07, color: '#A8D5E5' },
+    { type: 'circle', top: '88%', right: '15%', size: 11, opacity: 0.08, color: '#FFDAB3' },
+    { type: 'circle', top: '48%', left: '3%', size: 8, opacity: 0.06, color: '#B8E4DC' },
+    { type: 'circle', top: '72%', right: '4%', size: 10, opacity: 0.07, color: '#D4C4E8' },
+
+    // Small clouds - scattered throughout
+    { type: 'cloud', top: '6%', left: '8%', size: 35, opacity: 0.08 },
+    { type: 'cloud', top: '15%', right: '5%', size: 30, opacity: 0.07 },
+    { type: 'cloud', top: '28%', left: '2%', size: 40, opacity: 0.06 },
+    { type: 'cloud', top: '42%', right: '3%', size: 32, opacity: 0.08 },
+    { type: 'cloud', top: '55%', left: '5%', size: 28, opacity: 0.07 },
+    { type: 'cloud', top: '68%', right: '8%', size: 36, opacity: 0.06 },
+    { type: 'cloud', top: '80%', left: '10%', size: 30, opacity: 0.08 },
+    { type: 'cloud', top: '90%', right: '12%', size: 34, opacity: 0.07 },
+    { type: 'cloud', top: '35%', left: '22%', size: 26, opacity: 0.05 },
+    { type: 'cloud', top: '62%', right: '20%', size: 28, opacity: 0.05 },
   ];
 
   // Filter elements based on variant
   const getVisibleElements = () => {
     const filtered = [];
-    let starCount = 0, heartCount = 0, circleCount = 0;
+    let starCount = 0, heartCount = 0, circleCount = 0, cloudCount = 0;
 
     for (const el of scatteredElements) {
       if (el.type === 'star' && starCount < count.stars) {
@@ -136,6 +160,9 @@ const PlayfulBackground: React.FC<PlayfulBackgroundProps> = ({
       } else if (el.type === 'circle' && circleCount < count.circles) {
         filtered.push(el);
         circleCount++;
+      } else if (el.type === 'cloud' && cloudCount < count.clouds) {
+        filtered.push(el);
+        cloudCount++;
       }
     }
     return filtered;
@@ -218,6 +245,19 @@ const PlayfulBackground: React.FC<PlayfulBackgroundProps> = ({
               style={{
                 ...style,
                 color: (el as { color?: string }).color || '#B8E4DC',
+              }}
+            />
+          );
+        }
+        if (el.type === 'cloud') {
+          return (
+            <Cloud
+              key={`cloud-${index}`}
+              className={mobileHideClass}
+              style={{
+                ...style,
+                width: `${el.size}px`,
+                height: `${el.size * 0.6}px`,
               }}
             />
           );
