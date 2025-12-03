@@ -6,6 +6,7 @@ import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { Toaster } from "@/components/ui/sonner";
+import PlayfulBackground from "@/components/ui/playful-background";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -97,9 +98,11 @@ export default function RootLayout({
         </head>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
+          style={{ backgroundColor: 'var(--bg-playful)' }}
         >
+          <PlayfulBackground variant="default" showCornerDoodles={false} />
           <SiteHeader />
-          <main className="flex-grow">{children}</main>
+          <main className="flex-grow relative z-10">{children}</main>
           <SiteFooter />
           <Toaster 
             position="bottom-right"
