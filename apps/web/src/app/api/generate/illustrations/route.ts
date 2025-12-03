@@ -20,6 +20,7 @@ export interface IllustrationGenerationJobData {
   text: string | null;
   artStyle: string | null | undefined;
   bookTitle: string | null | undefined;
+  childName: string;
   isTitlePage: boolean;
   illustrationNotes: string | null | undefined;
   originalImageUrl: string | null;
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
       select: {
         id: true,
         title: true,
+        childName: true,
         artStyle: true,
         status: true,
         isWinkifyEnabled: true,
@@ -229,6 +231,7 @@ export async function POST(request: Request) {
             text: page.text,
             artStyle: book.artStyle,
             bookTitle: book.title,
+            childName: book.childName,
             isWinkifyEnabled: book.isWinkifyEnabled || false,
             isTitlePage: isActualTitlePage,
             illustrationNotes: page.illustrationNotes,

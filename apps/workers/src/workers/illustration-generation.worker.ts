@@ -88,7 +88,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     console.error('[DIAGNOSTIC] Failed to write job start diagnostic:', dbError);
   }
 
-  const { bookId, pageId, userId, pageNumber, artStyle, isWinkifyEnabled, illustrationNotes, isTitlePage, bookTitle, text } = job.data;
+  const { bookId, pageId, userId, pageNumber, artStyle, isWinkifyEnabled, illustrationNotes, isTitlePage, bookTitle, childName, text } = job.data;
 
   console.log(`[IllustrationWorker] Starting job ${job.id} for page ${pageNumber} of book ${bookId}`);
   console.log(`  - PageId: ${pageId}`);
@@ -246,7 +246,10 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       throw new Error(`Invalid style key: ${styleKey}. Available styles: ${Object.keys(STYLE_LIBRARY).join(', ')}`);
     }
 
-    const styleReferenceUrl = styleData.referenceImageUrl;
+    // Use cover reference image for title pages if available
+    const styleReferenceUrl = isTitlePage && styleData.coverReferenceImageUrl
+      ? styleData.coverReferenceImageUrl
+      : styleData.referenceImageUrl;
 
     // ============================================================================
     // DIAGNOSTIC: Database-persisted logging to survive process crashes
@@ -335,9 +338,10 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     }
 
     const promptInput: IllustrationPromptOptions = {
-        style: styleKey, 
+        style: styleKey,
         pageText: text, // Use text from job data
         bookTitle: bookTitle, // Use bookTitle from job data
+        childName: childName, // Use childName from job data for subtitle
         isTitlePage: isTitlePage, // Use isTitlePage from job data
         illustrationNotes: illustrationNotes,
         isWinkifyEnabled: isWinkifyEnabled

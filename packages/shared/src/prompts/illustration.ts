@@ -8,6 +8,7 @@ export interface IllustrationPromptOptions {
   style: StyleKey;
   pageText: string | null;
   bookTitle: string | null;
+  childName?: string | null;
   isTitlePage?: boolean;
   illustrationNotes?: string | null;
   isWinkifyEnabled?: boolean;
@@ -50,7 +51,7 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
 
   const titleBits = opts.isTitlePage
     ? [
-        `Text: Add the title "${opts.bookTitle}" in a readable font matching the second image's text style. Position naturally without covering important subjects. Size appropriately (5-7% of image height).`,
+        `Text: Add the title "${opts.bookTitle}" in a readable font matching the second image's text style. Position naturally without covering important subjects. Size appropriately (5-7% of image height).${opts.childName ? ` Below the title, add the subtitle "A ${opts.childName} adventure" in a smaller complementary font (approximately 3-4% of image height).` : ''}`,
       ]
     : [
         `Text: Add this text once: "${(opts.pageText ?? '').trim()}". Use the same font style and size as the second image (approximately 5-7% of image height for consistency across pages). Match the text aesthetic from the second image. Position text naturally, ensure fully visible and readable.`,

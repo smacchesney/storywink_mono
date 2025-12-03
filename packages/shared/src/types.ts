@@ -113,6 +113,7 @@ export interface IllustrationGenerationJob {
   text: string | null;
   artStyle: string;
   bookTitle: string;
+  childName: string;
   isWinkifyEnabled: boolean;
   isTitlePage: boolean;
   illustrationNotes?: string | null;

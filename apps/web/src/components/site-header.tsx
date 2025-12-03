@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import Image from "next/image";
-import { MenuIcon } from "lucide-react";
+import { MenuIcon, ArrowRight } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { NotificationBell } from "@/components/notification-bell";
 
@@ -85,14 +85,13 @@ export function SiteHeader() {
                 </Button>
              </SignedOut>
              <SignedIn>
-                 <Button asChild variant="secondary" size="sm">
-                    <Link
-                      href="/library"
-                      className="text-slate-900 dark:text-white transition-colors hover:text-slate-700 dark:hover:text-slate-300"
-                    >
-                      My Library
-                    </Link>
-                 </Button>
+                 <Link
+                  href="/library"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#F76C5E] text-white rounded-md font-playful text-sm hover:bg-[#e55d4f] transition-all group"
+                >
+                  To my stories
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </Link>
                  <NotificationBell />
                  <div className="flex items-center ml-2">
                    <UserButton afterSignOutUrl="/" />
@@ -127,10 +126,11 @@ export function SiteHeader() {
             <SignedIn>
               <Link
                 href="/library"
-                className="text-slate-900 dark:text-white transition-colors hover:text-slate-700 dark:hover:text-slate-300 py-2"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#F76C5E] text-white rounded-md font-playful text-sm hover:bg-[#e55d4f] transition-all group w-fit"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                My Library
+                To my stories
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
               <div className="py-2">
                 <UserButton afterSignOutUrl="/" />

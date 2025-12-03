@@ -6,6 +6,7 @@ export const STYLE_LIBRARY = {
   vignette: {
     label: 'Vignette',
     referenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1750348290/Pencil_Vignette_Style_vF_e89xiy.png',
+    coverReferenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1764772654/Pencil_Vignette_Style_FRONTCOVER_vF_jz9kez.png',
     description: "Follow the reference image exactly: create a vignette-style illustration with approximately 40% white space around the image borders. The main illustration should be centered within this whitespace frame, maintaining the same compositional balance, text positioning, and spatial relationships as shown in the reference image.",
   },
 } as const;
@@ -17,6 +18,7 @@ export const STYLE_LIBRARY = {
 export interface StyleDefinition {
   label: string;
   referenceImageUrl: string;
+  coverReferenceImageUrl?: string;
   description?: string | null;
 }
 

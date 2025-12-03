@@ -134,13 +134,13 @@ export function NotificationBell() {
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="relative flex items-center justify-center w-11 h-11 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+        className="relative flex items-center justify-center w-11 h-11 rounded-full hover:bg-[#B8E4DC]/30 dark:hover:bg-slate-800 transition-colors"
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
       >
         <Bell className="h-5 w-5 text-slate-600 dark:text-slate-300" />
         {/* Badge */}
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[11px] font-bold text-white bg-red-500 rounded-sm">
+          <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[11px] font-bold text-white bg-[#F76C5E] rounded-sm">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}

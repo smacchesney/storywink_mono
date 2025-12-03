@@ -2,201 +2,51 @@
 
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import React, { useRef, useEffect, useState, useContext, createContext, memo } from 'react';
-import { cn } from "@/lib/utils";
+import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { AnimatedHeroText } from "@/components/ui/animated-hero-text";
-import { optimizeCloudinaryUrl } from '@storywink/shared';
-import StorybookFrame from "@/components/ui/storybook-frame";
 
 // Lazy load components
 const StatsCounter = dynamic(() => import("@/components/landing-page/stats-counter"), {
   loading: () => <div className="h-6" />,
 });
 
-interface CarouselImage {
-  original: string;
-  illustrated: string;
-  alt: string;
-  title?: string; // Optional title to display
-}
-
-// Placeholder data for the first carousel (first 3 images for top display)
-const carouselImages = [
-  { original: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764315536/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/IMG_3244_rwy5uf.jpg"), illustrated: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764315803/storywink/cmiijx5dg004vmr0diwd3t9w8/generated/page_8.jpg"), alt: "Photo 1" },
-  { original: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764315538/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/IMG_3269_tcrmzo.jpg"), illustrated: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764315829/storywink/cmiijx5dg004vmr0diwd3t9w8/generated/page_10.jpg"), alt: "Photo 2" },
-  { original: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764315531/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/IMG_3336_ilx9fd.jpg"), illustrated: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764315742/storywink/cmiijx5dg004vmr0diwd3t9w8/generated/page_4.jpg"), alt: "Photo 3" },
-];
-
-// Placeholder data for the second carousel (first 3 images for top display)
-const carouselImagesStyle2 = [
-  { original: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764255047/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/WhatsApp_Image_2025-10-19_at_13.41.03_1_cprzju.jpg"), illustrated: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764255352/storywink/cmihjwm8l002bmr0dp7lhdvx2/generated/page_2.jpg"), alt: "Photo 4" },
-  { original: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764255046/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/WhatsApp_Image_2025-10-19_at_13.41.04_2_moijbz.jpg"), illustrated: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764255446/storywink/cmihjwm8l002bmr0dp7lhdvx2/generated/page_9.jpg"), alt: "Photo 5" },
-  { original: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764253791/user_user_2vuIux03jMcwJQMhRqWBrXuaAET/uploads/WhatsApp_Image_2025-10-19_at_13.41.03_h21hc7.jpg"), illustrated: optimizeCloudinaryUrl("https://res.cloudinary.com/storywink/image/upload/v1764255443/storywink/cmihjwm8l002bmr0dp7lhdvx2/generated/page_7.jpg"), alt: "Photo 6" },
-];
-
-interface CarouselSyncContextType {
-  currentIndex: number;
-  setCurrentIndex: (index: number) => void;
-  isTransitioning: boolean;
-  setIsTransitioning: React.Dispatch<React.SetStateAction<boolean>>;
-  totalImages: number;
-}
-
-const CarouselSyncContext = createContext<CarouselSyncContextType | undefined>(undefined);
-
-const useCarouselSync = () => {
-  const context = useContext(CarouselSyncContext);
-  if (!context) {
-    throw new Error("useCarouselSync must be used within a SynchronizedCarousels provider");
-  }
-  return context;
-};
-
-interface SynchronizedCarouselsProps {
-  children: React.ReactNode;
-  imageSets: CarouselImage[][]; // Array of image sets for each carousel
-  interval?: number;
-}
-
-const SynchronizedCarousels: React.FC<SynchronizedCarouselsProps> = ({ children, imageSets, interval = 4000 }) => {
-  const totalImages = Math.min(...imageSets.map(set => set.length)); // Sync based on the smallest set
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const resetTimer = () => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
-    timerRef.current = setTimeout(() => {
-      setCurrentIndex((prevIndex) => (prevIndex + 1) % totalImages);
-    }, interval);
-  };
-
-  useEffect(() => {
-    if (totalImages > 0) {
-     resetTimer();
-    }
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-    };
-  }, [currentIndex, totalImages, interval]);
-
-  const handleSetCurrentIndex = (index: number) => {
-    setCurrentIndex(index);
-    resetTimer();
-  };
-  
-  if (totalImages === 0) {
-    // Handle case with no images to prevent errors
-    return <>{children}</>; 
-  }
-
-  return (
-    <CarouselSyncContext.Provider value={{ currentIndex, setCurrentIndex: handleSetCurrentIndex, isTransitioning, setIsTransitioning, totalImages }}>
-      {children}
-    </CarouselSyncContext.Provider>
-  );
-};
-
-interface SynchronizedBeforeAfterPairProps {
-  images: CarouselImage[];
-  showControls?: boolean;
-  carouselId: string; // Unique ID for this carousel instance for keying
-}
-
-const SynchronizedBeforeAfterPair: React.FC<SynchronizedBeforeAfterPairProps> = memo(({ images, showControls = false, carouselId }) => {
-  const { currentIndex, setCurrentIndex, totalImages } = useCarouselSync();
-
-  // Preload next image pair before carousel transitions
-  useEffect(() => {
-    const nextIndex = (currentIndex + 1) % images.length;
-    const nextImage = images[nextIndex];
-
-    if (nextImage && typeof window !== 'undefined') {
-      const preloadOriginal = new window.Image();
-      preloadOriginal.src = nextImage.original;
-      const preloadIllustrated = new window.Image();
-      preloadIllustrated.src = nextImage.illustrated;
-    }
-  }, [currentIndex, images]);
-
-  if (!images || images.length === 0) return null;
-
-  const currentImagePair = images[currentIndex % images.length]; // Use modulo for safety if lengths differ despite totalImages
-  const isFirstImage = currentIndex === 0;
-
-  return (
-    <div className={cn("relative w-full max-w-md mx-auto flex flex-col items-center")} style={{ maxWidth: '28rem' }}>
-      {/* Storybook-style frame with hand-drawn border */}
-      <StorybookFrame
-        className="w-full shadow-md"
-        borderColor="var(--mint-soft)"
-        backgroundColor="var(--cream-yellow)"
-        key={`${carouselId}-${currentIndex}`}
-      >
-        <div className="flex flex-row w-full gap-3">
-          {/* Original photo side */}
-          <div className="w-1/2 relative">
-            <div className="aspect-square w-full relative rounded-lg overflow-hidden shadow-sm">
-              <Image
-                src={currentImagePair.original}
-                alt={`${currentImagePair.alt} - Original`}
-                fill
-                sizes="(max-width: 640px) 45vw, 180px"
-                className="object-cover"
-                priority={isFirstImage}
-              />
-            </div>
-          </div>
-          {/* Illustrated side */}
-          <div className="w-1/2 relative">
-            <div className="aspect-square w-full relative rounded-lg overflow-hidden shadow-sm">
-              <Image
-                src={currentImagePair.illustrated}
-                alt={`${currentImagePair.alt} - Illustrated`}
-                fill
-                sizes="(max-width: 640px) 45vw, 180px"
-                className="object-cover"
-                priority={isFirstImage}
-              />
-            </div>
-          </div>
-        </div>
-      </StorybookFrame>
-
-      {showControls && totalImages > 1 && (
-        <div className="flex items-center justify-center mt-3 space-x-2">
-          {Array.from({ length: totalImages }).map((_, idx) => (
-            <button
-              key={idx}
-              onClick={() => setCurrentIndex(idx)}
-              className={cn(
-                "h-2 w-2 rounded-full transition-all duration-200",
-                currentIndex === idx
-                  ? "bg-[var(--coral-primary)] scale-110"
-                  : "bg-[#D9D9D9] hover:bg-[#BFBFBF]"
-              )}
-              aria-label={`Image ${idx + 1}`}
-            />
-          ))}
-        </div>
-      )}
+// Lazy load flipbook (requires window/client-side only)
+const LandingFlipbook = dynamic(() => import("@/components/landing-page/landing-flipbook"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full max-w-md mx-auto">
+      <div
+        className="w-full bg-[var(--cream-yellow)] rounded-lg animate-pulse"
+        style={{ aspectRatio: '1' }}
+      />
     </div>
-  );
+  ),
 });
 
-SynchronizedBeforeAfterPair.displayName = 'SynchronizedBeforeAfterPair';
+// Demo book pages - "Kai at National Gallery!" sample storybook
+const demoBookPages = [
+  "https://res.cloudinary.com/storywink/image/upload/v1764513758/storywink/cmilt692a001ro20dnitou2oc/generated/page_1.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764513758/storywink/cmilt692a001ro20dnitou2oc/generated/page_2.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764513753/storywink/cmilt692a001ro20dnitou2oc/generated/page_3.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764513795/storywink/cmilt692a001ro20dnitou2oc/generated/page_4.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764513800/storywink/cmilt692a001ro20dnitou2oc/generated/page_5.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764513820/storywink/cmilt692a001ro20dnitou2oc/generated/page_6.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764513845/storywink/cmilt692a001ro20dnitou2oc/generated/page_7.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764513850/storywink/cmilt692a001ro20dnitou2oc/generated/page_8.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764513865/storywink/cmilt692a001ro20dnitou2oc/generated/page_9.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764513891/storywink/cmilt692a001ro20dnitou2oc/generated/page_10.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764513891/storywink/cmilt692a001ro20dnitou2oc/generated/page_11.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764513918/storywink/cmilt692a001ro20dnitou2oc/generated/page_12.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764513943/storywink/cmilt692a001ro20dnitou2oc/generated/page_13.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764513940/storywink/cmilt692a001ro20dnitou2oc/generated/page_14.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764513984/storywink/cmilt692a001ro20dnitou2oc/generated/page_15.jpg",
+];
 
 export default function Home() {
-  const firstCarouselImages = carouselImages.slice(0, 3);
-  const secondCarouselImages = carouselImagesStyle2.slice(0, 3);
   const { isLoaded, isSignedIn } = useAuth();
   const router = useRouter();
   const [isButtonLoading, setIsButtonLoading] = useState(true);
@@ -264,21 +114,27 @@ export default function Home() {
               <Button
                 size="lg"
                 variant="default"
-                className="w-full sm:w-auto px-8 py-3 md:px-10 md:py-4 text-lg md:text-xl bg-[#F76C5E] text-white hover:bg-[#F76C5E]/90 transition-colors rounded-full font-playful"
+                className="w-full sm:w-auto px-8 py-3 md:px-10 md:py-4 text-lg md:text-xl bg-[#F76C5E] text-white hover:bg-[#e55d4f] transition-all rounded-full font-playful group"
                 onClick={handleCreateStorybookClick}
                 disabled={!isLoaded}
               >
-                {isButtonLoading ? "Loading..." : "✨ Create Your Storybook"}
+                {isButtonLoading ? "Loading..." : (
+                  <>
+                    <svg
+                      className="mr-2 h-5 w-5 transition-transform group-hover:scale-125 group-hover:rotate-12"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path d="M12 0L14.59 8.41L23 11L14.59 13.59L12 22L9.41 13.59L1 11L9.41 8.41L12 0Z" />
+                    </svg>
+                    Create Your Storybook
+                  </>
+                )}
               </Button>
             </div>
 
             <div className="mb-2 mt-3">
-              <SynchronizedCarousels imageSets={[firstCarouselImages, secondCarouselImages]} interval={6000}>
-                <div className="grid grid-cols-1 gap-6 md:gap-8 items-start">
-                  <SynchronizedBeforeAfterPair images={firstCarouselImages} showControls={false} carouselId="carousel1" />
-                  <SynchronizedBeforeAfterPair images={secondCarouselImages} carouselId="carousel2" />
-                </div>
-              </SynchronizedCarousels>
+              <LandingFlipbook pages={demoBookPages} />
             </div>
 
             <StatsCounter count={1234} text="stories created" className="mt-5 text-sm text-slate-500" />
