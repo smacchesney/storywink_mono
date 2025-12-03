@@ -34,12 +34,12 @@ const Heart = ({ className, style }: { className?: string; style?: React.CSSProp
 
 const Cloud = ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
   <svg
-    viewBox="0 0 64 40"
+    viewBox="20 0 44 30"
     fill="currentColor"
     className={cn("text-sky-soft", className)}
     style={style}
   >
-    <path d="M52 28c5.5 0 10-4.5 10-10s-4.5-10-10-10c-1.2 0-2.3.2-3.4.6C46.8 3.6 42.8 0 38 0c-6.1 0-11 4.9-11 11 0 .4 0 .8.1 1.2C24.4 13.5 22 16.5 22 20c0 4.4 3.6 8 8 8h22zM12 40c6.6 0 12-5.4 12-12S18.6 16 12 16 0 21.4 0 28s5.4 12 12 12z" />
+    <path d="M52 28c5.5 0 10-4.5 10-10s-4.5-10-10-10c-1.2 0-2.3.2-3.4.6C46.8 3.6 42.8 0 38 0c-6.1 0-11 4.9-11 11 0 .4 0 .8.1 1.2C24.4 13.5 22 16.5 22 20c0 4.4 3.6 8 8 8h22z" />
   </svg>
 );
 
@@ -101,11 +101,11 @@ const PlayfulBackground: React.FC<PlayfulBackgroundProps> = ({
   showCornerDoodles = true,
   className,
 }) => {
-  // Element counts based on variant - increased density
+  // Element counts based on variant - includes middle-zone elements
   const counts = {
     minimal: { stars: 4, hearts: 3, rainbows: 2, clouds: 3 },
-    default: { stars: 8, hearts: 6, rainbows: 5, clouds: 6 },
-    dense: { stars: 12, hearts: 8, rainbows: 8, clouds: 10 },
+    default: { stars: 12, hearts: 8, rainbows: 6, clouds: 8 },
+    dense: { stars: 16, hearts: 10, rainbows: 10, clouds: 12 },
   };
 
   const count = counts[variant];
@@ -152,6 +152,18 @@ const PlayfulBackground: React.FC<PlayfulBackgroundProps> = ({
     // Row 7: Bottom section (90%+)
     { type: 'star', top: '92%', left: '8%', size: 13, opacity: 0.1, rotate: 70 },
     { type: 'heart', top: '94%', right: '7%', size: 14, opacity: 0.1, rotate: -20 },
+
+    // Middle-zone elements for desktop (28-38% from edges) - subtle, smaller
+    // These fill the gap between edges and center content area
+    { type: 'star', top: '6%', left: '32%', size: 11, opacity: 0.07, rotate: 20 },
+    { type: 'star', top: '24%', right: '30%', size: 10, opacity: 0.06, rotate: -30 },
+    { type: 'star', top: '44%', left: '28%', size: 12, opacity: 0.07, rotate: 40 },
+    { type: 'star', top: '66%', right: '32%', size: 11, opacity: 0.06, rotate: -50 },
+    { type: 'heart', top: '14%', right: '35%', size: 10, opacity: 0.06, rotate: 15 },
+    { type: 'heart', top: '36%', left: '30%', size: 9, opacity: 0.06, rotate: -20 },
+    { type: 'rainbow', top: '30%', right: '28%', size: 20, opacity: 0.05, rotate: 8 },
+    { type: 'cloud', top: '56%', left: '34%', size: 24, opacity: 0.05 },
+    { type: 'cloud', top: '76%', right: '30%', size: 22, opacity: 0.05 },
 
     // Extra elements for dense variant - spread throughout
     { type: 'star', top: '12%', left: '25%', size: 12, opacity: 0.08, rotate: 25 },

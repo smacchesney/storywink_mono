@@ -257,17 +257,6 @@ export default function Home() {
       <main className="flex-grow relative z-10">
         {/* Hero Section */}
         <section className="text-center px-4 py-8 md:py-12 relative">
-          {/* Mascot - positioned to the right on desktop, hidden on small mobile */}
-          <div className="hidden sm:block absolute right-4 md:right-8 lg:right-16 top-8 md:top-12">
-            <Image
-              src="/images/mascot/kai the dino waving.png"
-              alt="Kai the Dino waving"
-              width={80}
-              height={80}
-              className="w-16 h-16 md:w-20 md:h-20 lg:w-24 lg:h-24"
-            />
-          </div>
-
           <div className="max-w-4xl mx-auto">
             <AnimatedHeroText />
 
