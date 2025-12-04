@@ -41,7 +41,7 @@ function loadFont(): opentype.Font {
       ? __dirname
       : dirname(fileURLToPath(import.meta.url));
 
-    const fontPath = join(currentDir, '../assets/fonts/LibreBaskerville-Italic.ttf');
+    const fontPath = join(currentDir, '../assets/fonts/Excalifont.ttf');
 
     // Read font file and convert to proper ArrayBuffer
     // Node.js Buffer from the pool can have non-zero byteOffset, so we must
@@ -54,7 +54,7 @@ function loadFont(): opentype.Font {
     return loadedFont;
   } catch (error) {
     console.error('Failed to load font file:', error);
-    throw new Error('Font file not found. Ensure LibreBaskerville-Italic.ttf is in assets/fonts/');
+    throw new Error('Font file not found. Ensure Excalifont.ttf is in assets/fonts/');
   }
 }
 
