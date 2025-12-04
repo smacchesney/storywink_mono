@@ -182,6 +182,41 @@ function textToSvgPath(
 }
 
 // ----------------------------------
+// GRADIENT FADE (Fallback for missing white space)
+// ----------------------------------
+
+/**
+ * Apply a white gradient fade to the bottom of the image
+ * This is a fallback for when Gemini doesn't leave proper white space
+ * When Gemini does leave white space, this is invisible (white on white)
+ */
+async function applyGradientFade(
+  imageBuffer: Buffer,
+  width: number,
+  height: number
+): Promise<Buffer> {
+  // Gradient covers bottom 22% of image
+  // Starts transparent at 78%, fully white by ~90%
+  const gradientStartY = Math.round(height * 0.78);
+  const gradientHeight = height - gradientStartY;
+
+  const gradientSvg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="fadeGradient" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="white" stop-opacity="0"/>
+        <stop offset="55%" stop-color="white" stop-opacity="0.85"/>
+        <stop offset="100%" stop-color="white" stop-opacity="1"/>
+      </linearGradient>
+    </defs>
+    <rect x="0" y="${gradientStartY}" width="${width}" height="${gradientHeight}" fill="url(#fadeGradient)"/>
+  </svg>`;
+
+  return sharp(imageBuffer)
+    .composite([{ input: Buffer.from(gradientSvg), top: 0, left: 0 }])
+    .toBuffer();
+}
+
+// ----------------------------------
 // MAIN FUNCTION
 // ----------------------------------
 
@@ -189,6 +224,9 @@ function textToSvgPath(
  * Add text overlay to an image buffer
  * Text is rendered in the bottom portion of the image (white space area)
  * Uses opentype.js to convert text to SVG paths - no fontconfig dependency
+ *
+ * Applies a gradient fade fallback first to ensure text readability
+ * even when Gemini doesn't leave proper white space at bottom
  */
 export async function addTextToImage(
   imageBuffer: Buffer,
@@ -202,6 +240,10 @@ export async function addTextToImage(
   const metadata = await sharp(imageBuffer).metadata();
   const width = metadata.width || 1024;
   const height = metadata.height || 1024;
+
+  // Apply gradient fade as fallback for missing white space
+  // This is invisible when Gemini leaves proper white space (white on white)
+  const imageWithGradient = await applyGradientFade(imageBuffer, width, height);
 
   // Calculate max width for text in pixels
   const maxTextWidth = width * opts.maxWidth;
@@ -233,8 +275,8 @@ export async function addTextToImage(
     ${pathElements}
   </svg>`;
 
-  // Composite SVG onto image
-  return sharp(imageBuffer)
+  // Composite SVG onto image (with gradient already applied)
+  return sharp(imageWithGradient)
     .composite([{
       input: Buffer.from(svg),
       top: 0,
