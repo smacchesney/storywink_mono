@@ -18,11 +18,11 @@ export interface TextOverlayOptions {
 }
 
 const DEFAULT_OPTIONS: Required<TextOverlayOptions> = {
-  fontSize: 56,
+  fontSize: 80,
   color: '#1a1a1a',
   yPosition: 0.88, // 88% from top (centered in bottom 18%)
-  lineHeight: 1.4,
-  maxWidth: 0.88,
+  lineHeight: 1.3,
+  maxWidth: 0.90,
   maxLines: 3,
 };
 
