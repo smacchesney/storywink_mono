@@ -296,6 +296,70 @@ All AI prompts are centralized in the shared package for consistency:
   - Type-safe style keys and validation functions
   - Reference images hosted on Cloudinary
 
+## Text Overlay System (December 2025)
+
+Story page text is rendered programmatically for consistency, while title pages use AI-generated artistic text.
+
+### Hybrid Approach
+- **Title Pages**: AI generates artistic text integrated into the illustration (charming variation acceptable)
+- **Story Pages**: Programmatic text overlay in bottom 18% white space (guaranteed consistency)
+
+### Architecture
+```
+┌─────────────────────────────────┐
+│                                 │
+│      ILLUSTRATION AREA          │  ~82% of height
+│      (soft vignette edges)      │
+│                                 │
+│         ↓ fades to white ↓      │
+├ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┤  (no hard line)
+│                                 │
+│   "Story text rendered here"    │  ~18% of height
+│   "with Excalifont at 80px"     │  (pure white space)
+│                                 │
+└─────────────────────────────────┘
+```
+
+### Implementation
+- **Utility File**: `apps/workers/src/utils/text-overlay.ts`
+- **Font Rendering**: opentype.js converts text to SVG paths (avoids fontconfig dependency on Railway)
+- **Image Compositing**: Sharp overlays SVG onto the image
+- **Brand Font**: **Excalifont** (hand-drawn style from Excalidraw) at `apps/workers/assets/fonts/Excalifont.ttf`
+
+### Text Overlay Configuration
+```typescript
+const DEFAULT_OPTIONS = {
+  fontSize: 80,           // 80px base size
+  color: '#1a1a1a',       // Near-black text
+  yPosition: 0.88,        // 88% from top (centered in bottom 18%)
+  lineHeight: 1.3,        // Line spacing multiplier
+  maxWidth: 0.90,         // 90% of image width
+  maxLines: 3,            // Maximum lines before truncation
+};
+```
+
+### Key Technical Details
+- **Font Loading**: Uses `new Uint8Array(buffer)` pattern for proper ArrayBuffer conversion (Node.js Buffer pool can have non-zero byteOffset)
+- **SVG Path Conversion**: Text converted to `<path>` elements, not `<text>` elements (bypasses fontconfig entirely)
+- **Dynamic Font Sizing**: Automatically reduces font size (down to 65% of base) if text doesn't fit in maxLines
+- **Text Wrapping**: Actual font metrics used for accurate word wrapping
+
+### Prompt Integration
+Story pages request white space in the prompt (`illustration.ts`):
+```typescript
+`COMPOSITION: Create the illustration in the top ~82% of the image. Leave the
+bottom ~18% as PURE WHITE (#FFFFFF) empty space - this area will be used for
+text overlay. DO NOT add any text to the image.`
+```
+
+### Files Involved
+| File | Purpose |
+|------|---------|
+| `apps/workers/src/utils/text-overlay.ts` | Text rendering utilities |
+| `apps/workers/assets/fonts/Excalifont.ttf` | Brand font (TTF format) |
+| `apps/workers/src/workers/illustration-generation.worker.ts` | Calls `addTextToImage()` after Gemini |
+| `packages/shared/src/prompts/illustration.ts` | Requests white space for story pages |
+
 ## Cloudinary Image Optimization
 All Cloudinary images are automatically optimized using `f_auto,q_auto` transformations:
 
@@ -333,8 +397,10 @@ Currently no automated tests. Manual testing through:
 - Provide brutally honest and realistic assessments of requests, feasibility, and potential issues. No sugar-coating. No vague possibilities where concrete answers are needed.
 - Always operate under the assumption that I, the user, might be incorrect, misunderstanding concepts, or providing incomplete/flawed information. Even if I state something with confidence, critically evaluate it. If you suspect a misunderstanding on my part, or if my request is ambiguous, unclear, or potentially flawed, you must ask clarifying questions or politely point out the potential error and explain why. Don't just accept my statements at face value. Your goal is to ensure the underlying logic and approach are sound.
 
-## Brand visual identity
-Brand primary color: coral: #F76C5E
+## Brand Visual Identity
+- **Primary Color**: Coral `#F76C5E`
+- **Brand Font**: Excalifont (hand-drawn style from Excalidraw)
+- **Text Color**: Near-black `#1a1a1a`
 
 ## Recent Changes (October 1, 2025)
 
