@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import PhotoSourceSheet from '@/components/create/PhotoSourceSheet';
 import UploadProgressScreen from '@/components/create/UploadProgressScreen';
@@ -36,6 +36,7 @@ export default function CreateBookPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showCloudinaryUploader, setShowCloudinaryUploader] = useState(false);
+  const [isLoadingUploader, setIsLoadingUploader] = useState(false);
   
   // State for Progress Screen
   const [showProgressScreen, setShowProgressScreen] = useState(false);
@@ -170,6 +171,8 @@ export default function CreateBookPage() {
 
   const handleStartCreatingClick = () => {
     logger.info("Start Creating clicked - Directly opening Cloudinary uploader");
+    // Show loading spinner while Cloudinary widget loads
+    setIsLoadingUploader(true);
     // Skip the PhotoSourceSheet and directly trigger Cloudinary uploader
     setShowCloudinaryUploader(true);
   };
@@ -185,6 +188,7 @@ export default function CreateBookPage() {
     setShowCloudinaryUploader(false);
     setIsUploading(false);
     setShowProgressScreen(false);
+    setIsLoadingUploader(false);
   };
 
   const handleImportFromGooglePhotos = () => {
@@ -203,13 +207,17 @@ export default function CreateBookPage() {
       
       {!showProgressScreen && !showCloudinaryUploader && (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-150px)] px-4 py-8">
-          <Button 
+          <Button
             onClick={handleStartCreatingClick}
-            disabled={isUploading}
-            variant="outline" 
+            disabled={isUploading || isLoadingUploader}
+            variant="outline"
             className="relative bg-white rounded-full w-24 h-24 md:w-40 md:h-40 shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out flex items-center justify-center group"
           >
-            <Plus className="text-[#F76C5E] w-10 h-10 md:w-16 md:h-16 transition-transform duration-300 ease-in-out group-hover:scale-110" />
+            {isLoadingUploader ? (
+              <Loader2 className="text-[#F76C5E] w-10 h-10 md:w-16 md:h-16 animate-spin" />
+            ) : (
+              <Plus className="text-[#F76C5E] w-10 h-10 md:w-16 md:h-16 transition-transform duration-300 ease-in-out group-hover:scale-110" />
+            )}
           </Button>
 
           <p className="mt-4 md:mt-6 text-lg md:text-xl text-gray-600 font-medium">
@@ -233,6 +241,7 @@ export default function CreateBookPage() {
             onUploadStart={handleUploadStart}
             onUploadProgress={handleUploadProgress}
             onCancel={handleUploadCancel}
+            onOpen={() => setIsLoadingUploader(false)}
           />
         </div>
       )}

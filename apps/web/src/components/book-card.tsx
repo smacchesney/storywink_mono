@@ -93,7 +93,7 @@ const BookCard: React.FC<BookCardProps> = ({
           {/* Centered shimmer text and time estimate on image */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <TextShimmerWave
-              className="text-lg font-semibold [--base-color:#e2e8f0] [--base-gradient-color:#F76C5E]"
+              className="text-lg font-semibold font-playful [--base-color:#e2e8f0] [--base-gradient-color:#F76C5E]"
               duration={1}
               spread={1}
               zDistance={1}

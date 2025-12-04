@@ -11,6 +11,7 @@ interface CloudinaryUploaderAutoProps {
   onUploadStart?: (totalFiles: number) => void;
   onUploadProgress?: (progress: number, currentFile: number, totalFiles: number) => void;
   onCancel?: () => void;
+  onOpen?: () => void;  // Called when widget dialog opens
 }
 
 interface CloudinaryAsset {
@@ -94,7 +95,8 @@ export function CloudinaryUploaderAuto({
   onUploadComplete,
   onUploadStart,
   onUploadProgress,
-  onCancel
+  onCancel,
+  onOpen
 }: CloudinaryUploaderAutoProps) {
   const { user } = useUser();
   const widgetRef = useRef<any>(null);
@@ -214,7 +216,8 @@ export function CloudinaryUploaderAuto({
   const handleUploadOpen = useCallback(() => {
     logger.info("Cloudinary widget opened");
     hasOpened.current = true;
-  }, []);
+    onOpen?.();
+  }, [onOpen]);
 
   const handleUploadClose = useCallback(() => {
     logger.info({

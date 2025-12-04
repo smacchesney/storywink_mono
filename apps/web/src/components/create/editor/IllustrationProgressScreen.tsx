@@ -80,7 +80,7 @@ export function IllustrationProgressScreen({
       {/* Text with Shimmer Effect */}
       <div className="isolate mb-4">
         <TextShimmerWave
-          className="text-xl md:text-2xl font-semibold [--base-color:#374151] [--base-gradient-color:#F76C5E] dark:[--base-color:#D1D5DB] dark:[--base-gradient-color:#F76C5E]"
+          className="text-xl md:text-2xl font-semibold font-playful [--base-color:#374151] [--base-gradient-color:#F76C5E] dark:[--base-color:#D1D5DB] dark:[--base-gradient-color:#F76C5E]"
           duration={1}
           spread={1}
           zDistance={1}
