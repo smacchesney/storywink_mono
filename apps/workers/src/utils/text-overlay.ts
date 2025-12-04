@@ -43,16 +43,14 @@ function loadFont(): opentype.Font {
 
     const fontPath = join(currentDir, '../assets/fonts/LibreBaskerville-Italic.ttf');
 
-    // Read font file and convert Buffer to proper ArrayBuffer
-    // Buffer.buffer can have incorrect byteOffset, so we need to slice it correctly
+    // Read font file and convert to proper ArrayBuffer
+    // Node.js Buffer from the pool can have non-zero byteOffset, so we must
+    // copy into a fresh Uint8Array to guarantee ArrayBuffer starts at offset 0
     const fontBuffer = readFileSync(fontPath);
-    const arrayBuffer = fontBuffer.buffer.slice(
-      fontBuffer.byteOffset,
-      fontBuffer.byteOffset + fontBuffer.byteLength
-    );
+    const uint8Array = new Uint8Array(fontBuffer);
 
     // Parse font with opentype.js
-    loadedFont = opentype.parse(arrayBuffer);
+    loadedFont = opentype.parse(uint8Array.buffer);
     return loadedFont;
   } catch (error) {
     console.error('Failed to load font file:', error);
