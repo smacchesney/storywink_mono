@@ -5,13 +5,13 @@ import HTMLFlipBook from 'react-pageflip';
 import LandingFlipbookPage from './landing-flipbook-page';
 import { cn } from '@/lib/utils';
 import { optimizeCloudinaryUrl } from '@storywink/shared';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface LandingFlipbookProps {
   pages: string[]; // Array of image URLs
   autoFlipInterval?: number; // ms between flips (default: 3500)
   idleResumeDelay?: number; // ms before resuming after interaction (default: 8000)
   coverPauseDuration?: number; // ms to pause on cover before reopening (default: 2000)
-  flipBackSpeed?: number; // ms between flips when closing (default: 400)
   className?: string;
 }
 
@@ -25,19 +25,18 @@ const LandingFlipbook: React.FC<LandingFlipbookProps> = ({
   autoFlipInterval = 3500,
   idleResumeDelay = 8000,
   coverPauseDuration = 2000,
-  flipBackSpeed = 400,
   className,
 }) => {
   const flipBookRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [isBookOpen, setIsBookOpen] = useState(false); // Track if book is open (for centering)
-  const [isClosing, setIsClosing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isMobile, setIsMobile] = useState(false); // Track mobile viewport for touch behavior
+  const [currentPage, setCurrentPage] = useState(0); // Track current page for arrow visibility
 
   const autoFlipTimerRef = useRef<NodeJS.Timeout | null>(null);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const closeIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const totalPages = pages.length;
 
@@ -69,6 +68,14 @@ const LandingFlipbook: React.FC<LandingFlipbookProps> = ({
     return () => resizeObserver.disconnect();
   }, []);
 
+  // Detect mobile viewport
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // Clear all timers
   const clearAllTimers = useCallback(() => {
     if (autoFlipTimerRef.current) {
@@ -79,79 +86,44 @@ const LandingFlipbook: React.FC<LandingFlipbookProps> = ({
       clearTimeout(idleTimerRef.current);
       idleTimerRef.current = null;
     }
-    if (closeIntervalRef.current) {
-      clearInterval(closeIntervalRef.current);
-      closeIntervalRef.current = null;
-    }
   }, []);
-
-  // Start closing animation (flip back to cover)
-  const startClosingAnimation = useCallback(() => {
-    setIsClosing(true);
-
-    closeIntervalRef.current = setInterval(() => {
-      const pageFlip = flipBookRef.current?.pageFlip();
-      if (pageFlip) {
-        const current = pageFlip.getCurrentPageIndex();
-        if (current > 0) {
-          pageFlip.flipPrev('top');
-        } else {
-          // Reached cover - stop closing and pause
-          if (closeIntervalRef.current) {
-            clearInterval(closeIntervalRef.current);
-            closeIntervalRef.current = null;
-          }
-          setIsClosing(false);
-
-          // Pause on cover, then restart auto-flip
-          autoFlipTimerRef.current = setTimeout(() => {
-            if (!isPaused) {
-              const pf = flipBookRef.current?.pageFlip();
-              if (pf) {
-                pf.flipNext('bottom');
-              }
-            }
-          }, coverPauseDuration);
-        }
-      }
-    }, flipBackSpeed);
-  }, [flipBackSpeed, coverPauseDuration, isPaused]);
 
   // Schedule next auto-flip
   const scheduleNextFlip = useCallback(() => {
-    if (isPaused || isClosing) return;
+    if (isPaused) return;
 
     clearAllTimers();
 
     autoFlipTimerRef.current = setTimeout(() => {
       const pageFlip = flipBookRef.current?.pageFlip();
-      if (pageFlip && !isPaused && !isClosing) {
+      if (pageFlip && !isPaused) {
         const current = pageFlip.getCurrentPageIndex();
 
         // Check if we're at the last page (or near it for spreads)
         if (current >= totalPages - 2) {
-          // Start closing animation
-          startClosingAnimation();
+          // Flip directly back to cover (with animation)
+          pageFlip.flip(0, 'top');
         } else {
           // Flip to next page
           pageFlip.flipNext('bottom');
         }
       }
     }, autoFlipInterval);
-  }, [autoFlipInterval, isPaused, isClosing, totalPages, startClosingAnimation, clearAllTimers]);
+  }, [autoFlipInterval, isPaused, totalPages, clearAllTimers]);
 
   // Handle page flip event
   const handleFlip = useCallback((e: any) => {
     const pageIndex = e.data;
 
+    // Track current page for arrow visibility
+    setCurrentPage(pageIndex);
+
     // Track if book is open (page > 0) for centering
     setIsBookOpen(pageIndex > 0);
 
-    // Schedule next flip if not closing
-    if (!isClosing) {
-      scheduleNextFlip();
-    }
-  }, [isClosing, scheduleNextFlip]);
+    // Schedule next flip
+    scheduleNextFlip();
+  }, [scheduleNextFlip]);
 
   // Handle user interaction - pause auto-flip
   const handleUserInteraction = useCallback(() => {
@@ -175,12 +147,12 @@ const LandingFlipbook: React.FC<LandingFlipbookProps> = ({
 
   // Start auto-flip when not paused
   useEffect(() => {
-    if (!isPaused && !isClosing && dimensions.width > 0) {
+    if (!isPaused && dimensions.width > 0) {
       scheduleNextFlip();
     }
 
     return () => clearAllTimers();
-  }, [isPaused, isClosing, dimensions.width, scheduleNextFlip, clearAllTimers]);
+  }, [isPaused, dimensions.width, scheduleNextFlip, clearAllTimers]);
 
   // Initial flip to open the book after mount
   useEffect(() => {
@@ -206,6 +178,28 @@ const LandingFlipbook: React.FC<LandingFlipbookProps> = ({
     });
   }, [pages]);
 
+  // Mobile arrow navigation handlers
+  const handlePrevPage = useCallback(() => {
+    const pageFlip = flipBookRef.current?.pageFlip();
+    if (pageFlip && currentPage > 0) {
+      pageFlip.flipPrev('top');
+      handleUserInteraction(); // Pause auto-flip when user navigates
+    }
+  }, [currentPage, handleUserInteraction]);
+
+  const handleNextPage = useCallback(() => {
+    const pageFlip = flipBookRef.current?.pageFlip();
+    if (pageFlip) {
+      if (currentPage >= totalPages - 2) {
+        // On last page - loop back to cover
+        pageFlip.flip(0, 'top');
+      } else {
+        pageFlip.flipNext('bottom');
+      }
+      handleUserInteraction(); // Pause auto-flip when user navigates
+    }
+  }, [currentPage, totalPages, handleUserInteraction]);
+
   if (dimensions.width === 0) {
     // Loading placeholder - square aspect ratio
     return (
@@ -228,11 +222,41 @@ const LandingFlipbook: React.FC<LandingFlipbookProps> = ({
     >
       {/* Wrapper for centering: shifts left when closed (cover only), centered when open (spread) */}
       <div
-        className="transition-transform duration-500 ease-in-out"
+        className="relative transition-transform duration-500 ease-in-out"
         style={{
           transform: isBookOpen ? 'translateX(0)' : 'translateX(-25%)',
         }}
       >
+        {/* Navigation arrows */}
+        <>
+          {/* Left arrow - hidden on cover (page 0) */}
+          {currentPage > 0 && (
+            <button
+              onClick={handlePrevPage}
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-10
+                w-10 h-10 rounded-full bg-white/80 backdrop-blur-sm
+                flex items-center justify-center
+                text-[var(--coral-primary)] hover:bg-white hover:scale-110 active:scale-95
+                transition-all duration-200 shadow-md cursor-pointer"
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
+          )}
+          {/* Right arrow - always visible (loops back to cover on last page) */}
+          <button
+            onClick={handleNextPage}
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-10
+              w-10 h-10 rounded-full bg-white/80 backdrop-blur-sm
+              flex items-center justify-center
+              text-[var(--coral-primary)] hover:bg-white hover:scale-110 active:scale-95
+              transition-all duration-200 shadow-md cursor-pointer"
+            aria-label="Next page"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        </>
+
         <HTMLFlipBook
           ref={flipBookRef}
           width={dimensions.width}
@@ -253,14 +277,14 @@ const LandingFlipbook: React.FC<LandingFlipbookProps> = ({
           // Cover settings - IMPORTANT: enables closed book start
           showCover={true}
 
-          // Interaction settings
-          useMouseEvents={true}
-          swipeDistance={30}
-          showPageCorners={true}
-          disableFlipByClick={false}
+          // Interaction settings - conditional based on mobile
+          useMouseEvents={!isMobile}
+          swipeDistance={isMobile ? 0 : 30}
+          showPageCorners={!isMobile}
+          disableFlipByClick={isMobile}
           usePortrait={false}
-          mobileScrollSupport={false}
-          clickEventForward={true}
+          mobileScrollSupport={isMobile}
+          clickEventForward={!isMobile}
 
           // Visual settings
           drawShadow={true}

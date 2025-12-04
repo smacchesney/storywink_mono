@@ -119,7 +119,7 @@ const BookCard: React.FC<BookCardProps> = ({
             <Button
               disabled
               size="sm"
-              className="flex-grow mr-2 bg-slate-300 hover:bg-slate-300 text-slate-500 cursor-not-allowed"
+              className="flex-grow mr-2 bg-slate-300 hover:bg-slate-300 text-slate-500 cursor-not-allowed rounded-full font-playful"
             >
               <Eye className="h-4 w-4 mr-1.5" />
               View Preview
@@ -174,7 +174,7 @@ const BookCard: React.FC<BookCardProps> = ({
           <Button
             onClick={onRetryClick}
             size="sm"
-            className="flex-grow mr-2 bg-[#F76C5E] hover:bg-[#E55A4C]"
+            className="flex-grow mr-2 bg-[#F76C5E] hover:bg-[#E55A4C] rounded-full font-playful"
             disabled={isRetrying}
           >
             {isRetrying ? (
@@ -233,7 +233,7 @@ const BookCard: React.FC<BookCardProps> = ({
         <Button
           onClick={handleViewClick}
           size="sm"
-          className="flex-grow mr-2 bg-[#F76C5E] hover:bg-[#E55A4C]"
+          className="flex-grow mr-2 bg-[#F76C5E] hover:bg-[#E55A4C] rounded-full font-playful"
         >
           <Eye className="h-4 w-4 mr-1.5" />
           View Preview

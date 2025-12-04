@@ -234,8 +234,14 @@ export function LibraryClientView() {
 
           {/* Create new book button */}
           <Link href="/create">
-            <Button size="sm" className="w-full sm:w-auto bg-[#F76C5E] hover:bg-[#E55A4C] text-white">
-              <PlusCircle className="h-4 w-4 mr-2" />
+            <Button size="sm" className="w-full sm:w-auto bg-[#F76C5E] hover:bg-[#E55A4C] text-white rounded-full font-playful group">
+              <svg
+                className="mr-2 h-4 w-4 transition-transform group-hover:scale-125 group-hover:rotate-12"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d="M12 0L14.59 8.41L23 11L14.59 13.59L12 22L9.41 13.59L1 11L9.41 8.41L12 0Z" />
+              </svg>
               Create New Book
             </Button>
           </Link>
