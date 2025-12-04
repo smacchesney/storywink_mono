@@ -44,8 +44,8 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
 
   const winkifyBits = opts.isWinkifyEnabled && opts.illustrationNotes
     ? [
-        `Dynamic effects: Add subtle visual enhancement like motion lines, sparkles, or comic-style text ("Whoosh!", "Splash!"). Keep minimal (under 20% of image), matching the illustration style. Do not alter character faces or poses.`,
-        `Effect note: ${opts.illustrationNotes}`,
+        `DYNAMIC EFFECTS (Winkify): Add the specific visual effect described below to enhance the action. Emphasize bold, playful ONOMATOPOEIA text that matches the action (e.g., "SPLASH!" for water, "ZOOM!" for running, "MUNCH!" for eating). Draw onomatopoeia in a fun, hand-lettered comic style that fits the illustration. Keep effects minimal (under 15% of image area) and directly relevant to the scene - avoid generic sparkles unless the scene involves magic or wonder. Do not alter character faces or poses.`,
+        `Specific effect to add: ${opts.illustrationNotes}`,
       ]
     : [];
 
@@ -54,7 +54,7 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
         `Text: Add the title "${opts.bookTitle}" in a readable font matching the second image's text style. Position naturally without covering important subjects. Size appropriately (5-7% of image height).${opts.childName ? ` Below the title, add the subtitle "A ${opts.childName} adventure" in a smaller complementary font (approximately 3-4% of image height).` : ''}`,
       ]
     : [
-        `Text: Add this text once: "${(opts.pageText ?? '').trim()}". Use the same font style and size as the second image (approximately 5-7% of image height for consistency across pages). Match the text aesthetic from the second image. Position text naturally, ensure fully visible and readable.`,
+        `COMPOSITION: Create the illustration in the top ~82% of the image. Leave the bottom ~18% as PURE WHITE (#FFFFFF) empty space - this area will be used for text overlay. The illustration should fade softly into the pure white space with vignette-style edges (no hard horizontal line). All border areas and the text space must be pure white, not off-white or cream. DO NOT add any text to the image - the story text will be added programmatically afterward.`,
       ];
 
   const prompt = [...base, ...winkifyBits, ...titleBits]

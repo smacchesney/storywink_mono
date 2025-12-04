@@ -5,9 +5,11 @@
 export const STYLE_LIBRARY = {
   vignette: {
     label: 'Vignette',
-    referenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1750348290/Pencil_Vignette_Style_vF_e89xiy.png',
+    // Text-free reference for story pages (text added programmatically)
+    referenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1733358909/WhatsApp_Image_2025-12-04_at_23.35.09_hxjdcu.jpg',
+    // Reference with text for title pages (AI generates artistic title text)
     coverReferenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1764772654/Pencil_Vignette_Style_FRONTCOVER_vF_jz9kez.png',
-    description: "Follow the reference image exactly: create a vignette-style illustration with approximately 40% white space around the image borders. The main illustration should be centered within this whitespace frame, maintaining the same compositional balance, text positioning, and spatial relationships as shown in the reference image.",
+    description: "Create a vignette-style illustration filling the top ~82% of the image. The illustration should have soft, fading edges at the bottom that blend into PURE WHITE (#FFFFFF) space. Leave the bottom ~18% as empty pure white space for text overlay. All border areas must be pure white, not off-white or cream. Match the watercolor/pencil aesthetic, warm color palette, and hand-drawn quality shown in the reference image.",
   },
 } as const;
 

@@ -8,6 +8,8 @@ import util from 'util';
 import { createIllustrationPrompt, IllustrationPromptOptions } from '@storywink/shared/prompts/illustration';
 // Import STYLE_LIBRARY directly from styles module to avoid barrel export race condition
 import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
+// Text overlay for story pages (not title pages)
+import { addTextToImage } from '../utils/text-overlay.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -35,6 +37,10 @@ function isTransientError(error: Error): boolean {
     '429',
     'quota exceeded',
     'resource exhausted',
+    // Text overlay errors (retry-able)
+    'text overlay failed',
+    'font file not found',
+    'sharp',
   ];
   return transientPatterns.some(pattern => message.includes(pattern));
 }
@@ -467,12 +473,37 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     if (generatedImageBase64 && !moderationBlocked) {
       try {
           logger.info({ jobId: job.id, pageId, pageNumber }, 'Decoding and uploading generated image to Cloudinary...');
-          const generatedImageBuffer = Buffer.from(generatedImageBase64, 'base64');
-          
+          let generatedImageBuffer = Buffer.from(generatedImageBase64, 'base64');
+
+          // Add text overlay for story pages (not title pages)
+          if (!isTitlePage && text && text.trim().length > 0) {
+              try {
+                  logger.info({ jobId: job.id, pageId, pageNumber }, 'Adding text overlay to story page...');
+                  console.log(`[IllustrationWorker] Adding text overlay to page ${pageNumber}: "${text.substring(0, 50)}..."`);
+                  generatedImageBuffer = await addTextToImage(generatedImageBuffer, text);
+                  logger.info({ jobId: job.id, pageId, pageNumber }, 'Text overlay added successfully.');
+                  console.log(`[IllustrationWorker] Text overlay complete for page ${pageNumber}`);
+              } catch (textOverlayError: any) {
+                  // Text overlay failure should be retried, not silently skipped
+                  const errorMessage = `Text overlay failed: ${textOverlayError.message}`;
+                  logger.error({
+                      jobId: job.id,
+                      pageId,
+                      pageNumber,
+                      error: textOverlayError.message,
+                      stack: textOverlayError.stack,
+                  }, errorMessage);
+                  console.error(`[IllustrationWorker] Text overlay failed for page ${pageNumber}: ${textOverlayError.message}`);
+                  console.error(`[IllustrationWorker] Stack: ${textOverlayError.stack}`);
+                  // Throw to trigger retry logic - will be marked FAILED after exhausting retries
+                  throw new Error(errorMessage);
+              }
+          }
+
           const uploadResult = await new Promise<any>((resolve, reject) => {
                cloudinary.uploader.upload_stream(
                    {
-                       folder: `storywink/${bookId}/generated`, 
+                       folder: `storywink/${bookId}/generated`,
                        public_id: `page_${pageNumber}`,
                        overwrite: true,
                        tags: [`book:${bookId}`, `page:${pageId}`, `pageNum:${pageNumber}`, `style:${styleKey}`],
@@ -563,7 +594,8 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       isWinkifyEnabled,
       hasText: !!text,
       textLength: text?.length || 0,
-      failureStage: errorMessage.includes('Gemini') || errorMessage.includes('Google') ? 'ai_generation' :
+      failureStage: errorMessage.includes('text overlay') || errorMessage.includes('Text overlay') ? 'text_overlay' :
+                   errorMessage.includes('Gemini') || errorMessage.includes('Google') ? 'ai_generation' :
                    errorMessage.includes('Cloudinary') ? 'image_upload' :
                    errorMessage.includes('fetch') ? 'image_fetch' :
                    errorMessage.includes('database') ? 'database_update' : 'unknown'

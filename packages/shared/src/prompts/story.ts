@@ -90,7 +90,15 @@ export function createVisionStoryGenerationPrompt(
 
   const winkifyInstructions = [
     `\n- For **each** page, also suggest brief \"illustrationNotes\" (max 25 words) to dynamically enhance the image with fun effects:`,
-    `  - Focus only on **amplifying action** — e.g., "zoom lines", "sparkles", "motion blur", "confetti bursts".`,
+    `  - Focus on **amplifying the specific action in the scene**:`,
+    `    - Movement/Running: motion lines, speed streaks, "ZOOM!", "WHOOSH!"`,
+    `    - Water/Splashing: water droplets, ripples, "SPLASH!", "SPLISH!"`,
+    `    - Eating/Food: "YUM!", "MUNCH!", "CHOMP!", steam wisps, crumbs flying`,
+    `    - Jumping/Flying: arc trails, "BOING!", "WHEEE!"`,
+    `    - Surprise/Discovery: subtle glow, "WOW!", "OOOOH!"`,
+    `    - Hugging/Love: small floating hearts (2-3 max)`,
+    `  - Use sparkles ONLY for actual magic/wonder moments, not as a default effect.`,
+    `  - Match the effect to the specific action - if a kid is eating, suggest food effects, not sparkles.`,
     `  - NEVER alter faces, poses, or introduce new characters.`,
     `  - **Specifically for illustrationNotes ONLY:** Use visual language (e.g., 'the boy in red') instead of character names like '${input.childName || 'the child'}'. The illustration AI doesn't know names.`,
     `  - If no dynamic effect fits, set \"illustrationNotes\" to null or empty.`,
