@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { showError, showErrorWithRetry, showSuccess } from '@/lib/toast-utils';
 import { useRouter } from 'next/navigation';
-import { PlusCircle, SortDesc } from 'lucide-react';
+import { SortDesc } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // Polling interval for checking illustration status (5 seconds)
