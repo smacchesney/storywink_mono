@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import opentype from 'opentype.js';
 
 // ----------------------------------
 // TYPES
@@ -11,7 +12,7 @@ export interface TextOverlayOptions {
   fontSize?: number;
   color?: string;
   yPosition?: number; // 0-1, percentage from top
-  lineHeight?: number; // em units
+  lineHeight?: number; // multiplier for line spacing
   maxWidth?: number; // 0-1, percentage of image width
   maxLines?: number;
 }
@@ -26,13 +27,13 @@ const DEFAULT_OPTIONS: Required<TextOverlayOptions> = {
 };
 
 // ----------------------------------
-// FONT LOADING
+// FONT LOADING (opentype.js)
 // ----------------------------------
 
-let fontBase64: string | null = null;
+let loadedFont: opentype.Font | null = null;
 
-function loadFont(): string {
-  if (fontBase64) return fontBase64;
+function loadFont(): opentype.Font {
+  if (loadedFont) return loadedFont;
 
   try {
     // Handle both ESM and CommonJS module paths
@@ -41,8 +42,11 @@ function loadFont(): string {
       : dirname(fileURLToPath(import.meta.url));
 
     const fontPath = join(currentDir, '../assets/fonts/LibreBaskerville-Italic.ttf');
-    fontBase64 = readFileSync(fontPath).toString('base64');
-    return fontBase64;
+    const fontBuffer = readFileSync(fontPath);
+
+    // Parse font with opentype.js
+    loadedFont = opentype.parse(fontBuffer.buffer as ArrayBuffer);
+    return loadedFont;
   } catch (error) {
     console.error('Failed to load font file:', error);
     throw new Error('Font file not found. Ensure LibreBaskerville-Italic.ttf is in assets/fonts/');
@@ -50,34 +54,44 @@ function loadFont(): string {
 }
 
 // ----------------------------------
-// TEXT UTILITIES
+// TEXT MEASUREMENT & WRAPPING
 // ----------------------------------
 
 /**
- * Escape special XML characters for SVG
+ * Measure text width using actual font metrics
  */
-function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+function measureTextWidth(font: opentype.Font, text: string, fontSize: number): number {
+  const scale = fontSize / font.unitsPerEm;
+  let width = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    const glyph = font.charToGlyph(text[i]);
+    width += (glyph.advanceWidth || 0) * scale;
+  }
+
+  return width;
 }
 
 /**
- * Wrap text to fit within a maximum width
- * Uses character count approximation (no actual text measurement in Node)
+ * Wrap text to fit within a maximum width using actual font measurements
  */
-function wrapText(text: string, maxCharsPerLine: number, maxLines: number): string[] {
+function wrapTextWithFont(
+  font: opentype.Font,
+  text: string,
+  maxWidth: number,
+  fontSize: number,
+  maxLines: number
+): string[] {
   const words = text.trim().split(/\s+/);
   const lines: string[] = [];
   let currentLine = '';
 
-  for (const word of words) {
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
     const testLine = currentLine ? `${currentLine} ${word}` : word;
+    const testWidth = measureTextWidth(font, testLine, fontSize);
 
-    if (testLine.length <= maxCharsPerLine) {
+    if (testWidth <= maxWidth) {
       currentLine = testLine;
     } else {
       if (currentLine) {
@@ -88,9 +102,21 @@ function wrapText(text: string, maxCharsPerLine: number, maxLines: number): stri
       // Check if we've hit max lines
       if (lines.length >= maxLines - 1) {
         // Add remaining words to last line with ellipsis if needed
-        const remaining = words.slice(words.indexOf(word)).join(' ');
-        if (remaining.length > maxCharsPerLine) {
-          currentLine = remaining.substring(0, maxCharsPerLine - 3) + '...';
+        const remaining = words.slice(i).join(' ');
+        const remainingWidth = measureTextWidth(font, remaining, fontSize);
+
+        if (remainingWidth > maxWidth) {
+          // Truncate with ellipsis
+          let truncated = '';
+          for (let j = i; j < words.length; j++) {
+            const test = truncated ? `${truncated} ${words[j]}` : words[j];
+            if (measureTextWidth(font, test + '...', fontSize) <= maxWidth) {
+              truncated = test;
+            } else {
+              break;
+            }
+          }
+          currentLine = truncated ? truncated + '...' : word.substring(0, 10) + '...';
         } else {
           currentLine = remaining;
         }
@@ -109,20 +135,45 @@ function wrapText(text: string, maxCharsPerLine: number, maxLines: number): stri
 /**
  * Calculate appropriate font size based on text length
  */
-function calculateFontSize(text: string, baseFontSize: number, maxLines: number): number {
-  const charCount = text.length;
+function calculateFontSize(
+  font: opentype.Font,
+  text: string,
+  baseFontSize: number,
+  maxWidth: number,
+  maxLines: number
+): number {
+  // Start with base font size and reduce if needed
+  let fontSize = baseFontSize;
+  const minFontSize = baseFontSize * 0.65;
 
-  // Approximate characters per line at base font size (for 1024px width at 85%)
-  const baseCharsPerLine = 45;
-  const estimatedLines = Math.ceil(charCount / baseCharsPerLine);
-
-  if (estimatedLines <= maxLines) {
-    return baseFontSize;
+  while (fontSize >= minFontSize) {
+    const lines = wrapTextWithFont(font, text, maxWidth, fontSize, maxLines);
+    if (lines.length <= maxLines) {
+      return fontSize;
+    }
+    fontSize -= 2;
   }
 
-  // Reduce font size proportionally for longer text
-  const scaleFactor = Math.max(0.7, maxLines / estimatedLines);
-  return Math.round(baseFontSize * scaleFactor);
+  return minFontSize;
+}
+
+// ----------------------------------
+// SVG PATH GENERATION
+// ----------------------------------
+
+/**
+ * Convert text to SVG path data using opentype.js
+ * This bypasses fontconfig entirely - pure JavaScript font rendering
+ */
+function textToSvgPath(
+  font: opentype.Font,
+  text: string,
+  x: number,
+  y: number,
+  fontSize: number
+): string {
+  const path = font.getPath(text, x, y, fontSize);
+  return path.toPathData(2); // 2 decimal places precision
 }
 
 // ----------------------------------
@@ -132,6 +183,7 @@ function calculateFontSize(text: string, baseFontSize: number, maxLines: number)
 /**
  * Add text overlay to an image buffer
  * Text is rendered in the bottom portion of the image (white space area)
+ * Uses opentype.js to convert text to SVG paths - no fontconfig dependency
  */
 export async function addTextToImage(
   imageBuffer: Buffer,
@@ -146,51 +198,35 @@ export async function addTextToImage(
   const width = metadata.width || 1024;
   const height = metadata.height || 1024;
 
-  // Calculate font size based on text length
-  const fontSize = calculateFontSize(text, opts.fontSize, opts.maxLines);
+  // Calculate max width for text in pixels
+  const maxTextWidth = width * opts.maxWidth;
 
-  // Calculate max characters per line (approximate)
-  const maxCharsPerLine = Math.floor((width * opts.maxWidth) / (fontSize * 0.5));
+  // Calculate font size based on text length (using actual font metrics)
+  const fontSize = calculateFontSize(font, text, opts.fontSize, maxTextWidth, opts.maxLines);
 
-  // Wrap text into lines
-  const lines = wrapText(text, maxCharsPerLine, opts.maxLines);
+  // Wrap text into lines (using actual font metrics)
+  const lines = wrapTextWithFont(font, text, maxTextWidth, fontSize, opts.maxLines);
 
-  // Calculate vertical position for text block
-  // Center the text block in the bottom white space area
-  const textBlockHeight = lines.length * fontSize * opts.lineHeight;
+  // Calculate vertical positioning
+  const lineSpacing = fontSize * opts.lineHeight;
+  const textBlockHeight = lines.length * lineSpacing;
   const bottomAreaStart = height * 0.82; // Where illustration ends
   const bottomAreaHeight = height * 0.18; // White space area
-  const textY = bottomAreaStart + (bottomAreaHeight - textBlockHeight) / 2 + fontSize;
+  const startY = bottomAreaStart + (bottomAreaHeight - textBlockHeight) / 2 + fontSize;
 
-  // Build tspan elements for each line
-  const tspans = lines.map((line, i) => {
-    const dy = i === 0 ? 0 : opts.lineHeight;
-    return `<tspan x="50%" dy="${dy}em">${escapeXml(line)}</tspan>`;
-  }).join('');
+  // Generate SVG paths for each line (centered)
+  const pathElements = lines.map((line, i) => {
+    const lineWidth = measureTextWidth(font, line, fontSize);
+    const x = (width - lineWidth) / 2; // Center horizontally
+    const y = startY + (i * lineSpacing);
+    const pathData = textToSvgPath(font, line, x, y, fontSize);
+    return `<path d="${pathData}" fill="${opts.color}"/>`;
+  }).join('\n    ');
 
-  // Create SVG overlay
-  const svg = `
-    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <style>
-          @font-face {
-            font-family: 'Libre Baskerville';
-            src: url('data:font/truetype;base64,${font}') format('truetype');
-            font-style: italic;
-          }
-        </style>
-      </defs>
-      <text
-        x="50%"
-        y="${textY}"
-        font-family="Libre Baskerville, Georgia, serif"
-        font-style="italic"
-        font-size="${fontSize}px"
-        fill="${opts.color}"
-        text-anchor="middle"
-      >${tspans}</text>
-    </svg>
-  `;
+  // Create SVG with path elements (no text elements = no fontconfig needed)
+  const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+    ${pathElements}
+  </svg>`;
 
   // Composite SVG onto image
   return sharp(imageBuffer)
