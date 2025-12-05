@@ -205,7 +205,7 @@ export default function CreateBookPage() {
         />
       )}
       
-      {!showProgressScreen && !showCloudinaryUploader && (
+      {!showProgressScreen && (!showCloudinaryUploader || isLoadingUploader) && (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-150px)] px-4 py-8">
           <Button
             onClick={handleStartCreatingClick}

@@ -5,7 +5,8 @@ import {
   DndContext,
   closestCenter,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent,
@@ -19,6 +20,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Image from 'next/image';
+import { GripVertical } from 'lucide-react';
 import { StoryboardPage, optimizeCloudinaryUrl } from '@storywink/shared';
 import { cn } from '@/lib/utils';
 
@@ -29,13 +31,14 @@ interface StoryboardGridProps {
 
 // Individual Sortable Item Component
 function SortablePageItem({ id, page, visualIndex }: { id: string; page: StoryboardPage; visualIndex: number }) {
-  const { 
-    attributes, 
-    listeners, 
-    setNodeRef, 
-    transform, 
-    transition, 
-    isDragging 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef, // For drag handle
+    transform,
+    transition,
+    isDragging
   } = useSortable({ id });
 
   const style = {
@@ -46,19 +49,36 @@ function SortablePageItem({ id, page, visualIndex }: { id: string; page: Storybo
   };
 
   return (
-    <div 
-      ref={setNodeRef} 
-      style={style} 
-      {...attributes} 
-      {...listeners}
+    <div
+      ref={setNodeRef}
+      style={style}
       className={cn(
-        "relative aspect-square bg-gray-200 rounded overflow-hidden shadow touch-manipulation",
+        "relative aspect-square bg-gray-200 rounded overflow-hidden shadow",
         "hover:shadow-lg",
         "transition-shadow",
         "duration-200",
-        "ease-in-out"
+        "ease-in-out",
+        isDragging && "ring-2 ring-[#F76C5E]"
       )}
     >
+      {/* Drag Handle - only this receives drag listeners */}
+      <button
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        className={cn(
+          "absolute top-1 left-1 p-1.5 rounded z-10",
+          "bg-white/90 shadow-sm",
+          "cursor-grab active:cursor-grabbing",
+          "touch-none", // Prevents touch scrolling on the handle
+          "hover:bg-white hover:shadow-md",
+          "transition-all duration-150"
+        )}
+        aria-label={`Drag to reorder page ${visualIndex + 1}`}
+      >
+        <GripVertical className="h-4 w-4 text-gray-500" />
+      </button>
+
       {/* Use thumbnail, fallback to full url with optimization */}
       {page.asset?.thumbnailUrl || page.asset?.url ? (
         <Image
@@ -73,7 +93,7 @@ function SortablePageItem({ id, page, visualIndex }: { id: string; page: Storybo
         <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">No Thumb</div>
       )}
       {/* Page Number Overlay - Updated Style */}
-      <div 
+      <div
         className={cn(
           "absolute bottom-1 right-1 rounded-sm px-1.5 py-0.5", // Base positioning and padding
           "bg-[#F76C5E] text-white", // Coral background, white text
@@ -106,7 +126,19 @@ export function StoryboardGrid({ pages, onOrderChange }: StoryboardGridProps) {
   }, [pages]);
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(MouseSensor, {
+      // Require mouse to move 10px before activating drag
+      activationConstraint: {
+        distance: 10,
+      },
+    }),
+    useSensor(TouchSensor, {
+      // Press delay of 250ms with 5px tolerance - distinguishes from scroll
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
