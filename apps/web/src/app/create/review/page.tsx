@@ -5,13 +5,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { BookStatus, Page, Book } from '@prisma/client';
-import Image from 'next/image';
 
 // Import the new components
 import PageTracker from '@/components/create/review/PageTracker';
 import PageCard from '@/components/create/review/PageCard';
 import NavigationControls from '@/components/create/review/NavigationControls';
-import { TextShimmerWave } from '@/components/ui/text-shimmer-wave';
 
 // Define PageData with necessary fields from BookData context or fetched data
 type PageData = {
@@ -415,9 +413,6 @@ function ReviewPageContent() {
   // Regenerate Story handler
   // This function has been removed as it was unused and causing TypeScript errors
 
-  // State for showing Kai redirect confirmation
-  const [showRedirectConfirmation, setShowRedirectConfirmation] = useState(false);
-
   // --- Illustrate Book Handler ---
   const handleIllustrate = async () => {
     const bookIdToUse = bookIdFromUrl;
@@ -443,15 +438,8 @@ function ReviewPageContent() {
         const result = await response.json().catch(() => ({}));
         console.log("Illustration Job Request Result:", result);
 
-        // Show Kai-themed confirmation overlay and redirect to library
-        setShowRedirectConfirmation(true);
-
-        // Redirect to library after 2.5 seconds
-        setTimeout(() => {
-          if (isMountedRef.current) {
-            router.push('/library');
-          }
-        }, 2500);
+        // Redirect to library immediately
+        router.push('/library');
 
      } catch (error) {
         console.error("Error initiating illustration generation:", error);
@@ -480,51 +468,6 @@ function ReviewPageContent() {
   // Handle loading/redirect state before rendering main UI
   if (isFetchingInitialData) {
       return <div className="p-6 flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin mr-2" /> Loading review data...</div>;
-  }
-
-  // Show Kai-themed redirect confirmation
-  if (showRedirectConfirmation) {
-    return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-        <div className="flex flex-col items-center text-center px-6">
-          {/* Kai mascot */}
-          <div className="relative w-48 h-48 mb-6">
-            <Image
-              src="/images/mascot/kai the dino illustrating.png"
-              alt="Kai the Dino is on it!"
-              fill
-              className="object-contain"
-              priority
-            />
-          </div>
-
-          {/* Animated message */}
-          <TextShimmerWave
-            className="text-xl sm:text-2xl font-bold mb-4 [--base-color:#374151] [--base-gradient-color:#F76C5E]"
-            duration={1}
-            spread={1}
-            zDistance={1}
-            scaleDistance={1.1}
-            rotateYDistance={20}
-          >
-            Kai is on it!
-          </TextShimmerWave>
-
-          <p className="text-slate-600 dark:text-slate-300 text-base sm:text-lg mb-2">
-            Heading to your library...
-          </p>
-
-          <p className="text-slate-400 dark:text-slate-500 text-sm">
-            Your book will appear there when it&apos;s ready!
-          </p>
-
-          {/* Loading indicator */}
-          <div className="mt-8">
-            <Loader2 className="h-6 w-6 animate-spin text-[#F76C5E]" />
-          </div>
-        </div>
-      </div>
-    );
   }
 
   if (pages.length === 0 && !isFetchingInitialData) {
