@@ -101,6 +101,29 @@ export function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
+  // Mark all notifications as read when dropdown opens
+  useEffect(() => {
+    const markAllAsRead = async () => {
+      if (!isOpen || unreadCount === 0) return;
+
+      try {
+        const token = await getToken();
+        await fetch('/api/notifications/mark-all-read', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        // Clear the badge immediately
+        setUnreadCount(0);
+      } catch (error) {
+        console.error('Failed to mark all notifications as read:', error);
+      }
+    };
+
+    markAllAsRead();
+  }, [isOpen]);
+
   // Handle notification click
   const handleNotificationClick = async (notification: Notification) => {
     try {
