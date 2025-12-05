@@ -296,3 +296,100 @@ export function isTextOverlayReady(): boolean {
     return false;
   }
 }
+
+// ----------------------------------
+// LOGO OVERLAY FOR TITLE PAGES
+// ----------------------------------
+
+// Brand colors
+const CORAL_COLOR = '#F76C5E';
+const DARK_GRAY_COLOR = '#1a1a1a';
+
+/**
+ * Add Storywink.ai logo to the bottom-left of a title page image
+ * Logo consists of dino mascot + "Storywink.ai" text (with "k.ai" in coral)
+ */
+export async function addLogoToTitlePage(imageBuffer: Buffer): Promise<Buffer> {
+  const font = loadFont();
+
+  // Get image dimensions
+  const metadata = await sharp(imageBuffer).metadata();
+  const width = metadata.width || 1024;
+  const height = metadata.height || 1024;
+
+  // Logo sizing (responsive to image size)
+  const mascotHeight = Math.round(height * 0.06); // 6% of image height
+  const fontSize = Math.round(mascotHeight * 0.5); // Font ~50% of mascot height
+  const padding = Math.round(width * 0.03); // 3% padding from edges
+  const mascotTextGap = Math.round(mascotHeight * 0.15); // Gap between mascot and text
+
+  // Load and resize mascot image
+  const currentDir = typeof __dirname !== 'undefined'
+    ? __dirname
+    : dirname(fileURLToPath(import.meta.url));
+  const mascotPath = join(currentDir, '../assets/images/mascot.png');
+
+  let mascotBuffer: Buffer;
+  try {
+    mascotBuffer = await sharp(mascotPath)
+      .resize({ height: mascotHeight, withoutEnlargement: false })
+      .toBuffer();
+  } catch (error) {
+    console.error('Failed to load mascot image:', error);
+    // Return original image if mascot loading fails
+    return imageBuffer;
+  }
+
+  const mascotMeta = await sharp(mascotBuffer).metadata();
+  const mascotWidth = mascotMeta.width || mascotHeight;
+
+  // Text parts: "Storywin" (dark gray) + "k.ai" (coral)
+  const text1 = 'Storywin';
+  const text2 = 'k.ai';
+
+  // Measure text widths
+  const text1Width = measureTextWidth(font, text1, fontSize);
+  const text2Width = measureTextWidth(font, text2, fontSize);
+
+  // Calculate positions
+  const textStartX = mascotWidth + mascotTextGap;
+  const totalLogoWidth = textStartX + text1Width + text2Width;
+
+  // Position logo in bottom-left corner
+  const logoX = padding;
+  const logoY = height - padding - mascotHeight;
+
+  // Create SVG for text with two colors
+  // Y position for text baseline (vertically centered with mascot)
+  const textY = mascotHeight * 0.7; // Baseline position
+
+  // Generate path data for both text parts
+  const path1Data = textToSvgPath(font, text1, textStartX, textY, fontSize);
+  const path2Data = textToSvgPath(font, text2, textStartX + text1Width, textY, fontSize);
+
+  const textSvg = `<svg width="${totalLogoWidth}" height="${mascotHeight}" xmlns="http://www.w3.org/2000/svg">
+    <path d="${path1Data}" fill="${DARK_GRAY_COLOR}"/>
+    <path d="${path2Data}" fill="${CORAL_COLOR}"/>
+  </svg>`;
+
+  const textBuffer = await sharp(Buffer.from(textSvg))
+    .toBuffer();
+
+  // Composite everything onto the original image
+  return sharp(imageBuffer)
+    .composite([
+      // Mascot in bottom-left
+      {
+        input: mascotBuffer,
+        left: logoX,
+        top: logoY,
+      },
+      // Text next to mascot
+      {
+        input: textBuffer,
+        left: logoX,
+        top: logoY,
+      },
+    ])
+    .toBuffer();
+}

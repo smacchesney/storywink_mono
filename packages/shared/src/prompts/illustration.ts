@@ -11,7 +11,7 @@ export interface IllustrationPromptOptions {
   childName?: string | null;
   isTitlePage?: boolean;
   illustrationNotes?: string | null;
-  isWinkifyEnabled?: boolean;
+  referenceImageCount?: number; // Number of style reference images (1 for title, 2 for story pages)
 }
 
 // ----------------------------------
@@ -31,20 +31,27 @@ const MAX_PROMPT_CHARS = 30000;
 export function createIllustrationPrompt(opts: IllustrationPromptOptions): string {
   const styleDefinition = getStyleDefinition(opts.style);
   const styleDescription = styleDefinition?.description;
+  const refCount = opts.referenceImageCount || 1;
+
+  // Base prompt varies based on number of style reference images
+  const imageCountText = refCount === 1
+    ? `using the two images provided. The first image shows the scene/subjects, the second image shows the artistic style to apply.`
+    : `using the ${1 + refCount} images provided. The first image shows the scene/subjects, the following ${refCount} image(s) show the artistic style to apply. Use all style reference images for comprehensive style matching.`;
 
   const base = [
-    `Create a children's picture book illustration using the two images provided. The first image shows the scene/subjects, the second image shows the artistic style to apply.`,
+    `Create a children's picture book illustration ${imageCountText}`,
 
-    `ARTISTIC STYLE (Primary directive): Fully transform this into a hand-drawn/painted children's book illustration matching the style from the second image. Apply its complete aesthetic: color palette, brush techniques, line work, textures, shading, and lighting approach. The final image must look like it was illustrated from imagination, not like a filtered photograph. Replace all photographic elements (realistic textures, camera lighting, photo grain) with illustrated equivalents. Backgrounds should be simplified into clean illustrated shapes and forms.${styleDescription ? ` Style emphasis: ${styleDescription}` : ''}`,
+    `ARTISTIC STYLE (Primary directive): Fully transform this into a hand-drawn/painted children's book illustration matching the style from the reference image(s). Apply its complete aesthetic: color palette, brush techniques, line work, textures, shading, and lighting approach. The final image must look like it was illustrated from imagination, not like a filtered photograph. Replace all photographic elements (realistic textures, camera lighting, photo grain) with illustrated equivalents. Backgrounds should be simplified into clean illustrated shapes and forms.${styleDescription ? ` Style emphasis: ${styleDescription}` : ''}`,
 
     `SCENE INTERPRETATION (Secondary directive): Use the first image as reference for: character/subject identity and their pose, the spatial layout and composition, key recognizable objects that establish the setting. Translate these elements into illustration form - a wooden fence becomes illustrated wood with simple line work, not photographic grain; metal becomes clean illustrated surfaces with simple highlights, not realistic reflections. Simplify complex backgrounds into essential illustrated elements while keeping the scene recognizable.`,
 
     `CHARACTER CONSISTENCY: Maintain the same illustrated appearance of people across all pages - consistent face shape, hair style, skin tone, and proportions in the illustrated style. The child should be immediately recognizable as the same character throughout the book.`,
   ];
 
-  const winkifyBits = opts.isWinkifyEnabled && opts.illustrationNotes
+  // Dynamic effects always included when illustrationNotes are provided
+  const dynamicEffectsBits = opts.illustrationNotes
     ? [
-        `DYNAMIC EFFECTS (Winkify): Add the specific visual effect described below to enhance the action. Emphasize bold, playful ONOMATOPOEIA text that matches the action (e.g., "SPLASH!" for water, "ZOOM!" for running, "MUNCH!" for eating). Draw onomatopoeia in a fun, hand-lettered comic style that fits the illustration. Keep effects minimal (under 15% of image area) and directly relevant to the scene - avoid generic sparkles unless the scene involves magic or wonder. Do not alter character faces or poses.`,
+        `DYNAMIC EFFECTS: Add visual effects to enhance the action. Draw onomatopoeia text (like "SPLASH!", "ZOOM!", "MUNCH!") in the same BLACK PENCIL-SKETCH STYLE shown in the reference images - using black hand-drawn lettering with sketch-like lines and strokes that match the illustration's aesthetic. Keep effects minimal (under 15% of image area) and directly relevant to the scene - avoid generic sparkles unless the scene involves magic or wonder. Do not alter character faces or poses.`,
         `Specific effect to add: ${opts.illustrationNotes}`,
       ]
     : [];
@@ -57,7 +64,7 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
         `COMPOSITION: Create the illustration in the top ~82% of the image. Leave the bottom ~18% as PURE WHITE (#FFFFFF) empty space - this area will be used for text overlay. The illustration should fade softly into the pure white space with vignette-style edges (no hard horizontal line). All border areas and the text space must be pure white, not off-white or cream. DO NOT add any text to the image - the story text will be added programmatically afterward.`,
       ];
 
-  const prompt = [...base, ...winkifyBits, ...titleBits]
+  const prompt = [...base, ...dynamicEffectsBits, ...titleBits]
     .filter(Boolean)
     .join(' ');
 
@@ -84,8 +91,8 @@ export function buildStyleApplicationSection(styleDescription?: string | null): 
   return `Apply the style from the second image: Transfer its color palette, textures, brush strokes, line work, shading techniques, and overall artistic aesthetic to the content from the first image. Only the visual style should come from the second image, not its composition or content.${styleDescription ? ` Style characteristics to emphasize: ${styleDescription}` : ''}`;
 }
 
-export function buildWinkifySection(illustrationNotes: string): string {
-  return `Add subtle dynamic visual effects to enhance the action, such as: motion lines, zoom effects, sparkles, confetti, or comic-style text (like "Whoosh!", "Splash!", "Zoom!"). Keep these effects minimal (under 20% of the image) and ensure they do not change the people, faces, or poses from the first image. All effects should match the artistic style from the second image. Specific effect to add: ${illustrationNotes}`;
+export function buildDynamicEffectsSection(illustrationNotes: string): string {
+  return `Add visual effects to enhance the action. Draw onomatopoeia text (like "SPLASH!", "ZOOM!", "MUNCH!") in the same BLACK PENCIL-SKETCH STYLE shown in the reference images - using black hand-drawn lettering with sketch-like lines and strokes that match the illustration's aesthetic. Keep effects minimal (under 15% of image area) and directly relevant to the scene. Specific effect to add: ${illustrationNotes}`;
 }
 
 export function buildTextSection(isTitlePage: boolean, text: string | null, bookTitle: string | null): string {

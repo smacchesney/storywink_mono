@@ -24,7 +24,6 @@ export interface IllustrationGenerationJobData {
   isTitlePage: boolean;
   illustrationNotes: string | null | undefined;
   originalImageUrl: string | null;
-  isWinkifyEnabled: boolean;
 }
 
 // Define job data structure for the BookFinalize parent job (used locally)
@@ -63,7 +62,6 @@ export async function POST(request: Request) {
         childName: true,
         artStyle: true,
         status: true,
-        isWinkifyEnabled: true,
         coverAssetId: true, // Include coverAssetId to identify title page
         pages: {
           orderBy: { index: 'asc' },
@@ -195,21 +193,19 @@ export async function POST(request: Request) {
       }, { status: 200 });
     }
 
-    logger.info({ 
-      clerkId, 
-      dbUserId: dbUser.id, 
+    logger.info({
+      clerkId,
+      dbUserId: dbUser.id,
       bookId: book.id,
       pageCount: book.pages.length,
       currentStatus: book.status,
-      artStyle: book.artStyle,
-      isWinkifyEnabled: book.isWinkifyEnabled
+      artStyle: book.artStyle
     }, 'Book validation successful.');
-    
+
     console.log(`[IllustrationAPI] Starting illustration for book ${book.id}:`);
     console.log(`  - Title: ${book.title}`);
     console.log(`  - Pages: ${book.pages.length}`);
     console.log(`  - Art Style: ${book.artStyle}`);
-    console.log(`  - Winkify: ${book.isWinkifyEnabled}`);
 
     // Step 2: Update Book Status to ILLUSTRATING
     await prisma.book.update({
@@ -232,7 +228,6 @@ export async function POST(request: Request) {
             artStyle: book.artStyle,
             bookTitle: book.title,
             childName: book.childName,
-            isWinkifyEnabled: book.isWinkifyEnabled || false,
             isTitlePage: isActualTitlePage,
             illustrationNotes: page.illustrationNotes,
             originalImageUrl: page.originalImageUrl, // This will be fetched from asset in worker

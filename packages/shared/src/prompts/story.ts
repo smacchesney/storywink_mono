@@ -18,12 +18,11 @@ export interface StoryGenerationInput {
   isDoubleSpread: boolean;
   artStyle?: string;
   storyPages: {
-    pageId: string; 
+    pageId: string;
     pageNumber: number;
-    assetId: string | null; 
-    originalImageUrl: string | null; 
+    assetId: string | null;
+    originalImageUrl: string | null;
   }[];
-  isWinkifyEnabled?: boolean;
 }
 
 // ----------------------------------
@@ -74,7 +73,7 @@ export function createVisionStoryGenerationPrompt(
   // ---------- INSTRUCTIONS ----------
   const baseInstructions = [
     `# Instructions & Guiding Principles:`,
-    `- You are an award-winning children's book author${input.isWinkifyEnabled ? ' and illustrator' : ''}.`,
+    `- You are an award-winning children's book author and illustrator.`,
     `- Your task is to craft a **cohesive and delightful story** matching the provided sequence of user-uploaded images.`,
     `- Each story should have a **clear beginning, middle, and end**, grounded in the sequence order.`,
     `- Write from a **toddler's perspective**, highlighting familiar experiences and relatable emotions (joy, frustration, silliness, pride).`,
@@ -88,8 +87,8 @@ export function createVisionStoryGenerationPrompt(
     `  - Adjust slightly across pages to maintain good narrative flow.`
   ].join('\n');
 
-  const winkifyInstructions = [
-    `\n- For **each** page, also suggest brief \"illustrationNotes\" (max 25 words) to dynamically enhance the image with fun effects:`,
+  const illustrationNotesInstructions = [
+    `\n- For **each** page, also suggest \"illustrationNotes\" to dynamically enhance the image with fun effects:`,
     `  - Focus on **amplifying the specific action in the scene**:`,
     `    - Movement/Running: motion lines, speed streaks, "ZOOM!", "WHOOSH!"`,
     `    - Water/Splashing: water droplets, ripples, "SPLASH!", "SPLISH!"`,
@@ -106,17 +105,11 @@ export function createVisionStoryGenerationPrompt(
     `\n- Final Output:`,
     `\nReturn ONLY a valid JSON object. The keys must be page numbers as strings (e.g., \"1\", \"2\"). The value for each key must be an object with two keys: \"text\" (string, the story text) and \"illustrationNotes\" (string or null, the visual suggestion).`,
     `Example format: {\"1\":{\"text\":\"Sample text...\",\"illustrationNotes\":\"Suggestion...\"},\"2\":{\"text\":\"More text...\",\"illustrationNotes\":null}}`
-  ];
-  const winkifyExtra = winkifyInstructions.join('');
-
-  const nonWinkifyExtra =
-    '- Output **ONLY** valid JSON mapping page numbers to text. Example: { "1": "Leo and Mommy went to the park." }';
+  ].join('');
 
   msg.push({
     type: 'text',
-    text: `${baseInstructions}\n${
-      input.isWinkifyEnabled ? winkifyExtra : nonWinkifyExtra
-    }`,
+    text: `${baseInstructions}\n${illustrationNotesInstructions}`,
   });
 
   return msg;
@@ -128,10 +121,9 @@ export interface StoryPageResponse {
   illustrationNotes?: string | null;
 }
 
-export interface WinkifyStoryResponse {
+export interface StoryResponse {
   [pageNumber: string]: StoryPageResponse;
 }
 
-export interface StandardStoryResponse {
-  [pageNumber: string]: string;
-}
+// Backwards compatibility alias (deprecated)
+export type WinkifyStoryResponse = StoryResponse;

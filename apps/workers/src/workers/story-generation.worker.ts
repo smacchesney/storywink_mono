@@ -7,8 +7,7 @@ import {
   createVisionStoryGenerationPrompt,
   StoryGenerationInput,
   STORY_GENERATION_SYSTEM_PROMPT,
-  WinkifyStoryResponse,
-  StandardStoryResponse
+  StoryResponse
 } from '@storywink/shared/prompts/story';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -114,8 +113,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
         pageNumber: index + 1, // 1-based numbering for story pages
         assetId: page.assetId,
         originalImageUrl: page.asset?.url || page.asset?.thumbnailUrl || null
-      })),
-      isWinkifyEnabled: book.isWinkifyEnabled || false
+      }))
     };
 
     // Create the advanced prompt
@@ -160,131 +158,68 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
     let pageUpdates: PageUpdateData[] = [];
 
     try {
-      if (book.isWinkifyEnabled) {
-        // Winkify response format: { "1": { "text": "...", "illustrationNotes": "..." }, ... }
-        const winkifyResponse: WinkifyStoryResponse = JSON.parse(rawResult);
+      // Response format: { "1": { "text": "...", "illustrationNotes": "..." }, ... }
+      const storyResponse: StoryResponse = JSON.parse(rawResult);
 
-        logger.info({ bookId, isWinkifyEnabled: true, responseKeys: Object.keys(winkifyResponse) }, 'Parsing Winkify response');
+      logger.info({ bookId, responseKeys: Object.keys(storyResponse) }, 'Parsing story response');
 
-        // Validate that all expected pages are present in response
-        const expectedPageNumbers = storyPages.map((_, i) => (i + 1).toString());
-        const receivedPageNumbers = Object.keys(winkifyResponse);
-        const missingPages = expectedPageNumbers.filter(p => !receivedPageNumbers.includes(p));
+      // Validate that all expected pages are present in response
+      const expectedPageNumbers = storyPages.map((_, i) => (i + 1).toString());
+      const receivedPageNumbers = Object.keys(storyResponse);
+      const missingPages = expectedPageNumbers.filter(p => !receivedPageNumbers.includes(p));
 
-        if (missingPages.length > 0) {
-          logger.warn({
-            bookId,
-            missingPages,
-            expectedCount: expectedPageNumbers.length,
-            receivedCount: receivedPageNumbers.length
-          }, 'Some pages missing from GPT response');
-        }
-
-        // Create a map for easier lookup
-        const responseMap = new Map(Object.entries(winkifyResponse));
-
-        // Prepare update data for all story pages
-        pageUpdates = storyPages.map((page, index) => {
-          const storyPosition = index + 1; // 1-based position
-          const content = responseMap.get(storyPosition.toString());
-
-          if (!content) {
-            logger.warn({
-              bookId,
-              pageId: page.id,
-              storyPosition,
-              pageNumber: page.pageNumber
-            }, 'No Winkify content generated for this page - using defaults');
-          }
-
-          // Fix for empty string bug: check if text exists AND is not empty after trim
-          const trimmedText = content?.text?.trim() || '';
-          const finalText = trimmedText.length > 0 ? trimmedText : `[Page ${storyPosition} text pending]`;
-
-          logger.info({
-            bookId,
-            pageId: page.id,
-            pageNumber: page.pageNumber,
-            index: page.index,
-            storyPosition,
-            finalTextLength: finalText.length,
-            hadContent: !!content,
-            usedFallback: !content || trimmedText.length === 0,
-            textPreview: finalText.substring(0, 50),
-            hasIllustrationNotes: !!content?.illustrationNotes
-          }, 'Winkify: Prepared page update');
-
-          return {
-            pageId: page.id,
-            text: finalText,
-            illustrationNotes: content?.illustrationNotes || null,
-            textConfirmed: trimmedText.length > 0,
-          };
-        });
-
-      } else {
-        // Standard response format: { "1": "text...", "2": "text...", ... }
-        const standardResponse: StandardStoryResponse = JSON.parse(rawResult);
-
-        logger.info({ bookId, isWinkifyEnabled: false, responseKeys: Object.keys(standardResponse) }, 'Parsing standard response');
-
-        // Validate that all expected pages are present in response
-        const expectedPageNumbers = storyPages.map((_, i) => (i + 1).toString());
-        const receivedPageNumbers = Object.keys(standardResponse);
-        const missingPages = expectedPageNumbers.filter(p => !receivedPageNumbers.includes(p));
-
-        if (missingPages.length > 0) {
-          logger.warn({
-            bookId,
-            missingPages,
-            expectedCount: expectedPageNumbers.length,
-            receivedCount: receivedPageNumbers.length
-          }, 'Some pages missing from GPT response');
-        }
-
-        // Create a map for easier lookup
-        const responseMap = new Map(Object.entries(standardResponse));
-
-        // Prepare update data for all story pages
-        pageUpdates = storyPages.map((page, index) => {
-          const storyPosition = index + 1; // 1-based position
-          const text = responseMap.get(storyPosition.toString()) || '';
-
-          if (!text) {
-            logger.warn({
-              bookId,
-              pageId: page.id,
-              storyPosition,
-              pageNumber: page.pageNumber
-            }, 'No text generated for this page - using fallback');
-          }
-
-          // Fix for empty string bug: check if text exists AND is not empty after trim
-          const trimmedText = text.trim();
-          const finalText = trimmedText.length > 0 ? trimmedText : `[Page ${storyPosition} text pending]`;
-
-          logger.info({
-            bookId,
-            pageId: page.id,
-            pageNumber: page.pageNumber,
-            index: page.index,
-            storyPosition,
-            finalTextLength: finalText.length,
-            hadContent: !!text,
-            usedFallback: trimmedText.length === 0,
-            textPreview: finalText.substring(0, 50)
-          }, 'Standard: Prepared page update');
-
-          return {
-            pageId: page.id,
-            text: finalText,
-            illustrationNotes: null,
-            textConfirmed: trimmedText.length > 0,
-          };
-        });
+      if (missingPages.length > 0) {
+        logger.warn({
+          bookId,
+          missingPages,
+          expectedCount: expectedPageNumbers.length,
+          receivedCount: receivedPageNumbers.length
+        }, 'Some pages missing from GPT response');
       }
+
+      // Create a map for easier lookup
+      const responseMap = new Map(Object.entries(storyResponse));
+
+      // Prepare update data for all story pages
+      pageUpdates = storyPages.map((page, index) => {
+        const storyPosition = index + 1; // 1-based position
+        const content = responseMap.get(storyPosition.toString());
+
+        if (!content) {
+          logger.warn({
+            bookId,
+            pageId: page.id,
+            storyPosition,
+            pageNumber: page.pageNumber
+          }, 'No content generated for this page - using defaults');
+        }
+
+        // Fix for empty string bug: check if text exists AND is not empty after trim
+        const trimmedText = content?.text?.trim() || '';
+        const finalText = trimmedText.length > 0 ? trimmedText : `[Page ${storyPosition} text pending]`;
+
+        logger.info({
+          bookId,
+          pageId: page.id,
+          pageNumber: page.pageNumber,
+          index: page.index,
+          storyPosition,
+          finalTextLength: finalText.length,
+          hadContent: !!content,
+          usedFallback: !content || trimmedText.length === 0,
+          textPreview: finalText.substring(0, 50),
+          hasIllustrationNotes: !!content?.illustrationNotes
+        }, 'Prepared page update');
+
+        return {
+          pageId: page.id,
+          text: finalText,
+          illustrationNotes: content?.illustrationNotes || null,
+          textConfirmed: trimmedText.length > 0,
+        };
+      });
     } catch (error) {
-      logger.error({ bookId, rawResult, isWinkifyEnabled: book.isWinkifyEnabled }, 'Failed to parse OpenAI response');
+      logger.error({ bookId, rawResult }, 'Failed to parse OpenAI response');
       throw new Error('Invalid JSON response from OpenAI');
     }
 
@@ -353,13 +288,11 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
         missingPageIndices: pagesWithoutText.map(p => p.index),
         pageUpdatesCreated: pageUpdates.length,
         expectedStoryPages: storyPages.length,
-        gptResponseKeys: book.isWinkifyEnabled ?
-          Object.keys(JSON.parse(rawResult)) :
-          Object.keys(JSON.parse(rawResult))
+        gptResponseKeys: Object.keys(JSON.parse(rawResult))
       }, 'CRITICAL: Some pages missing text after batch update - applying fallback');
 
       // Fix pages that didn't get text
-      const fixPromises = pagesWithoutText.map((page, idx) => {
+      const fixPromises = pagesWithoutText.map((page) => {
         const fallbackText = `[Page ${page.pageNumber} text pending - please regenerate]`;
         logger.warn({
           bookId,

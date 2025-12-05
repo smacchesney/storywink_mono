@@ -115,7 +115,6 @@ booksRouter.post("/", async (req: AuthenticatedRequest, res, next) => {
         artStyle: body.artStyle,
         tone: body.tone,
         theme: body.theme,
-        isWinkifyEnabled: body.isWinkifyEnabled,
         status: "DRAFT",
         pages: {
           create: body.assetIds.map((assetId, index) => {

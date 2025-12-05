@@ -7,6 +7,6 @@ export {
 export type {
   StoryGenerationInput,
   StoryPageResponse,
-  WinkifyStoryResponse,
-  StandardStoryResponse,
+  StoryResponse,
+  WinkifyStoryResponse, // Backwards compatibility alias
 } from "@storywink/shared";

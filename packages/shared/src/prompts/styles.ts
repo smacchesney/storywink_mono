@@ -5,11 +5,15 @@
 export const STYLE_LIBRARY = {
   vignette: {
     label: 'Vignette',
-    // Text-free reference for story pages (text added programmatically)
-    referenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1733358909/WhatsApp_Image_2025-12-04_at_23.35.09_hxjdcu.jpg',
+    // Text-free references for story pages (text added programmatically)
+    // Two references for better style consistency with onomatopoeia examples
+    referenceImageUrls: [
+      'https://res.cloudinary.com/storywink/image/upload/v1764939472/Pencil_Vignette_ref_1_evxxjl.jpg',
+      'https://res.cloudinary.com/storywink/image/upload/v1764939472/Pencil_Vignette_ref_2_tvaogo.jpg',
+    ],
     // Reference with text for title pages (AI generates artistic title text)
-    coverReferenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1764772654/Pencil_Vignette_Style_FRONTCOVER_vF_jz9kez.png',
-    description: "Create a vignette-style illustration filling the top ~82% of the image. The illustration should have soft, fading edges at the bottom that blend into PURE WHITE (#FFFFFF) space. Leave the bottom ~18% as empty pure white space for text overlay. All border areas must be pure white, not off-white or cream. Match the watercolor/pencil aesthetic, warm color palette, and hand-drawn quality shown in the reference image.",
+    coverReferenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1764941361/Pencil_Vignette_title_ref_1_gbuznf.png',
+    description: "Create a vignette-style illustration filling the top ~82% of the image. The illustration should have soft, fading edges at the bottom that blend into PURE WHITE (#FFFFFF) space. Leave the bottom ~18% as empty pure white space for text overlay. All border areas must be pure white, not off-white or cream. Match the watercolor/pencil aesthetic, warm color palette, and hand-drawn quality shown in the reference images.",
   },
 } as const;
 
@@ -19,7 +23,7 @@ export const STYLE_LIBRARY = {
 
 export interface StyleDefinition {
   label: string;
-  referenceImageUrl: string;
+  referenceImageUrls: readonly string[];
   coverReferenceImageUrl?: string;
   description?: string | null;
 }
@@ -49,6 +53,10 @@ export function getStyleLabel(style: StyleKey): string {
   return TypedStyleLibrary[style].label;
 }
 
-export function getStyleReferenceUrl(style: StyleKey): string {
-  return TypedStyleLibrary[style].referenceImageUrl;
+export function getStyleReferenceUrls(style: StyleKey): readonly string[] {
+  return TypedStyleLibrary[style].referenceImageUrls;
+}
+
+export function getStylePreviewUrl(style: StyleKey): string {
+  return TypedStyleLibrary[style].referenceImageUrls[0];
 }

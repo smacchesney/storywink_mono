@@ -7,7 +7,6 @@ import logger from '@/lib/logger'; // Import logger
 // Zod schema for validating PATCH request body
 const updateBookSchema = z.object({
   artStyle: z.string().nullable().optional(), // Allow null or undefined
-  isWinkifyEnabled: z.boolean().optional(),
   // Add other updatable fields here later (e.g., title, childName)
   title: z.string().min(1, { message: 'Title cannot be empty.' }).optional(),
   childName: z.string().min(1, { message: 'Child name cannot be empty.' }).optional(),

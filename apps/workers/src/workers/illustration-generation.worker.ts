@@ -8,8 +8,8 @@ import util from 'util';
 import { createIllustrationPrompt, IllustrationPromptOptions } from '@storywink/shared/prompts/illustration';
 // Import STYLE_LIBRARY directly from styles module to avoid barrel export race condition
 import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
-// Text overlay for story pages (not title pages)
-import { addTextToImage } from '../utils/text-overlay.js';
+// Text overlay for story pages, logo overlay for title pages
+import { addTextToImage, addLogoToTitlePage } from '../utils/text-overlay.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -94,14 +94,14 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     console.error('[DIAGNOSTIC] Failed to write job start diagnostic:', dbError);
   }
 
-  const { bookId, pageId, userId, pageNumber, artStyle, isWinkifyEnabled, illustrationNotes, isTitlePage, bookTitle, childName, text } = job.data;
+  const { bookId, pageId, userId, pageNumber, artStyle, illustrationNotes, isTitlePage, bookTitle, childName, text } = job.data;
 
   console.log(`[IllustrationWorker] Starting job ${job.id} for page ${pageNumber} of book ${bookId}`);
   console.log(`  - PageId: ${pageId}`);
   console.log(`  - Is Title Page: ${isTitlePage}`);
   console.log(`  - Art Style: ${artStyle}`);
   console.log(`  - Has Text: ${!!text} (${text?.length || 0} chars)`);
-  console.log(`  - Winkify Enabled: ${isWinkifyEnabled}`);
+  console.log(`  - Illustration Notes: ${illustrationNotes ? 'Yes' : 'None'}`);
 
   try {
     // Validate prerequisites
@@ -200,8 +200,6 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         throw new Error('Content image buffer/mime type missing.');
     }
 
-    let styleReferenceBuffer: Buffer | null = null;
-    let styleReferenceMimeType: string | null = null;
     const styleKey = artStyle as StyleKey;
 
     // ============================================================================
@@ -221,7 +219,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       console.log('='.repeat(80));
 
       console.log('[FirstJob] styles module URL:', import.meta.url);
-      console.log('[FirstJob] referenceImageUrl snapshot:', STYLE_LIBRARY.vignette?.referenceImageUrl);
+      console.log('[FirstJob] referenceImageUrls snapshot:', STYLE_LIBRARY.vignette?.referenceImageUrls);
 
       console.log('[FirstJob] Full STYLE_LIBRARY object:');
       console.log(util.inspect(STYLE_LIBRARY, { depth: 5, showHidden: true, colors: false }));
@@ -252,22 +250,26 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       throw new Error(`Invalid style key: ${styleKey}. Available styles: ${Object.keys(STYLE_LIBRARY).join(', ')}`);
     }
 
-    // Use cover reference image for title pages if available
-    const styleReferenceUrl = isTitlePage && styleData.coverReferenceImageUrl
-      ? styleData.coverReferenceImageUrl
-      : styleData.referenceImageUrl;
+    // Get style reference URLs - title pages use single cover ref, story pages use array of refs
+    let styleReferenceUrls: string[];
+    if (isTitlePage && styleData.coverReferenceImageUrl) {
+      styleReferenceUrls = [styleData.coverReferenceImageUrl];
+    } else {
+      // Spread to convert readonly array to mutable array
+      styleReferenceUrls = [...styleData.referenceImageUrls];
+    }
 
     // ============================================================================
     // DIAGNOSTIC: Database-persisted logging to survive process crashes
     // ============================================================================
     // CRITICAL: Console logs are being lost due to process crashes/termination.
     // Write diagnostic data to database FIRST, then log to console.
-    if (!styleReferenceUrl || styleReferenceUrl.trim().length === 0) {
+    if (!styleReferenceUrls || styleReferenceUrls.length === 0) {
       // Write to database IMMEDIATELY - survives even SIGKILL
       try {
         await prisma.workerDiagnostic.create({
           data: {
-            jobId: job.id,
+            jobId: job.id || 'unknown',
             jobType: 'illustration',
             attemptNum: job.attemptsMade + 1,
             maxAttempts: job.opts?.attempts || 5,
@@ -275,13 +277,13 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
             pageId,
             pageNumber,
             errorType: 'missing_reference_url',
-            errorMessage: `Missing referenceImageUrl for style: ${styleKey}`,
+            errorMessage: `Missing referenceImageUrls for style: ${styleKey}`,
             errorStage: 'style_library_lookup',
             styleKey,
             styleExists: !!styleData,
-            hasReferenceImageUrl: 'referenceImageUrl' in styleData,
-            referenceImageUrlType: typeof styleData.referenceImageUrl,
-            referenceImageUrlValue: String(styleData.referenceImageUrl || 'undefined'),
+            hasReferenceImageUrl: 'referenceImageUrls' in styleData,
+            referenceImageUrlType: typeof styleData.referenceImageUrls,
+            referenceImageUrlValue: String(styleData.referenceImageUrls || 'undefined'),
             availableStyleKeys: JSON.stringify(Object.keys(styleData)),
             instanceId: process.env.INSTANCE_ID || 'unknown',
             processId: process.pid,
@@ -297,7 +299,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
 
       // Now log to console (may be lost if process crashes)
       console.error('='.repeat(80));
-      console.error('[CRITICAL FAILURE] referenceImageUrl Missing');
+      console.error('[CRITICAL FAILURE] referenceImageUrls Missing');
       console.error('='.repeat(80));
       console.error(`Job: ${job.id} | Page: ${pageNumber} | Style: ${styleKey}`);
       console.error(`Process PID: ${process.pid} | Hostname: ${process.env.HOSTNAME || 'unknown'}`);
@@ -305,9 +307,9 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       console.error(`Railway Commit: ${process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown'}`);
       console.error(`\nSTYLE_LIBRARY state:`);
       console.error(`  - Style exists: ${!!styleData}`);
-      console.error(`  - Has referenceImageUrl property: ${'referenceImageUrl' in styleData}`);
-      console.error(`  - Value type: ${typeof styleData.referenceImageUrl}`);
-      console.error(`  - Value: ${styleData.referenceImageUrl}`);
+      console.error(`  - Has referenceImageUrls property: ${'referenceImageUrls' in styleData}`);
+      console.error(`  - Value type: ${typeof styleData.referenceImageUrls}`);
+      console.error(`  - Value: ${styleData.referenceImageUrls}`);
       console.error(`  - Available keys: ${Object.keys(styleData).join(', ')}`);
       console.error('='.repeat(80));
       console.error('[DIAGNOSTIC] Wrote failure details to WorkerDiagnostic table - query with MCP');
@@ -315,33 +317,42 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       // Force log flush with small delay to ensure Railway captures output
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      throw new Error(`Missing referenceImageUrl for style: ${styleKey}. Attempt ${job.attemptsMade + 1}/${job.opts?.attempts || 'unknown'}`);
+      throw new Error(`Missing referenceImageUrls for style: ${styleKey}. Attempt ${job.attemptsMade + 1}/${job.opts?.attempts || 'unknown'}`);
     }
 
-    // Fetch style reference image (we know styleReferenceUrl exists from validation above)
-    try {
-      logger.info({ jobId: job.id, pageNumber }, `Fetching style reference image from ${styleReferenceUrl}`);
-      const styleResponse = await fetch(styleReferenceUrl);
-      if (!styleResponse.ok) {
-        throw new Error(`Failed to fetch style image: ${styleResponse.status} ${styleResponse.statusText}`);
+    // Fetch all style reference images
+    const styleReferenceBuffers: Array<{ buffer: Buffer; mimeType: string }> = [];
+
+    for (const styleRefUrl of styleReferenceUrls) {
+      try {
+        logger.info({ jobId: job.id, pageNumber }, `Fetching style reference image from ${styleRefUrl}`);
+        const styleResponse = await fetch(styleRefUrl);
+        if (!styleResponse.ok) {
+          throw new Error(`Failed to fetch style image: ${styleResponse.status} ${styleResponse.statusText}`);
+        }
+        const styleContentTypeHeader = styleResponse.headers.get('content-type');
+        const mimeType = styleContentTypeHeader?.startsWith('image/')
+          ? styleContentTypeHeader
+          : (styleRefUrl.endsWith('.png') ? 'image/png' : 'image/jpeg');
+
+        const styleArrayBuffer = await styleResponse.arrayBuffer();
+        styleReferenceBuffers.push({
+          buffer: Buffer.from(styleArrayBuffer),
+          mimeType,
+        });
+        logger.info({ jobId: job.id, pageNumber }, `Fetched style reference image (${mimeType}).`);
+      } catch (fetchError: any) {
+        logger.error({ jobId: job.id, pageId, pageNumber, styleKey, error: fetchError.message }, 'Failed to fetch style reference image.');
+        throw fetchError;
       }
-      const styleContentTypeHeader = styleResponse.headers.get('content-type');
-      styleReferenceMimeType = styleContentTypeHeader?.startsWith('image/')
-        ? styleContentTypeHeader
-        : (styleReferenceUrl.endsWith('.png') ? 'image/png' : 'image/jpeg');
-            
-      const styleArrayBuffer = await styleResponse.arrayBuffer();
-      styleReferenceBuffer = Buffer.from(styleArrayBuffer);
-      logger.info({ jobId: job.id, pageNumber }, `Fetched style reference image (${styleReferenceMimeType}).`);
-    } catch (fetchError: any) {
-      logger.error({ jobId: job.id, pageId, pageNumber, styleKey, error: fetchError.message }, 'Failed to fetch style reference image.');
-      throw fetchError;
     }
-    
-    if (!styleReferenceBuffer || !styleReferenceMimeType) {
-        logger.error({ jobId: job.id, pageId, pageNumber }, 'Style reference image buffer or mime type missing.');
-        throw new Error('Style reference image buffer/mime type missing.');
+
+    if (styleReferenceBuffers.length === 0) {
+        logger.error({ jobId: job.id, pageId, pageNumber }, 'No style reference images fetched successfully.');
+        throw new Error('No style reference images fetched.');
     }
+
+    console.log(`[IllustrationWorker] Fetched ${styleReferenceBuffers.length} style reference image(s) for page ${pageNumber}`);
 
     const promptInput: IllustrationPromptOptions = {
         style: styleKey,
@@ -350,7 +361,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         childName: childName, // Use childName from job data for subtitle
         isTitlePage: isTitlePage, // Use isTitlePage from job data
         illustrationNotes: illustrationNotes,
-        isWinkifyEnabled: isWinkifyEnabled
+        referenceImageCount: styleReferenceBuffers.length, // Tell prompt how many refs we're sending
     };
     
     logger.info({ jobId: job.id, pageId, promptInput }, "Constructed promptInput for createIllustrationPrompt");
@@ -361,11 +372,10 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     console.log(`  - Prompt length: ${textPrompt.length} chars`);
     console.log(`  - First 100 chars: ${textPrompt.substring(0, 100)}...`);
 
-    // Convert images to base64 for Gemini API
+    // Convert content image to base64 for Gemini API
     const contentImageBase64 = contentImageBuffer.toString('base64');
-    const styleReferenceBase64 = styleReferenceBuffer.toString('base64');
 
-    logger.info({ jobId: job.id, pageId, pageNumber }, 'Prepared images as base64 for Gemini API.');
+    logger.info({ jobId: job.id, pageId, pageNumber, refCount: styleReferenceBuffers.length }, 'Prepared images as base64 for Gemini API.');
 
     let generatedImageBase64: string | null = null;
     let moderationBlocked = false;
@@ -373,22 +383,26 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
 
     try {
        logger.info({ jobId: job.id, pageId, pageNumber }, 'Calling Gemini 3 Pro Image API...');
-       console.log(`[IllustrationWorker] Calling Gemini 3 Pro API for page ${pageNumber}...`);
+       console.log(`[IllustrationWorker] Calling Gemini 3 Pro API for page ${pageNumber} with ${styleReferenceBuffers.length} style ref(s)...`);
 
        // Build multi-image prompt for Gemini
+       // Content image first, then all style references, then text prompt
        const prompt = [
+           // Content image (user's photo)
            {
                inlineData: {
                    mimeType: contentImageMimeType,
                    data: contentImageBase64,
                },
            },
-           {
+           // Style reference image(s) - 1 for title pages, 2 for story pages
+           ...styleReferenceBuffers.map(ref => ({
                inlineData: {
-                   mimeType: styleReferenceMimeType,
-                   data: styleReferenceBase64,
+                   mimeType: ref.mimeType,
+                   data: ref.buffer.toString('base64'),
                },
-           },
+           })),
+           // Text prompt
            {
                text: textPrompt
            }
@@ -500,6 +514,31 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
               }
           }
 
+          // Add Storywink.ai logo to title pages
+          if (isTitlePage) {
+              try {
+                  logger.info({ jobId: job.id, pageId, pageNumber }, 'Adding logo overlay to title page...');
+                  console.log(`[IllustrationWorker] Adding Storywink.ai logo to title page ${pageNumber}`);
+                  generatedImageBuffer = await addLogoToTitlePage(generatedImageBuffer);
+                  logger.info({ jobId: job.id, pageId, pageNumber }, 'Logo overlay added successfully.');
+                  console.log(`[IllustrationWorker] Logo overlay complete for page ${pageNumber}`);
+              } catch (logoOverlayError: any) {
+                  // Logo overlay failure should be retried, not silently skipped
+                  const errorMessage = `Logo overlay failed: ${logoOverlayError.message}`;
+                  logger.error({
+                      jobId: job.id,
+                      pageId,
+                      pageNumber,
+                      error: logoOverlayError.message,
+                      stack: logoOverlayError.stack,
+                  }, errorMessage);
+                  console.error(`[IllustrationWorker] Logo overlay failed for page ${pageNumber}: ${logoOverlayError.message}`);
+                  console.error(`[IllustrationWorker] Stack: ${logoOverlayError.stack}`);
+                  // Throw to trigger retry logic - will be marked FAILED after exhausting retries
+                  throw new Error(errorMessage);
+              }
+          }
+
           const uploadResult = await new Promise<any>((resolve, reject) => {
                cloudinary.uploader.upload_stream(
                    {
@@ -591,7 +630,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       parentJobId: job.parent?.id,
       isTitlePage,
       artStyle,
-      isWinkifyEnabled,
+      hasIllustrationNotes: !!illustrationNotes,
       hasText: !!text,
       textLength: text?.length || 0,
       failureStage: errorMessage.includes('text overlay') || errorMessage.includes('Text overlay') ? 'text_overlay' :

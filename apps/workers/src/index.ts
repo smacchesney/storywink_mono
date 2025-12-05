@@ -74,11 +74,11 @@ function validateStyleLibrary() {
 
   // Validate each style has required properties
   for (const [key, value] of Object.entries(STYLE_LIBRARY)) {
-    if (!value.referenceImageUrl) {
-      console.error(`[Startup] FATAL: Style "${key}" missing referenceImageUrl`);
+    if (!value.referenceImageUrls || value.referenceImageUrls.length === 0) {
+      console.error(`[Startup] FATAL: Style "${key}" missing referenceImageUrls`);
       process.exit(1);
     }
-    console.log(`[Startup] ✓ Style "${key}" loaded with referenceImageUrl: ${value.referenceImageUrl}`);
+    console.log(`[Startup] ✓ Style "${key}" loaded with ${value.referenceImageUrls.length} reference images`);
   }
 
   console.log(`[Startup] ✓ STYLE_LIBRARY validated successfully (${Object.keys(STYLE_LIBRARY).length} styles)`);
@@ -87,7 +87,7 @@ function validateStyleLibrary() {
 // Run validation immediately at module load
 validateStyleLibrary();
 console.log('[Startup] styles module URL:', import.meta.url);
-console.log('[Startup] referenceImageUrl snapshot:', STYLE_LIBRARY.vignette?.referenceImageUrl);
+console.log('[Startup] referenceImageUrls count:', STYLE_LIBRARY.vignette?.referenceImageUrls.length);
 
 // ============================================================================
 // DIAGNOSTIC: Deep freeze STYLE_LIBRARY to detect mutations
@@ -211,7 +211,7 @@ illustrationWorker.on('active', (job) => {
   console.log(`  - Process PID: ${process.pid}`)
   console.log(`  - Book: ${job.data.bookId}`)
   console.log(`  - Page: ${job.data.pageNumber}`)
-  console.log(`  - Style: ${job.data.style || 'unknown'}`)
+  console.log(`  - Style: ${job.data.artStyle || 'unknown'}`)
   console.log(`  - Parent Job: ${job.parent?.id || 'None'}`)
 });
 
@@ -274,7 +274,7 @@ illustrationWorker.on('failed', (job, err) => {
   console.error(`    - Page Number: ${job?.data?.pageNumber}`);
   console.error(`    - Page ID: ${job?.data?.pageId}`);
   console.error(`    - Parent Job: ${job?.parent?.id || 'None'}`);
-  console.error(`    - Style: ${job?.data?.style || 'unknown'}`);
+  console.error(`    - Style: ${job?.data?.artStyle || 'unknown'}`);
   console.error('');
   console.error(`  Error Details:`);
   console.error(`    - Message: ${err.message}`);

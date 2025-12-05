@@ -8,7 +8,6 @@ export const createBookSchema = z.object({
   artStyle: z.string().optional(),
   tone: z.string().optional(),
   theme: z.string().optional(),
-  isWinkifyEnabled: z.boolean().default(false),
 });
 
 export const updateBookSchema = z.object({
@@ -16,7 +15,6 @@ export const updateBookSchema = z.object({
   childName: z.string().optional(),
   artStyle: z.string().optional(),
   coverAssetId: z.string().optional(),
-  isWinkifyEnabled: z.boolean().optional(),
 });
 
 export const updatePageSchema = z.object({

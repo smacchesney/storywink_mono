@@ -56,7 +56,6 @@ export default function EditBookPage() {
   const [isArtStylePanelOpen, setIsArtStylePanelOpen] = useState(false); // <-- State for Art Style panel
   // State for pending Art Style changes
   const [pendingArtStyle, setPendingArtStyle] = useState<string | null | undefined>(undefined);
-  const [pendingWinkifyEnabled, setPendingWinkifyEnabled] = useState<boolean>(false);
   const [isSavingArtStyle, setIsSavingArtStyle] = useState(false); // <-- Loading state for saving style
   const [isCoverPanelOpen, setIsCoverPanelOpen] = useState(false); // <-- State for Cover panel
   // State for pending Cover changes
@@ -289,7 +288,6 @@ export default function EditBookPage() {
 
     if (tab === 'artStyle') {
       setPendingArtStyle(bookData?.artStyle);
-      setPendingWinkifyEnabled(bookData?.isWinkifyEnabled ?? true);
     } else if (tab === 'cover') {
       // setPendingTitle(bookData?.title || ''); // Moved to details
       // setPendingChildName(bookData?.childName || ''); // Moved to details
@@ -362,28 +360,21 @@ export default function EditBookPage() {
   const handlePendingStyleChange = (styleKey: string) => {
     setPendingArtStyle(styleKey);
   };
-  const handlePendingWinkifyChange = (enabled: boolean) => {
-    setPendingWinkifyEnabled(enabled);
-  };
-
-  // Handler for saving the selected Art Style and Winkify setting
+  // Handler for saving the selected Art Style
   const handleSaveArtStyle = async () => {
     if (!bookData || isSavingArtStyle) return;
     setIsSavingArtStyle(true);
-    logger.info({ bookId, style: pendingArtStyle, winkify: pendingWinkifyEnabled }, "Saving art style...");
+    logger.info({ bookId, style: pendingArtStyle }, "Saving art style...");
 
     // Prepare only the fields that changed or are defined
-    const updatePayload: { artStyle?: string | null; isWinkifyEnabled?: boolean } = {};
+    const updatePayload: { artStyle?: string | null } = {};
     if (pendingArtStyle !== undefined) {
       updatePayload.artStyle = pendingArtStyle;
     }
-    if (pendingWinkifyEnabled !== undefined) { // Check boolean specifically
-        updatePayload.isWinkifyEnabled = pendingWinkifyEnabled;
-    }
-    
+
     // Only call API if there's something to update
     if (Object.keys(updatePayload).length === 0) {
-        logger.info({ bookId }, "No changes detected in art style or winkify settings.");
+        logger.info({ bookId }, "No changes detected in art style settings.");
         setIsSavingArtStyle(false);
         setIsArtStylePanelOpen(false);
         return; // Exit early if no changes
@@ -405,14 +396,13 @@ export default function EditBookPage() {
       // Update main bookData state ONLY after successful save
       setBookData(prevData => {
         if (!prevData) return null;
-        return { 
-            ...prevData, 
+        return {
+            ...prevData,
             // Only update fields that were actually sent
             ...(updatePayload.artStyle !== undefined && { artStyle: updatePayload.artStyle }),
-            ...(updatePayload.isWinkifyEnabled !== undefined && { isWinkifyEnabled: updatePayload.isWinkifyEnabled })
         };
       });
-         
+
        setIsArtStylePanelOpen(false); // Close panel on success
 
     } catch (error) {
@@ -894,9 +884,7 @@ export default function EditBookPage() {
         {bookData && (
           <ArtStylePicker
             currentStyle={pendingArtStyle} // Use pending state
-            isWinkifyEnabled={pendingWinkifyEnabled} // Use pending state
             onStyleChange={handlePendingStyleChange}
-            onWinkifyChange={handlePendingWinkifyChange}
           />
         )}
       </div>

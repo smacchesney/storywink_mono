@@ -38,7 +38,6 @@ interface IllustrationGenerationJobData {
   bookTitle: string | null | undefined;
   isTitlePage: boolean;
   illustrationNotes: string | null | undefined;
-  isWinkifyEnabled: boolean;
 }
 
 interface BookFinalizeJobData {
@@ -96,7 +95,6 @@ generateRouter.post("/story", async (req: AuthenticatedRequest, res, next) => {
         artStyle: book.artStyle,
         tone: book.tone,
         theme: book.theme,
-        isWinkifyEnabled: book.isWinkifyEnabled,
       },
     });
 
@@ -175,7 +173,6 @@ generateRouter.post(
       console.log(`  - Total Pages: ${book.pages.length}`);
       console.log(`  - Current Status: ${book.status}`);
       console.log(`  - Art Style: ${book.artStyle}`);
-      console.log(`  - Winkify: ${book.isWinkifyEnabled}`);
       console.log(`  - Cover Asset ID: ${book.coverAssetId}`);
 
       // Update book status
@@ -236,7 +233,6 @@ generateRouter.post(
           text: page.text,
           artStyle: book.artStyle,
           bookTitle: book.title,
-          isWinkifyEnabled: book.isWinkifyEnabled || false,
           isTitlePage: isActualTitlePage,
           illustrationNotes: page.illustrationNotes,
         };

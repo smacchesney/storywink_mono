@@ -65,7 +65,6 @@ model Book {
   user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   pages             Page[]
   notifications     Notification[]
-  isWinkifyEnabled  Boolean        @default(false)
 
   @@index([userId])
 }

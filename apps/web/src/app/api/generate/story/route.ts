@@ -45,12 +45,11 @@ export interface StoryGenerationJobData {
   promptContext: Omit<StoryGenerationInput, 'assets' | 'droppedAssets' | 'pageCount' | 'storyPages'>;
   // Array of story pages needing text generation
   storyPages: {
-    pageId: string;       
-    pageNumber: number;   
-    assetId: string | null; 
-    originalImageUrl: string | null; 
+    pageId: string;
+    pageNumber: number;
+    assetId: string | null;
+    originalImageUrl: string | null;
   }[];
-  isWinkifyEnabled: boolean;
 }
 
 // Zod schema for the NEW request body
@@ -143,13 +142,12 @@ export async function POST(req: NextRequest) {
       promptContext: { // Simplified prompt context
         bookTitle: book.title,
         childName: book.childName,
-        artStyle: book.artStyle, 
-        // Removed tone, theme, keyCharacters, specialObjects, excitementElement 
+        artStyle: book.artStyle,
+        // Removed tone, theme, keyCharacters, specialObjects, excitementElement
         // Assuming these are not in StoryGenerationInput type
-        isDoubleSpread: false, 
+        isDoubleSpread: false,
       },
       storyPages: pagesForStory,
-      isWinkifyEnabled: book.isWinkifyEnabled,
     };
 
     // 6. Add job to queue using getQueue

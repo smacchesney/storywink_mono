@@ -33,7 +33,6 @@ export interface Book {
   promptTokens?: number | null;
   completionTokens?: number | null;
   totalTokens?: number | null;
-  isWinkifyEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -114,7 +113,6 @@ export interface IllustrationGenerationJob {
   artStyle: string;
   bookTitle: string;
   childName: string;
-  isWinkifyEnabled: boolean;
   isTitlePage: boolean;
   illustrationNotes?: string | null;
   originalImageUrl?: string | null;
