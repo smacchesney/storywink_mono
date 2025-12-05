@@ -7,7 +7,8 @@ import {
   createVisionStoryGenerationPrompt,
   StoryGenerationInput,
   STORY_GENERATION_SYSTEM_PROMPT,
-  StoryResponse
+  StoryResponse,
+  STORY_RESPONSE_SCHEMA
 } from '@storywink/shared/prompts/story';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -119,28 +120,34 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
     // Create the advanced prompt
     const messageContent = createVisionStoryGenerationPrompt(storyInput);
     
-    // Prepare messages for OpenAI
-    const messages = [
+    // Prepare input for OpenAI Responses API (GPT-5.1)
+    const input = [
       {
-        role: 'system',
+        role: 'system' as const,
         content: STORY_GENERATION_SYSTEM_PROMPT
       },
       {
-        role: 'user',
+        role: 'user' as const,
         content: messageContent
       }
     ];
 
-    // Call OpenAI API with vision
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o', // gpt-4o supports vision
-      messages: messages as any,
-      max_tokens: 4000, // Increased safety margin for 8+ page books with Winkify
-      temperature: 0.7,
-      response_format: { type: 'json_object' },
+    // Call OpenAI Responses API with GPT-5.1
+    const response = await openai.responses.create({
+      model: 'gpt-5.1',
+      input: input,
+      max_output_tokens: 4000, // Increased safety margin for 8+ page books
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'story_response',
+          strict: true,
+          schema: STORY_RESPONSE_SCHEMA
+        }
+      }
     });
 
-    const rawResult = completion.choices[0]?.message?.content;
+    const rawResult = response.output_text;
     if (!rawResult) {
       throw new Error('OpenAI returned empty response');
     }

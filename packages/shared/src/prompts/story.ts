@@ -4,12 +4,32 @@
 
 import { convertHeicToJpeg } from '../utils.js';
 
-type MessageContentPart =
-  | { type: 'text'; text: string }
-  | {
-      type: 'image_url';
-      image_url: { url: string; detail?: 'low' | 'high' | 'auto' };
-    };
+// Content types for OpenAI Responses API (GPT-5.1)
+// Using explicit types that match OpenAI SDK expectations
+type InputText = { type: 'input_text'; text: string };
+type InputImage = { type: 'input_image'; image_url: string; detail: 'low' | 'high' | 'auto' };
+type MessageContentPart = InputText | InputImage;
+
+// JSON Schema for structured story response output
+export const STORY_RESPONSE_SCHEMA = {
+  type: 'object',
+  description: 'Story text and illustration notes for each page, keyed by page number',
+  additionalProperties: {
+    type: 'object',
+    properties: {
+      text: {
+        type: 'string',
+        description: 'The story text for this page (1-3 sentences)'
+      },
+      illustrationNotes: {
+        type: ['string', 'null'],
+        description: 'Visual effects suggestion for the illustration, or null if none'
+      }
+    },
+    required: ['text'],
+    additionalProperties: false
+  }
+} as const;
 
 // Simplified Input Type - Expects pre-filtered/sorted pages
 export interface StoryGenerationInput {
@@ -43,32 +63,33 @@ export function createVisionStoryGenerationPrompt(
 
   // ---------- CONFIG ----------
   msg.push({
-    type: 'text',
+    type: 'input_text',
     text: `# Configuration\nChild's Name: ${input.childName || 'the child'}\nBook Title: ${
       input.bookTitle || 'My Special Story'
     }\nPage Count: ${input.storyPages.length}`,
   });
 
   // ---------- STORYBOARD (IMAGES) ----------
-  msg.push({ type: 'text', text: '# Storyboard Sequence' });
+  msg.push({ type: 'input_text', text: '# Storyboard Sequence' });
 
   input.storyPages.forEach((page) => {
-    msg.push({ type: 'text', text: `--- Page ${page.pageNumber} ---` });
+    msg.push({ type: 'input_text', text: `--- Page ${page.pageNumber} ---` });
     if (page.originalImageUrl) {
       // Convert HEIC to JPEG for OpenAI compatibility
       const convertedUrl = convertHeicToJpeg(page.originalImageUrl);
       msg.push({
-        type: 'image_url',
-        image_url: { url: convertedUrl, detail: 'high' },
+        type: 'input_image',
+        image_url: convertedUrl,
+        detail: 'high',
       });
     } else {
       msg.push({
-        type: 'text',
+        type: 'input_text',
         text: `[No Image Provided for Page ${page.pageNumber}]`,
       });
     }
   });
-  msg.push({ type: 'text', text: '--- End Storyboard ---' });
+  msg.push({ type: 'input_text', text: '--- End Storyboard ---' });
 
   // ---------- INSTRUCTIONS ----------
   const baseInstructions = [
@@ -108,7 +129,7 @@ export function createVisionStoryGenerationPrompt(
   ].join('');
 
   msg.push({
-    type: 'text',
+    type: 'input_text',
     text: `${baseInstructions}\n${illustrationNotesInstructions}`,
   });
 
