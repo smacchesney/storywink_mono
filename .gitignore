@@ -61,6 +61,10 @@ logs
 # Railway
 railway.json
 
+# Local assets and test screenshots
+assets/
+.playwright-mcp/
+
 # Documentation (except README.md and project docs)
 *.md
 !README.md
