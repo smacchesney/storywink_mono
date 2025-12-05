@@ -278,21 +278,31 @@ The system uses centralized logic for title page detection:
 - **Cover changes**: Automatically handled - old cover becomes story page
 - **Migration script**: `scripts/fix-title-pages.ts` for data cleanup
 
+### Title Page Logo Overlay
+Title pages automatically receive a Storywink.ai logo in the bottom-left corner:
+- **Function**: `addLogoToTitlePage()` in `apps/workers/src/utils/text-overlay.ts`
+- **Components**: Dino mascot image + "Storywink.ai" text with "k.ai" in coral (#F76C5E)
+- **Mascot Image**: `apps/workers/assets/images/mascot.png`
+- **Position**: Bottom-left with ~3% padding from edges
+- **Applied**: After Gemini generates the illustration, before Cloudinary upload
+
 ## AI Prompt Architecture
 All AI prompts are centralized in the shared package for consistency:
 - **Location**: `/packages/shared/src/prompts/`
 - **Story Prompts**: `story.ts` - Advanced prompts for GPT-4o Vision
   - Targets ages 2-5 (toddlers)
-  - Supports Winkify mode for illustration enhancement notes
+  - Always generates `illustrationNotes` for dynamic effects (onomatopoeia like "SPLASH!", "ZOOM!")
   - Structured message format with high-detail image analysis
-  - Response format varies by Winkify state
+  - Response format: `{ "1": { "text": "...", "illustrationNotes": "..." }, ... }`
 - **Illustration Prompts**: `illustration.ts` - Style transfer prompts
-  - Uses Gemini 2.5 Flash Image model with dual image inputs
-  - Handles title pages vs story pages
-  - Applies Winkify dynamic effects when enabled
+  - Uses Gemini model with multi-image inputs (content + style references)
+  - Handles title pages vs story pages differently
+  - Always applies dynamic effects using black pencil-sketch style from references
   - Natural language instructions optimized for Gemini's interpretation
 - **Style Library**: `styles.ts` - Art style definitions
   - Centralized style definitions with metadata
+  - **`referenceImageUrls: string[]`** - Array of reference images (2 for story pages, 1 for title)
+  - **`coverReferenceImageUrl?: string`** - Optional separate reference for title pages
   - Type-safe style keys and validation functions
   - Reference images hosted on Cloudinary
 
@@ -562,3 +572,44 @@ The application uses both Express and Next.js API routes:
 - Next.js routes have direct access to frontend context (Clerk auth, cookies)
 - Express routes handle queue operations and worker coordination
 - Separation allows independent scaling of user operations vs background jobs
+
+## Recent Changes (December 2025)
+
+### Winkify Now Default + Multi-Reference Image Support
+
+**Summary**: Dynamic effects (onomatopoeia) are now always enabled. The `isWinkifyEnabled` toggle has been removed.
+
+**Key Changes**:
+1. **No Toggle**: `isWinkifyEnabled` field removed from Book model and all code paths
+2. **2 Reference Images**: Style library now uses `referenceImageUrls: string[]` (array) instead of single URL
+   - Story pages: 2 reference images for better style consistency
+   - Title pages: 1 reference image via `coverReferenceImageUrl`
+3. **Title Page Logo**: Storywink.ai logo automatically added to title pages (bottom-left)
+4. **Black Pencil-Sketch Onomatopoeia**: Dynamic effects match the hand-drawn style from reference images
+5. **No Word Limit**: `illustrationNotes` no longer limited to 25 words
+
+**Style Library Structure**:
+```typescript
+export const STYLE_LIBRARY = {
+  vignette: {
+    label: 'Vignette',
+    referenceImageUrls: [
+      'https://res.cloudinary.com/.../Pencil_Vignette_ref_1_evxxjl.jpg',
+      'https://res.cloudinary.com/.../Pencil_Vignette_ref_2_tvaogo.jpg',
+    ],
+    coverReferenceImageUrl: 'https://res.cloudinary.com/.../Pencil_Vignette_title_ref_1_gbuznf.png',
+    description: "...",
+  },
+} as const;
+```
+
+**Database Migration**: `20251205143749_remove_winkify_enabled_field` - Drops `isWinkifyEnabled` column
+
+**Files Changed**:
+- `packages/shared/src/prompts/styles.ts` - Array of reference URLs
+- `packages/shared/src/prompts/story.ts` - Always generates illustrationNotes
+- `packages/shared/src/prompts/illustration.ts` - Multi-reference support, black pencil style
+- `apps/workers/src/workers/illustration-generation.worker.ts` - Fetches multiple refs, adds logo
+- `apps/workers/src/utils/text-overlay.ts` - New `addLogoToTitlePage()` function
+- `apps/web/src/components/create/editor/ArtStylePicker.tsx` - Removed toggle UI
+- All API routes and types - Removed `isWinkifyEnabled` references
