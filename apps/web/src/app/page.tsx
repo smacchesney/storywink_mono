@@ -27,23 +27,21 @@ const LandingFlipbook = dynamic(() => import("@/components/landing-page/landing-
   ),
 });
 
-// Demo book pages - "Kai at National Gallery!" sample storybook
+// Demo book pages - Sample storybook for landing page flipbook
 const demoBookPages = [
-  "https://res.cloudinary.com/storywink/image/upload/v1764513758/storywink/cmilt692a001ro20dnitou2oc/generated/page_1.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764513758/storywink/cmilt692a001ro20dnitou2oc/generated/page_2.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764513753/storywink/cmilt692a001ro20dnitou2oc/generated/page_3.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764513795/storywink/cmilt692a001ro20dnitou2oc/generated/page_4.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764513800/storywink/cmilt692a001ro20dnitou2oc/generated/page_5.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764513820/storywink/cmilt692a001ro20dnitou2oc/generated/page_6.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764513845/storywink/cmilt692a001ro20dnitou2oc/generated/page_7.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764513850/storywink/cmilt692a001ro20dnitou2oc/generated/page_8.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764513865/storywink/cmilt692a001ro20dnitou2oc/generated/page_9.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764513891/storywink/cmilt692a001ro20dnitou2oc/generated/page_10.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764513891/storywink/cmilt692a001ro20dnitou2oc/generated/page_11.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764513918/storywink/cmilt692a001ro20dnitou2oc/generated/page_12.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764513943/storywink/cmilt692a001ro20dnitou2oc/generated/page_13.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764513940/storywink/cmilt692a001ro20dnitou2oc/generated/page_14.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764513984/storywink/cmilt692a001ro20dnitou2oc/generated/page_15.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764946351/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_1.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764946371/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_2.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764946350/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_3.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764946395/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_4.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764946392/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_5.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764946411/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_6.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764946436/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_7.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764946442/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_8.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764946449/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_9.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764946489/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_10.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764946495/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_11.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764946501/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_12.jpg",
+  "https://res.cloudinary.com/storywink/image/upload/v1764946536/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_13.jpg",
 ];
 
 export default function Home() {
