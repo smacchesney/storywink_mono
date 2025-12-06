@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Storywink.ai is an AI-powered platform that transforms users' photos into personalized children's picture books. The application uses GPT-4o Vision for story generation and Google's Gemini 2.5 Flash Image API for illustrations, with a queue-based architecture for asynchronous processing.
+Storywink.ai is an AI-powered platform that transforms users' photos into personalized children's picture books. The application uses GPT-5.1 for story generation and Google's Gemini 3 Pro Image API for illustrations, with a queue-based architecture for asynchronous processing.
 
 ## Essential Commands
 
@@ -73,7 +73,7 @@ npm run clean          # Clean all build artifacts
 - **Queue**: BullMQ with Redis (via Docker)
 - **Auth**: Clerk.dev for user authentication
 - **Storage**: Cloudinary for image hosting
-- **AI**: OpenAI (GPT-4o Vision for story), Google Gemini 2.5 Flash Image for illustrations
+- **AI**: OpenAI (GPT-5.1 for story), Google Gemini 3 Pro Image for illustrations
 
 ### Redis Configuration Requirements
 **CRITICAL**: Redis must be configured with the correct eviction policy for job queue reliability:
@@ -109,10 +109,10 @@ Configure your Clerk webhook to point to the Next.js API route:
 1. User uploads photos → direct browser-to-Cloudinary upload
 2. Database records created via `/api/cloudinary/notify` endpoint
 3. Book created with status `DRAFT`
-4. Story generation job queued → GPT-4o Vision analyzes images
+4. Story generation job queued → GPT-5.1 analyzes images
 5. Book status updates to `GENERATING`
 6. Story generation completes → status `STORY_READY`
-7. Illustration jobs queued → ChatGPT's image1 API generates images
+7. Illustration jobs queued → Gemini 3 Pro Image generates illustrations
 8. Book status updates to `ILLUSTRATING`
 9. Final book assembled → status `COMPLETED` or `PARTIAL`
 10. PDF export available via `/api/book/[bookId]/export/pdf`
@@ -214,7 +214,7 @@ import { BookStatus } from '@/shared';   // No path aliases to shared
 
 ## Book Status Flow
 - **DRAFT**: Initial book creation, user uploading photos
-- **GENERATING**: Story generation in progress (GPT-4o Vision analyzing photos)
+- **GENERATING**: Story generation in progress (GPT-5.1 analyzing photos)
 - **STORY_READY**: Story generation complete, ready for illustrations
 - **ILLUSTRATING**: Illustration generation in progress (Gemini 3 Pro Image)
 - **COMPLETED**: All story and illustration generation successful
@@ -289,7 +289,7 @@ Title pages automatically receive a Storywink.ai logo in the bottom-left corner:
 ## AI Prompt Architecture
 All AI prompts are centralized in the shared package for consistency:
 - **Location**: `/packages/shared/src/prompts/`
-- **Story Prompts**: `story.ts` - Advanced prompts for GPT-4o Vision
+- **Story Prompts**: `story.ts` - Advanced prompts for GPT-5.1
   - Targets ages 2-5 (toddlers)
   - Always generates `illustrationNotes` for dynamic effects (onomatopoeia like "SPLASH!", "ZOOM!")
   - Structured message format with high-detail image analysis
@@ -418,7 +418,7 @@ Currently no automated tests. Manual testing through:
 
 **Completed Migration**
 - **Illustration API**: Migrated from OpenAI `gpt-image-1` to Google Gemini 3 Pro Image (`gemini-3-pro-image-preview`)
-- **Story API**: Still using OpenAI GPT-4o Vision (no changes)
+- **Story API**: Now using OpenAI GPT-5.1 (upgraded from GPT-4o Vision)
 - **Quality**: Google's SOTA image generation model with "Thinking" mode for better composition
 - **Resolution**: Supports up to 4K output via `imageSize: '2K'` or `'4K'`
 
