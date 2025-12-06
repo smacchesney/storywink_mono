@@ -20,7 +20,7 @@ export const STORY_RESPONSE_SCHEMA = {
     properties: {
       text: {
         type: 'string',
-        description: 'The story text for this page (1-3 sentences)'
+        description: 'The story text for this page (1-3 sentences, max 35 words)'
       },
       illustrationNotes: {
         type: ['string', 'null'],
@@ -51,7 +51,7 @@ export interface StoryGenerationInput {
 // ----------------------------------
 
 export const STORY_GENERATION_SYSTEM_PROMPT =
-  "You are an expert children's picture‑book author for toddlers (ages 2‑5). Your task is to write engaging story text for a personalised picture book based on the user's photos and inputs.";
+  "You are an expert children's picture‑book author for toddlers (ages 2-4). Parents will read this story aloud to their children. Your task is to write engaging, age-appropriate story text for a personalised picture book based on the user's photos and inputs.";
 
 // ----------------------------------
 // STORY GENERATION – VISION PROMPT
@@ -105,7 +105,8 @@ export function createVisionStoryGenerationPrompt(
     `- **Seamlessly weave in** user details where applicable:`,
     `  - Child's Name: \"${input.childName || '(Not Provided)'}\" (Use this name in the story text!)`,
     `  - Book Title: \"${input.bookTitle || '(Not Provided)'}\"`,
-    `- Generate **1-3 simple sentences per page** (for the ${input.storyPages.length} pages provided).`,
+    `- Generate **1-3 simple sentences per page, maximum 35 words** (for the ${input.storyPages.length} pages provided).`,
+    `  - This 35 word limit is STRICT - text will be displayed in a small area.`,
     `  - Adjust slightly across pages to maintain good narrative flow.`
   ].join('\n');
 

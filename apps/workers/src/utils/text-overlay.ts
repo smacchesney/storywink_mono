@@ -18,7 +18,7 @@ export interface TextOverlayOptions {
 }
 
 const DEFAULT_OPTIONS: Required<TextOverlayOptions> = {
-  fontSize: 80,
+  fontSize: 50, // Smaller for more text capacity (was 80px)
   color: '#1a1a1a',
   yPosition: 0.88, // 88% from top (centered in bottom 18%)
   lineHeight: 1.3,
