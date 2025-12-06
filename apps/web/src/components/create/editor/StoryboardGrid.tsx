@@ -71,6 +71,8 @@ function SortablePageItem({ id, page, visualIndex }: { id: string; page: Storybo
           "bg-white/90 shadow-sm",
           "cursor-grab active:cursor-grabbing",
           "touch-none", // Prevents touch scrolling on the handle
+          "select-none", // Prevent text selection
+          "[-webkit-touch-callout:none]", // Prevent iOS callout menu on long-press
           "hover:bg-white hover:shadow-md",
           "transition-all duration-150"
         )}
@@ -133,10 +135,10 @@ export function StoryboardGrid({ pages, onOrderChange }: StoryboardGridProps) {
       },
     }),
     useSensor(TouchSensor, {
-      // Press delay of 250ms with 5px tolerance - distinguishes from scroll
+      // Distance-based activation - start drag after moving 10px
+      // This avoids conflicts with iOS long-press gestures (zoom, text selection)
       activationConstraint: {
-        delay: 250,
-        tolerance: 5,
+        distance: 10,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -178,10 +180,18 @@ export function StoryboardGrid({ pages, onOrderChange }: StoryboardGridProps) {
   // For now, assume items are already filtered non-cover pages from parent
   // const items = pages; 
 
+  // Haptic feedback on drag start
+  const handleDragStart = () => {
+    if (window.navigator.vibrate) {
+      window.navigator.vibrate(50); // Brief 50ms haptic feedback
+    }
+  };
+
   return (
-    <DndContext 
+    <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
       {/* We need one SortableContext containing ALL draggable items */}
