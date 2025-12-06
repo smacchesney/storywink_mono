@@ -125,9 +125,20 @@ Configure your Clerk webhook to point to the Next.js API route:
 - **Progress tracking**: Real-time upload progress shown with custom UI
 - **Database sync**: After upload, `/api/cloudinary/notify` creates Asset and Page records
 - **No size limits**: Bypasses server completely, supporting unlimited file sizes
-- **User flow**: 
+- **User flow**:
   - Create: Start Creating → Photo Source → Choose Phone → File Picker → Upload Progress → Edit Page
-  - Edit: Add Photos → Photo Source → Choose Phone → File Picker → Upload Progress → Updated Pages
+  - Edit: Photos Button → Manage Photos Panel → Add/Remove Photos
+
+### Photo Management (December 2025)
+- **Manage Photos Panel**: Unified UI for adding and removing photos from books
+- **Location**: "Photos" button in bottom toolbar opens the panel
+- **Component**: `ManagePhotosPanel.tsx` - responsive Sheet (mobile) / Drawer (desktop)
+- **Delete API**: `DELETE /api/book/[bookId]/page/[pageId]` removes page and re-indexes remaining pages
+- **Constraints**:
+  - Cannot delete cover photo (must change cover first)
+  - Minimum 2 pages required per book
+  - Confirmation dialog before deletion
+- **Re-indexing**: Atomic transaction updates all page indices after deletion
 
 ### Key Directories
 - `/apps/web/src/app/`: Next.js App Router pages and API routes
