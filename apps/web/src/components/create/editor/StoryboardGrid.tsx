@@ -20,7 +20,6 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Image from 'next/image';
-import { GripVertical } from 'lucide-react';
 import { StoryboardPage, optimizeCloudinaryUrl } from '@storywink/shared';
 import { cn } from '@/lib/utils';
 
@@ -35,7 +34,6 @@ function SortablePageItem({ id, page, visualIndex }: { id: string; page: Storybo
     attributes,
     listeners,
     setNodeRef,
-    setActivatorNodeRef, // For drag handle
     transform,
     transition,
     isDragging
@@ -58,29 +56,15 @@ function SortablePageItem({ id, page, visualIndex }: { id: string; page: Storybo
         "transition-shadow",
         "duration-200",
         "ease-in-out",
+        "touch-none", // Prevent scroll interference during drag
+        "select-none", // Prevent text selection
+        "[-webkit-touch-callout:none]", // Prevent iOS callout menu
+        "cursor-grab active:cursor-grabbing",
         isDragging && "ring-2 ring-[#F76C5E]"
       )}
+      {...attributes}
+      {...listeners}
     >
-      {/* Drag Handle - only this receives drag listeners */}
-      <button
-        ref={setActivatorNodeRef}
-        {...attributes}
-        {...listeners}
-        className={cn(
-          "absolute top-1 left-1 p-1.5 rounded z-10",
-          "bg-white/90 shadow-sm",
-          "cursor-grab active:cursor-grabbing",
-          "touch-none", // Prevents touch scrolling on the handle
-          "select-none", // Prevent text selection
-          "[-webkit-touch-callout:none]", // Prevent iOS callout menu on long-press
-          "hover:bg-white hover:shadow-md",
-          "transition-all duration-150"
-        )}
-        aria-label={`Drag to reorder page ${visualIndex + 1}`}
-      >
-        <GripVertical className="h-4 w-4 text-gray-500" />
-      </button>
-
       {/* Use thumbnail, fallback to full url with optimization */}
       {page.asset?.thumbnailUrl || page.asset?.url ? (
         <Image
