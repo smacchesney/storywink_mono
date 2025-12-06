@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Plus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import PhotoSourceSheet from '@/components/create/PhotoSourceSheet';
-import UploadProgressScreen from '@/components/create/UploadProgressScreen';
 import { CloudinaryUploaderAuto } from '@/components/cloudinary-uploader-auto';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@clerk/nextjs';
@@ -37,12 +36,6 @@ export default function CreateBookPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showCloudinaryUploader, setShowCloudinaryUploader] = useState(false);
   const [isLoadingUploader, setIsLoadingUploader] = useState(false);
-  
-  // State for Progress Screen
-  const [showProgressScreen, setShowProgressScreen] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [currentUploadFile, setCurrentUploadFile] = useState(0);
-  const [totalUploadFiles, setTotalUploadFiles] = useState(0);
 
   // Track when loading started for minimum spinner display time
   const loadingStartTimeRef = useRef<number | null>(null);
@@ -113,63 +106,41 @@ export default function CreateBookPage() {
     // Hide the Cloudinary component now that uploads are done
     setShowCloudinaryUploader(false);
 
-    // Keep progress screen visible while creating database records
-    setUploadProgress(90); // Show we're almost done
-
     try {
       // Create database records for the uploaded assets
       const dbAssets = await createAssetRecords(cloudinaryAssets);
       logger.info({ count: dbAssets.length }, "Database assets created");
-
-      setUploadProgress(95); // Almost there
 
       if (dbAssets.length > 0) {
         const assetIds = dbAssets.map(asset => asset.id);
         const creationResult = await handleCreateBook(assetIds);
 
         if (creationResult?.bookId) {
-          setUploadProgress(98); // Show progress but keep screen until navigation completes
-          // Navigate immediately - let the edit page handle its own loading
-          // Progress screen will stay visible until the new page mounts
+          // Navigate directly to edit page
           router.push(`/create/${creationResult.bookId}/edit`);
         } else {
           // Error occurred during handleCreateBook
-          setShowProgressScreen(false);
           setIsUploading(false);
-          setShowCloudinaryUploader(false);
         }
       } else {
         toast.warning("No assets were created");
-        setShowProgressScreen(false);
         setIsUploading(false);
-        setShowCloudinaryUploader(false);
       }
     } catch (error) {
       logger.error({ error }, "Failed to process uploads");
       toast.error(`Failed to process uploads: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setShowProgressScreen(false);
       setIsUploading(false);
-      setShowCloudinaryUploader(false);
     }
   };
 
   const handleUploadStart = (totalFiles: number) => {
     logger.info({ totalFiles }, "Upload started");
     setIsUploading(true);
-    setShowProgressScreen(true);
     setIsSheetOpen(false);
-    // Keep the Cloudinary uploader mounted during upload!
-    // It will be hidden by handleUploadComplete when done
-    setTotalUploadFiles(totalFiles);
-    setCurrentUploadFile(0);
-    setUploadProgress(0);
   };
 
-  const handleUploadProgress = (progress: number, currentFile: number, totalFiles: number) => {
-    logger.info({ progress, currentFile, totalFiles }, "Upload progress update");
-    setUploadProgress(Math.min(progress * 0.9, 90)); // Cap at 90% during upload
-    setCurrentUploadFile(currentFile);
-    setTotalUploadFiles(totalFiles);
+  const handleUploadProgress = (_progress: number, _currentFile: number, _totalFiles: number) => {
+    // Progress is handled by Cloudinary's built-in widget UI
   };
 
   const handleStartCreatingClick = () => {
@@ -192,7 +163,6 @@ export default function CreateBookPage() {
     logger.info("Upload cancelled");
     setShowCloudinaryUploader(false);
     setIsUploading(false);
-    setShowProgressScreen(false);
     setIsLoadingUploader(false);
   };
 
@@ -202,15 +172,7 @@ export default function CreateBookPage() {
 
   return (
     <>
-      {showProgressScreen && (
-        <UploadProgressScreen 
-          progress={uploadProgress}
-          currentFile={currentUploadFile}
-          totalFiles={totalUploadFiles}
-        />
-      )}
-      
-      {!showProgressScreen && (!showCloudinaryUploader || isLoadingUploader) && (
+      {(!showCloudinaryUploader || isLoadingUploader) && (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-150px)] px-4 py-8">
           <Button
             onClick={handleStartCreatingClick}
@@ -228,7 +190,7 @@ export default function CreateBookPage() {
           <p className="mt-4 md:mt-6 text-lg md:text-xl text-gray-600 font-medium">
             Start Creating
           </p>
-          
+
           <PhotoSourceSheet
             isOpen={isSheetOpen}
             onOpenChange={setIsSheetOpen}
@@ -238,28 +200,26 @@ export default function CreateBookPage() {
         </div>
       )}
 
-      {/* Invisible Cloudinary uploader that auto-opens */}
+      {/* Cloudinary uploader that auto-opens */}
       {showCloudinaryUploader && (
-        <div style={{ display: showProgressScreen ? 'none' : 'block' }}>
-          <CloudinaryUploaderAuto
-            onUploadComplete={handleUploadComplete}
-            onUploadStart={handleUploadStart}
-            onUploadProgress={handleUploadProgress}
-            onCancel={handleUploadCancel}
-            onOpen={() => {
-              // Ensure spinner shows for at least 2 seconds (typical widget load time)
-              const MIN_LOADING_TIME = 2000;
-              const elapsed = Date.now() - (loadingStartTimeRef.current || Date.now());
-              const remaining = Math.max(0, MIN_LOADING_TIME - elapsed);
+        <CloudinaryUploaderAuto
+          onUploadComplete={handleUploadComplete}
+          onUploadStart={handleUploadStart}
+          onUploadProgress={handleUploadProgress}
+          onCancel={handleUploadCancel}
+          onOpen={() => {
+            // Ensure spinner shows for at least 2 seconds (typical widget load time)
+            const MIN_LOADING_TIME = 2000;
+            const elapsed = Date.now() - (loadingStartTimeRef.current || Date.now());
+            const remaining = Math.max(0, MIN_LOADING_TIME - elapsed);
 
-              if (remaining > 0) {
-                setTimeout(() => setIsLoadingUploader(false), remaining);
-              } else {
-                setIsLoadingUploader(false);
-              }
-            }}
-          />
-        </div>
+            if (remaining > 0) {
+              setTimeout(() => setIsLoadingUploader(false), remaining);
+            } else {
+              setIsLoadingUploader(false);
+            }
+          }}
+        />
       )}
     </>
   );
