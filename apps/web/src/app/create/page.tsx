@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2 } from 'lucide-react';
@@ -43,6 +43,9 @@ export default function CreateBookPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [currentUploadFile, setCurrentUploadFile] = useState(0);
   const [totalUploadFiles, setTotalUploadFiles] = useState(0);
+
+  // Track when loading started for minimum spinner display time
+  const loadingStartTimeRef = useRef<number | null>(null);
 
   // Handle creation of database records for uploaded assets
   const createAssetRecords = async (cloudinaryAssets: CloudinaryAsset[]): Promise<Asset[]> => {
@@ -171,6 +174,8 @@ export default function CreateBookPage() {
 
   const handleStartCreatingClick = () => {
     logger.info("Start Creating clicked - Directly opening Cloudinary uploader");
+    // Track when loading started for minimum spinner display
+    loadingStartTimeRef.current = Date.now();
     // Show loading spinner while Cloudinary widget loads
     setIsLoadingUploader(true);
     // Skip the PhotoSourceSheet and directly trigger Cloudinary uploader
@@ -241,7 +246,18 @@ export default function CreateBookPage() {
             onUploadStart={handleUploadStart}
             onUploadProgress={handleUploadProgress}
             onCancel={handleUploadCancel}
-            onOpen={() => setIsLoadingUploader(false)}
+            onOpen={() => {
+              // Ensure spinner shows for at least 2 seconds (typical widget load time)
+              const MIN_LOADING_TIME = 2000;
+              const elapsed = Date.now() - (loadingStartTimeRef.current || Date.now());
+              const remaining = Math.max(0, MIN_LOADING_TIME - elapsed);
+
+              if (remaining > 0) {
+                setTimeout(() => setIsLoadingUploader(false), remaining);
+              } else {
+                setIsLoadingUploader(false);
+              }
+            }}
           />
         </div>
       )}
