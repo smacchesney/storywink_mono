@@ -3,14 +3,14 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { BookOpen, LayoutGrid, Palette, Plus, FileText, Check } from 'lucide-react';
+import { BookOpen, LayoutGrid, Palette, Images, FileText, Check } from 'lucide-react';
 
 export type EditorTab = 'details' | 'cover' | 'pages' | 'artStyle';
 
 interface BottomToolbarProps {
   activeTab: EditorTab;
   onTabChange: (tab: EditorTab) => void;
-  onAddPhotoClick: () => void;
+  onPhotosClick: () => void;
   completedSteps: Set<EditorTab>;
 }
 
@@ -21,11 +21,11 @@ const tabs: { id: EditorTab; label: string; stepNumber: number; icon: React.Elem
   { id: 'artStyle', label: 'Art Style', stepNumber: 4, icon: Palette, tourId: 'art-style-button' },
 ];
 
-export default function BottomToolbar({ 
-  activeTab, 
-  onTabChange, 
-  onAddPhotoClick, 
-  completedSteps 
+export default function BottomToolbar({
+  activeTab,
+  onTabChange,
+  onPhotosClick,
+  completedSteps
 }: BottomToolbarProps) {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg">
@@ -92,23 +92,24 @@ export default function BottomToolbar({
             })}
           </div>
 
-          {/* Add Photo Button */}
+          {/* Photos Management Button */}
           <div className="flex flex-col items-center">
             {/* Empty space to align with step indicators */}
             <div className="w-6 h-6 mb-3 md:mb-4" />
-            
+
             <Button
               variant="outline"
               size="sm"
-              onClick={onAddPhotoClick}
+              onClick={onPhotosClick}
+              data-tourid="photos-button"
               className={cn(
                 "flex flex-col items-center justify-center min-h-[60px] min-w-[70px] px-2 py-3 text-xs",
-                "border-dashed border-2 border-gray-300 hover:border-[#F76C5E] hover:bg-orange-50",
+                "border-2 border-[#F76C5E] hover:bg-orange-50",
                 "transition-all duration-200 rounded-lg bg-white"
               )}
             >
-              <Plus className="w-4 h-4 mb-1.5 text-[#F76C5E]" />
-              <span className="text-[#F76C5E] font-medium leading-tight">Add</span>
+              <Images className="w-4 h-4 mb-1.5 text-[#F76C5E]" />
+              <span className="text-[#F76C5E] font-medium leading-tight">Photos</span>
             </Button>
           </div>
         </div>

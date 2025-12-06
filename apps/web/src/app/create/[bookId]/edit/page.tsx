@@ -26,6 +26,17 @@ import {
 import ArtStylePicker from '@/components/create/editor/ArtStylePicker';
 import CoverEditorPanel from '@/components/create/editor/CoverEditorPanel';
 import DetailsEditorPanel from '@/components/create/editor/DetailsEditorPanel'; // <-- Import new component
+import ManagePhotosPanel from '@/components/create/editor/ManagePhotosPanel'; // <-- Import Manage Photos panel
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Asset } from '@prisma/client'; // Import Asset for filtering
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'; // Import Tooltip
 import WritingProgressScreen from '@/components/create/editor/WritingProgressScreen'; // Import Progress Screen
@@ -50,6 +61,9 @@ export default function EditBookPage() {
   const [activeTab, setActiveTab] = useState<EditorTab>('details'); // Default to details
   const [isPhotoSheetOpen, setIsPhotoSheetOpen] = useState(false); // <-- State for Add Photo sheet
   const [showCloudinaryUploader, setShowCloudinaryUploader] = useState(false); // <-- State for Cloudinary uploader
+  const [isManagePhotosPanelOpen, setIsManagePhotosPanelOpen] = useState(false); // <-- State for Manage Photos panel
+  const [pageToDelete, setPageToDelete] = useState<StoryboardPage | null>(null); // <-- Page pending deletion
+  const [isDeletingPage, setIsDeletingPage] = useState(false); // <-- Loading state for deletion
   const fileInputRef = useRef<HTMLInputElement>(null); // <-- Keep for backwards compatibility
   const [isPagesPanelOpen, setIsPagesPanelOpen] = useState(false); // Unified state for Sheet/Drawer
   const [storyboardOrder, setStoryboardOrder] = useState<StoryboardPage[]>([]); // Use StoryboardPage type
@@ -244,8 +258,8 @@ export default function EditBookPage() {
           disableBeacon: true,
         },
         {
-          target: '[data-tourid="add-photo-button"]',
-          content: 'Add additional photos to your storybook using this button.',
+          target: '[data-tourid="photos-button"]',
+          content: 'Manage your photos here - add more or remove unwanted ones.',
           placement: 'top',
           isFixed: true,
           disableScrolling: true,
@@ -625,9 +639,92 @@ export default function EditBookPage() {
     setShowCloudinaryUploader(true);
   };
 
-  const handleAddPhotoClick = () => {
-    logger.info({ bookId }, "Add photo clicked");
+  const handlePhotosClick = () => {
+    logger.info({ bookId }, "Photos button clicked");
+    setIsManagePhotosPanelOpen(true);
+  };
+
+  // Handler for add photos from within Manage Photos panel
+  const handleAddPhotosFromPanel = () => {
+    setIsManagePhotosPanelOpen(false);
     setIsPhotoSheetOpen(true);
+  };
+
+  // Handler for page delete request from Manage Photos panel
+  const handleDeletePageRequest = (pageId: string, isCover: boolean) => {
+    if (isCover) {
+      toast.error("Cannot delete the cover photo. Please select a different cover first.");
+      return;
+    }
+
+    // Check minimum pages
+    const totalPages = bookData?.pages.length || 0;
+    if (totalPages <= 2) {
+      toast.error("Your book must have at least 2 photos.");
+      return;
+    }
+
+    // Find the page to delete
+    const page = bookData?.pages.find(p => p.id === pageId);
+    if (page) {
+      setPageToDelete(page);
+    }
+  };
+
+  // Handler for confirming page deletion
+  const handleConfirmDeletePage = async () => {
+    if (!pageToDelete || !bookData || isDeletingPage) return;
+
+    setIsDeletingPage(true);
+    logger.info({ bookId, pageId: pageToDelete.id }, "Deleting page...");
+
+    try {
+      const response = await fetch(`/api/book/${bookId}/page/${pageToDelete.id}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || `Failed to delete page: ${response.statusText}`);
+      }
+
+      // Update local state - remove deleted page
+      setBookData(prevData => {
+        if (!prevData) return null;
+
+        const updatedPages = prevData.pages.filter(p => p.id !== pageToDelete.id);
+
+        // Re-index remaining pages
+        const reIndexedPages = updatedPages
+          .sort((a, b) => a.index - b.index)
+          .map((page, idx) => ({
+            ...page,
+            index: idx,
+            pageNumber: idx + 1,
+            isTitlePage: idx === 0
+          }));
+
+        return {
+          ...prevData,
+          pages: reIndexedPages,
+          pageLength: reIndexedPages.length,
+        };
+      });
+
+      // Reset completion tracking
+      setPagesResetKey(prev => prev + 1);
+      setPagesConfirmed(false);
+
+      toast.success("Photo removed from book");
+      setPageToDelete(null);
+
+    } catch (error) {
+      logger.error({ bookId, pageId: pageToDelete.id, error }, "Failed to delete page");
+      toast.error(`Failed to delete: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsDeletingPage(false);
+    }
   };
 
   // Keep old handler for backwards compatibility but unused
@@ -1036,10 +1133,10 @@ export default function EditBookPage() {
           </div>
 
           {/* 3. Bottom Toolbar */}
-          <BottomToolbar 
+          <BottomToolbar
             activeTab={activeTab}
             onTabChange={handleTabChange}
-            onAddPhotoClick={handleAddPhotoClick}
+            onPhotosClick={handlePhotosClick}
             completedSteps={completedSteps}
           />
           
@@ -1161,6 +1258,48 @@ export default function EditBookPage() {
               onCancel={handleCloudinaryUploadCancel}
             />
           )}
+
+          {/* Manage Photos Panel */}
+          {bookData && (
+            <ManagePhotosPanel
+              isOpen={isManagePhotosPanelOpen}
+              onClose={() => setIsManagePhotosPanelOpen(false)}
+              pages={bookData.pages}
+              coverAssetId={bookData.coverAssetId}
+              onDeleteRequest={handleDeletePageRequest}
+              onAddPhotosClick={handleAddPhotosFromPanel}
+              minPagesReached={(bookData.pages.length || 0) <= 2}
+            />
+          )}
+
+          {/* Delete Photo Confirmation Dialog */}
+          <AlertDialog open={!!pageToDelete} onOpenChange={(open) => !open && setPageToDelete(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Photo?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will remove the photo from your book. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isDeletingPage}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleConfirmDeletePage}
+                  disabled={isDeletingPage}
+                  className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                >
+                  {isDeletingPage ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete'
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* --- React Joyride Component --- */}
           {tourSteps.length > 0 && (

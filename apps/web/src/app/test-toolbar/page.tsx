@@ -11,8 +11,8 @@ export default function TestToolbarPage() {
     setActiveTab(tab);
   };
 
-  const handleAddPhotoClick = () => {
-    alert('Add photo clicked!');
+  const handlePhotosClick = () => {
+    alert('Photos button clicked!');
   };
 
   const toggleCompletion = (tab: EditorTab) => {
@@ -72,10 +72,10 @@ export default function TestToolbarPage() {
       </div>
 
       {/* BottomToolbar */}
-      <BottomToolbar 
+      <BottomToolbar
         activeTab={activeTab}
         onTabChange={handleTabChange}
-        onAddPhotoClick={handleAddPhotoClick}
+        onPhotosClick={handlePhotosClick}
         completedSteps={completedSteps}
       />
     </div>
