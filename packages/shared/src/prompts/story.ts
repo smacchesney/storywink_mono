@@ -26,7 +26,7 @@ export const STORY_RESPONSE_SCHEMA = {
         description: 'Visual effects suggestion for the illustration, or null if none'
       }
     },
-    required: ['text'],
+    required: ['text', 'illustrationNotes'],
     additionalProperties: false
   }
 } as const;
