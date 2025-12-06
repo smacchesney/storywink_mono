@@ -14,6 +14,7 @@ type MessageContentPart = InputText | InputImage;
 export const STORY_RESPONSE_SCHEMA = {
   type: 'object',
   description: 'Story text and illustration notes for each page, keyed by page number',
+  properties: {}, // Required by OpenAI - empty because we use dynamic keys via additionalProperties
   additionalProperties: {
     type: 'object',
     properties: {
