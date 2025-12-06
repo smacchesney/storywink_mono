@@ -30,8 +30,8 @@ import { Asset } from '@prisma/client'; // Import Asset for filtering
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'; // Import Tooltip
 import WritingProgressScreen from '@/components/create/editor/WritingProgressScreen'; // Import Progress Screen
 import AdditionalPhotoUploadProgressScreen from '@/components/create/editor/AdditionalPhotoUploadProgressScreen'; // <-- Import new progress screen
-import UploadProgressScreen from '@/components/create/UploadProgressScreen'; // Import upload progress screen for initial load
 import useMediaQuery from '@/hooks/useMediaQuery'; // Import the hook
+import { useUploadFlow } from '@/context/UploadFlowContext';
 import Joyride, { Step, EVENTS, STATUS, CallBackProps } from 'react-joyride'; // <-- Add Joyride imports
 import { cn } from '@/lib/utils';
 import { useAuth } from '@clerk/nextjs';
@@ -40,6 +40,7 @@ export default function EditBookPage() {
   const params = useParams();
   const router = useRouter();
   const { getToken } = useAuth();
+  const { state: uploadFlowState, startLoading, finish: finishUploadFlow } = useUploadFlow();
   const bookId = params.bookId as string; // Get bookId from dynamic route
   const isDesktop = useMediaQuery('(min-width: 768px)'); // Tailwind md breakpoint
 
@@ -91,8 +92,16 @@ export default function EditBookPage() {
       toast.error("Book ID is missing.");
       setError("Book ID is missing from the URL.");
       setIsLoading(false);
+      finishUploadFlow();
       return;
     }
+
+    // If we're NOT already in an upload flow (direct navigation to edit page),
+    // show the loading overlay
+    if (uploadFlowState.phase === 'idle') {
+      startLoading();
+    }
+
     console.log(`Fetching/Refetching book data for ${bookId}`);
     setIsLoading(true);
     setError(null);
@@ -113,24 +122,23 @@ export default function EditBookPage() {
       // Route guard: Redirect completed books to preview page
       if (data.status === BookStatus.COMPLETED || data.status === BookStatus.PARTIAL) {
         console.log(`[Edit Page] Book ${bookId} is already ${data.status}, redirecting to preview`);
+        finishUploadFlow(); // Clean up before redirect
         router.replace(`/book/${bookId}/preview`);
         return;
       }
 
       setBookData(data);
+      finishUploadFlow(); // Hide the progress overlay now that data is loaded
     } catch (err) {
       console.error("Error fetching book:", err);
       const message = err instanceof Error ? err.message : "An unknown error occurred";
       toast.error(`Error loading book: ${message}`);
       setError(message);
-      // Optionally redirect if book not found (e.g., status 404)
-      // if (err instanceof Error && err.message.includes('404')) { 
-      //   router.push('/create'); // Or a dedicated not-found page
-      // }
+      finishUploadFlow(); // Hide overlay on error too
     } finally {
       if (isMountedRef.current) { setIsLoading(false); }
     }
-  }, [bookId, router]);
+  }, [bookId, router, uploadFlowState.phase, startLoading, finishUploadFlow]);
 
   // Initial fetch
   useEffect(() => {
@@ -804,13 +812,9 @@ export default function EditBookPage() {
     // after structural changes to their book
   }, [pagesResetKey]);
 
+  // Loading state is now handled by ProgressOverlay at the layout level
   if (isLoading) {
-    return (
-      <UploadProgressScreen
-        message="Uploading your photos..."
-        progress={undefined}
-      />
-    );
+    return null; // ProgressOverlay shows during loading
   }
 
   if (error) {
