@@ -12,9 +12,10 @@ import { BookWithStoryboardPages, optimizeCloudinaryUrl } from '@storywink/share
 interface CanvasProps {
   bookData: BookWithStoryboardPages; // <-- Use shared type
   options?: EmblaOptionsType;
+  onTitlePlaceholderClick?: () => void; // Callback when placeholder title is clicked
 }
 
-export function Canvas({ bookData, options }: CanvasProps) {
+export function Canvas({ bookData, options, onTitlePlaceholderClick }: CanvasProps) {
   const [emblaRef, emblaApi] = useEmblaCarousel(options);
   const [prevBtnDisabled, setPrevBtnDisabled] = useState(true);
   const [nextBtnDisabled, setNextBtnDisabled] = useState(true);
@@ -82,15 +83,28 @@ export function Canvas({ bookData, options }: CanvasProps) {
                 </div>
               )}
               
-              {/* Title Overlay - Now simplified, as cover is always first */}
+              {/* Title Overlay - Cover is always first */}
               {displayIndex === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/30 p-4">
-                  <h2 className="text-white text-2xl md:text-3xl font-bold text-center shadow-text">
-                    {bookData.title && bookData.title.trim() !== '' 
-                      ? bookData.title 
-                      : "Insert Title in Details below"
-                    }
-                  </h2>
+                  {bookData.title && bookData.title.trim() !== '' ? (
+                    <h2 className="text-white text-2xl md:text-3xl font-bold text-center shadow-text">
+                      {bookData.title}
+                    </h2>
+                  ) : onTitlePlaceholderClick ? (
+                    <button
+                      onClick={onTitlePlaceholderClick}
+                      className="text-white text-2xl md:text-3xl font-bold text-center
+                                 underline decoration-2 underline-offset-4
+                                 hover:opacity-80 active:opacity-60
+                                 transition-opacity cursor-pointer"
+                    >
+                      Tap to add title
+                    </button>
+                  ) : (
+                    <h2 className="text-white text-2xl md:text-3xl font-bold text-center shadow-text">
+                      Insert Title in Details below
+                    </h2>
+                  )}
                 </div>
               )}
             </div>

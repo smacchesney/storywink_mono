@@ -931,18 +931,27 @@ export default function EditBookPage() {
     );
   }
 
+  // Handler for clicking the title placeholder on canvas
+  const handleTitlePlaceholderClick = () => {
+    setActiveTab('details');
+    setIsDetailsPanelOpen(true);
+    setPendingTitle(bookData?.title || '');
+    setPendingChildName(bookData?.childName || '');
+    logger.info({ bookId }, "Title placeholder clicked, opening Details drawer");
+  };
+
   // Function to render content based on active tab
   const renderContent = () => {
     if (!bookData) return null; // Guard against null bookData
     switch (activeTab) {
       case 'cover':
-      case 'artStyle': 
+      case 'artStyle':
       case 'details': // Show canvas for details tab too
-        return <Canvas bookData={bookData} />; 
+        return <Canvas bookData={bookData} onTitlePlaceholderClick={handleTitlePlaceholderClick} />;
       case 'pages':
-        return <Canvas bookData={bookData} />; // Keep showing canvas behind sheet/drawer
+        return <Canvas bookData={bookData} onTitlePlaceholderClick={handleTitlePlaceholderClick} />; // Keep showing canvas behind sheet/drawer
       default:
-        return <Canvas bookData={bookData} />; // Default to cover/canvas
+        return <Canvas bookData={bookData} onTitlePlaceholderClick={handleTitlePlaceholderClick} />; // Default to cover/canvas
     }
   };
 
