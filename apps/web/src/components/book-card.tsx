@@ -17,10 +17,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Trash2, Eye, Loader2, AlertTriangle, RefreshCw, Download } from 'lucide-react';
+import { MoreHorizontal, Trash2, Eye, Loader2, AlertTriangle, RefreshCw, Download, Printer } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { coolifyImageUrl } from '@storywink/shared';
 import { TextShimmerWave } from '@/components/ui/text-shimmer-wave';
+import { PrintOrderSheet, PrintOrderBook } from '@/components/print/PrintOrderSheet';
 
 export interface BookCardProps {
   id: string;
@@ -28,6 +29,7 @@ export interface BookCardProps {
   status: BookStatus;
   updatedAt?: Date | null;
   pages?: Page[];
+  pageCount?: number;
   coverImageUrl?: string | null;
   onDeleteClick: () => void;
   onRetryClick?: () => void;
@@ -40,7 +42,8 @@ const BookCard: React.FC<BookCardProps> = ({
   title,
   updatedAt: _updatedAt,
   status,
-  pages: _pages,
+  pages,
+  pageCount,
   coverImageUrl,
   onDeleteClick,
   onRetryClick,
@@ -49,6 +52,10 @@ const BookCard: React.FC<BookCardProps> = ({
 }) => {
   const router = useRouter();
   const [isExporting, setIsExporting] = useState(false);
+  const [showPrintSheet, setShowPrintSheet] = useState(false);
+
+  // Calculate page count from pages array or use explicit pageCount
+  const actualPageCount = pageCount ?? pages?.length ?? 0;
 
   const handleViewClick = () => {
     router.push(`/book/${id}/preview`);
@@ -203,70 +210,101 @@ const BookCard: React.FC<BookCardProps> = ({
     );
   }
 
+  // Prepare book data for PrintOrderSheet
+  const printOrderBook: PrintOrderBook = {
+    id,
+    title,
+    coverImageUrl: coverImageUrl ?? null,
+    pageCount: actualPageCount,
+  };
+
   // COMPLETED STATE - Simplified card without status badge
   return (
-    <Card className="flex flex-col hover:shadow-md transition-shadow overflow-hidden">
-      {/* Image */}
-      <div className="relative w-full aspect-video bg-muted overflow-hidden">
-        {displayImageUrl ? (
-          <Image
-            src={coolifyImageUrl(displayImageUrl)}
-            alt={`${title || 'Book'} cover`}
-            fill
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 45vw, 25vw"
-            className="object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <span className="text-xs text-muted-foreground">No Preview</span>
-          </div>
-        )}
-      </div>
+    <>
+      <Card className="flex flex-col hover:shadow-md transition-shadow overflow-hidden">
+        {/* Image */}
+        <div className="relative w-full aspect-video bg-muted overflow-hidden">
+          {displayImageUrl ? (
+            <Image
+              src={coolifyImageUrl(displayImageUrl)}
+              alt={`${title || 'Book'} cover`}
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 45vw, 25vw"
+              className="object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="text-xs text-muted-foreground">No Preview</span>
+            </div>
+          )}
+        </div>
 
-      {/* Content below image */}
-      <CardHeader className="pb-2 pt-4 px-4">
-        <CardTitle className="text-lg truncate text-center">{title || 'Untitled Book'}</CardTitle>
-      </CardHeader>
+        {/* Content below image */}
+        <CardHeader className="pb-2 pt-4 px-4">
+          <CardTitle className="text-lg truncate text-center">{title || 'Untitled Book'}</CardTitle>
+        </CardHeader>
 
-      {/* Footer with View and dropdown */}
-      <CardFooter className="flex justify-between items-center pt-2 px-4 pb-3">
-        <Button
-          onClick={handleViewClick}
-          size="sm"
-          className="flex-grow mr-2 bg-[#F76C5E] hover:bg-[#E55A4C] rounded-full font-playful"
-        >
-          <Eye className="h-4 w-4 mr-1.5" />
-          View Preview
-        </Button>
-
-        {/* Dropdown menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" disabled={isDeleting || isExporting}>
-              {isDeleting || isExporting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <MoreHorizontal className="h-4 w-4" />
-              )}
-              <span className="sr-only">Book Actions</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={handleExportPdf} disabled={isExporting}>
-              <Download className="mr-2 h-4 w-4" /> Export PDF
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive focus:bg-destructive/10"
-              onClick={onDeleteClick}
-              disabled={isDeleting}
+        {/* Footer with View, Order Print, and dropdown */}
+        <CardFooter className="flex flex-col gap-2 pt-2 px-4 pb-3">
+          {/* Primary actions row */}
+          <div className="flex justify-between items-center w-full gap-2">
+            <Button
+              onClick={handleViewClick}
+              size="sm"
+              variant="outline"
+              className="flex-1 rounded-full font-playful"
             >
-              <Trash2 className="mr-2 h-4 w-4" /> Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </CardFooter>
-    </Card>
+              <Eye className="h-4 w-4 mr-1.5" />
+              View
+            </Button>
+            <Button
+              onClick={() => setShowPrintSheet(true)}
+              size="sm"
+              className="flex-1 bg-[#F76C5E] hover:bg-[#E55A4C] rounded-full font-playful"
+            >
+              <Printer className="h-4 w-4 mr-1.5" />
+              Order Print
+            </Button>
+          </div>
+
+          {/* Secondary actions row */}
+          <div className="flex justify-end w-full">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" disabled={isDeleting || isExporting} className="text-muted-foreground">
+                  {isDeleting || isExporting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <MoreHorizontal className="h-4 w-4" />
+                  )}
+                  <span className="sr-only">Book Actions</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportPdf} disabled={isExporting}>
+                  <Download className="mr-2 h-4 w-4" /> Export PDF
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                  onClick={onDeleteClick}
+                  disabled={isDeleting}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </CardFooter>
+      </Card>
+
+      {/* Print Order Sheet */}
+      <PrintOrderSheet
+        book={printOrderBook}
+        isOpen={showPrintSheet}
+        onClose={() => setShowPrintSheet(false)}
+      />
+    </>
   );
 };
 
