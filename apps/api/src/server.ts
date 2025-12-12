@@ -16,6 +16,8 @@ import { pagesRouter } from "./routes/pages.js";
 import { assetsRouter } from "./routes/assets.js";
 import { uploadRouter } from "./routes/upload.js";
 import { generateRouter } from "./routes/generate.js";
+import { cartRouter } from "./routes/cart.js";
+import { printOrdersRouter } from "./routes/print-orders.js";
 
 // Import middleware
 import { errorHandler } from "./middleware/error-handler.js";
@@ -61,6 +63,8 @@ app.use("/api/pages", pagesRouter);
 app.use("/api/assets", assetsRouter);
 app.use("/api/upload", uploadRouter);
 app.use("/api/generate", generateRouter);
+app.use("/api/cart", cartRouter);
+app.use("/api/print-orders", printOrdersRouter);
 
 // Error handling
 app.use(notFound);

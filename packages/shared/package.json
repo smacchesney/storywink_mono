@@ -45,6 +45,10 @@
     "./redis": {
       "types": "./dist/redis.d.ts",
       "import": "./dist/redis.js"
+    },
+    "./lulu": {
+      "types": "./dist/lulu.d.ts",
+      "import": "./dist/lulu.js"
     }
   },
   "scripts": {

@@ -16,20 +16,18 @@ function optimizeForPrint(url: string | null | undefined): string {
 // Define the expected input type (Book with Pages)
 type BookWithPages = Book & { pages: Page[] };
 
-// Constants
+// Constants - Lulu 8.5x8.5 Print Specifications
+// See: packages/shared/src/lulu.ts for full spec documentation
 const DPI = 300;
-const PAGE_WIDTH_IN = 6.25; // Trimmed width
-const PAGE_HEIGHT_IN = 6.25; // Trimmed height
-const BLEED_MARGIN_IN = 0.25;
+const PAGE_WIDTH_IN = 8.5; // Lulu trim width
+const PAGE_HEIGHT_IN = 8.5; // Lulu trim height
+const BLEED_MARGIN_IN = 0.125; // Lulu bleed margin
 
-const PAGE_WIDTH_WITH_BLEED_IN = PAGE_WIDTH_IN + 2 * BLEED_MARGIN_IN;
-const PAGE_HEIGHT_WITH_BLEED_IN = PAGE_HEIGHT_IN + 2 * BLEED_MARGIN_IN;
+const PAGE_WIDTH_WITH_BLEED_IN = PAGE_WIDTH_IN + 2 * BLEED_MARGIN_IN; // 8.75"
+const PAGE_HEIGHT_WITH_BLEED_IN = PAGE_HEIGHT_IN + 2 * BLEED_MARGIN_IN; // 8.75"
 
-// const PAGE_WIDTH_PX_TRIM = Math.round(PAGE_WIDTH_IN * DPI); // Original, for reference if needed
-// const PAGE_HEIGHT_PX_TRIM = Math.round(PAGE_HEIGHT_IN * DPI); // Original, for reference if needed
-
-const PAGE_WIDTH_PX = Math.round(PAGE_WIDTH_WITH_BLEED_IN * DPI); // Full size with bleed
-const PAGE_HEIGHT_PX = Math.round(PAGE_HEIGHT_WITH_BLEED_IN * DPI); // Full size with bleed
+const PAGE_WIDTH_PX = Math.round(PAGE_WIDTH_WITH_BLEED_IN * DPI); // 2625px
+const PAGE_HEIGHT_PX = Math.round(PAGE_HEIGHT_WITH_BLEED_IN * DPI); // 2625px
 
 /**
  * Generates HTML for a single book page.

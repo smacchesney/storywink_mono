@@ -7,3 +7,4 @@ export * from './redis.js';
 export * from './prompts/story.js';
 // REMOVED: export * from './prompts/styles.js'; - Prevents barrel import race condition
 export * from './prompts/illustration.js';
+export * from './lulu.js';
