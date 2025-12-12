@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 
@@ -59,7 +59,7 @@ const SHIPPING_LABELS: Record<string, string> = {
   EXPRESS: 'Express (1-3 days)',
 };
 
-export default function DummyCheckoutPage() {
+function DummyCheckoutContent() {
   const searchParams = useSearchParams();
   const bookId = searchParams.get('bookId');
   const { getToken } = useAuth();
@@ -428,5 +428,19 @@ export default function DummyCheckoutPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function DummyCheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
+        </div>
+      }
+    >
+      <DummyCheckoutContent />
+    </Suspense>
   );
 }
