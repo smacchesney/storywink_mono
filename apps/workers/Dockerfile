@@ -46,8 +46,8 @@ COPY --from=deps /app/turbo.json ./turbo.json
 # Copy all source files (including the fixed source code)
 COPY . .
 
-# Build the workers app
-RUN npm run build --filter=@storywink/workers
+# Build workers (with dependencies) but exclude web
+RUN npx turbo run build --filter=@storywink/workers --filter='!@storywink/web'
 
 # Production image
 FROM base AS runner

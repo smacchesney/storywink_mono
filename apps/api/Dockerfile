@@ -46,8 +46,8 @@ COPY --from=deps /app/turbo.json ./turbo.json
 # Copy all source files (including the fixed source code)
 COPY . .
 
-# Build the API app
-RUN npm run build --filter=@storywink/api
+# Build API (with dependencies) but exclude web
+RUN npx turbo run build --filter=@storywink/api --filter='!@storywink/web'
 
 # Production image
 FROM base AS runner
