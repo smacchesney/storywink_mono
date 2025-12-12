@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { stripe, SHIPPING_OPTIONS, calculatePrintCost } from '@/lib/stripe';
+import { getStripe, SHIPPING_OPTIONS, calculatePrintCost } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import { coolifyImageUrl } from '@storywink/shared';
 
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
     // Create Stripe Checkout session
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       mode: 'payment',
       customer_email: user.email || undefined,
       shipping_address_collection: {

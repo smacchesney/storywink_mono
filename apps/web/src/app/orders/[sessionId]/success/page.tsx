@@ -10,7 +10,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
-import { stripe } from '@/lib/stripe';
+import { getStripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import { coolifyImageUrl } from '@storywink/shared';
 import { Button } from '@/components/ui/button';
@@ -41,7 +41,7 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
   // Retrieve the checkout session from Stripe
   let session;
   try {
-    session = await stripe.checkout.sessions.retrieve(sessionId, {
+    session = await getStripe().checkout.sessions.retrieve(sessionId, {
       expand: ['line_items', 'shipping_details'],
     });
   } catch (error) {
