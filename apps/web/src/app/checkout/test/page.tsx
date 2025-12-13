@@ -73,6 +73,7 @@ function DummyCheckoutContent() {
   const [priceQuote, setPriceQuote] = useState<PriceQuote | null>(null);
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [orderCreated, setOrderCreated] = useState<string | null>(null);
+  const [pdfUrls, setPdfUrls] = useState<{ interior: string; cover: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Fetch shipping options on mount
@@ -236,7 +237,8 @@ function DummyCheckoutContent() {
       console.log('Submitted to Lulu:', submitData);
       */
 
-      alert(`Order created successfully!\n\nOrder ID: ${orderData.data.id}\nInterior PDF: ${interiorData.url}\nCover PDF: ${coverData.url}`);
+      // Store PDF URLs for display in the UI
+      setPdfUrls({ interior: interiorData.url, cover: coverData.url });
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to process order');
@@ -429,6 +431,29 @@ function DummyCheckoutContent() {
             <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
               <p className="text-green-700 font-medium">Order Created Successfully!</p>
               <p className="text-sm text-green-600 mt-1">Order ID: {orderCreated}</p>
+              {pdfUrls && (
+                <div className="mt-3 pt-3 border-t border-green-200">
+                  <p className="text-sm font-medium text-green-700 mb-2">Generated PDFs:</p>
+                  <div className="space-y-1">
+                    <a
+                      href={pdfUrls.interior}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-sm text-blue-600 hover:text-blue-800 underline truncate"
+                    >
+                      📄 Interior PDF (click to view)
+                    </a>
+                    <a
+                      href={pdfUrls.cover}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-sm text-blue-600 hover:text-blue-800 underline truncate"
+                    >
+                      📄 Cover PDF (click to view)
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
