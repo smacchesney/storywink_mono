@@ -7,7 +7,10 @@ if (!accessToken) {
   logger.error('Missing DROPBOX_ACCESS_TOKEN environment variable');
 }
 
-const dbx = new Dropbox({ accessToken });
+const dbx = new Dropbox({
+  accessToken,
+  fetch: fetch, // Required for Node.js/Next.js server environment
+});
 
 /**
  * Upload a PDF buffer to Dropbox and return a public download URL.
