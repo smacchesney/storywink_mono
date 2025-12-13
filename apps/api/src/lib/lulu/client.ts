@@ -221,13 +221,21 @@ export class LuluApiClient {
     shippingOption: string;
     podPackageId?: string;
   }): Promise<LuluPrintJobCostResponse> {
-    const requestBody: LuluPrintJobCostRequest = {
+    const requestBody = {
       line_items: [{
         page_count: params.pageCount,
         pod_package_id: params.podPackageId || LULU_CONFIG.DEFAULT_POD_PACKAGE,
         quantity: params.quantity,
       }],
-      shipping_address: params.shippingAddress,
+      // Lulu API uses "country" not "country_code" and requires phone_number
+      shipping_address: {
+        city: params.shippingAddress.city,
+        country: params.shippingAddress.country_code,
+        postcode: params.shippingAddress.postcode,
+        state_code: params.shippingAddress.state_code,
+        street1: params.shippingAddress.street1,
+        phone_number: params.shippingAddress.phone_number || '+1 000 000 0000',
+      },
       shipping_option: params.shippingOption,
     };
 

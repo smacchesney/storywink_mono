@@ -170,10 +170,11 @@ printOrdersRouter.post('/shipping-options', async (req: AuthenticatedRequest, re
           costExclTax: opt.total_cost_excl_tax,
           costInclTax: opt.total_cost_incl_tax,
           currency: opt.currency,
-          estimatedDelivery: {
+          // estimated_shipping_dates may be undefined for some options
+          estimatedDelivery: opt.estimated_shipping_dates ? {
             min: opt.estimated_shipping_dates.arrival_min,
             max: opt.estimated_shipping_dates.arrival_max,
-          },
+          } : null,
         })),
       },
     });
