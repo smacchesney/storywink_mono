@@ -36,6 +36,7 @@
     "cloudinary": "^2.6.0",
     "clsx": "^2.1.1",
     "critters": "^0.0.23",
+    "dropbox": "^10.34.0",
     "embla-carousel-react": "^8.1.7",
     "framer-motion": "^12.11.3",
     "ioredis": "^5.6.1",

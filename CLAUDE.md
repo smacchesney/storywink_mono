@@ -805,6 +805,36 @@ model PrintOrder {
 }
 ```
 
+### Dropbox Integration (Lulu PDFs)
+
+Lulu print PDFs are stored in Dropbox instead of Cloudinary to avoid the 10MB upload limit.
+
+**Folder Structure**:
+```
+/Apps/Storywink/lulu-prints/{bookId}/interior.pdf
+/Apps/Storywink/lulu-prints/{bookId}/cover.pdf
+```
+
+**Environment Variable** (apps/web):
+```
+DROPBOX_ACCESS_TOKEN=sl.xxxxx
+```
+
+**Key Files**:
+| File | Purpose |
+|------|---------|
+| `apps/web/src/lib/dropbox.ts` | Dropbox client + `uploadPdfToDropbox()` |
+| `apps/web/src/app/api/book/[bookId]/export/lulu-interior/route.ts` | Interior PDF → Dropbox |
+| `apps/web/src/app/api/book/[bookId]/export/lulu-cover/route.ts` | Cover PDF → Dropbox |
+
+**Technical Notes**:
+- Uses `filesUpload()` for files < 150MB
+- Creates public shared links via `sharingCreateSharedLinkWithSettings()`
+- URLs converted to `?dl=1` for direct download (required by Lulu)
+- Existing files overwritten on re-upload
+
+**What stays on Cloudinary**: User photos, generated illustrations, regular PDF exports
+
 ### Phase 2 (Pending): Stripe Integration
 
 Not yet implemented:

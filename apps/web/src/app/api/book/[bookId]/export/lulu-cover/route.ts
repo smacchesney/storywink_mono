@@ -3,14 +3,14 @@ import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
 import { generateLuluCover } from '@/lib/pdf/generateLuluCover';
-import cloudinary from '@/lib/cloudinary';
+import { uploadPdfToDropbox } from '@/lib/dropbox';
 import { Book, Page } from '@prisma/client';
 
 // Define the expected Book type with Pages for the PDF generator
 type BookWithPages = Book & { pages: Page[] };
 
 /**
- * Generates cover spread PDF for Lulu print-on-demand and uploads to Cloudinary.
+ * Generates cover spread PDF for Lulu print-on-demand and uploads to Dropbox.
  * Creates a spread with back cover (coral branding) and front cover (title page).
  * Returns a publicly accessible URL that Lulu API can fetch.
  *
@@ -79,37 +79,16 @@ export async function POST(
     logger.info({ bookId }, 'Generating cover PDF for Lulu...');
     const pdfBuffer = await generateLuluCover(bookData as BookWithPages);
 
-    // Upload to Cloudinary with public access
-    logger.info({ bookId }, 'Uploading cover PDF to Cloudinary...');
-    const uploadResult = await new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder: `storywink/${bookId}/print`,
-          public_id: 'cover',
-          resource_type: 'raw', // PDF is raw resource type
-          overwrite: true,
-          format: 'pdf',
-          tags: [`book:${bookId}`, 'lulu-cover', 'print'],
-        },
-        (error, result) => {
-          if (error) {
-            reject(error);
-          } else if (result) {
-            resolve({ secure_url: result.secure_url, public_id: result.public_id });
-          } else {
-            reject(new Error('No result from Cloudinary upload'));
-          }
-        }
-      );
-      uploadStream.end(pdfBuffer);
-    });
+    // Upload to Dropbox with public shared link (avoids Cloudinary 10MB limit)
+    logger.info({ bookId }, 'Uploading cover PDF to Dropbox...');
+    const uploadResult = await uploadPdfToDropbox(pdfBuffer, bookId, 'cover.pdf');
 
-    logger.info({ bookId, publicId: uploadResult.public_id }, 'Cover PDF uploaded to Cloudinary.');
+    logger.info({ bookId, dropboxPath: uploadResult.path }, 'Cover PDF uploaded to Dropbox.');
 
     return NextResponse.json({
       success: true,
-      url: uploadResult.secure_url,
-      publicId: uploadResult.public_id,
+      url: uploadResult.url,
+      dropboxPath: uploadResult.path,
     });
 
   } catch (error) {
