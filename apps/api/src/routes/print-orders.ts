@@ -79,6 +79,9 @@ printOrdersRouter.post('/calculate-price', async (req: AuthenticatedRequest, res
       shippingOption,
     });
 
+    // Extract line item cost details for transparent breakdown
+    const lineItem = costResult.line_item_costs[0];
+
     res.json({
       success: true,
       data: {
@@ -88,8 +91,13 @@ printOrdersRouter.post('/calculate-price', async (req: AuthenticatedRequest, res
         quantity: qty,
         shippingOption,
         costs: {
-          printCost: costResult.line_item_costs[0]?.cost_excl_discounts || '0.00',
+          // Per-unit print cost (for display: "5 × $7.50")
+          perUnitCost: lineItem?.cost_excl_discounts || '0.00',
+          // Total print cost for all units (this is what scales with quantity)
+          printCost: lineItem?.total_cost_excl_tax || '0.00',
           shippingCost: costResult.shipping_cost.total_cost_excl_tax,
+          // Per-order fulfillment fee (doesn't scale with quantity)
+          fulfillmentFee: costResult.fulfillment_cost?.total_cost_excl_tax || '0.00',
           subtotal: costResult.total_cost_excl_tax,
           tax: costResult.total_tax,
           total: costResult.total_cost_incl_tax,

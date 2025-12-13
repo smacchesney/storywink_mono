@@ -89,16 +89,45 @@ export interface LuluPrintJobCostResponse {
   total_cost_excl_tax: string;
   total_tax: string;
   total_cost_incl_tax: string;
+  total_discount_amount?: string;
   currency: string;
   line_item_costs: Array<{
-    cost_excl_discounts: string;
+    cost_excl_discounts: string;           // Per-unit cost (doesn't scale with qty)
+    total_cost_excl_discounts?: string;    // cost_excl_discounts × quantity
+    total_cost_excl_tax: string;           // Total print cost for quantity (after discounts, before tax)
+    total_cost_incl_tax?: string;          // Total print cost including tax
+    total_tax?: string;                    // Tax for this line item
+    tax_rate?: string;                     // Tax rate as decimal
+    unit_tier_cost?: string | null;        // Per-unit with volume discount
     quantity: number;
     currency: string;
+    discounts?: Array<{
+      amount: string;
+      description: string;
+    }>;
   }>;
   shipping_cost: {
     total_cost_excl_tax: string;
+    total_cost_incl_tax?: string;
+    total_tax?: string;
+    tax_rate?: string;
     currency: string;
   };
+  fulfillment_cost?: {
+    total_cost_excl_tax: string;
+    total_cost_incl_tax: string;
+    total_tax: string;
+    tax_rate?: string;
+  };
+  fees?: Array<{
+    fee_type: string;
+    sku?: string;
+    currency: string;
+    total_cost_excl_tax: string;
+    total_cost_incl_tax: string;
+    total_tax: string;
+    tax_rate?: string;
+  }>;
 }
 
 // Lulu /shipping-options/ returns an array directly, not wrapped in an object

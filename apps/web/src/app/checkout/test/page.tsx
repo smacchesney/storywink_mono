@@ -20,8 +20,10 @@ interface PriceQuote {
   quantity: number;
   shippingOption: string;
   costs: {
-    printCost: string;
+    perUnitCost: string;      // Per-unit print cost
+    printCost: string;        // Total print cost for all units
     shippingCost: string;
+    fulfillmentFee: string;   // Per-order fee (doesn't scale)
     subtotal: string;
     tax: string;
     total: string;
@@ -374,13 +376,21 @@ function DummyCheckoutContent() {
                 </div>
                 <div className="border-t my-3"></div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Print Cost</span>
+                  <span className="text-gray-600">
+                    Print Cost ({priceQuote.quantity} × ${priceQuote.costs.perUnitCost})
+                  </span>
                   <span>${priceQuote.costs.printCost}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
                   <span>${priceQuote.costs.shippingCost}</span>
                 </div>
+                {priceQuote.costs.fulfillmentFee && parseFloat(priceQuote.costs.fulfillmentFee) > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Fulfillment Fee</span>
+                    <span>${priceQuote.costs.fulfillmentFee}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-600">Subtotal</span>
                   <span>${priceQuote.costs.subtotal}</span>
