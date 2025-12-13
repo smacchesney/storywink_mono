@@ -330,10 +330,14 @@ function DummyCheckoutContent() {
                       />
                       <div>
                         <p className="font-medium">{SHIPPING_LABELS[option.level] || option.level}</p>
-                        <p className="text-xs text-gray-500">
-                          Est. delivery: {new Date(option.estimatedDelivery.min).toLocaleDateString()} -{' '}
-                          {new Date(option.estimatedDelivery.max).toLocaleDateString()}
-                        </p>
+                        {option.estimatedDelivery ? (
+                          <p className="text-xs text-gray-500">
+                            Est. delivery: {new Date(option.estimatedDelivery.min).toLocaleDateString()} -{' '}
+                            {new Date(option.estimatedDelivery.max).toLocaleDateString()}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-gray-500">Delivery estimate not available</p>
+                        )}
                       </div>
                     </div>
                     <span className="font-medium">${option.costExclTax}</span>
