@@ -101,18 +101,19 @@ export interface LuluPrintJobCostResponse {
   };
 }
 
-export interface LuluShippingOptionsResponse {
-  shipping_options: Array<{
-    level: string;
-    total_cost_excl_tax: string;
-    total_cost_incl_tax: string;
-    currency: string;
-    estimated_shipping_dates: {
-      arrival_min: string;
-      arrival_max: string;
-    };
-  }>;
+// Lulu /shipping-options/ returns an array directly, not wrapped in an object
+export interface LuluShippingOption {
+  level: string;
+  total_cost_excl_tax: string;
+  total_cost_incl_tax: string;
+  currency: string;
+  estimated_shipping_dates: {
+    arrival_min: string;
+    arrival_max: string;
+  };
 }
+
+export type LuluShippingOptionsResponse = LuluShippingOption[];
 
 /**
  * Lulu API Client

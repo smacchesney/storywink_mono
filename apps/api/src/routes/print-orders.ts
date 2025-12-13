@@ -158,13 +158,14 @@ printOrdersRouter.post('/shipping-options', async (req: AuthenticatedRequest, re
       shippingAddress: address,
     });
 
+    // Lulu API returns array directly, not wrapped in shipping_options
     res.json({
       success: true,
       data: {
         bookId: book.id,
         pageCount: book._count.pages,
         quantity: qty,
-        shippingOptions: optionsResult.shipping_options.map(opt => ({
+        shippingOptions: optionsResult.map(opt => ({
           level: opt.level,
           costExclTax: opt.total_cost_excl_tax,
           costInclTax: opt.total_cost_incl_tax,
