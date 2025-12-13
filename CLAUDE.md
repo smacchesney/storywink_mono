@@ -624,3 +624,193 @@ export const STYLE_LIBRARY = {
 - `apps/workers/src/utils/text-overlay.ts` - New `addLogoToTitlePage()` function
 - `apps/web/src/components/create/editor/ArtStylePicker.tsx` - Removed toggle UI
 - All API routes and types - Removed `isWinkifyEnabled` references
+
+## Print-on-Demand Integration (December 2025) - MILESTONE 1 ✅
+
+### Overview
+Lulu Print-on-Demand API integration for printing physical children's books. Phase 1 complete: API integration tested and working. Phase 2 (Stripe checkout + user-facing UI) pending.
+
+### Lulu API Configuration
+- **Sandbox API**: `https://api.sandbox.lulu.com`
+- **Production API**: `https://api.lulu.com`
+- **Auth**: OAuth 2.0 client credentials flow
+- **POD Package**: `0850X0850FCPRESS080CW444MXX` (8.5x8.5" Saddle Stitch, Full Color)
+
+### Environment Variables
+```bash
+# apps/api/.env
+LULU_CLIENT_ID=...
+LULU_CLIENT_SECRET=...
+LULU_USE_SANDBOX=true  # Remove or set false for production
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `packages/shared/src/lulu.ts` | Lulu constants, PDF specs, shipping labels |
+| `apps/api/src/lib/lulu/client.ts` | Lulu API client with OAuth |
+| `apps/api/src/routes/print-orders.ts` | Print order API routes |
+| `apps/web/src/app/checkout/test/page.tsx` | Test checkout page (no Stripe) |
+| `apps/web/src/app/api/book/[bookId]/export/lulu-interior/route.ts` | Interior PDF generation |
+| `apps/web/src/app/api/book/[bookId]/export/lulu-cover/route.ts` | Cover PDF generation |
+
+### Lulu API Client (`apps/api/src/lib/lulu/client.ts`)
+
+```typescript
+import { getLuluClient } from '../lib/lulu/client.js';
+
+const client = getLuluClient();
+
+// Get shipping options
+const options = await client.getShippingOptions({
+  pageCount: 16,
+  quantity: 1,
+  shippingAddress: { city, country_code, postcode, state_code, street1, phone_number },
+});
+
+// Calculate price quote
+const cost = await client.calculateCost({
+  pageCount: 16,
+  quantity: 1,
+  shippingAddress: { ... },
+  shippingOption: 'MAIL',
+});
+
+// Create print job (after payment)
+const job = await client.createPrintJob({
+  contactEmail: 'user@example.com',
+  pageCount: 16,
+  quantity: 1,
+  interiorPdfUrl: 'https://...',
+  coverPdfUrl: 'https://...',
+  shippingAddress: { ... },
+  shippingLevel: 'MAIL',
+  bookTitle: 'My Book',
+  externalId: 'order-123',
+});
+```
+
+### API Endpoints (Express - Port 4000)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/print-orders/shipping-options` | POST | Get available shipping options from Lulu |
+| `/api/print-orders/calculate-price` | POST | Get price quote from Lulu |
+| `/api/print-orders` | POST | Create print order record |
+| `/api/print-orders` | GET | List user's print orders |
+| `/api/print-orders/:orderId` | GET | Get specific order |
+| `/api/print-orders/:orderId/submit-to-lulu` | POST | Submit order to Lulu API |
+| `/api/print-orders/:orderId/cancel` | POST | Cancel order |
+
+### Lulu API Quirks (IMPORTANT)
+
+1. **Different field names per endpoint**:
+   - `/shipping-options/` uses `country` in shipping_address
+   - `/print-job-cost-calculations/` uses `country_code` in shipping_address
+
+2. **phone_number required**: Both endpoints require `phone_number` in shipping_address
+
+3. **Response formats differ**:
+   - `/shipping-options/` returns array directly (not wrapped)
+   - `/print-job-cost-calculations/` returns object with nested fields
+
+4. **Cost fields**:
+   - `cost_excl_discounts` = per-unit cost (doesn't scale with quantity)
+   - `total_cost_excl_tax` = total cost for all units (scales with quantity)
+   - `fulfillment_cost` = per-order fee (doesn't scale)
+
+### Cost Response Structure
+
+```typescript
+interface LuluPrintJobCostResponse {
+  total_cost_excl_tax: string;      // Grand total before tax
+  total_cost_incl_tax: string;      // Grand total including tax
+  total_tax: string;
+  currency: string;
+  line_item_costs: Array<{
+    cost_excl_discounts: string;    // Per-unit cost
+    total_cost_excl_tax: string;    // Total for quantity (USE THIS)
+    quantity: number;
+  }>;
+  shipping_cost: {
+    total_cost_excl_tax: string;
+  };
+  fulfillment_cost?: {              // Per-order fee (~$0.75)
+    total_cost_excl_tax: string;
+  };
+}
+```
+
+### Test Checkout Page
+
+**URL**: `/checkout/test?bookId=xxx`
+
+Tests Lulu API integration without Stripe:
+- Fetches shipping options
+- Calculates price quotes
+- Creates test orders
+- Generates interior + cover PDFs
+- Displays PDF URLs for verification
+
+### PDF Specifications (8.5x8.5" Saddle Stitch)
+
+| Spec | Interior | Cover Spread |
+|------|----------|--------------|
+| Trim Size | 8.5" × 8.5" | 17.25" × 8.75" (back + front) |
+| With Bleed | 8.75" × 8.75" | Same |
+| Bleed Margin | 0.125" | 0.125" |
+| Resolution | 300 DPI | 300 DPI |
+| Pixels | 2625 × 2625 | 5175 × 2625 |
+| Page Count | 4-48 (divisible by 4) | N/A |
+
+### Database Schema
+
+```prisma
+model PrintOrder {
+  id                String   @id @default(cuid())
+  userId            String
+  bookId            String
+  quantity          Int      @default(1)
+  status            String   @default("PENDING_PAYMENT")
+  pageCount         Int?
+
+  // Shipping address
+  shippingName      String?
+  shippingStreet1   String?
+  shippingStreet2   String?
+  shippingCity      String?
+  shippingState     String?
+  shippingPostcode  String?
+  shippingCountry   String?
+  shippingPhone     String?
+  contactEmail      String?
+
+  // Lulu integration
+  luluPrintJobId    String?
+  interiorPdfUrl    String?
+  coverPdfUrl       String?
+  submittedAt       DateTime?
+
+  // Stripe integration (Phase 2)
+  stripeSessionId   String?
+  stripePaymentId   String?
+  totalAmount       Int?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user              User     @relation(...)
+  book              Book     @relation(...)
+}
+```
+
+### Phase 2 (Pending): Stripe Integration
+
+Not yet implemented:
+- PrintOrderSheet component (quantity + shipping selector)
+- Stripe Checkout session creation
+- Stripe webhook handler
+- Order success page
+- PDF generation in webhook flow
+- Lulu order submission after payment
