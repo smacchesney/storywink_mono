@@ -241,6 +241,9 @@ export class LuluApiClient {
 
   /**
    * Get available shipping options for a given address.
+   *
+   * Official Lulu API Endpoint: POST /shipping-options/
+   * Docs: https://api.lulu.com/docs/#tag/Shipping-Options
    */
   async getShippingOptions(params: {
     pageCount: number;
@@ -254,11 +257,18 @@ export class LuluApiClient {
         pod_package_id: params.podPackageId || LULU_CONFIG.DEFAULT_POD_PACKAGE,
         quantity: params.quantity,
       }],
-      shipping_address: params.shippingAddress,
+      // Lulu API uses "country" not "country_code" in shipping_address
+      shipping_address: {
+        city: params.shippingAddress.city,
+        country: params.shippingAddress.country_code,
+        postcode: params.shippingAddress.postcode,
+        state_code: params.shippingAddress.state_code,
+        street1: params.shippingAddress.street1,
+      },
     };
 
     return this.request<LuluShippingOptionsResponse>(
-      '/print-shipping-options/',
+      '/shipping-options/',
       {
         method: 'POST',
         body: JSON.stringify(requestBody),
