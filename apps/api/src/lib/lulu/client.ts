@@ -227,10 +227,10 @@ export class LuluApiClient {
         pod_package_id: params.podPackageId || LULU_CONFIG.DEFAULT_POD_PACKAGE,
         quantity: params.quantity,
       }],
-      // Lulu API uses "country" not "country_code" and requires phone_number
+      // /print-job-cost-calculations/ uses country_code (unlike /shipping-options/ which uses country)
       shipping_address: {
         city: params.shippingAddress.city,
-        country: params.shippingAddress.country_code,
+        country_code: params.shippingAddress.country_code,
         postcode: params.shippingAddress.postcode,
         state_code: params.shippingAddress.state_code,
         street1: params.shippingAddress.street1,
