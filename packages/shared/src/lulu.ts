@@ -6,10 +6,10 @@ export const LULU_CONFIG = {
   SANDBOX_API: 'https://api.sandbox.lulu.com',
   TOKEN_ENDPOINT: '/auth/realms/glasstree/protocol/openid-connect/token',
 
-  // 8.5x8.5 Full Color options
+  // 8.5x8.5 Full Color Saddle Stitch options
   POD_PACKAGES: {
-    // Sandbox-compatible package ID
-    SQUARE_8X8_FULL_COLOR: '0850X0850FCPRECW080CW444MXX',
+    // Sandbox-compatible saddle stitch (4-48 pages)
+    SADDLE_STITCH_8X8: '0850X0850FCPRESS080CW444MXX',
   },
 
   // Shipping options from Lulu API
@@ -21,8 +21,8 @@ export const LULU_CONFIG = {
     MAX_PAGES: 48,
   },
 
-  // Default POD package for Storywink books (sandbox-compatible)
-  DEFAULT_POD_PACKAGE: '0850X0850FCPRECW080CW444MXX',
+  // Default POD package for Storywink books (sandbox-compatible saddle stitch)
+  DEFAULT_POD_PACKAGE: '0850X0850FCPRESS080CW444MXX',
 } as const;
 
 // PDF Specifications for Lulu Print
