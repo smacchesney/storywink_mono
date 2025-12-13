@@ -264,6 +264,7 @@ export class LuluApiClient {
         postcode: params.shippingAddress.postcode,
         state_code: params.shippingAddress.state_code,
         street1: params.shippingAddress.street1,
+        phone_number: params.shippingAddress.phone_number || '+1 000 000 0000',
       },
     };
 
