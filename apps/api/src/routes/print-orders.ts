@@ -394,7 +394,6 @@ printOrdersRouter.post('/:orderId/submit-to-lulu', async (req: AuthenticatedRequ
     const client = getLuluClient();
     const printJob = await client.createPrintJob({
       contactEmail: order.contactEmail || 'orders@storywink.ai',
-      pageCount: order.pageCount || 0,
       quantity: order.quantity,
       interiorPdfUrl,
       coverPdfUrl,
@@ -403,10 +402,10 @@ printOrdersRouter.post('/:orderId/submit-to-lulu', async (req: AuthenticatedRequ
         street1: order.shippingStreet1 || '',
         street2: order.shippingStreet2 || undefined,
         city: order.shippingCity || '',
-        state_code: order.shippingState || undefined,
+        state_code: order.shippingState || '',
         country_code: order.shippingCountry || 'US',
         postcode: order.shippingPostcode || '',
-        phone_number: order.shippingPhone || undefined,
+        phone_number: order.shippingPhone || '+1 000 000 0000',
       },
       shippingLevel,
       bookTitle: order.book.title,

@@ -27,15 +27,13 @@ export interface LuluShippingAddress {
 }
 
 export interface LuluLineItem {
-  page_count: number;
+  external_id?: string;
+  printable_normalization: {
+    cover: { source_url: string };
+    interior: { source_url: string };
+  };
   pod_package_id: string;
   quantity: number;
-  interior: {
-    source_url: string;
-  };
-  cover: {
-    source_url: string;
-  };
   title?: string;
 }
 
@@ -234,6 +232,14 @@ export class LuluApiClient {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`Lulu API error (${response.status}):`, errorText);
+      // Try to parse as JSON for more detailed error info
+      try {
+        const errorJson = JSON.parse(errorText);
+        console.error('Lulu API error details:', JSON.stringify(errorJson, null, 2));
+      } catch {
+        // HTML error response, already logged above
+      }
       throw new Error(`Lulu API error: ${response.status} ${errorText}`);
     }
 
@@ -320,7 +326,6 @@ export class LuluApiClient {
    */
   async createPrintJob(params: {
     contactEmail: string;
-    pageCount: number;
     quantity: number;
     interiorPdfUrl: string;
     coverPdfUrl: string;
@@ -332,22 +337,30 @@ export class LuluApiClient {
   }): Promise<LuluPrintJob> {
     const requestBody: LuluCreatePrintJobRequest = {
       contact_email: params.contactEmail,
+      external_id: params.externalId,
       line_items: [{
-        page_count: params.pageCount,
+        printable_normalization: {
+          cover: { source_url: params.coverPdfUrl },
+          interior: { source_url: params.interiorPdfUrl },
+        },
         pod_package_id: params.podPackageId || LULU_CONFIG.DEFAULT_POD_PACKAGE,
         quantity: params.quantity,
-        interior: {
-          source_url: params.interiorPdfUrl,
-        },
-        cover: {
-          source_url: params.coverPdfUrl,
-        },
         title: params.bookTitle,
       }],
-      shipping_address: params.shippingAddress,
+      shipping_address: {
+        name: params.shippingAddress.name,
+        street1: params.shippingAddress.street1,
+        street2: params.shippingAddress.street2,
+        city: params.shippingAddress.city,
+        state_code: params.shippingAddress.state_code || '',
+        country_code: params.shippingAddress.country_code,
+        postcode: params.shippingAddress.postcode,
+        phone_number: params.shippingAddress.phone_number || '+1 000 000 0000',
+      },
       shipping_level: params.shippingLevel,
-      external_id: params.externalId,
     };
+
+    console.log('Lulu createPrintJob request:', JSON.stringify(requestBody, null, 2));
 
     return this.request<LuluPrintJob>(
       '/print-jobs/',
