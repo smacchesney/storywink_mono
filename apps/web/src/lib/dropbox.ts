@@ -80,8 +80,9 @@ export async function uploadPdfToDropbox(
     }
   }
 
-  // Convert to direct download URL for Lulu (replace ?dl=0 with ?dl=1)
-  const directDownloadUrl = sharedUrl.replace(/\?dl=0$/, '?dl=1');
+  // Convert to direct download URL for Lulu (replace ?dl=0 with ?dl=1&raw=1)
+  // The raw=1 parameter ensures Dropbox serves raw file content, not HTML preview
+  const directDownloadUrl = sharedUrl.replace(/\?dl=0$/, '?dl=1&raw=1');
 
   logger.info(
     { bookId, dropboxPath, url: directDownloadUrl },
