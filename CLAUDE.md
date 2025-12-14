@@ -815,19 +815,22 @@ Lulu print PDFs are stored in Dropbox instead of Cloudinary to avoid the 10MB up
 /Apps/Storywink/lulu-prints/{bookId}/cover.pdf
 ```
 
-**Environment Variable** (apps/web):
-```
-DROPBOX_ACCESS_TOKEN=sl.xxxxx
+**Environment Variables** (apps/web):
+```bash
+DROPBOX_APP_KEY=your_app_key
+DROPBOX_APP_SECRET=your_app_secret
+DROPBOX_REFRESH_TOKEN=your_refresh_token
 ```
 
 **Key Files**:
 | File | Purpose |
 |------|---------|
-| `apps/web/src/lib/dropbox.ts` | Dropbox client + `uploadPdfToDropbox()` |
+| `apps/web/src/lib/dropbox.ts` | Dropbox client with refresh token auth |
 | `apps/web/src/app/api/book/[bookId]/export/lulu-interior/route.ts` | Interior PDF → Dropbox |
 | `apps/web/src/app/api/book/[bookId]/export/lulu-cover/route.ts` | Cover PDF → Dropbox |
 
 **Technical Notes**:
+- Uses `DropboxAuth` with refresh token for automatic token renewal (no 4-hour expiration)
 - Uses `filesUpload()` for files < 150MB
 - Creates public shared links via `sharingCreateSharedLinkWithSettings()`
 - URLs converted to `?dl=1` for direct download (required by Lulu)

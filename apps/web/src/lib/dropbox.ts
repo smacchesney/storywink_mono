@@ -1,20 +1,28 @@
-import { Dropbox } from 'dropbox';
+import { Dropbox, DropboxAuth } from 'dropbox';
 import logger from './logger';
 
-const accessToken = process.env.DROPBOX_ACCESS_TOKEN;
+const appKey = process.env.DROPBOX_APP_KEY;
+const appSecret = process.env.DROPBOX_APP_SECRET;
+const refreshToken = process.env.DROPBOX_REFRESH_TOKEN;
 
-if (!accessToken) {
-  logger.error('Missing DROPBOX_ACCESS_TOKEN environment variable');
+if (!appKey || !appSecret || !refreshToken) {
+  logger.error('Missing Dropbox credentials: DROPBOX_APP_KEY, DROPBOX_APP_SECRET, or DROPBOX_REFRESH_TOKEN');
 }
 
-const dbx = new Dropbox({
-  accessToken,
-  fetch: fetch, // Required for Node.js/Next.js server environment
+// Create auth instance with refresh token - automatically handles token refresh
+const dbxAuth = new DropboxAuth({
+  clientId: appKey,
+  clientSecret: appSecret,
+  refreshToken: refreshToken,
+  fetch: fetch,
 });
+
+// Create Dropbox client with auth
+const dbx = new Dropbox({ auth: dbxAuth, fetch: fetch });
 
 /**
  * Upload a PDF buffer to Dropbox and return a public download URL.
- * Used for Lulu print PDFs which may exceed Cloudinary's 10MB limit.
+ * Uses refresh token for automatic token renewal (no 4-hour expiration issues).
  *
  * @param buffer - PDF file buffer
  * @param bookId - Book ID for folder organization
@@ -26,8 +34,8 @@ export async function uploadPdfToDropbox(
   bookId: string,
   filename: 'interior.pdf' | 'cover.pdf'
 ): Promise<{ url: string; path: string }> {
-  if (!accessToken) {
-    throw new Error('Dropbox not configured: Missing DROPBOX_ACCESS_TOKEN');
+  if (!appKey || !appSecret || !refreshToken) {
+    throw new Error('Dropbox not configured: Missing DROPBOX_APP_KEY, DROPBOX_APP_SECRET, or DROPBOX_REFRESH_TOKEN');
   }
 
   const dropboxPath = `/Apps/Storywink/lulu-prints/${bookId}/${filename}`;
