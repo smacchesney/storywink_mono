@@ -75,6 +75,12 @@ function DummyCheckoutContent() {
   const [orderCreated, setOrderCreated] = useState<string | null>(null);
   const [pdfUrls, setPdfUrls] = useState<{ interior: string; cover: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [luluSubmitting, setLuluSubmitting] = useState(false);
+  const [luluResult, setLuluResult] = useState<{
+    success: boolean;
+    printJobId?: string;
+    error?: string;
+  } | null>(null);
 
   // Fetch shipping options on mount
   useEffect(() => {
@@ -217,26 +223,6 @@ function DummyCheckoutContent() {
         throw new Error('Failed to generate PDFs');
       }
 
-      // Step 3: Submit to Lulu (optional for testing)
-      // Uncomment this to actually submit to Lulu sandbox
-      /*
-      const submitResponse = await fetch(`${getApiUrl()}/api/print-orders/${orderData.data.id}/submit-to-lulu`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          interiorPdfUrl: interiorData.url,
-          coverPdfUrl: coverData.url,
-          shippingLevel,
-        }),
-      });
-
-      const submitData = await submitResponse.json();
-      console.log('Submitted to Lulu:', submitData);
-      */
-
       // Store PDF URLs for display in the UI
       setPdfUrls({ interior: interiorData.url, cover: coverData.url });
 
@@ -244,6 +230,52 @@ function DummyCheckoutContent() {
       setError(err instanceof Error ? err.message : 'Failed to process order');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSubmitToLulu = async () => {
+    if (!orderCreated || !pdfUrls) return;
+
+    setLuluSubmitting(true);
+    setLuluResult(null);
+    setError(null);
+
+    try {
+      const token = await getToken();
+
+      const response = await fetch(`${getApiUrl()}/api/print-orders/${orderCreated}/submit-to-lulu`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          interiorPdfUrl: pdfUrls.interior,
+          coverPdfUrl: pdfUrls.cover,
+          shippingLevel,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setLuluResult({
+          success: true,
+          printJobId: data.data.luluPrintJob?.id || data.data.order?.luluPrintJobId,
+        });
+      } else {
+        setLuluResult({
+          success: false,
+          error: data.error || 'Failed to submit to Lulu',
+        });
+      }
+    } catch (err) {
+      setLuluResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to submit to Lulu',
+      });
+    } finally {
+      setLuluSubmitting(false);
     }
   };
 
@@ -422,7 +454,7 @@ function DummyCheckoutContent() {
 
             <p className="text-xs text-gray-500 text-center">
               This will create a test order and generate PDFs.
-              To actually submit to Lulu sandbox, uncomment the submit code.
+              After PDFs are generated, click &quot;Submit to Lulu Sandbox&quot; to test the full flow.
             </p>
           </div>
 
@@ -441,7 +473,7 @@ function DummyCheckoutContent() {
                       rel="noopener noreferrer"
                       className="block text-sm text-blue-600 hover:text-blue-800 underline truncate"
                     >
-                      📄 Interior PDF (click to view)
+                      Interior PDF (click to view)
                     </a>
                     <a
                       href={pdfUrls.cover}
@@ -449,9 +481,42 @@ function DummyCheckoutContent() {
                       rel="noopener noreferrer"
                       className="block text-sm text-blue-600 hover:text-blue-800 underline truncate"
                     >
-                      📄 Cover PDF (click to view)
+                      Cover PDF (click to view)
                     </a>
                   </div>
+
+                  {/* Submit to Lulu Button */}
+                  {!luluResult?.success && (
+                    <button
+                      onClick={handleSubmitToLulu}
+                      disabled={luluSubmitting}
+                      className="mt-4 w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {luluSubmitting ? 'Submitting to Lulu...' : 'Submit to Lulu Sandbox'}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Lulu Submission Result */}
+              {luluResult && (
+                <div className={`mt-4 p-3 rounded-lg ${
+                  luluResult.success ? 'bg-blue-50 border border-blue-200' : 'bg-red-50 border border-red-200'
+                }`}>
+                  {luluResult.success ? (
+                    <>
+                      <p className="text-blue-700 font-medium">Submitted to Lulu!</p>
+                      <p className="text-sm text-blue-600 mt-1">Print Job ID: {luluResult.printJobId}</p>
+                      <p className="text-xs text-blue-500 mt-2">
+                        Check your Lulu sandbox dashboard to verify the order.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-red-700 font-medium">Lulu Submission Failed</p>
+                      <p className="text-sm text-red-600 mt-1">{luluResult.error}</p>
+                    </>
+                  )}
                 </div>
               )}
             </div>
