@@ -34,20 +34,21 @@ const PAGE_HEIGHT_PX = Math.round(PAGE_HEIGHT_WITH_BLEED_IN * DPI); // 2625px
  * TODO: Refine styling for text overlay, fonts, bleed, etc.
  */
 function generatePageHtml(page: Page, _bookTitle: string): string {
-  // Basic inline styles for now, move to CSS string later
+  // Use inches for container to match PDF page dimensions exactly
   const pageStyle = `
-    width: ${PAGE_WIDTH_PX}px;
-    height: ${PAGE_HEIGHT_PX}px;
-    position: relative; /* For text overlay */
-    overflow: hidden; /* Ensure content stays within bounds */
-    page-break-after: always; /* Create page break */
-    background-color: #f0f0f0; /* Placeholder background */
+    width: ${PAGE_WIDTH_WITH_BLEED_IN}in;
+    height: ${PAGE_HEIGHT_WITH_BLEED_IN}in;
+    position: relative;
+    overflow: hidden;
+    page-break-after: always;
+    background-color: white;
   `;
   const imageStyle = `
     display: block;
-    width: 100%; 
-    height: 100%; 
-    object-fit: cover; /* Cover the area, might crop */
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
   `;
   // const textStyle = `
   //   position: absolute;

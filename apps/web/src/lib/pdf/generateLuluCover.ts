@@ -27,8 +27,8 @@ const COVER_HEIGHT_IN = 8.75;
 const COVER_WIDTH_PX = Math.round(COVER_WIDTH_IN * DPI); // 5175px
 const COVER_HEIGHT_PX = Math.round(COVER_HEIGHT_IN * DPI); // 2625px
 
-// Single panel dimensions
-const PANEL_WIDTH_PX = COVER_WIDTH_PX / 2; // 2587.5px (will be rounded)
+// Single panel dimensions (in inches for PDF rendering)
+const PANEL_WIDTH_IN = COVER_WIDTH_IN / 2; // 8.625"
 
 // Brand colors
 const CORAL_COLOR = '#F76C5E';
@@ -49,9 +49,10 @@ const CORAL_COLOR = '#F76C5E';
  *      8.625"              8.625"
  */
 function generateCoverHtml(titlePageImageUrl: string | null, bookTitle: string): string {
+  // Use inches for all dimensions to match PDF page size exactly
   const containerStyle = `
-    width: ${COVER_WIDTH_PX}px;
-    height: ${COVER_HEIGHT_PX}px;
+    width: ${COVER_WIDTH_IN}in;
+    height: ${COVER_HEIGHT_IN}in;
     display: flex;
     flex-direction: row;
     margin: 0;
@@ -59,20 +60,20 @@ function generateCoverHtml(titlePageImageUrl: string | null, bookTitle: string):
   `;
 
   const backCoverStyle = `
-    width: ${PANEL_WIDTH_PX}px;
-    height: ${COVER_HEIGHT_PX}px;
+    width: ${PANEL_WIDTH_IN}in;
+    height: ${COVER_HEIGHT_IN}in;
     background-color: ${CORAL_COLOR};
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
     align-items: center;
-    padding-bottom: 120px;
+    padding-bottom: 0.5in;
     box-sizing: border-box;
   `;
 
   const frontCoverStyle = `
-    width: ${PANEL_WIDTH_PX}px;
-    height: ${COVER_HEIGHT_PX}px;
+    width: ${PANEL_WIDTH_IN}in;
+    height: ${COVER_HEIGHT_IN}in;
     overflow: hidden;
   `;
 
@@ -80,6 +81,7 @@ function generateCoverHtml(titlePageImageUrl: string | null, bookTitle: string):
     width: 100%;
     height: 100%;
     object-fit: cover;
+    object-position: center center;
   `;
 
   const brandingStyle = `
