@@ -110,7 +110,7 @@ const BookCard: React.FC<BookCardProps> = ({
               Creating illustrations...
             </TextShimmerWave>
             <p className="text-sm text-white/70 mt-2">
-              This may take 3-5 minutes
+              This usually takes 10-15 minutes
             </p>
           </div>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Bell } from 'lucide-react';
@@ -22,7 +22,7 @@ export function IllustrationProgressScreen({
   onComplete,
   onError,
 }: IllustrationProgressScreenProps) {
-  const [pollCount, setPollCount] = useState(0);
+  const pollCountRef = useRef(0);
 
   useEffect(() => {
     if (!bookId) return;
@@ -32,22 +32,22 @@ export function IllustrationProgressScreen({
         const response = await fetch(`/api/book-status?bookId=${bookId}`);
         if (!response.ok) {
           console.error(`Polling error (Illustration): ${response.status}`);
-          if (pollCount > MAX_POLLS / 2) {
+          pollCountRef.current += 1;
+          if (pollCountRef.current > MAX_POLLS / 2) {
             throw new Error("Failed to get book status repeatedly during illustration.");
           }
-          setPollCount(prev => prev + 1);
           return;
         }
-        
+
         const data = await response.json();
         const status = data.status as BookStatus;
-        setPollCount(prev => prev + 1);
+        pollCountRef.current += 1;
 
         if (status === BookStatus.COMPLETED || status === BookStatus.PARTIAL || status === BookStatus.FAILED) {
           clearInterval(intervalId);
           // PARTIAL means all illustrations done (title pages without text are OK)
           onComplete(bookId, status);
-        } else if (pollCount >= MAX_POLLS) {
+        } else if (pollCountRef.current >= MAX_POLLS) {
           clearInterval(intervalId);
           onError(bookId, "Illustration timed out.");
         }
@@ -61,7 +61,7 @@ export function IllustrationProgressScreen({
     }, POLLING_INTERVAL);
 
     return () => clearInterval(intervalId);
-  }, [bookId, onComplete, onError, pollCount]);
+  }, [bookId, onComplete, onError]);
 
   return (
     <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-50 p-4 text-center">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import Image from 'next/image';
 // import { Loader2 } from 'lucide-react'; // Or a custom doodle SVG
 // import { TextShimmer } from '@/components/ui/text-shimmer'; // Old import
@@ -21,7 +21,7 @@ export function WritingProgressScreen({
   onComplete,
   onError,
 }: WritingProgressScreenProps) {
-  const [pollCount, setPollCount] = useState(0);
+  const pollCountRef = useRef(0);
   const MAX_POLLS = 24; // Timeout after 2 minutes (24 * 5 seconds)
 
   useEffect(() => {
@@ -34,16 +34,16 @@ export function WritingProgressScreen({
           // Handle non-OK responses during polling
           console.error(`Polling error: ${response.status}`);
           // Optionally stop polling after several errors
-          if (pollCount > MAX_POLLS / 2) { // Stop if errors persist
-              throw new Error("Failed to get book status repeatedly.");
+          pollCountRef.current += 1;
+          if (pollCountRef.current > MAX_POLLS / 2) { // Stop if errors persist
+            throw new Error("Failed to get book status repeatedly.");
           }
-          setPollCount(prev => prev + 1);
           return; // Continue polling for a while
         }
-        
+
         const data = await response.json();
         const status = data.status as BookStatus;
-        setPollCount(prev => prev + 1);
+        pollCountRef.current += 1;
 
         if (status === BookStatus.STORY_READY || status === BookStatus.ILLUSTRATING || status === BookStatus.COMPLETED) {
           clearInterval(intervalId);
@@ -51,9 +51,9 @@ export function WritingProgressScreen({
         } else if (status === BookStatus.FAILED) {
           clearInterval(intervalId);
           onError(bookId, "Generation process failed.");
-        } else if (pollCount >= MAX_POLLS) {
-            clearInterval(intervalId);
-            onError(bookId, "Generation timed out.");
+        } else if (pollCountRef.current >= MAX_POLLS) {
+          clearInterval(intervalId);
+          onError(bookId, "Generation timed out.");
         }
         // Continue polling if still GENERATING
       } catch (err) {
@@ -67,7 +67,7 @@ export function WritingProgressScreen({
     // Cleanup function to clear interval when component unmounts
     return () => clearInterval(intervalId);
 
-  }, [bookId, onComplete, onError, pollCount]); // pollCount is a dependency
+  }, [bookId, onComplete, onError]);
 
   return (
     <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-50">
@@ -84,17 +84,27 @@ export function WritingProgressScreen({
       </div>
 
       {/* Text with Shimmer Effect - Properly contained */}
-      <div className="isolate">
+      <div className="isolate mb-4">
         <TextShimmerWave
-          className="text-lg md:text-xl font-semibold font-playful [--base-color:#374151] [--base-gradient-color:#F76C5E] dark:[--base-color:#D1D5DB] dark:[--base-gradient-color:#F76C5E]"
+          className="text-xl md:text-2xl font-semibold font-playful [--base-color:#374151] [--base-gradient-color:#F76C5E] dark:[--base-color:#D1D5DB] dark:[--base-gradient-color:#F76C5E]"
           duration={1}
           spread={1}
           zDistance={1}
           scaleDistance={1.1}
-          rotateYDistance={20}  
+          rotateYDistance={20}
         >
           Brewing a Bedtime adventure...
         </TextShimmerWave>
+      </div>
+
+      {/* Time estimate and instruction */}
+      <div className="max-w-xs md:max-w-sm space-y-2">
+        <p className="text-sm md:text-base text-gray-600">
+          This usually takes <span className="font-medium text-gray-700">1-2 minutes</span>.
+        </p>
+        <p className="text-xs md:text-sm text-gray-500">
+          Please don&apos;t close this page while your story is being written.
+        </p>
       </div>
     </div>
   );
