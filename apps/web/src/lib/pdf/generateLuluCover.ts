@@ -100,15 +100,34 @@ function generateCoverHtml(titlePageImageUrl: string | null, bookTitle: string):
       <meta charset="UTF-8">
       <title>${bookTitle} - Cover</title>
       <style>
-        body { margin: 0; padding: 0; }
-        @page {
-          size: ${COVER_WIDTH_IN}in ${COVER_HEIGHT_IN}in;
+        /* Page size handled by Puppeteer pdf() options - single source of truth */
+        html, body {
           margin: 0;
+          padding: 0;
+          width: ${COVER_WIDTH_IN}in;
+          height: ${COVER_HEIGHT_IN}in;
+          overflow: hidden;
+        }
+        /* Prevent page breaks - both legacy and modern properties */
+        * {
+          page-break-inside: avoid;
+          page-break-before: avoid;
+          page-break-after: avoid;
+          break-inside: avoid;
+          break-before: avoid;
+          break-after: avoid;
+        }
+        .cover-spread {
+          display: flex;
+          width: ${COVER_WIDTH_IN}in;
+          height: ${COVER_HEIGHT_IN}in;
+          page-break-inside: avoid;
+          break-inside: avoid;
         }
       </style>
     </head>
     <body>
-      <div style="${containerStyle}">
+      <div class="cover-spread" style="${containerStyle}">
         <!-- Back Cover (Left Side) -->
         <div style="${backCoverStyle}">
           <div style="${brandingStyle}">
@@ -173,24 +192,38 @@ export async function generateLuluCover(bookData: BookWithPages): Promise<Buffer
 
     const page = await browser.newPage();
 
-    // Set content and wait for images
-    await page.setContent(coverHtml, { waitUntil: 'networkidle0' });
-
-    // Set viewport to match pixel dimensions for high-res rendering
+    // Set viewport FIRST (before content) for correct layout calculation
     await page.setViewport({
       width: COVER_WIDTH_PX,
       height: COVER_HEIGHT_PX,
       deviceScaleFactor: 1,
     });
 
-    // Generate PDF with dimensions in inches (not pixels) for correct Lulu page size
+    // Set content and wait for network to settle
+    await page.setContent(coverHtml, { waitUntil: 'networkidle0' });
+
+    // Explicitly wait for all images to load (networkidle0 may fire before Cloudinary images finish)
+    await page.evaluate(async () => {
+      const images = Array.from(document.querySelectorAll('img'));
+      await Promise.all(
+        images.map(img => {
+          if (img.complete) return Promise.resolve();
+          return new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+          });
+        })
+      );
+    });
+
+    // Generate PDF with Puppeteer as single source of truth for dimensions
     logger.info({ bookId: bookData.id }, 'Generating cover PDF buffer...');
     const pdfUint8Array = await page.pdf({
       width: `${COVER_WIDTH_IN}in`,
       height: `${COVER_HEIGHT_IN}in`,
       printBackground: true,
       margin: { top: '0', right: '0', bottom: '0', left: '0' },
-      preferCSSPageSize: true,
+      preferCSSPageSize: false,  // Puppeteer dimensions take precedence
     });
 
     const pdfBuffer = Buffer.from(pdfUint8Array);

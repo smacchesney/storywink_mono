@@ -89,11 +89,7 @@ export async function generateBookPdf(bookData: BookWithPages): Promise<Buffer> 
         <title>${bookData.title || 'My Storybook'}</title>
         <style>
           body { margin: 0; padding: 0; }
-          @page {
-            size: ${PAGE_WIDTH_WITH_BLEED_IN}in ${PAGE_HEIGHT_WITH_BLEED_IN}in;
-            margin: 0;
-          }
-          /* Add other global styles, @font-face if needed */
+          /* Page size handled by Puppeteer pdf() options - single source of truth */
         </style>
       </head>
       <body>
@@ -125,24 +121,38 @@ export async function generateBookPdf(bookData: BookWithPages): Promise<Buffer> 
     });
     const page = await browser.newPage();
 
-    // Set content and wait for images/network to likely settle
-    await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
-
-    // Set viewport to match pixel dimensions for high-res rendering
+    // Set viewport FIRST (before content) for correct layout calculation
     await page.setViewport({
       width: PAGE_WIDTH_PX,
       height: PAGE_HEIGHT_PX,
       deviceScaleFactor: 1,
     });
 
-    // Generate PDF with dimensions in inches (not pixels) for correct Lulu page size
+    // Set content and wait for network to settle
+    await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
+
+    // Explicitly wait for all images to load (networkidle0 may fire before Cloudinary images finish)
+    await page.evaluate(async () => {
+      const images = Array.from(document.querySelectorAll('img'));
+      await Promise.all(
+        images.map(img => {
+          if (img.complete) return Promise.resolve();
+          return new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+          });
+        })
+      );
+    });
+
+    // Generate PDF with Puppeteer as single source of truth for dimensions
     logger.info({ bookId: bookData.id }, "Generating PDF buffer...");
     const pdfUint8Array = await page.pdf({
       width: `${PAGE_WIDTH_WITH_BLEED_IN}in`,
       height: `${PAGE_HEIGHT_WITH_BLEED_IN}in`,
       printBackground: true,
       margin: { top: '0', right: '0', bottom: '0', left: '0' },
-      preferCSSPageSize: true,
+      preferCSSPageSize: false,  // Puppeteer dimensions take precedence
     });
     // Convert Uint8Array to Buffer
     const pdfBuffer = Buffer.from(pdfUint8Array);
