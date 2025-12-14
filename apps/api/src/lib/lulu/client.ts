@@ -31,8 +31,8 @@ export interface LuluLineItem {
   printable_normalization: {
     cover: { source_url: string };
     interior: { source_url: string };
+    pod_package_id: string;
   };
-  pod_package_id: string;
   quantity: number;
   title?: string;
 }
@@ -342,8 +342,8 @@ export class LuluApiClient {
         printable_normalization: {
           cover: { source_url: params.coverPdfUrl },
           interior: { source_url: params.interiorPdfUrl },
+          pod_package_id: params.podPackageId || LULU_CONFIG.DEFAULT_POD_PACKAGE,
         },
-        pod_package_id: params.podPackageId || LULU_CONFIG.DEFAULT_POD_PACKAGE,
         quantity: params.quantity,
         title: params.bookTitle,
       }],
