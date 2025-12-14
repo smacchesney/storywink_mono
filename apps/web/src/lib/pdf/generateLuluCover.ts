@@ -102,7 +102,7 @@ function generateCoverHtml(titlePageImageUrl: string | null, bookTitle: string):
       <style>
         body { margin: 0; padding: 0; }
         @page {
-          size: ${COVER_WIDTH_PX}px ${COVER_HEIGHT_PX}px;
+          size: ${COVER_WIDTH_IN}in ${COVER_HEIGHT_IN}in;
           margin: 0;
         }
       </style>
@@ -176,11 +176,18 @@ export async function generateLuluCover(bookData: BookWithPages): Promise<Buffer
     // Set content and wait for images
     await page.setContent(coverHtml, { waitUntil: 'networkidle0' });
 
-    // Generate PDF
+    // Set viewport to match pixel dimensions for high-res rendering
+    await page.setViewport({
+      width: COVER_WIDTH_PX,
+      height: COVER_HEIGHT_PX,
+      deviceScaleFactor: 1,
+    });
+
+    // Generate PDF with dimensions in inches (not pixels) for correct Lulu page size
     logger.info({ bookId: bookData.id }, 'Generating cover PDF buffer...');
     const pdfUint8Array = await page.pdf({
-      width: `${COVER_WIDTH_PX}px`,
-      height: `${COVER_HEIGHT_PX}px`,
+      width: `${COVER_WIDTH_IN}in`,
+      height: `${COVER_HEIGHT_IN}in`,
       printBackground: true,
       margin: { top: '0', right: '0', bottom: '0', left: '0' },
       preferCSSPageSize: true,
