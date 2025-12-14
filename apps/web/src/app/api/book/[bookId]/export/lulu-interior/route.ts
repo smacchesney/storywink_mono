@@ -5,6 +5,7 @@ import logger from '@/lib/logger';
 import { generateBookPdf } from '@/lib/pdf/generateBookPdf';
 import { uploadPdfToDropbox } from '@/lib/dropbox';
 import { Book, Page } from '@prisma/client';
+import { isTitlePage } from '@storywink/shared/utils';
 
 // Define the expected Book type with Pages for the PDF generator
 type BookWithPages = Book & { pages: Page[] };
@@ -74,9 +75,34 @@ export async function POST(
       );
     }
 
+    // Filter out title page - Lulu interior should only contain story pages
+    // The title page is used for the cover (separate PDF), not the interior
+    const storyPages = bookData.pages.filter(
+      page => !isTitlePage(page.assetId, bookData.coverAssetId)
+    );
+
+    logger.info({
+      bookId,
+      totalPages: bookData.pages.length,
+      storyPages: storyPages.length,
+      coverAssetId: bookData.coverAssetId,
+    }, 'Filtered pages for Lulu interior (excluding title page)');
+
+    // Validate we have story pages to print
+    if (storyPages.length === 0) {
+      logger.warn({ bookId }, 'No story pages found for interior PDF');
+      return NextResponse.json(
+        { error: 'No story pages found. Book must have at least one story page for interior PDF.' },
+        { status: 400 }
+      );
+    }
+
     // Generate the interior PDF buffer (now with Lulu 8.5x8.5 specs)
-    logger.info({ bookId }, 'Generating interior PDF for Lulu...');
-    const pdfBuffer = await generateBookPdf(bookData as BookWithPages);
+    logger.info({ bookId, pageCount: storyPages.length }, 'Generating interior PDF for Lulu...');
+    const pdfBuffer = await generateBookPdf({
+      ...bookData,
+      pages: storyPages,
+    } as BookWithPages);
 
     // Upload to Dropbox with public shared link (avoids Cloudinary 10MB limit)
     logger.info({ bookId }, 'Uploading interior PDF to Dropbox...');
@@ -88,7 +114,7 @@ export async function POST(
       success: true,
       url: uploadResult.url,
       dropboxPath: uploadResult.path,
-      pageCount: bookData.pages.length,
+      pageCount: storyPages.length,  // Return story page count, not total
     });
 
   } catch (error) {
