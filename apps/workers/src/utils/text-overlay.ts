@@ -5,6 +5,13 @@ import { fileURLToPath } from 'url';
 import opentype from 'opentype.js';
 
 // ----------------------------------
+// CONSTANTS
+// ----------------------------------
+
+// Target size for Lulu print (8.75" × 8.75" at 300 DPI)
+const LULU_PRINT_SIZE_PX = 2625;
+
+// ----------------------------------
 // TYPES
 // ----------------------------------
 
@@ -295,6 +302,34 @@ export function isTextOverlayReady(): boolean {
   } catch {
     return false;
   }
+}
+
+// ----------------------------------
+// IMAGE UPSCALING FOR PRINT
+// ----------------------------------
+
+/**
+ * Upscale image to Lulu print dimensions using Sharp.
+ * Uses lanczos3 kernel for best quality upscaling.
+ *
+ * Gemini generates 2K (2048×2048) images, but Lulu requires
+ * 2625×2625 pixels for 300 DPI at 8.75" × 8.75" with bleed.
+ *
+ * @param imageBuffer - Input image buffer (typically 2048×2048 from Gemini)
+ * @param targetSize - Target dimension in pixels (default: 2625 for Lulu)
+ * @returns Upscaled image buffer
+ */
+export async function upscaleForPrint(
+  imageBuffer: Buffer,
+  targetSize: number = LULU_PRINT_SIZE_PX
+): Promise<Buffer> {
+  return sharp(imageBuffer)
+    .resize(targetSize, targetSize, {
+      kernel: 'lanczos3',  // Best quality for upscaling
+      fit: 'fill',         // Exact dimensions (image is already 1:1)
+    })
+    .png({ quality: 100 })
+    .toBuffer();
 }
 
 // ----------------------------------

@@ -8,8 +8,8 @@ import util from 'util';
 import { createIllustrationPrompt, IllustrationPromptOptions } from '@storywink/shared/prompts/illustration';
 // Import STYLE_LIBRARY directly from styles module to avoid barrel export race condition
 import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
-// Text overlay for story pages, logo overlay for title pages
-import { addTextToImage, addLogoToTitlePage } from '../utils/text-overlay.js';
+// Text overlay for story pages, logo overlay for title pages, upscaling for print
+import { addTextToImage, addLogoToTitlePage, upscaleForPrint } from '../utils/text-overlay.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -488,6 +488,26 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       try {
           logger.info({ jobId: job.id, pageId, pageNumber }, 'Decoding and uploading generated image to Cloudinary...');
           let generatedImageBuffer = Buffer.from(generatedImageBase64, 'base64');
+
+          // Upscale from Gemini 2K (2048×2048) to Lulu print size (2625×2625)
+          // This ensures 300 DPI quality for 8.75" × 8.75" print with bleed
+          try {
+              logger.info({ jobId: job.id, pageId, pageNumber }, 'Upscaling image for print quality (2048 → 2625px)...');
+              console.log(`[IllustrationWorker] Upscaling page ${pageNumber} to 2625×2625 for print`);
+              generatedImageBuffer = await upscaleForPrint(generatedImageBuffer);
+              logger.info({ jobId: job.id, pageId, pageNumber }, 'Image upscaled successfully.');
+          } catch (upscaleError: any) {
+              const errorMessage = `Image upscaling failed: ${upscaleError.message}`;
+              logger.error({
+                  jobId: job.id,
+                  pageId,
+                  pageNumber,
+                  error: upscaleError.message,
+                  stack: upscaleError.stack,
+              }, errorMessage);
+              console.error(`[IllustrationWorker] Upscaling failed for page ${pageNumber}: ${upscaleError.message}`);
+              throw new Error(errorMessage);
+          }
 
           // Add text overlay for story pages (not title pages)
           if (!isTitlePage && text && text.trim().length > 0) {
