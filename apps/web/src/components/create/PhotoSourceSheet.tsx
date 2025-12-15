@@ -7,16 +7,17 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  // SheetTrigger, // We might trigger this externally, but keep for reference
-  // SheetClose, // To allow closing
+  SheetDescription,
 } from "@/components/ui/sheet";
-import { Smartphone, Image as ImageIcon } from 'lucide-react'; // Assuming Google Photos icon isn't directly available
+import { Smartphone, Image as ImageIcon } from 'lucide-react';
+import { BOOK_CONSTRAINTS } from '@storywink/shared';
 
 interface PhotoSourceSheetProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onChooseFromPhone: () => void;
-  onImportFromGooglePhotos: () => void; // Add handler for Google Photos
+  onImportFromGooglePhotos: () => void;
+  currentPhotoCount?: number; // Optional: show remaining capacity
 }
 
 export function PhotoSourceSheet({
@@ -24,29 +25,34 @@ export function PhotoSourceSheet({
   onOpenChange,
   onChooseFromPhone,
   onImportFromGooglePhotos,
+  currentPhotoCount,
 }: PhotoSourceSheetProps) {
-  
+  const maxPhotos = BOOK_CONSTRAINTS.MAX_PHOTOS;
+  const remainingPhotos = currentPhotoCount !== undefined
+    ? maxPhotos - currentPhotoCount
+    : maxPhotos;
+
   const handleChooseFromPhone = () => {
     onChooseFromPhone();
-    onOpenChange(false); // Close sheet after selection
+    onOpenChange(false);
   };
 
   const handleImportGoogle = () => {
     onImportFromGooglePhotos();
-    // Potentially close sheet or show loading state
-    // onOpenChange(false); 
   };
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      {/* SheetTrigger could be used if the sheet is self-contained */}
-      {/* <SheetTrigger asChild> */}
-      {/*   <Button variant="outline">Open Sheet</Button> */}
-      {/* </SheetTrigger> */}
       <SheetContent side="bottom" className="rounded-t-lg">
         <SheetHeader className="mb-4">
           <SheetTitle className="text-center text-lg font-medium">Add Photos</SheetTitle>
-          {/* Optional: <SheetDescription>Choose where to add photos from.</SheetDescription> */}
+          <SheetDescription className="text-center text-sm text-gray-500">
+            {currentPhotoCount !== undefined ? (
+              <>You can add up to <span className="font-medium text-[#F76C5E]">{remainingPhotos}</span> more photos (max {maxPhotos})</>
+            ) : (
+              <>Maximum {maxPhotos} photos per book</>
+            )}
+          </SheetDescription>
         </SheetHeader>
         <div className="grid gap-4 py-4">
           <Button 

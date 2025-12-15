@@ -240,7 +240,7 @@ model PrintOrder {
   podPackageId   String? // e.g., "0850X0850FCSTDSS060UW444GXX"
   pageCount      Int? // Interior page count
 
-  // PDF URLs (Cloudinary-hosted, publicly accessible for Lulu)
+  // PDF URLs (Dropbox-hosted, publicly accessible for Lulu)
   interiorPdfUrl String?
   coverPdfUrl    String?
 
@@ -262,9 +262,10 @@ model PrintOrder {
   shippingCity     String?
   shippingState    String?
   shippingPostcode String?
-  shippingCountry  String  @default("US")
+  shippingCountry  String  @default("SG")
   shippingPhone    String?
   contactEmail     String?
+  shippingTier     String? // e.g., 'sg_my', 'sg_my_express' - maps to Lulu shipping level
 
   // Tracking information
   trackingNumber    String?

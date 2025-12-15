@@ -3,13 +3,20 @@
  *
  * Creates a Stripe Checkout session for ordering a printed book.
  * Collects shipping address and payment in one step.
+ *
+ * Phase 1: Singapore & Malaysia only.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { getStripe, SHIPPING_OPTIONS, calculatePrintCost } from '@/lib/stripe';
+import { getStripe, calculatePrintCost } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
-import { coolifyImageUrl } from '@storywink/shared';
+import {
+  coolifyImageUrl,
+  getAllowedCountries,
+  buildStripeShippingOptions,
+} from '@storywink/shared';
+import Stripe from 'stripe';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { bookId, quantity = 1, shippingOption = 'STANDARD' } = body;
+    const { bookId, quantity = 1 } = body;
 
     if (!bookId) {
       return NextResponse.json(
@@ -47,14 +54,6 @@ export async function POST(request: NextRequest) {
 
     // Validate quantity
     const qty = Math.min(Math.max(1, quantity), 10);
-
-    // Validate shipping option
-    if (!['STANDARD', 'EXPRESS'].includes(shippingOption)) {
-      return NextResponse.json(
-        { error: 'Invalid shipping option' },
-        { status: 400 }
-      );
-    }
 
     // Fetch book with page count
     const book = await prisma.book.findFirst({
@@ -93,43 +92,18 @@ export async function POST(request: NextRequest) {
     // Build base URL for success/cancel
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
+    // Get allowed countries and shipping options from shared config
+    const allowedCountries = getAllowedCountries() as Stripe.Checkout.SessionCreateParams.ShippingAddressCollection.AllowedCountry[];
+    const shippingOptions = buildStripeShippingOptions();
+
     // Create Stripe Checkout session
     const session = await getStripe().checkout.sessions.create({
       mode: 'payment',
       customer_email: user.email || undefined,
       shipping_address_collection: {
-        allowed_countries: ['US'],
+        allowed_countries: allowedCountries,
       },
-      shipping_options: [
-        {
-          shipping_rate_data: {
-            type: 'fixed_amount',
-            fixed_amount: {
-              amount: SHIPPING_OPTIONS.STANDARD.rate,
-              currency: 'usd',
-            },
-            display_name: SHIPPING_OPTIONS.STANDARD.name,
-            delivery_estimate: {
-              minimum: { unit: 'business_day', value: SHIPPING_OPTIONS.STANDARD.deliveryMin },
-              maximum: { unit: 'business_day', value: SHIPPING_OPTIONS.STANDARD.deliveryMax },
-            },
-          },
-        },
-        {
-          shipping_rate_data: {
-            type: 'fixed_amount',
-            fixed_amount: {
-              amount: SHIPPING_OPTIONS.EXPRESS.rate,
-              currency: 'usd',
-            },
-            display_name: SHIPPING_OPTIONS.EXPRESS.name,
-            delivery_estimate: {
-              minimum: { unit: 'business_day', value: SHIPPING_OPTIONS.EXPRESS.deliveryMin },
-              maximum: { unit: 'business_day', value: SHIPPING_OPTIONS.EXPRESS.deliveryMax },
-            },
-          },
-        },
-      ],
+      shipping_options: shippingOptions,
       line_items: [
         {
           price_data: {

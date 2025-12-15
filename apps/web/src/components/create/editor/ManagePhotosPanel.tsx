@@ -2,8 +2,8 @@
 
 import React from 'react';
 import Image from 'next/image';
-import { X, Plus } from 'lucide-react';
-import { StoryboardPage, optimizeCloudinaryUrl } from '@storywink/shared';
+import { X, Plus, Camera } from 'lucide-react';
+import { StoryboardPage, optimizeCloudinaryUrl, BOOK_CONSTRAINTS } from '@storywink/shared';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import useMediaQuery from '@/hooks/useMediaQuery';
@@ -105,9 +105,44 @@ function PanelContent({
 }: Omit<ManagePhotosPanelProps, 'isOpen'>) {
   // Sort pages by index
   const sortedPages = [...pages].sort((a, b) => a.index - b.index);
+  const photoCount = sortedPages.length;
+  const maxPhotos = BOOK_CONSTRAINTS.MAX_PHOTOS;
+  const isAtMaxPhotos = photoCount >= maxPhotos;
+  const remainingPhotos = maxPhotos - photoCount;
 
   return (
     <>
+      {/* Photo counter - prominent display */}
+      <div className="px-4 py-3 border-b bg-gray-50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Camera className="w-4 h-4 text-gray-500" />
+            <span className="text-sm font-medium text-gray-700">
+              {photoCount} / {maxPhotos} photos
+            </span>
+          </div>
+          {isAtMaxPhotos ? (
+            <span className="text-xs text-amber-600 font-medium">
+              Maximum reached
+            </span>
+          ) : (
+            <span className="text-xs text-gray-500">
+              {remainingPhotos} more allowed
+            </span>
+          )}
+        </div>
+        {/* Progress bar */}
+        <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          <div
+            className={cn(
+              "h-full rounded-full transition-all duration-300",
+              isAtMaxPhotos ? "bg-amber-500" : "bg-[#F76C5E]"
+            )}
+            style={{ width: `${(photoCount / maxPhotos) * 100}%` }}
+          />
+        </div>
+      </div>
+
       {/* Scrollable grid */}
       <div className="flex-grow overflow-y-auto px-4 py-2">
         {minPagesReached && (
@@ -148,10 +183,16 @@ function PanelContent({
         <Button
           onClick={onAddPhotosClick}
           variant="outline"
-          className="w-full border-dashed border-2 border-[#F76C5E] text-[#F76C5E] hover:bg-orange-50"
+          disabled={isAtMaxPhotos}
+          className={cn(
+            "w-full border-dashed border-2",
+            isAtMaxPhotos
+              ? "border-gray-300 text-gray-400 cursor-not-allowed"
+              : "border-[#F76C5E] text-[#F76C5E] hover:bg-orange-50"
+          )}
         >
           <Plus className="w-4 h-4 mr-2" />
-          Add More Photos
+          {isAtMaxPhotos ? `Maximum ${maxPhotos} photos reached` : 'Add More Photos'}
         </Button>
         <Button onClick={onClose} className="w-full bg-[#F76C5E] hover:bg-[#E55A4C]">
           Done

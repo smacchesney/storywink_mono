@@ -43,20 +43,17 @@ export const SHIPPING_OPTIONS = {
 } as const;
 
 /**
- * Estimated print cost per page (in cents)
- * Based on Lulu's pricing for 8.5x8.5 saddle-stitch
+ * Print pricing - flat rate for simplicity
+ * Based on Lulu's pricing for 8.5x8.5 saddle-stitch (up to 20 pages)
  */
 export const PRINT_PRICING = {
-  BASE_COST_CENTS: 500, // $5.00 base cost
-  PER_PAGE_CENTS: 50,   // $0.50 per page
-  MIN_PRICE_CENTS: 1000, // $10.00 minimum
-  MAX_PAGES: 80,
+  FLAT_COST_CENTS: 1500, // $15.00 flat rate
+  MAX_PAGES: 20,
 } as const;
 
 /**
- * Calculate estimated print cost based on page count
+ * Calculate print cost - flat rate
  */
-export function calculatePrintCost(pageCount: number): number {
-  const cost = PRINT_PRICING.BASE_COST_CENTS + (pageCount * PRINT_PRICING.PER_PAGE_CENTS);
-  return Math.max(cost, PRINT_PRICING.MIN_PRICE_CENTS);
+export function calculatePrintCost(_pageCount: number): number {
+  return PRINT_PRICING.FLAT_COST_CENTS;
 }

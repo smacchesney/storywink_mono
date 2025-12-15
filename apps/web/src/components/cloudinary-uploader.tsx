@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useUser } from '@clerk/nextjs';
 import logger from '@/lib/logger';
+import { BOOK_CONSTRAINTS } from '@storywink/shared';
 
 interface CloudinaryUploaderProps {
   onUploadComplete: (assets: CloudinaryAsset[]) => void;
@@ -45,7 +46,7 @@ export function CloudinaryUploader({
   onUploadProgress,
   className,
   multiple = true,
-  maxFiles = 20
+  maxFiles = BOOK_CONSTRAINTS.MAX_PHOTOS
 }: CloudinaryUploaderProps) {
   const { user } = useUser();
   const [isUploading, setIsUploading] = useState(false);
@@ -222,7 +223,7 @@ export function CloudinaryUploader({
                     <span className="font-semibold text-primary">drag & drop</span>
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Supports: JPG, PNG, HEIC, HEIF, WebP. Max 10MB per file.
+                    Max <span className="font-semibold">{maxFiles}</span> photos per book. JPG, PNG, HEIC, WebP. Up to 10MB each.
                   </p>
                 </>
               )}

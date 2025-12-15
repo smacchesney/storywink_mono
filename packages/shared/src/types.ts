@@ -122,3 +122,13 @@ export interface BookFinalizeJob {
   bookId: string;
   userId: string;
 }
+
+/**
+ * Print fulfillment job data - queued after Stripe payment completes.
+ * Handles PDF generation, Dropbox upload, and Lulu submission.
+ */
+export interface PrintFulfillmentJob {
+  printOrderId: string;
+  userId: string;
+  bookId: string;
+}

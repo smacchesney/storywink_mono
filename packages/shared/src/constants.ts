@@ -17,6 +17,7 @@ export const QUEUE_NAMES = {
   STORY_GENERATION: 'story-generation',
   ILLUSTRATION_GENERATION: 'illustration-generation',
   BOOK_FINALIZE: 'book-finalize',
+  PRINT_FULFILLMENT: 'print-fulfillment',
 } as const;
 
 // Book constraints

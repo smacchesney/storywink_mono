@@ -39,8 +39,8 @@ export const flowProducer = new Proxy({} as FlowProducer, {
 export enum QueueName {
   StoryGeneration = 'story-generation',
   IllustrationGeneration = 'illustration-generation',
-  BookFinalize = 'book-finalize', // Add queue for finalization job
-  // Add other queue names here if needed
+  BookFinalize = 'book-finalize',
+  PrintFulfillment = 'print-fulfillment',
 }
 
 // Function to create or get a queue instance

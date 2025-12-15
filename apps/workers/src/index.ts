@@ -58,6 +58,7 @@ const redis = new Redis(createBullMQConnection());
 import { processStoryGeneration } from './workers/story-generation.worker.js';
 import { processIllustrationGeneration } from './workers/illustration-generation.worker.js';
 import { processBookFinalize } from './workers/book-finalize.worker.js';
+import { processPrintFulfillment } from './workers/print-fulfillment.worker.js';
 
 // CRITICAL: Pre-load and validate STYLE_LIBRARY before processing any jobs
 // This prevents race conditions where workers access STYLE_LIBRARY before it's fully loaded
@@ -141,11 +142,13 @@ console.log('='.repeat(80));
 const STORY_CONCURRENCY = parseInt(process.env.STORY_CONCURRENCY || '2', 10);
 const ILLUSTRATION_CONCURRENCY = parseInt(process.env.ILLUSTRATION_CONCURRENCY || '3', 10);
 const FINALIZE_CONCURRENCY = parseInt(process.env.FINALIZE_CONCURRENCY || '2', 10);
+const PRINT_FULFILLMENT_CONCURRENCY = parseInt(process.env.PRINT_FULFILLMENT_CONCURRENCY || '1', 10);
 
 console.log(`[Startup] Concurrency settings:`);
 console.log(`  - Story: ${STORY_CONCURRENCY}`);
 console.log(`  - Illustration: ${ILLUSTRATION_CONCURRENCY}`);
 console.log(`  - Finalize: ${FINALIZE_CONCURRENCY}`);
+console.log(`  - Print Fulfillment: ${PRINT_FULFILLMENT_CONCURRENCY}`);
 
 // Create workers
 const storyWorker = new Worker(
@@ -174,6 +177,16 @@ const finalizeWorker = new Worker(
   {
     connection: redis,
     concurrency: FINALIZE_CONCURRENCY,
+  }
+);
+
+const printFulfillmentWorker = new Worker(
+  QUEUE_NAMES.PRINT_FULFILLMENT,
+  processPrintFulfillment,
+  {
+    connection: redis,
+    concurrency: PRINT_FULFILLMENT_CONCURRENCY,
+    lockDuration: 600000, // 10 minutes for PDF generation + upload + Lulu submission
   }
 );
 
@@ -321,6 +334,50 @@ finalizeWorker.on('failed', (job, err) => {
   console.error('='.repeat(80));
 });
 
+// Print Fulfillment Worker event handlers
+printFulfillmentWorker.on('active', (job) => {
+  console.log(`[PrintFulfillmentWorker] Job ${job.id} started for order ${job.data.printOrderId}`);
+  console.log(`  - Instance ID: ${INSTANCE_ID}`);
+  console.log(`  - Process PID: ${process.pid}`);
+  console.log(`  - Book ID: ${job.data.bookId}`);
+});
+
+printFulfillmentWorker.on('progress', (job, progress) => {
+  console.log(`[PrintFulfillmentWorker] Job ${job.id} progress:`, JSON.stringify(progress));
+});
+
+printFulfillmentWorker.on('completed', (job) => {
+  logger.info({
+    jobId: job.id,
+    printOrderId: job.data.printOrderId,
+    bookId: job.data.bookId,
+  }, 'Print fulfillment completed');
+  console.log(`[PrintFulfillmentWorker] Completed job ${job.id} for order ${job.data.printOrderId}`);
+});
+
+printFulfillmentWorker.on('failed', (job, err) => {
+  logger.error({
+    jobId: job?.id,
+    error: err.message,
+    printOrderId: job?.data?.printOrderId,
+    bookId: job?.data?.bookId,
+    attempts: job?.attemptsMade
+  }, 'Print fulfillment failed');
+  console.error('='.repeat(80));
+  console.error(`[PrintFulfillmentWorker] FAILED JOB ${job?.id}`);
+  console.error('='.repeat(80));
+  console.error(`  Instance ID: ${INSTANCE_ID}`);
+  console.error(`  Process PID: ${process.pid}`);
+  console.error(`  Hostname: ${process.env.HOSTNAME || 'unknown'}`);
+  console.error(`  Order ID: ${job?.data?.printOrderId}`);
+  console.error(`  Book ID: ${job?.data?.bookId}`);
+  console.error(`  Error: ${err.message}`);
+  console.error(`  Attempts: ${job?.attemptsMade}`);
+  console.error(`  Stack Trace:`);
+  console.error(err.stack);
+  console.error('='.repeat(80));
+});
+
 // Graceful shutdown
 const shutdown = async () => {
   logger.info('Shutting down workers...');
@@ -328,6 +385,7 @@ const shutdown = async () => {
   await storyWorker.close();
   await illustrationWorker.close();
   await finalizeWorker.close();
+  await printFulfillmentWorker.close();
   await redis.quit();
   
   process.exit(0);
@@ -347,6 +405,7 @@ console.log('[Workers] Configuration:');
 console.log(`  - Story Worker: concurrency=${STORY_CONCURRENCY}`);
 console.log(`  - Illustration Worker: concurrency=${ILLUSTRATION_CONCURRENCY}`);
 console.log(`  - Finalize Worker: concurrency=${FINALIZE_CONCURRENCY}`);
+console.log(`  - Print Fulfillment Worker: concurrency=${PRINT_FULFILLMENT_CONCURRENCY}`);
 console.log(`  - Redis URL: ${process.env.REDIS_URL || 'redis://localhost:6379'}`);
 console.log(`  - Log Level: ${process.env.LOG_LEVEL || 'info'}`);
 console.log('='.repeat(80));

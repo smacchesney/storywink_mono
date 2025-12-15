@@ -838,12 +838,119 @@ DROPBOX_REFRESH_TOKEN=your_refresh_token
 
 **What stays on Cloudinary**: User photos, generated illustrations, regular PDF exports
 
-### Phase 2 (Pending): Stripe Integration
+## Checkout & Print Fulfillment (December 2025) - PHASE 2 ✅
 
-Not yet implemented:
-- PrintOrderSheet component (quantity + shipping selector)
-- Stripe Checkout session creation
-- Stripe webhook handler
-- Order success page
-- PDF generation in webhook flow
-- Lulu order submission after payment
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         CHECKOUT FLOW                                │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  User clicks "Order Print"                                           │
+│         ↓                                                            │
+│  POST /api/checkout/print                                            │
+│  (Creates Stripe Checkout session with shipping options)             │
+│         ↓                                                            │
+│  Stripe Checkout UI (payment + shipping address)                     │
+│         ↓                                                            │
+│  checkout.session.completed webhook                                  │
+│         ↓                                                            │
+│  Create PrintOrder record (idempotent)                               │
+│         ↓                                                            │
+│  Queue PRINT_FULFILLMENT job                                         │
+│         ↓                                                            │
+│  Worker: Generate PDFs → Dropbox → Lulu API                          │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Design Decisions
+
+1. **Stripe ↔ Lulu Decoupling**: No direct integration. Stripe handles payment, our system generates PDFs and submits to Lulu.
+2. **Async Fulfillment**: PDF generation and Lulu submission happen in workers, not during payment.
+3. **Fixed Pricing**: $15 flat print cost + $10/$20 shipping (SG/MY only for Phase 1).
+4. **Photo Limit**: Maximum 20 photos per book (enforced in UI and Cloudinary widget).
+
+### Environment Variables
+
+```bash
+# apps/workers/.env
+LULU_CLIENT_ID=...
+LULU_CLIENT_SECRET=...
+LULU_USE_SANDBOX=true
+DROPBOX_APP_KEY=...
+DROPBOX_APP_SECRET=...
+DROPBOX_REFRESH_TOKEN=...
+
+# apps/web/.env.local
+STRIPE_SECRET_KEY=...
+STRIPE_WEBHOOK_SECRET=...
+```
+
+### Pricing Configuration
+
+```typescript
+// apps/web/src/lib/stripe.ts
+export const PRINT_PRICING = {
+  FLAT_COST_CENTS: 1500, // $15.00 flat rate
+  MAX_PAGES: 20,
+} as const;
+
+// packages/shared/src/shipping.ts
+export const SHIPPING_TIERS = {
+  SINGAPORE_MALAYSIA: { priceCents: 1000, luluLevel: 'MAIL' },      // $10
+  SINGAPORE_MALAYSIA_EXPRESS: { priceCents: 2000, luluLevel: 'EXPEDITED' }, // $20
+};
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `apps/web/src/lib/stripe.ts` | Stripe config, pricing constants |
+| `apps/web/src/app/api/checkout/print/route.ts` | Creates Stripe Checkout sessions |
+| `apps/web/src/app/api/webhooks/stripe/route.ts` | Handles payment completion, queues fulfillment |
+| `apps/workers/src/workers/print-fulfillment.worker.ts` | PDF generation + Lulu submission |
+| `packages/shared/src/shipping.ts` | Shipping tiers for SG/MY |
+
+### Webhook Flow (Critical Path)
+
+```typescript
+// apps/web/src/app/api/webhooks/stripe/route.ts
+// 1. Idempotency check (prevents duplicate orders)
+const existingOrder = await prisma.printOrder.findFirst({
+  where: { stripeSessionId: session.id },
+});
+if (existingOrder) return; // Skip if already processed
+
+// 2. Create PrintOrder from Stripe session
+const printOrder = await prisma.printOrder.create({ ... });
+
+// 3. Queue async fulfillment
+await queue.add('fulfill-order', {
+  printOrderId: printOrder.id,
+  bookId: printOrder.bookId,
+});
+```
+
+### Worker Flow
+
+```typescript
+// apps/workers/src/workers/print-fulfillment.worker.ts
+async function processPrintFulfillment(job) {
+  // 1. Load order + book data
+  // 2. Generate interior PDF (via Puppeteer)
+  // 3. Generate cover PDF (via Puppeteer)
+  // 4. Upload both to Dropbox
+  // 5. Submit to Lulu API
+  // 6. Update order status to SUBMITTED_TO_LULU
+}
+```
+
+### Photo Limit (20 max)
+
+- **Constant**: `BOOK_CONSTRAINTS.MAX_PHOTOS` in `packages/shared/src/constants.ts`
+- **UI**: ManagePhotosPanel shows "X / 20 photos" with progress bar
+- **Enforcement**: Cloudinary widget `maxFiles: BOOK_CONSTRAINTS.MAX_PHOTOS`
+- **Disable**: "Add More Photos" button disabled when at limit

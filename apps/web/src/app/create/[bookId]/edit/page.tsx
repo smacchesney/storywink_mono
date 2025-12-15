@@ -1246,12 +1246,13 @@ export default function EditBookPage() {
           )}
           {/* -------------------------------------------------------- */}
           
-          {/* PhotoSourceSheet for adding photos - Remains unchanged */}
+          {/* PhotoSourceSheet for adding photos */}
           <PhotoSourceSheet
             isOpen={isPhotoSheetOpen}
             onOpenChange={setIsPhotoSheetOpen}
             onChooseFromPhone={triggerAddPhotoUpload}
             onImportFromGooglePhotos={handleImportFromGooglePhotos}
+            currentPhotoCount={bookData?.pages.length || 0}
           />
 
           {/* Invisible Cloudinary uploader that auto-opens */}

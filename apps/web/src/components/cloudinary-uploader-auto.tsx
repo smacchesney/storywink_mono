@@ -5,6 +5,7 @@ import { CldUploadWidget } from 'next-cloudinary';
 import { useUser } from '@clerk/nextjs';
 import logger from '@/lib/logger';
 import { toast } from 'sonner';
+import { BOOK_CONSTRAINTS } from '@storywink/shared';
 
 interface CloudinaryUploaderAutoProps {
   onUploadComplete: (assets: CloudinaryAsset[]) => void;
@@ -291,7 +292,7 @@ export function CloudinaryUploaderAuto({
     folder: folder,
     sources: ['local', 'camera'] as ('local' | 'camera')[],
     multiple: true,
-    maxFiles: 20,
+    maxFiles: BOOK_CONSTRAINTS.MAX_PHOTOS,
     // Only allow formats that OpenAI Vision API supports (no HEIC/HEIF)
     clientAllowedFormats: ['jpg', 'jpeg', 'png', 'webp'],
     maxFileSize: 10485760, // 10MB

@@ -8,6 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
+import { Queue } from 'bullmq';
+import { createBullMQConnection, QUEUE_NAMES } from '@storywink/shared';
 import Stripe from 'stripe';
 
 // Disable body parsing - we need the raw body for signature verification
@@ -25,6 +27,15 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   const userId = metadata.userId;
   const quantity = parseInt(metadata.quantity || '1', 10);
   const pageCount = parseInt(metadata.pageCount || '0', 10);
+
+  // Idempotency check: Skip if order already exists for this session
+  const existingOrder = await prisma.printOrder.findFirst({
+    where: { stripeSessionId: session.id },
+  });
+  if (existingOrder) {
+    console.log('Order already processed, skipping:', session.id);
+    return;
+  }
 
   // Get shipping address from collected_information or customer_details
   // Note: In Stripe API 2025+, shipping is in collected_information
@@ -44,11 +55,16 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     return;
   }
 
-  // Determine shipping level based on selected option
-  const shippingCost = session.shipping_cost;
-  let shippingLevel = 'MAIL'; // default
-  if (shippingCost && shippingCost.amount_total && shippingCost.amount_total >= 1500) {
-    shippingLevel = 'EXPEDITED';
+  // Extract shipping tier from the selected shipping rate
+  let shippingTier = 'sg_my'; // default
+  const shippingRateId = session.shipping_cost?.shipping_rate;
+  if (shippingRateId && typeof shippingRateId === 'string') {
+    try {
+      const rate = await getStripe().shippingRates.retrieve(shippingRateId);
+      shippingTier = rate.metadata?.tierKey || 'sg_my';
+    } catch (err) {
+      console.error('Failed to retrieve shipping rate:', err);
+    }
   }
 
   // Create PrintOrder record
@@ -71,23 +87,38 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       shippingCity: shippingAddress.city || '',
       shippingState: shippingAddress.state || '',
       shippingPostcode: shippingAddress.postal_code || '',
-      shippingCountry: shippingAddress.country || 'US',
+      shippingCountry: shippingAddress.country || 'SG',
       shippingPhone: session.customer_details?.phone || undefined,
       contactEmail: session.customer_details?.email || session.customer_email || '',
+      shippingTier,
+      paidAt: new Date(),
     },
   });
 
   console.log('Created PrintOrder:', printOrder.id, 'for session:', session.id);
 
-  // TODO: Trigger PDF generation and Lulu submission asynchronously
-  // This could be done via a queue job or background process
-  // For now, we'll log that this needs to happen
-  console.log('PrintOrder ready for fulfillment:', {
-    orderId: printOrder.id,
-    bookId,
-    quantity,
-    shippingLevel,
+  // Queue the print fulfillment job
+  const queue = new Queue(QUEUE_NAMES.PRINT_FULFILLMENT, {
+    connection: createBullMQConnection(),
   });
+
+  await queue.add(
+    'fulfill-order',
+    {
+      printOrderId: printOrder.id,
+      userId: printOrder.userId,
+      bookId: printOrder.bookId,
+    },
+    {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 60000 }, // 1 min, 2 min, 4 min
+    }
+  );
+
+  console.log('Queued print fulfillment for order:', printOrder.id);
+
+  // Close the queue connection
+  await queue.close();
 }
 
 export async function POST(request: NextRequest) {
