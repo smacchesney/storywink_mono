@@ -38,30 +38,56 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
     redirect('/sign-in');
   }
 
-  // Retrieve the checkout session from Stripe
-  let session;
+  // Database-first approach: Get the print order first (webhook already created it)
+  // This ensures we can show confirmation even if Stripe API fails
+  const printOrder = await prisma.printOrder.findFirst({
+    where: {
+      stripeSessionId: sessionId,
+      userId: user.id,
+    },
+    include: {
+      book: {
+        include: {
+          pages: {
+            where: { isTitlePage: true },
+            select: { generatedImageUrl: true },
+            take: 1,
+          },
+        },
+      },
+    },
+  });
+
+  // Try to retrieve the checkout session from Stripe for additional details
+  // Note: shipping_details is NOT expandable - it's a direct property
+  let session = null;
   try {
     session = await getStripe().checkout.sessions.retrieve(sessionId, {
-      expand: ['line_items', 'shipping_details'],
+      expand: ['line_items'],
     });
   } catch (error) {
     console.error('Failed to retrieve checkout session:', error);
+    // Continue with database data - don't redirect
+  }
+
+  // Verify authorization: either session belongs to user, or print order exists for user
+  const sessionUserId = session?.metadata?.userId;
+  if (!printOrder && sessionUserId !== user.id) {
+    // Neither database nor Stripe confirms this user owns this order
     redirect('/library');
   }
 
-  // Verify the session belongs to this user
-  const metadata = session.metadata;
-  if (metadata?.userId !== user.id) {
-    redirect('/library');
-  }
+  // Get book details from database or Stripe metadata
+  const bookId = printOrder?.bookId || session?.metadata?.bookId;
+  const bookTitle = printOrder?.book?.title || session?.metadata?.bookTitle || 'Your Book';
+  const quantity = printOrder?.quantity || parseInt(session?.metadata?.quantity || '1', 10);
 
-  // Get book details
-  const bookId = metadata?.bookId;
-  const bookTitle = metadata?.bookTitle || 'Your Book';
-  const quantity = parseInt(metadata?.quantity || '1', 10);
-
+  // Get cover image from the included book data
   let coverImageUrl: string | null = null;
-  if (bookId) {
+  if (printOrder?.book) {
+    coverImageUrl = printOrder.book.pages[0]?.generatedImageUrl || null;
+  } else if (bookId) {
+    // Fallback: fetch book separately if not in printOrder
     const book = await prisma.book.findFirst({
       where: { id: bookId, userId: user.id },
       include: {
@@ -75,17 +101,10 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
     coverImageUrl = book?.pages[0]?.generatedImageUrl || null;
   }
 
-  // Get the print order
-  const printOrder = await prisma.printOrder.findFirst({
-    where: {
-      stripeSessionId: sessionId,
-      userId: user.id,
-    },
-  });
-
-  // Format price
-  const totalAmount = session.amount_total
-    ? `$${(session.amount_total / 100).toFixed(2)}`
+  // Format price - prefer Stripe session, fallback to database
+  const totalAmountCents = session?.amount_total || printOrder?.totalAmount;
+  const totalAmount = totalAmountCents
+    ? `$${(totalAmountCents / 100).toFixed(2)}`
     : 'N/A';
 
   return (

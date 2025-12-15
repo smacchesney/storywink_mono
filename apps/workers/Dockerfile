@@ -53,6 +53,22 @@ RUN npx turbo run build --filter=@storywink/workers --filter='!@storywink/web'
 FROM base AS runner
 WORKDIR /app
 
+# Install Chromium and dependencies for PDF generation
+# @sparticuz/chromium is designed for Lambda; system Chromium is more reliable in Docker
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    font-noto \
+    font-noto-emoji
+
+# Tell Puppeteer to use system Chromium instead of downloading its own
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
 ENV NODE_ENV=production
 
 # Copy entire monorepo structure (needed for workspace dependencies)
