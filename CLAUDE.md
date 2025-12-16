@@ -625,10 +625,10 @@ export const STYLE_LIBRARY = {
 - `apps/web/src/components/create/editor/ArtStylePicker.tsx` - Removed toggle UI
 - All API routes and types - Removed `isWinkifyEnabled` references
 
-## Print-on-Demand Integration (December 2025) - MILESTONE 1 ✅
+## Print-on-Demand Integration (December 2025) - COMPLETE ✅
 
 ### Overview
-Lulu Print-on-Demand API integration for printing physical children's books. Phase 1 complete: API integration tested and working. Phase 2 (Stripe checkout + user-facing UI) pending.
+Lulu Print-on-Demand API integration for printing physical children's books. Full checkout flow with Stripe payment and async fulfillment is live and working.
 
 ### Lulu API Configuration
 - **Sandbox API**: `https://api.sandbox.lulu.com`
@@ -954,3 +954,78 @@ async function processPrintFulfillment(job) {
 - **UI**: ManagePhotosPanel shows "X / 20 photos" with progress bar
 - **Enforcement**: Cloudinary widget `maxFiles: BOOK_CONSTRAINTS.MAX_PHOTOS`
 - **Disable**: "Add More Photos" button disabled when at limit
+
+### Order Success Page
+
+**URL**: `/orders/[sessionId]/success`
+
+Displays order confirmation after successful Stripe checkout.
+
+**Key Features**:
+- **Database-first approach**: Queries PrintOrder from database before Stripe (webhook already created it)
+- **Graceful degradation**: Shows confirmation even if Stripe API call fails
+- **Data sources**: Prefers database data, falls back to Stripe session metadata
+
+**File**: `apps/web/src/app/orders/[sessionId]/success/page.tsx`
+
+**Stripe API Note**: `shipping_details` is NOT an expandable field - it's a direct property on the session object. Only expand `line_items` or `payment_intent`.
+
+```typescript
+// ✅ Correct
+const session = await stripe.checkout.sessions.retrieve(sessionId, {
+  expand: ['line_items'],
+});
+
+// ❌ Wrong - will throw 400 error
+const session = await stripe.checkout.sessions.retrieve(sessionId, {
+  expand: ['line_items', 'shipping_details'],  // shipping_details is NOT expandable
+});
+```
+
+### PDF Generation in Docker (Railway)
+
+The workers use Puppeteer for PDF generation. The `@sparticuz/chromium` package is designed for Lambda/Vercel serverless, not Docker containers.
+
+**Solution**: Install system Chromium in the Dockerfile.
+
+**File**: `apps/workers/Dockerfile`
+
+```dockerfile
+FROM base AS runner
+WORKDIR /app
+
+# Install Chromium and dependencies for PDF generation
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    font-noto \
+    font-noto-emoji
+
+# Tell Puppeteer to use system Chromium
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+```
+
+**PDF Generation Code**: Both `generateBookPdf.ts` and `generateLuluCover.ts` respect `PUPPETEER_EXECUTABLE_PATH` env var.
+
+### Recovery Script for Failed Orders
+
+If a print order fails (e.g., due to Chromium issues), use this script to retry:
+
+**File**: `scripts/retry-failed-print-order.ts`
+
+```bash
+# Usage
+npx tsx scripts/retry-failed-print-order.ts <orderId>
+
+# Example
+npx tsx scripts/retry-failed-print-order.ts cmj7akirs0053le0d8ody1m0s
+```
+
+**What it does**:
+1. Resets order status from `FAILED` to `PAYMENT_COMPLETED`
+2. Re-queues the print fulfillment job
