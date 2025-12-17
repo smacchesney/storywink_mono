@@ -116,8 +116,8 @@ export default function CreateBookPage() {
         const creationResult = await handleCreateBook(assetIds);
 
         if (creationResult?.bookId) {
-          // Navigate directly to edit page
-          router.push(`/create/${creationResult.bookId}/edit`);
+          // Navigate to character selection page (will auto-skip if no faces detected)
+          router.push(`/create/${creationResult.bookId}/characters`);
         } else {
           // Error occurred during handleCreateBook
           setIsUploading(false);

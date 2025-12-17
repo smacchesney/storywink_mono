@@ -12,6 +12,9 @@ export interface IllustrationPromptOptions {
   isTitlePage?: boolean;
   illustrationNotes?: string | null;
   referenceImageCount?: number; // Number of style reference images (1 for title, 2 for story pages)
+  // Character references for face consistency
+  characterNames?: string[]; // Names of characters (in order of face images provided)
+  characterFaceCount?: number; // Number of character face images provided
 }
 
 // ----------------------------------
@@ -32,11 +35,21 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
   const styleDefinition = getStyleDefinition(opts.style);
   const styleDescription = styleDefinition?.description;
   const refCount = opts.referenceImageCount || 1;
+  const charFaceCount = opts.characterFaceCount || 0;
+  const charNames = opts.characterNames || [];
 
-  // Base prompt varies based on number of style reference images
-  const imageCountText = refCount === 1
-    ? `using the two images provided. The first image shows the scene/subjects, the second image shows the artistic style to apply.`
-    : `using the ${1 + refCount} images provided. The first image shows the scene/subjects, the following ${refCount} image(s) show the artistic style to apply. Use all style reference images for comprehensive style matching.`;
+  // Calculate total image count: 1 content + N character faces + N style references
+  const totalImageCount = 1 + charFaceCount + refCount;
+
+  // Build image order description based on what's provided
+  let imageCountText: string;
+  if (charFaceCount > 0) {
+    imageCountText = `using the ${totalImageCount} images provided. Image 1 shows the scene/subjects. Images 2-${1 + charFaceCount} show character face references for visual consistency. Images ${2 + charFaceCount}-${totalImageCount} show the artistic style to apply.`;
+  } else {
+    imageCountText = refCount === 1
+      ? `using the two images provided. The first image shows the scene/subjects, the second image shows the artistic style to apply.`
+      : `using the ${1 + refCount} images provided. The first image shows the scene/subjects, the following ${refCount} image(s) show the artistic style to apply. Use all style reference images for comprehensive style matching.`;
+  }
 
   const base = [
     `Create a children's picture book illustration ${imageCountText}`,
@@ -44,9 +57,14 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
     `ARTISTIC STYLE (Primary directive): Fully transform this into a hand-drawn/painted children's book illustration matching the style from the reference image(s). Apply its complete aesthetic: color palette, brush techniques, line work, textures, shading, and lighting approach. The final image must look like it was illustrated from imagination, not like a filtered photograph. Replace all photographic elements (realistic textures, camera lighting, photo grain) with illustrated equivalents. Backgrounds should be simplified into clean illustrated shapes and forms.${styleDescription ? ` Style emphasis: ${styleDescription}` : ''}`,
 
     `SCENE INTERPRETATION (Secondary directive): Use the first image as reference for: character/subject identity and their pose, the spatial layout and composition, key recognizable objects that establish the setting. Translate these elements into illustration form - a wooden fence becomes illustrated wood with simple line work, not photographic grain; metal becomes clean illustrated surfaces with simple highlights, not realistic reflections. Simplify complex backgrounds into essential illustrated elements while keeping the scene recognizable.`,
-
-    `CHARACTER CONSISTENCY: Maintain the same illustrated appearance of people across all pages - consistent face shape, hair style, skin tone, and proportions in the illustrated style. The child should be immediately recognizable as the same character throughout the book.`,
   ];
+
+  // Character consistency section - enhanced if character faces provided
+  const characterConsistencySection = charFaceCount > 0 && charNames.length > 0
+    ? `CHARACTER REFERENCES (CRITICAL): I've provided ${charFaceCount} face reference image(s) for: ${charNames.join(', ')}. Use these as the PRIMARY REFERENCE for each character's appearance. Match exactly: face shape, eyes, nose, mouth, skin tone, and hair style/color. The character(s) must be immediately recognizable from these reference photos throughout all pages. DO NOT invent or alter facial features - use the reference images as your guide.`
+    : `CHARACTER CONSISTENCY: Maintain the same illustrated appearance of people across all pages - consistent face shape, hair style, skin tone, and proportions in the illustrated style. The child should be immediately recognizable as the same character throughout the book.`;
+
+  base.push(characterConsistencySection);
 
   // Dynamic effects always included when illustrationNotes are provided
   const dynamicEffectsBits = opts.illustrationNotes
@@ -101,4 +119,37 @@ export function buildTextSection(isTitlePage: boolean, text: string | null, book
   } else {
     return `Add this text to the image: "${(text ?? '').trim()}". Render it exactly once, using a font style, size, color, and position that matches any text shown in the second image. Ensure the entire text is visible and not cut off.`;
   }
+}
+
+// ----------------------------------
+// CHARACTER REFERENCE HELPERS
+// ----------------------------------
+
+/**
+ * Builds the character reference section for illustration prompts
+ * Used when character face images are provided for consistency
+ */
+export function buildCharacterReferenceSection(
+  characterNames: string[],
+  startImageIndex: number // Image index where character faces start (1-based)
+): string {
+  if (characterNames.length === 0) {
+    return 'CHARACTER CONSISTENCY: Maintain consistent facial features across all pages.';
+  }
+
+  if (characterNames.length === 1) {
+    return `CHARACTER REFERENCE (CRITICAL):
+Image ${startImageIndex} shows ${characterNames[0]}'s face. Use this as the PRIMARY REFERENCE for their appearance.
+Match exactly: face shape, eyes, nose, mouth, skin tone, and hair style/color.
+Do not invent or alter facial features - use the reference image.`;
+  }
+
+  // Multiple characters
+  const endIndex = startImageIndex + characterNames.length - 1;
+  return `CHARACTER REFERENCES (CRITICAL):
+Images ${startImageIndex}-${endIndex} show the faces of: ${characterNames.join(', ')}.
+Use these as PRIMARY REFERENCES for each character's appearance.
+Match exactly: face shape, eyes, nose, mouth, skin tone, and hair for each person.
+Keep characters visually distinct from each other.
+Do not invent or alter facial features - use the reference images.`;
 }

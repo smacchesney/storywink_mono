@@ -52,7 +52,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
       data: { status: 'GENERATING' },
     });
 
-    // Get book with pages (excluding cover page)
+    // Get book with pages (excluding cover page) and characters
     const book = await prisma.book.findUnique({
       where: { id: bookId },
       include: {
@@ -60,11 +60,27 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
           orderBy: { index: 'asc' }, // Use user-defined order, not pageNumber
           include: { asset: true },
         },
+        characters: {
+          orderBy: { displayOrder: 'asc' },
+          select: {
+            name: true,
+            croppedFaceUrl: true,
+          },
+        },
       },
     });
 
     if (!book) {
       throw new Error('Book not found');
+    }
+
+    // Log character data if present
+    if (book.characters.length > 0) {
+      logger.info({
+        bookId,
+        characterCount: book.characters.length,
+        characterNames: book.characters.map(c => c.name),
+      }, 'Characters found for story generation');
     }
 
     // Filter out cover/title page to get story pages with their assets
@@ -114,7 +130,14 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
         pageNumber: index + 1, // 1-based numbering for story pages
         assetId: page.assetId,
         originalImageUrl: page.asset?.url || page.asset?.thumbnailUrl || null
-      }))
+      })),
+      // Include character data for personalized naming
+      characters: book.characters.length > 0
+        ? book.characters.map(c => ({
+            name: c.name,
+            croppedFaceUrl: c.croppedFaceUrl,
+          }))
+        : undefined,
     };
 
     // Create the advanced prompt

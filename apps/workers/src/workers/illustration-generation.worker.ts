@@ -11,6 +11,13 @@ import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
 // Text overlay for story pages, logo overlay for title pages, upscaling for print
 import { addTextToImage, addLogoToTitlePage, upscaleForPrint } from '../utils/text-overlay.js';
 
+// Character data type for face references
+interface CharacterFace {
+  name: string;
+  buffer: Buffer;
+  mimeType: string;
+}
+
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
 /**
@@ -354,6 +361,55 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
 
     console.log(`[IllustrationWorker] Fetched ${styleReferenceBuffers.length} style reference image(s) for page ${pageNumber}`);
 
+    // Fetch character face images for visual consistency
+    const characterFaces: CharacterFace[] = [];
+    const characterNames: string[] = [];
+
+    try {
+      const characters = await prisma.character.findMany({
+        where: { bookId },
+        orderBy: { displayOrder: 'asc' },
+        select: {
+          name: true,
+          croppedFaceUrl: true,
+        },
+      });
+
+      if (characters.length > 0) {
+        logger.info({ jobId: job.id, pageNumber, characterCount: characters.length }, 'Fetching character face images...');
+        console.log(`[IllustrationWorker] Fetching ${characters.length} character face image(s) for page ${pageNumber}`);
+
+        for (const char of characters) {
+          try {
+            const faceResponse = await fetch(char.croppedFaceUrl);
+            if (!faceResponse.ok) {
+              logger.warn({ jobId: job.id, pageNumber, characterName: char.name, status: faceResponse.status }, 'Failed to fetch character face, skipping');
+              continue;
+            }
+            const faceContentType = faceResponse.headers.get('content-type');
+            const mimeType = faceContentType?.startsWith('image/')
+              ? faceContentType
+              : 'image/jpeg';
+            const faceArrayBuffer = await faceResponse.arrayBuffer();
+
+            characterFaces.push({
+              name: char.name,
+              buffer: Buffer.from(faceArrayBuffer),
+              mimeType,
+            });
+            characterNames.push(char.name);
+            logger.info({ jobId: job.id, pageNumber, characterName: char.name }, 'Character face image fetched');
+          } catch (faceError: any) {
+            logger.warn({ jobId: job.id, pageNumber, characterName: char.name, error: faceError.message }, 'Error fetching character face, skipping');
+          }
+        }
+
+        console.log(`[IllustrationWorker] Fetched ${characterFaces.length} of ${characters.length} character face images`);
+      }
+    } catch (charError: any) {
+      logger.warn({ jobId: job.id, pageNumber, error: charError.message }, 'Error fetching characters, continuing without character references');
+    }
+
     const promptInput: IllustrationPromptOptions = {
         style: styleKey,
         pageText: text, // Use text from job data
@@ -362,6 +418,9 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         isTitlePage: isTitlePage, // Use isTitlePage from job data
         illustrationNotes: illustrationNotes,
         referenceImageCount: styleReferenceBuffers.length, // Tell prompt how many refs we're sending
+        // Character face references for visual consistency
+        characterNames: characterNames.length > 0 ? characterNames : undefined,
+        characterFaceCount: characterFaces.length > 0 ? characterFaces.length : undefined,
     };
     
     logger.info({ jobId: job.id, pageId, promptInput }, "Constructed promptInput for createIllustrationPrompt");
@@ -386,27 +445,43 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
        console.log(`[IllustrationWorker] Calling Gemini 3 Pro API for page ${pageNumber} with ${styleReferenceBuffers.length} style ref(s)...`);
 
        // Build multi-image prompt for Gemini
-       // Content image first, then all style references, then text prompt
+       // Order: Content image, Character faces (if any), Style references, Text prompt
        const prompt = [
-           // Content image (user's photo)
+           // 1. Content image (user's photo)
            {
                inlineData: {
                    mimeType: contentImageMimeType,
                    data: contentImageBase64,
                },
            },
-           // Style reference image(s) - 1 for title pages, 2 for story pages
+           // 2. Character face images (for visual consistency)
+           ...characterFaces.map(char => ({
+               inlineData: {
+                   mimeType: char.mimeType,
+                   data: char.buffer.toString('base64'),
+               },
+           })),
+           // 3. Style reference image(s) - 1 for title pages, 2 for story pages
            ...styleReferenceBuffers.map(ref => ({
                inlineData: {
                    mimeType: ref.mimeType,
                    data: ref.buffer.toString('base64'),
                },
            })),
-           // Text prompt
+           // 4. Text prompt
            {
                text: textPrompt
            }
        ];
+
+       logger.info({
+           jobId: job.id,
+           pageNumber,
+           imageCount: 1 + characterFaces.length + styleReferenceBuffers.length,
+           contentImage: 1,
+           characterFaces: characterFaces.length,
+           styleRefs: styleReferenceBuffers.length,
+       }, 'Prepared Gemini prompt with images');
 
        const result = await ai.models.generateContent({
            model: "gemini-3-pro-image-preview",
