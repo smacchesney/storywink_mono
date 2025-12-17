@@ -95,9 +95,9 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Validate required fields for generation
-    if (!book.title?.trim() || !book.childName?.trim() || !book.artStyle) {
-        logger.warn({ clerkId, dbUserId: dbUser.id, bookId }, 'API: /generate/story - Missing required book details (title, childName, artStyle).');
-        return NextResponse.json({ error: 'Missing required book details: Title, Child\'s Name, and Art Style must be set.' }, { status: 400 });
+    if (!book.title?.trim() || !book.artStyle) {
+        logger.warn({ clerkId, dbUserId: dbUser.id, bookId }, 'API: /generate/story - Missing required book details (title, artStyle).');
+        return NextResponse.json({ error: 'Missing required book details: Title and Art Style must be set.' }, { status: 400 });
     }
     
     // Ensure book is in a state where generation can be started (e.g., DRAFT or maybe FAILED)
@@ -141,10 +141,7 @@ export async function POST(req: NextRequest) {
       bookId,
       promptContext: { // Simplified prompt context
         bookTitle: book.title,
-        childName: book.childName,
         artStyle: book.artStyle,
-        // Removed tone, theme, keyCharacters, specialObjects, excitementElement
-        // Assuming these are not in StoryGenerationInput type
         isDoubleSpread: false,
       },
       storyPages: pagesForStory,

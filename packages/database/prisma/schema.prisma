@@ -48,7 +48,6 @@ model Book {
   id                String         @id @default(cuid())
   userId            String
   title             String
-  childName         String
   status            BookStatus     @default(DRAFT)
   pageLength        Int // 8, 12, or 16
   artStyle          String?

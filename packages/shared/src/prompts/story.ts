@@ -34,7 +34,6 @@ export const STORY_RESPONSE_SCHEMA = {
 
 // Simplified Input Type - Expects pre-filtered/sorted pages
 export interface StoryGenerationInput {
-  childName: string;
   bookTitle: string;
   isDoubleSpread: boolean;
   artStyle?: string;
@@ -44,7 +43,7 @@ export interface StoryGenerationInput {
     assetId: string | null;
     originalImageUrl: string | null;
   }[];
-  // Character data for personalized naming
+  // Character data for personalized naming (from face detection/tagging)
   characters?: Array<{
     name: string;
     croppedFaceUrl: string;
@@ -63,10 +62,9 @@ export const STORY_GENERATION_SYSTEM_PROMPT =
 // ----------------------------------
 
 function buildCharacterPromptSection(
-  characters: StoryGenerationInput['characters'],
-  childName: string
+  characters: StoryGenerationInput['characters']
 ): string {
-  // If no characters provided, fall back to using childName
+  // If no characters provided, use generic references
   if (!characters || characters.length === 0) {
     return '';
   }
@@ -113,17 +111,14 @@ export function createVisionStoryGenerationPrompt(
   // ---------- CONFIG ----------
   msg.push({
     type: 'input_text',
-    text: `# Configuration\nChild's Name: ${input.childName || 'the child'}\nBook Title: ${
+    text: `# Configuration\nBook Title: ${
       input.bookTitle || 'My Special Story'
     }\nPage Count: ${input.storyPages.length}`,
   });
 
-  // ---------- CHARACTER REFERENCES (NEW) ----------
+  // ---------- CHARACTER REFERENCES ----------
   if (input.characters && input.characters.length > 0) {
-    const characterSection = buildCharacterPromptSection(
-      input.characters,
-      input.childName
-    );
+    const characterSection = buildCharacterPromptSection(input.characters);
     if (characterSection) {
       msg.push({ type: 'input_text', text: characterSection });
     }
@@ -167,6 +162,12 @@ export function createVisionStoryGenerationPrompt(
   msg.push({ type: 'input_text', text: '--- End Storyboard ---' });
 
   // ---------- INSTRUCTIONS ----------
+  // Build character names instruction if characters exist
+  const characterNames = input.characters?.map(c => c.name) || [];
+  const characterInstruction = characterNames.length > 0
+    ? `  - Character Names: ${characterNames.join(', ')} (Use these names when the characters appear in scenes!)`
+    : `  - Use descriptive terms like "the child", "the little one", etc.`;
+
   const baseInstructions = [
     `# Instructions & Guiding Principles:`,
     `- You are an award-winning children's book author and illustrator.`,
@@ -177,7 +178,7 @@ export function createVisionStoryGenerationPrompt(
     `- Use **rhythm, repetition, and fun sounds (onomatopoeia)** naturally to enhance read-aloud appeal.`,
     `- Incorporate **gentle, age-appropriate humor** (mild mischief, small surprises) when fitting.`,
     `- **Seamlessly weave in** user details where applicable:`,
-    `  - Child's Name: \"${input.childName || '(Not Provided)'}\" (Use this name in the story text!)`,
+    characterInstruction,
     `  - Book Title: \"${input.bookTitle || '(Not Provided)'}\"`,
     `- Generate **1-3 simple sentences per page, maximum 35 words** (for the ${input.storyPages.length} pages provided).`,
     `  - This 35 word limit is STRICT - text will be displayed in a small area.`,
@@ -196,7 +197,7 @@ export function createVisionStoryGenerationPrompt(
     `  - Use sparkles ONLY for actual magic/wonder moments, not as a default effect.`,
     `  - Match the effect to the specific action - if a kid is eating, suggest food effects, not sparkles.`,
     `  - NEVER alter faces, poses, or introduce new characters.`,
-    `  - **Specifically for illustrationNotes ONLY:** Use visual language (e.g., 'the boy in red') instead of character names like '${input.childName || 'the child'}'. The illustration AI doesn't know names.`,
+    `  - **Specifically for illustrationNotes ONLY:** Use visual language (e.g., 'the boy in red', 'the girl with pigtails') instead of character names. The illustration AI doesn't know names.`,
     `  - If no dynamic effect fits, set \"illustrationNotes\" to null or empty.`,
     `\n- Effects must feel playful but natural, blending into the scene without overwhelming it.`,
     `\n- Final Output:`,

@@ -37,7 +37,6 @@ type LibraryBook = {
   title: string;
   status: BookStatus;
   createdAt: string;
-  childName: string;
   updatedAt: string;
   pages: Array<{
     id: string;

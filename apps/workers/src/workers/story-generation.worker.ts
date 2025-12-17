@@ -121,7 +121,6 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
 
     // Prepare story generation input using advanced prompt structure
     const storyInput: StoryGenerationInput = {
-      childName: book.childName || 'the child',
       bookTitle: book.title || 'My Special Story',
       isDoubleSpread: false, // Could be added to book settings in future
       artStyle: book.artStyle || undefined,

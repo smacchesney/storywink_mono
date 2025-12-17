@@ -65,7 +65,6 @@ export async function POST(req: NextRequest) {
         data: {
           userId: dbUser.id, // Use database user ID instead of Clerk ID
           title: '', // Start with empty title as per new requirements
-          childName: '', // Start with empty child name as per new requirements
           status: BookStatus.DRAFT,
           pageLength: assetIds.length, // Set page length based on provided assets
           coverAssetId: assetIds[0], // First photo becomes the cover

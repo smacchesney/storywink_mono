@@ -8,7 +8,6 @@ export interface IllustrationPromptOptions {
   style: StyleKey;
   pageText: string | null;
   bookTitle: string | null;
-  childName?: string | null;
   isTitlePage?: boolean;
   illustrationNotes?: string | null;
   referenceImageCount?: number; // Number of style reference images (1 for title, 2 for story pages)
@@ -74,9 +73,24 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
       ]
     : [];
 
+  // Format character names for title page subtitle
+  // 1 name: "A Kai adventure"
+  // 2 names: "A Kai and Mia adventure"
+  // 3+ names: "A Kai, Mia, and Leo adventure"
+  const formatCharacterNamesForSubtitle = (names: string[]): string => {
+    if (names.length === 0) return '';
+    if (names.length === 1) return names[0];
+    if (names.length === 2) return `${names[0]} and ${names[1]}`;
+    return `${names.slice(0, -1).join(', ')}, and ${names.at(-1)}`;
+  };
+
+  const subtitleNames = opts.characterNames && opts.characterNames.length > 0
+    ? formatCharacterNamesForSubtitle(opts.characterNames)
+    : null;
+
   const titleBits = opts.isTitlePage
     ? [
-        `Text: Add the title "${opts.bookTitle}" in a readable font matching the second image's text style. Position naturally without covering important subjects. Size appropriately (5-7% of image height).${opts.childName ? ` Below the title, add the subtitle "A ${opts.childName} adventure" in a smaller complementary font (approximately 3-4% of image height).` : ''}`,
+        `Text: Add the title "${opts.bookTitle}" in a readable font matching the second image's text style. Position naturally without covering important subjects. Size appropriately (5-7% of image height).${subtitleNames ? ` Below the title, add the subtitle "A ${subtitleNames} adventure" in a smaller complementary font (approximately 3-4% of image height).` : ''}`,
       ]
     : [
         `COMPOSITION: Create the illustration in the top ~82% of the image. Leave the bottom ~18% as PURE WHITE (#FFFFFF) empty space - this area will be used for text overlay. The illustration should fade softly into the pure white space with vignette-style edges (no hard horizontal line). All border areas and the text space must be pure white, not off-white or cream. DO NOT add any text to the image - the story text will be added programmatically afterward.`,

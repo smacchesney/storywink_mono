@@ -9,9 +9,7 @@ import { DrawerFooter } from "@/components/ui/drawer"; // For consistency if use
 
 interface DetailsEditorPanelProps {
   currentTitle: string;
-  currentChildName: string;
   onTitleChange: (title: string) => void;
-  onChildNameChange: (name: string) => void;
   onSave: () => void; // Simplified, can be async if needed from parent
   onCancel: () => void;
   isSaving: boolean;
@@ -19,9 +17,7 @@ interface DetailsEditorPanelProps {
 
 export function DetailsEditorPanel({
   currentTitle,
-  currentChildName,
   onTitleChange,
-  onChildNameChange,
   onSave,
   onCancel,
   isSaving,
@@ -39,16 +35,6 @@ export function DetailsEditorPanel({
             data-tourid="details-title-input" // For tour if needed
           />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="details-child-name" className="text-sm font-semibold">Child's Name</Label>
-          <Input
-            id="details-child-name"
-            placeholder={currentChildName.trim() === '' ? "e.g., Kai" : ""}
-            value={currentChildName}
-            onChange={(e) => onChildNameChange(e.target.value)}
-            data-tourid="details-childname-input" // For tour if needed
-          />
-        </div>
       </div>
       <DrawerFooter className="pt-2 flex-row">
         <Button
@@ -59,7 +45,7 @@ export function DetailsEditorPanel({
           {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           Done
         </Button>
-        {/* 
+        {/*
           DrawerClose is typically used when the component is directly inside a Drawer.
           If this panel is used in both Drawer and Sheet, the onCancel prop is more robust.
           The parent component (EditBookPage) will handle closing the Drawer/Sheet.
@@ -72,4 +58,4 @@ export function DetailsEditorPanel({
   );
 }
 
-export default DetailsEditorPanel; 
+export default DetailsEditorPanel;

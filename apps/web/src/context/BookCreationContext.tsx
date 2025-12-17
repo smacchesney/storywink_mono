@@ -15,7 +15,6 @@ type PageCount = 8 | 12 | 16;
 // ENSURE THIS TYPE IS SIMPLIFIED
 type EditorSettings = {
   bookTitle: string;
-  childName: string;
   artStyle: string;
   // storyTone, theme, etc. MUST be removed here
   isDoubleSpread: boolean;

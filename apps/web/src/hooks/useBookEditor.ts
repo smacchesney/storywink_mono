@@ -23,7 +23,6 @@ interface BookEditorState {
   pendingArtStyle: string | null | undefined;
   pendingWinkifyEnabled: boolean;
   pendingTitle: string;
-  pendingChildName: string;
   pendingCoverAssetId: string | null | undefined;
   
   // Loading states
@@ -52,7 +51,7 @@ type BookEditorAction =
   | { type: 'SET_ACTIVE_TAB'; payload: EditorTab }
   | { type: 'TOGGLE_PANEL'; panel: keyof BookEditorState; value?: boolean }
   | { type: 'SET_PENDING_STYLE'; artStyle: string | null | undefined; winkify: boolean }
-  | { type: 'SET_PENDING_COVER'; title: string; childName: string; assetId: string | null | undefined }
+  | { type: 'SET_PENDING_COVER'; title: string; assetId: string | null | undefined }
   | { type: 'SET_SAVING_STATE'; key: keyof BookEditorState; value: boolean }
   | { type: 'SET_STORYBOARD_ORDER'; payload: StoryboardPage[] }
   | { type: 'MARK_STEP_COMPLETED'; step: EditorTab }
@@ -76,7 +75,6 @@ const initialState: BookEditorState = {
   pendingArtStyle: undefined,
   pendingWinkifyEnabled: false,
   pendingTitle: '',
-  pendingChildName: '',
   pendingCoverAssetId: undefined,
   isSavingOrder: false,
   isSavingArtStyle: false,
@@ -117,10 +115,9 @@ function bookEditorReducer(state: BookEditorState, action: BookEditorAction): Bo
       };
     
     case 'SET_PENDING_COVER':
-      return { 
-        ...state, 
+      return {
+        ...state,
         pendingTitle: action.title,
-        pendingChildName: action.childName,
         pendingCoverAssetId: action.assetId
       };
     
@@ -179,8 +176,8 @@ export function useBookEditor() {
     dispatch({ type: 'SET_PENDING_STYLE', artStyle, winkify });
   }, []);
 
-  const setPendingCover = useCallback((title: string, childName: string, assetId: string | null | undefined) => {
-    dispatch({ type: 'SET_PENDING_COVER', title, childName, assetId });
+  const setPendingCover = useCallback((title: string, assetId: string | null | undefined) => {
+    dispatch({ type: 'SET_PENDING_COVER', title, assetId });
   }, []);
 
   const setSavingState = useCallback((key: keyof BookEditorState, value: boolean) => {

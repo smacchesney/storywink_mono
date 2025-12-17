@@ -101,7 +101,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     console.error('[DIAGNOSTIC] Failed to write job start diagnostic:', dbError);
   }
 
-  const { bookId, pageId, userId, pageNumber, artStyle, illustrationNotes, isTitlePage, bookTitle, childName, text } = job.data;
+  const { bookId, pageId, userId, pageNumber, artStyle, illustrationNotes, isTitlePage, bookTitle, characterNames: jobCharacterNames, text } = job.data;
 
   console.log(`[IllustrationWorker] Starting job ${job.id} for page ${pageNumber} of book ${bookId}`);
   console.log(`  - PageId: ${pageId}`);
@@ -414,12 +414,13 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         style: styleKey,
         pageText: text, // Use text from job data
         bookTitle: bookTitle, // Use bookTitle from job data
-        childName: childName, // Use childName from job data for subtitle
         isTitlePage: isTitlePage, // Use isTitlePage from job data
         illustrationNotes: illustrationNotes,
         referenceImageCount: styleReferenceBuffers.length, // Tell prompt how many refs we're sending
-        // Character face references for visual consistency
-        characterNames: characterNames.length > 0 ? characterNames : undefined,
+        // Character names for title page subtitle - use from job data first, fallback to fetched names
+        characterNames: (jobCharacterNames && jobCharacterNames.length > 0)
+            ? jobCharacterNames
+            : (characterNames.length > 0 ? characterNames : undefined),
         characterFaceCount: characterFaces.length > 0 ? characterFaces.length : undefined,
     };
     

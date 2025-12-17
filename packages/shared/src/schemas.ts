@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 // API Request/Response schemas
 export const createBookSchema = z.object({
-  childName: z.string().min(1, "Child's name is required"),
   assetIds: z.array(z.string()).min(1, "At least one photo is required"),
   pageLength: z.number().int().min(6).max(20).default(10),
   artStyle: z.string().optional(),
@@ -12,7 +11,6 @@ export const createBookSchema = z.object({
 
 export const updateBookSchema = z.object({
   title: z.string().optional(),
-  childName: z.string().optional(),
   artStyle: z.string().optional(),
   coverAssetId: z.string().optional(),
 });

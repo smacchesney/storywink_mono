@@ -91,7 +91,6 @@ generateRouter.post("/story", async (req: AuthenticatedRequest, res, next) => {
       assets: book.pages.map((p) => p.asset).filter(Boolean),
       bookDetails: {
         title: book.title,
-        childName: book.childName,
         artStyle: book.artStyle,
         tone: book.tone,
         theme: book.theme,

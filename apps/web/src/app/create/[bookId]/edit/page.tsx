@@ -74,7 +74,6 @@ export default function EditBookPage() {
   const [isCoverPanelOpen, setIsCoverPanelOpen] = useState(false); // <-- State for Cover panel
   // State for pending Cover changes
   const [pendingTitle, setPendingTitle] = useState('');
-  const [pendingChildName, setPendingChildName] = useState('');
   const [pendingCoverAssetId, setPendingCoverAssetId] = useState<string | null | undefined>(undefined);
   const [isSavingCover, setIsSavingCover] = useState(false); // <-- Loading state for saving cover
   const [isGeneratingStory, setIsGeneratingStory] = useState(false); // <-- State for generation loading
@@ -219,7 +218,7 @@ export default function EditBookPage() {
       const steps: Step[] = [
         {
           target: '[data-tourid="details-button"]',
-          content: "Input Book title and Child's name for the story here.",
+          content: "Input your Book Title here.",
           placement: 'top',
           isFixed: true,
           disableScrolling: true,
@@ -303,12 +302,9 @@ export default function EditBookPage() {
     if (tab === 'artStyle') {
       setPendingArtStyle(bookData?.artStyle);
     } else if (tab === 'cover') {
-      // setPendingTitle(bookData?.title || ''); // Moved to details
-      // setPendingChildName(bookData?.childName || ''); // Moved to details
       setPendingCoverAssetId(bookData?.coverAssetId);
     } else if (tab === 'details') { // Initialize pending details
       setPendingTitle(bookData?.title || '');
-      setPendingChildName(bookData?.childName || '');
     }
     logger.info({ bookId, newTab: tab }, "Editor tab changed");
   };
@@ -494,29 +490,25 @@ export default function EditBookPage() {
   const handlePendingTitleChange = (title: string) => {
     setPendingTitle(title);
   };
-  const handlePendingChildNameChange = (name: string) => {
-    setPendingChildName(name);
-  };
 
   // Handler for saving Details (new)
   const handleSaveDetails = async () => {
     if (!bookData || isSavingDetails) return;
     setIsSavingDetails(true);
-    logger.info({ bookId, title: pendingTitle, childName: pendingChildName }, "Saving book details...");
+    logger.info({ bookId, title: pendingTitle }, "Saving book details...");
 
-    const updatePayload: { title?: string; childName?: string; } = {};
+    const updatePayload: { title?: string; } = {};
     if (pendingTitle !== bookData.title) updatePayload.title = pendingTitle;
-    if (pendingChildName !== bookData.childName) updatePayload.childName = pendingChildName;
 
     if (Object.keys(updatePayload).length === 0) {
       logger.info({ bookId }, "No changes detected in book details.");
       setIsSavingDetails(false);
       setIsDetailsPanelOpen(false);
-      return; 
+      return;
     }
 
     try {
-      const response = await fetch(`/api/book/${bookId}`, { 
+      const response = await fetch(`/api/book/${bookId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload),
@@ -526,13 +518,12 @@ export default function EditBookPage() {
 
       setBookData(prevData => {
         if (!prevData) return null;
-        return { 
-            ...prevData, 
+        return {
+            ...prevData,
             ...(updatePayload.title !== undefined && { title: updatePayload.title }),
-            ...(updatePayload.childName !== undefined && { childName: updatePayload.childName }),
         };
       });
-         
+
        setIsDetailsPanelOpen(false);
     } catch (error) {
       logger.error({ bookId, error }, "Failed to save book details");
@@ -803,10 +794,9 @@ export default function EditBookPage() {
   const canGenerate = useMemo(() => {
       return !!(
           bookData &&
-          bookData.title?.trim() && 
-          bookData.childName?.trim() && 
+          bookData.title?.trim() &&
           bookData.artStyle
-          // Add other required checks here if needed
+          // Characters are optional but enhance the story
       );
   }, [bookData]);
   // ----------------------------
@@ -863,8 +853,8 @@ export default function EditBookPage() {
 
     const newCompletedSteps = new Set<EditorTab>();
 
-    // Details: completed if both title and childName are set
-    if (bookData.title && bookData.title.trim() && bookData.childName && bookData.childName.trim()) {
+    // Details: completed if title is set
+    if (bookData.title && bookData.title.trim()) {
       newCompletedSteps.add('details');
     }
 
@@ -936,7 +926,6 @@ export default function EditBookPage() {
     setActiveTab('details');
     setIsDetailsPanelOpen(true);
     setPendingTitle(bookData?.title || '');
-    setPendingChildName(bookData?.childName || '');
     logger.info({ bookId }, "Title placeholder clicked, opening Details drawer");
   };
 
@@ -1124,7 +1113,7 @@ export default function EditBookPage() {
                     </TooltipTrigger>
                     {!canGenerate && (
                         <TooltipContent>
-                            <p>Please set Title, Child's Name, and Art Style first.</p>
+                            <p>Please set Book Title and Art Style first.</p>
                         </TooltipContent>
                     )}
                  </Tooltip>
@@ -1151,30 +1140,26 @@ export default function EditBookPage() {
           {activeTab === 'details' && (
             isDesktop ? (
               <Drawer open={isDetailsPanelOpen} onOpenChange={setIsDetailsPanelOpen} modal={false} shouldScaleBackground={false}>
-                <DrawerContent className="h-full w-[380px] mt-0 fixed left-0 rounded-none border-r"> 
+                <DrawerContent className="h-full w-[380px] mt-0 fixed left-0 rounded-none border-r">
                   <DrawerHeader><DrawerTitle>Book Details</DrawerTitle></DrawerHeader>
-                  <DetailsEditorPanel 
+                  <DetailsEditorPanel
                     currentTitle={pendingTitle}
-                    currentChildName={pendingChildName}
                     onTitleChange={handlePendingTitleChange}
-                    onChildNameChange={handlePendingChildNameChange}
                     onSave={handleSaveDetails}
-                    onCancel={() => setIsDetailsPanelOpen(false)} // Close panel on cancel
+                    onCancel={() => setIsDetailsPanelOpen(false)}
                     isSaving={isSavingDetails}
                   />
                 </DrawerContent>
               </Drawer>
             ) : (
               <Sheet open={isDetailsPanelOpen} onOpenChange={setIsDetailsPanelOpen}>
-                 <SheetContent side="bottom" className="h-[85vh] flex flex-col"> 
+                 <SheetContent side="bottom" className="h-[85vh] flex flex-col">
                    <SheetHeader><SheetTitle>Book Details</SheetTitle></SheetHeader>
-                   <DetailsEditorPanel 
+                   <DetailsEditorPanel
                     currentTitle={pendingTitle}
-                    currentChildName={pendingChildName}
                     onTitleChange={handlePendingTitleChange}
-                    onChildNameChange={handlePendingChildNameChange}
                     onSave={handleSaveDetails}
-                    onCancel={() => setIsDetailsPanelOpen(false)} // Close panel on cancel
+                    onCancel={() => setIsDetailsPanelOpen(false)}
                     isSaving={isSavingDetails}
                   />
                  </SheetContent>

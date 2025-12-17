@@ -19,7 +19,6 @@ export interface Book {
   id: string;
   userId: string;
   title: string;
-  childName: string;
   status: BookStatus;
   pageLength: number;
   artStyle?: string | null;
@@ -112,7 +111,7 @@ export interface IllustrationGenerationJob {
   text: string | null;
   artStyle: string;
   bookTitle: string;
-  childName: string;
+  characterNames: string[]; // Names of characters for title page subtitle
   isTitlePage: boolean;
   illustrationNotes?: string | null;
   originalImageUrl?: string | null;

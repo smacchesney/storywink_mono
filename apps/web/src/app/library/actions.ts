@@ -6,7 +6,7 @@ import { Prisma, Book, BookStatus } from "@prisma/client"; // Use @prisma/client
 import { revalidatePath } from 'next/cache'; // Import for revalidation
 
 // Define the structure of the book data needed by the card
-export type LibraryBook = Pick<Book, 'id' | 'title' | 'status' | 'createdAt' | 'childName' | 'updatedAt'> & {
+export type LibraryBook = Pick<Book, 'id' | 'title' | 'status' | 'createdAt' | 'updatedAt'> & {
   coverImageUrl: string | null;
 };
 
@@ -31,7 +31,6 @@ export async function getUserBooks(): Promise<UserBooksResult> {
         status: true,
         createdAt: true,
         updatedAt: true,
-        childName: true,
         coverAssetId: true, // Ensure coverAssetId is fetched
         pages: {
           orderBy: { index: Prisma.SortOrder.asc }, // Order pages by index
@@ -79,7 +78,6 @@ export async function getUserBooks(): Promise<UserBooksResult> {
         status: book.status,
         createdAt: book.createdAt,
         updatedAt: book.updatedAt,
-        childName: book.childName,
         coverImageUrl: determinedCoverImageUrl,
       };
     });
@@ -169,7 +167,6 @@ export async function duplicateBook(bookId: string): Promise<{ success: boolean;
       // Select only fields needed for duplication
       select: {
         title: true,
-        childName: true,
         pageLength: true,
         artStyle: true,
         tone: true,
@@ -182,8 +179,8 @@ export async function duplicateBook(bookId: string): Promise<{ success: boolean;
         // Remove fields not needed for duplication
         // createdAt: true,
         // updatedAt: true,
-        // coverImageUrl: true, 
-        // pages: { ... } 
+        // coverImageUrl: true,
+        // pages: { ... }
       }
     });
 
@@ -195,7 +192,6 @@ export async function duplicateBook(bookId: string): Promise<{ success: boolean;
     const newBookRecord = await prisma.book.create({
       data: {
         title: `${originalBook.title} (Copy)`,
-        childName: originalBook.childName,
         pageLength: originalBook.pageLength,
         artStyle: originalBook.artStyle,
         tone: originalBook.tone,
@@ -205,7 +201,7 @@ export async function duplicateBook(bookId: string): Promise<{ success: boolean;
         specialObjects: originalBook.specialObjects,
         excitementElement: originalBook.excitementElement,
         userId: dbUser.id, // Use database user ID, not original book's userId
-        status: BookStatus.DRAFT, 
+        status: BookStatus.DRAFT,
       },
       select: { id: true } // Only need the new ID
     });

@@ -290,7 +290,6 @@ printOrdersRouter.get('/', async (req: AuthenticatedRequest, res, next) => {
           select: {
             id: true,
             title: true,
-            childName: true,
           },
         },
       },
@@ -321,7 +320,6 @@ printOrdersRouter.get('/:orderId', async (req: AuthenticatedRequest, res, next) 
           select: {
             id: true,
             title: true,
-            childName: true,
             pageLength: true,
           },
         },

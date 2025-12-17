@@ -43,7 +43,6 @@ cartRouter.get('/', async (req: AuthenticatedRequest, res, next) => {
       book: {
         id: item.book.id,
         title: item.book.title,
-        childName: item.book.childName,
         status: item.book.status,
         pageCount: item.book.pageLength,
         coverImageUrl: item.book.pages[0]?.generatedImageUrl || null,
@@ -123,7 +122,6 @@ cartRouter.post('/', async (req: AuthenticatedRequest, res, next) => {
           select: {
             id: true,
             title: true,
-            childName: true,
             status: true,
             pageLength: true,
           },
@@ -182,7 +180,6 @@ cartRouter.patch('/:cartItemId', async (req: AuthenticatedRequest, res, next) =>
           select: {
             id: true,
             title: true,
-            childName: true,
             status: true,
             pageLength: true,
           },
