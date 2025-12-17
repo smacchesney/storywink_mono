@@ -4,15 +4,37 @@ import { FlowProducer } from 'bullmq';
 import { createBullMQConnection } from '@storywink/shared/redis';
 
 // Lazy initialization variables
+let redisConnection: IORedis | null = null;
 let connectionOptions: { connection: IORedis } | null = null;
 let flowProducerInstance: FlowProducer | null = null;
+
+// Function to get or create Redis connection with error handling
+function getRedisConnection(): IORedis {
+  if (!redisConnection) {
+    redisConnection = new IORedis(createBullMQConnection());
+
+    // Handle Redis connection errors gracefully (prevent process crash)
+    redisConnection.on('error', (err) => {
+      console.error('[Redis] Connection error:', err.message);
+    });
+
+    redisConnection.on('close', () => {
+      console.warn('[Redis] Connection closed, will attempt to reconnect...');
+    });
+
+    redisConnection.on('reconnecting', () => {
+      console.info('[Redis] Reconnecting...');
+    });
+  }
+  return redisConnection;
+}
 
 // Function to get or create connection options
 // Uses family: 0 for IPv6 support on Railway private networking
 function getConnectionOptions(): { connection: IORedis } {
   if (!connectionOptions) {
     connectionOptions = {
-      connection: new IORedis(createBullMQConnection()),
+      connection: getRedisConnection(),
     };
   }
   return connectionOptions;
@@ -22,6 +44,11 @@ function getConnectionOptions(): { connection: IORedis } {
 export function getFlowProducer(): FlowProducer {
   if (!flowProducerInstance) {
     flowProducerInstance = new FlowProducer(getConnectionOptions());
+
+    // Handle FlowProducer errors to prevent unhandled rejection crashes
+    flowProducerInstance.on('error', (err) => {
+      console.error('[FlowProducer] Error:', err.message);
+    });
   }
   return flowProducerInstance;
 }

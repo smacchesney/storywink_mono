@@ -54,6 +54,19 @@ const logger = pino({
 // Uses family: 0 for IPv6 support on Railway private networking
 const redis = new Redis(createBullMQConnection());
 
+// Handle Redis connection errors gracefully (prevent process crash)
+redis.on('error', (err) => {
+  console.error('[Redis] Connection error:', err.message);
+});
+
+redis.on('close', () => {
+  console.warn('[Redis] Connection closed, will attempt to reconnect...');
+});
+
+redis.on('reconnecting', () => {
+  console.info('[Redis] Reconnecting...');
+});
+
 // Import worker processors
 import { processStoryGeneration } from './workers/story-generation.worker.js';
 import { processIllustrationGeneration } from './workers/illustration-generation.worker.js';

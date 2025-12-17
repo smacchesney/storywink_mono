@@ -8,14 +8,35 @@ if (!process.env.REDIS_URL) {
   throw new Error("Missing REDIS_URL environment variable");
 }
 
+// Create Redis connection with reconnection support
+const redisConnection = new IORedis(createBullMQConnection());
+
+// Handle Redis connection errors gracefully (prevent process crash)
+redisConnection.on("error", (err) => {
+  console.error("[Redis] Connection error:", err.message);
+});
+
+redisConnection.on("close", () => {
+  console.warn("[Redis] Connection closed, will attempt to reconnect...");
+});
+
+redisConnection.on("reconnecting", () => {
+  console.info("[Redis] Reconnecting...");
+});
+
 // Reusable connection options
 // Uses family: 0 for IPv6 support on Railway private networking
 const connectionOptions = {
-  connection: new IORedis(createBullMQConnection()),
+  connection: redisConnection,
 };
 
 // Create and export a single FlowProducer instance
 export const flowProducer = new FlowProducer(connectionOptions);
+
+// Handle FlowProducer errors to prevent unhandled rejection crashes
+flowProducer.on("error", (err) => {
+  console.error("[FlowProducer] Error:", err.message);
+});
 
 // Define queue names centrally
 export enum QueueName {
