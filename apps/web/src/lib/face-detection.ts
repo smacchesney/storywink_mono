@@ -1,5 +1,21 @@
 import * as faceapi from '@vladmandic/face-api';
 
+// Configuration
+const CONFIG = {
+  // Clustering thresholds (euclidean distance)
+  DISTANCE_THRESHOLD: 0.5, // Was 0.6 - more lenient for children's variable expressions
+  MERGE_THRESHOLD: 0.55, // For post-clustering merge pass
+
+  // Detection settings
+  MIN_FACE_SIZE: 30, // Was 50 - catch smaller faces in group shots
+  MIN_CONFIDENCE: 0.5, // Detection confidence threshold
+  MAX_IMAGE_DIMENSION: 1920, // Resize large images for better detection
+
+  // Filtering
+  MIN_FREQUENCY_FOR_DISPLAY: 2, // Must appear in 2+ photos
+  HIGH_CONFIDENCE_SINGLE: 0.9, // OR single photo with high confidence
+};
+
 // Types
 export interface DetectedFace {
   id: string;
@@ -59,6 +75,38 @@ export function areModelsLoaded(): boolean {
 }
 
 /**
+ * Resize image if too large for optimal face detection
+ * Returns a canvas element that can be used for detection
+ */
+function resizeImageForDetection(img: HTMLImageElement): HTMLCanvasElement | HTMLImageElement {
+  const maxDim = CONFIG.MAX_IMAGE_DIMENSION;
+  const { width, height } = img;
+
+  // If image is small enough, return as-is
+  if (width <= maxDim && height <= maxDim) {
+    return img;
+  }
+
+  // Calculate new dimensions maintaining aspect ratio
+  const scale = Math.min(maxDim / width, maxDim / height);
+  const newWidth = Math.round(width * scale);
+  const newHeight = Math.round(height * scale);
+
+  console.log(
+    `[FaceDetection] Resizing image from ${width}x${height} to ${newWidth}x${newHeight}`
+  );
+
+  // Create canvas and draw resized image
+  const canvas = document.createElement('canvas');
+  canvas.width = newWidth;
+  canvas.height = newHeight;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(img, 0, 0, newWidth, newHeight);
+
+  return canvas;
+}
+
+/**
  * Detect all faces in a single image
  */
 export async function detectFacesInImage(
@@ -67,33 +115,149 @@ export async function detectFacesInImage(
 ): Promise<DetectedFace[]> {
   // Load image into HTML element
   const img = await faceapi.fetchImage(imageUrl);
+  const originalWidth = img.width;
+  const originalHeight = img.height;
+
+  // Resize if needed for better detection
+  const inputImage = resizeImageForDetection(img);
+  const scale =
+    inputImage instanceof HTMLCanvasElement
+      ? originalWidth / inputImage.width
+      : 1;
+
+  // Detection options with lower confidence threshold
+  const options = new faceapi.SsdMobilenetv1Options({
+    minConfidence: CONFIG.MIN_CONFIDENCE,
+  });
 
   // Detect faces with landmarks and descriptors
   const detections = await faceapi
-    .detectAllFaces(img)
+    .detectAllFaces(inputImage, options)
     .withFaceLandmarks()
     .withFaceDescriptors();
 
-  // Convert to our format
-  return detections
-    .filter((d) => {
-      // Filter out tiny faces (< 50x50 pixels)
-      const { width, height } = d.detection.box;
-      return width >= 50 && height >= 50;
-    })
-    .map((d, i) => ({
-      id: `${assetId}-face-${i}`,
-      assetId,
-      imageUrl,
-      box: {
-        x: d.detection.box.x,
-        y: d.detection.box.y,
-        width: d.detection.box.width,
-        height: d.detection.box.height,
-      },
-      score: d.detection.score,
-      descriptor: d.descriptor,
-    }));
+  // Filter and convert to our format
+  const filtered = detections.filter((d) => {
+    // Filter out tiny faces (< MIN_FACE_SIZE pixels) - using original image coordinates
+    const { width, height } = d.detection.box;
+    const originalBoxWidth = width * scale;
+    const originalBoxHeight = height * scale;
+    return (
+      originalBoxWidth >= CONFIG.MIN_FACE_SIZE &&
+      originalBoxHeight >= CONFIG.MIN_FACE_SIZE
+    );
+  });
+
+  console.log(
+    `[FaceDetection] Photo ${assetId}: detected ${detections.length} faces, kept ${filtered.length} after size filter (${originalWidth}x${originalHeight})`
+  );
+
+  return filtered.map((d, i) => ({
+    id: `${assetId}-face-${i}`,
+    assetId,
+    imageUrl,
+    // Scale bounding box back to original image coordinates
+    box: {
+      x: d.detection.box.x * scale,
+      y: d.detection.box.y * scale,
+      width: d.detection.box.width * scale,
+      height: d.detection.box.height * scale,
+    },
+    score: d.detection.score,
+    descriptor: d.descriptor,
+  }));
+}
+
+/**
+ * Calculate centroid (average) descriptor for a cluster
+ */
+function calculateCentroid(faces: DetectedFace[]): Float32Array {
+  const centroid = new Float32Array(128).fill(0);
+  for (const face of faces) {
+    for (let i = 0; i < 128; i++) {
+      centroid[i] += face.descriptor[i];
+    }
+  }
+  for (let i = 0; i < 128; i++) {
+    centroid[i] /= faces.length;
+  }
+  return centroid;
+}
+
+/**
+ * Find minimum distance from a face to any face in a cluster
+ * This is better than comparing to bestFace only because poses/expressions vary
+ */
+function minDistanceToCluster(
+  face: DetectedFace,
+  cluster: FaceCluster
+): number {
+  let minDistance = Infinity;
+  for (const clusterFace of cluster.faces) {
+    const d = faceapi.euclideanDistance(face.descriptor, clusterFace.descriptor);
+    if (d < minDistance) {
+      minDistance = d;
+    }
+  }
+  return minDistance;
+}
+
+/**
+ * Merge clusters that have similar centroids
+ * This catches cases where the same person ended up in different clusters
+ */
+function mergeSimilarClusters(clusters: FaceCluster[]): FaceCluster[] {
+  if (clusters.length <= 1) return clusters;
+
+  const merged: FaceCluster[] = [];
+  const usedIndices = new Set<number>();
+
+  for (let i = 0; i < clusters.length; i++) {
+    if (usedIndices.has(i)) continue;
+
+    let currentCluster = { ...clusters[i], faces: [...clusters[i].faces] };
+    usedIndices.add(i);
+
+    // Try to merge with other clusters
+    for (let j = i + 1; j < clusters.length; j++) {
+      if (usedIndices.has(j)) continue;
+
+      const centroid1 = calculateCentroid(currentCluster.faces);
+      const centroid2 = calculateCentroid(clusters[j].faces);
+      const distance = faceapi.euclideanDistance(centroid1, centroid2);
+
+      if (distance < CONFIG.MERGE_THRESHOLD) {
+        console.log(
+          `[FaceDetection] Merging cluster ${currentCluster.id} with ${clusters[j].id} (centroid distance: ${distance.toFixed(3)})`
+        );
+
+        // Merge faces
+        currentCluster.faces.push(...clusters[j].faces);
+        currentCluster.frequency = new Set(
+          currentCluster.faces.map((f) => f.assetId)
+        ).size;
+
+        // Update best face
+        for (const face of clusters[j].faces) {
+          const currentBestQuality =
+            currentCluster.bestFace.score *
+            currentCluster.bestFace.box.width *
+            currentCluster.bestFace.box.height;
+          const newQuality = face.score * face.box.width * face.box.height;
+          if (newQuality > currentBestQuality) {
+            currentCluster.bestFace = face;
+          }
+        }
+
+        usedIndices.add(j);
+      }
+    }
+
+    merged.push(currentCluster);
+  }
+
+  // Re-sort by frequency
+  return merged.sort((a, b) => b.frequency - a.frequency);
 }
 
 /**
@@ -101,24 +265,27 @@ export async function detectFacesInImage(
  * Uses Euclidean distance on 128-dim descriptors
  */
 export function clusterFaces(allFaces: DetectedFace[]): FaceCluster[] {
-  const THRESHOLD = 0.6; // Lower = stricter matching
+  console.log(`[FaceDetection] Clustering ${allFaces.length} total faces...`);
   const clusters: FaceCluster[] = [];
 
   for (const face of allFaces) {
     // Find existing cluster this face belongs to
+    // Compare against ALL faces in cluster, not just bestFace
     let foundCluster: FaceCluster | null = null;
+    let bestMatchDistance = Infinity;
 
     for (const cluster of clusters) {
-      const distance = faceapi.euclideanDistance(
-        face.descriptor,
-        cluster.bestFace.descriptor
-      );
+      const distance = minDistanceToCluster(face, cluster);
 
-      if (distance < THRESHOLD) {
+      if (distance < CONFIG.DISTANCE_THRESHOLD && distance < bestMatchDistance) {
         foundCluster = cluster;
-        break;
+        bestMatchDistance = distance;
       }
     }
+
+    console.log(
+      `[FaceDetection] Face from ${face.assetId}: best match distance=${bestMatchDistance.toFixed(3)}, matched=${foundCluster ? 'yes' : 'no'}`
+    );
 
     if (foundCluster) {
       // Add to existing cluster
@@ -148,8 +315,24 @@ export function clusterFaces(allFaces: DetectedFace[]): FaceCluster[] {
     }
   }
 
-  // Sort by frequency (most common person first)
-  return clusters.sort((a, b) => b.frequency - a.frequency);
+  console.log(`[FaceDetection] Initial clustering: ${clusters.length} clusters`);
+  clusters.forEach((c) =>
+    console.log(
+      `  - Cluster ${c.id}: ${c.faces.length} faces from ${c.frequency} photos`
+    )
+  );
+
+  // Post-processing: merge clusters with similar centroids
+  const mergedClusters = mergeSimilarClusters(clusters);
+
+  console.log(`[FaceDetection] After merge pass: ${mergedClusters.length} clusters`);
+  mergedClusters.forEach((c) =>
+    console.log(
+      `  - Cluster ${c.id}: ${c.faces.length} faces from ${c.frequency} photos`
+    )
+  );
+
+  return mergedClusters;
 }
 
 /**
@@ -158,7 +341,9 @@ export function clusterFaces(allFaces: DetectedFace[]): FaceCluster[] {
  */
 export function getDisplayableClusters(clusters: FaceCluster[]): FaceCluster[] {
   return clusters.filter(
-    (cluster) => cluster.frequency >= 2 || cluster.bestFace.score > 0.9
+    (cluster) =>
+      cluster.frequency >= CONFIG.MIN_FREQUENCY_FOR_DISPLAY ||
+      cluster.bestFace.score > CONFIG.HIGH_CONFIDENCE_SINGLE
   );
 }
 
