@@ -111,7 +111,6 @@ export interface IllustrationGenerationJob {
   text: string | null;
   artStyle: string;
   bookTitle: string;
-  characterNames: string[]; // Names of characters for title page subtitle
   isTitlePage: boolean;
   illustrationNotes?: string | null;
   originalImageUrl?: string | null;

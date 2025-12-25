@@ -31,7 +31,6 @@
     "@storywink/database": "*",
     "@storywink/shared": "*",
     "@stripe/stripe-js": "^8.5.3",
-    "@vladmandic/face-api": "^1.7.15",
     "bullmq": "^5.48.1",
     "class-variance-authority": "^0.7.1",
     "cloudinary": "^2.6.0",

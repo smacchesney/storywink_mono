@@ -68,7 +68,6 @@ model Book {
   notifications     Notification[]
   cartItems         CartItem[]
   printOrders       PrintOrder[]
-  characters        Character[]
 
   @@index([userId])
 }
@@ -112,7 +111,6 @@ model Asset {
   createdAt    DateTime @default(now())
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   pages        Page[] // Add relation back to Page model
-  characters   Character[]
 
   @@index([userId])
 }
@@ -191,28 +189,6 @@ model WorkerDiagnostic {
   @@index([pageId])
   @@index([errorType])
   @@index([createdAt])
-}
-
-// ═══════════════════════════════════════════════════════════════
-// CHARACTER DETECTION: Face Detection & Character References
-// ═══════════════════════════════════════════════════════════════
-
-// Character model for face detection and character references
-model Character {
-  id              String   @id @default(cuid())
-  bookId          String
-  name            String
-  croppedFaceUrl  String   // Cloudinary URL of cropped face
-  sourceAssetId   String   // Which uploaded photo this face came from
-  faceBounds      Json?    // { x, y, width, height } - for re-cropping if needed
-  isMainCharacter Boolean  @default(true)
-  displayOrder    Int      @default(0)
-  createdAt       DateTime @default(now())
-
-  book        Book  @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  sourceAsset Asset @relation(fields: [sourceAssetId], references: [id])
-
-  @@index([bookId])
 }
 
 // ═══════════════════════════════════════════════════════════════

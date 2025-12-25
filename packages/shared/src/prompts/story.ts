@@ -43,11 +43,6 @@ export interface StoryGenerationInput {
     assetId: string | null;
     originalImageUrl: string | null;
   }[];
-  // Character data for personalized naming (from face detection/tagging)
-  characters?: Array<{
-    name: string;
-    croppedFaceUrl: string;
-  }>;
 }
 
 // ----------------------------------
@@ -56,48 +51,6 @@ export interface StoryGenerationInput {
 
 export const STORY_GENERATION_SYSTEM_PROMPT =
   "You are an expert children's picture‑book author for toddlers (ages 2-4). Parents will read this story aloud to their children. Your task is to write engaging, age-appropriate story text for a personalised picture book based on the user's photos and inputs.";
-
-// ----------------------------------
-// CHARACTER PROMPT SECTION BUILDER
-// ----------------------------------
-
-function buildCharacterPromptSection(
-  characters: StoryGenerationInput['characters']
-): string {
-  // If no characters provided, use generic references
-  if (!characters || characters.length === 0) {
-    return '';
-  }
-
-  const characterNames = characters.map((c) => c.name);
-
-  if (characters.length === 1) {
-    return `
-# Main Character
-The protagonist is **${characters[0].name}**.
-- Use this name throughout the story whenever they appear.
-- I've included a reference photo of their face below - identify this person in each page photo.
-- Refer to them by name in your story text (e.g., "${characters[0].name} splashed in the puddle!").`;
-  }
-
-  if (characters.length === 2) {
-    return `
-# Main Characters
-This story features **${characters[0].name}** and **${characters[1].name}**.
-- They are co-protagonists. Feature both naturally throughout.
-- I've included reference photos of their faces below - identify them in each page photo.
-- Use their names when they appear in scenes (e.g., "${characters[0].name} and ${characters[1].name} ran through the park!").`;
-  }
-
-  // 3+ characters
-  return `
-# Main Characters
-This story features: **${characterNames.join(', ')}**.
-- I've included reference photos of their faces below.
-- Use their actual names when they appear in scenes.
-- Focus primarily on ${characterNames[0]} and ${characterNames[1]} as main protagonists.
-- Other characters can appear as supporting roles.`;
-}
 
 // ----------------------------------
 // STORY GENERATION – VISION PROMPT
@@ -115,29 +68,6 @@ export function createVisionStoryGenerationPrompt(
       input.bookTitle || 'My Special Story'
     }\nPage Count: ${input.storyPages.length}`,
   });
-
-  // ---------- CHARACTER REFERENCES ----------
-  if (input.characters && input.characters.length > 0) {
-    const characterSection = buildCharacterPromptSection(input.characters);
-    if (characterSection) {
-      msg.push({ type: 'input_text', text: characterSection });
-    }
-
-    // Add character face images for visual reference
-    msg.push({ type: 'input_text', text: '\n## Character Reference Photos' });
-    input.characters.forEach((char, i) => {
-      msg.push({
-        type: 'input_text',
-        text: `--- Character ${i + 1}: ${char.name} ---`,
-      });
-      msg.push({
-        type: 'input_image',
-        image_url: char.croppedFaceUrl,
-        detail: 'high',
-      });
-    });
-    msg.push({ type: 'input_text', text: '--- End Character References ---\n' });
-  }
 
   // ---------- STORYBOARD (IMAGES) ----------
   msg.push({ type: 'input_text', text: '# Storyboard Sequence' });
@@ -162,11 +92,7 @@ export function createVisionStoryGenerationPrompt(
   msg.push({ type: 'input_text', text: '--- End Storyboard ---' });
 
   // ---------- INSTRUCTIONS ----------
-  // Build character names instruction if characters exist
-  const characterNames = input.characters?.map(c => c.name) || [];
-  const characterInstruction = characterNames.length > 0
-    ? `  - Character Names: ${characterNames.join(', ')} (Use these names when the characters appear in scenes!)`
-    : `  - Use descriptive terms like "the child", "the little one", etc.`;
+  const characterInstruction = `  - Use descriptive terms like "the child", "the little one", etc.`;
 
   const baseInstructions = [
     `# Instructions & Guiding Principles:`,

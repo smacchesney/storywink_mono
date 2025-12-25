@@ -20,7 +20,6 @@ export interface IllustrationGenerationJobData {
   text: string | null;
   artStyle: string | null | undefined;
   bookTitle: string | null | undefined;
-  characterNames: string[]; // Names of characters for title page subtitle
   isTitlePage: boolean;
   illustrationNotes: string | null | undefined;
   originalImageUrl: string | null;
@@ -62,11 +61,6 @@ export async function POST(request: Request) {
         artStyle: true,
         status: true,
         coverAssetId: true, // Include coverAssetId to identify title page
-        characters: {
-          select: {
-            name: true,
-          }
-        },
         pages: {
           orderBy: { index: 'asc' },
           select: {
@@ -219,9 +213,6 @@ export async function POST(request: Request) {
     logger.info({ clerkId, dbUserId: dbUser.id, bookId: book.id }, 'Book status updated to ILLUSTRATING.');
 
     // Step 3: Create child job definitions for pages that need illustration
-    // Extract character names for title page subtitle
-    const characterNames = book.characters?.map(c => c.name).filter(Boolean) || [];
-
     console.log(`[IllustrationAPI] Creating illustration jobs for ${pagesToProcess.length} page(s)...`);
     const pageChildren = pagesToProcess.map((page) => {
         const isActualTitlePage = page.assetId === book.coverAssetId;
@@ -234,7 +225,6 @@ export async function POST(request: Request) {
             text: page.text,
             artStyle: book.artStyle,
             bookTitle: book.title,
-            characterNames, // Pass character names for title page subtitle
             isTitlePage: isActualTitlePage,
             illustrationNotes: page.illustrationNotes,
             originalImageUrl: page.originalImageUrl, // This will be fetched from asset in worker
