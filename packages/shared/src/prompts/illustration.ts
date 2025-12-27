@@ -40,13 +40,21 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
   const base = [
     `Create a children's picture book illustration ${imageCountText}`,
 
-    `ARTISTIC STYLE (Primary directive): Fully transform this into a hand-drawn/painted children's book illustration matching the style from the reference image(s). Apply its complete aesthetic: color palette, brush techniques, line work, textures, shading, and lighting approach. The final image must look like it was illustrated from imagination, not like a filtered photograph. Replace all photographic elements (realistic textures, camera lighting, photo grain) with illustrated equivalents. Backgrounds should be simplified into clean illustrated shapes and forms.${styleDescription ? ` Style emphasis: ${styleDescription}` : ''}`,
+    `ARTISTIC STYLE (Primary directive): Fully transform this into a hand-drawn/painted children's book illustration matching the style from the reference image(s). Apply its complete aesthetic: color palette, brush techniques, line work, textures, shading, and lighting approach. The final image must look like a hand-illustrated children's book page, not a filtered photograph—while keeping people precisely recognizable. Replace all photographic elements (realistic textures, camera lighting, photo grain) with illustrated equivalents. Backgrounds should be simplified into clean illustrated shapes and forms.${styleDescription ? ` Style emphasis: ${styleDescription}` : ''}`,
 
     `SCENE INTERPRETATION (Secondary directive): Use the first image as reference for: character/subject identity and their pose, the spatial layout and composition, key recognizable objects that establish the setting. Translate these elements into illustration form - a wooden fence becomes illustrated wood with simple line work, not photographic grain; metal becomes clean illustrated surfaces with simple highlights, not realistic reflections. Simplify complex backgrounds into essential illustrated elements while keeping the scene recognizable.`,
   ];
 
   // Character consistency section
-  const characterConsistencySection = `CHARACTER CONSISTENCY: Maintain the same illustrated appearance of people across all pages - consistent face shape, hair style, skin tone, and proportions in the illustrated style. The child should be immediately recognizable as the same character throughout the book.`;
+  const characterConsistencySection = `PEOPLE - STRICT FIDELITY (non-negotiable):
+Every person in the illustration must be immediately recognizable from the source photo.
+- Face shape, features, expression: exact match to what's visible
+- Hair color, style, length: exact match to what's visible
+- Skin tone: exact match
+- Body proportions, clothing: exact match
+- If any feature is hidden (hat, angle, shadow): keep it hidden—never invent
+
+DO NOT reimagine, stylize away, or invent features for any person. A parent must look at your illustration and instantly recognize their child and family. Render people in the illustration style, but preserve their exact features—stylized execution, faithful likeness.`;
 
   base.push(characterConsistencySection);
 
