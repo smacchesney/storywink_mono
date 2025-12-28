@@ -47,6 +47,7 @@ import Joyride, { Step, EVENTS, STATUS, CallBackProps } from 'react-joyride'; //
 import { cn } from '@/lib/utils';
 import { useAuth } from '@clerk/nextjs';
 
+// Book editor page with character personalization
 export default function EditBookPage() {
   const params = useParams();
   const router = useRouter();
