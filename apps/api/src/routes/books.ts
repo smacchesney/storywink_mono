@@ -168,10 +168,16 @@ booksRouter.patch("/:bookId", async (req: AuthenticatedRequest, res, next) => {
       return;
     }
 
+    // Prepare data for Prisma (serialize additionalCharacters to JSON string)
+    const dataForPrisma: Record<string, unknown> = { ...body };
+    if (body.additionalCharacters !== undefined) {
+      dataForPrisma.additionalCharacters = JSON.stringify(body.additionalCharacters);
+    }
+
     // Update book
     const book = await prisma.book.update({
       where: { id: bookId },
-      data: body,
+      data: dataForPrisma,
       include: {
         pages: {
           orderBy: { pageNumber: "asc" },
