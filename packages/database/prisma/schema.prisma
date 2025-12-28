@@ -54,8 +54,10 @@ model Book {
   tone              String?
   typography        String?
   theme             String?
-  keyCharacters     String?
-  specialObjects    String?
+  keyCharacters        String?
+  childName            String?
+  additionalCharacters String?   // JSON: [{"name":"Sarah","relationship":"Mom"}]
+  specialObjects       String?
   excitementElement String?
   coverAssetId      String?
   promptTokens      Int?

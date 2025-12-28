@@ -103,11 +103,23 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
       }, 'Page count mismatch - story pages vs expected');
     }
 
+    // Parse additional characters from JSON string (if present)
+    let additionalCharacters: { name: string; relationship: string }[] = [];
+    if (book.additionalCharacters) {
+      try {
+        additionalCharacters = JSON.parse(book.additionalCharacters);
+      } catch (e) {
+        logger.warn({ bookId, error: e }, 'Failed to parse additionalCharacters');
+      }
+    }
+
     // Prepare story generation input using advanced prompt structure
     const storyInput: StoryGenerationInput = {
       bookTitle: book.title || 'My Special Story',
       isDoubleSpread: false, // Could be added to book settings in future
       artStyle: book.artStyle || undefined,
+      childName: book.childName || undefined,
+      additionalCharacters: additionalCharacters.length > 0 ? additionalCharacters : undefined,
       storyPages: storyPages.map((page, index) => ({
         pageId: page.id,
         pageNumber: index + 1, // 1-based numbering for story pages

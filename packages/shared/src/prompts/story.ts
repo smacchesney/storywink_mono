@@ -37,6 +37,8 @@ export interface StoryGenerationInput {
   bookTitle: string;
   isDoubleSpread: boolean;
   artStyle?: string;
+  childName?: string;
+  additionalCharacters?: { name: string; relationship: string }[];
   storyPages: {
     pageId: string;
     pageNumber: number;
@@ -92,7 +94,20 @@ export function createVisionStoryGenerationPrompt(
   msg.push({ type: 'input_text', text: '--- End Storyboard ---' });
 
   // ---------- INSTRUCTIONS ----------
-  const characterInstruction = `  - Use descriptive terms like "the child", "the little one", etc.`;
+  // Build character instruction dynamically based on provided names
+  let characterInstruction: string;
+  if (input.childName) {
+    characterInstruction = `  - The main character is named "${input.childName}". Use this name directly in the story text.`;
+    if (input.additionalCharacters && input.additionalCharacters.length > 0) {
+      const charList = input.additionalCharacters
+        .map(c => `"${c.name}" (${c.relationship})`)
+        .join(', ');
+      characterInstruction += `\n  - Other characters who may appear: ${charList}. Identify which characters appear in each photo and use their names appropriately.`;
+    }
+  } else {
+    // Fallback to generic terms if no child name provided
+    characterInstruction = `  - Use descriptive terms like "the child", "the little one", etc.`;
+  }
 
   const baseInstructions = [
     `# Instructions & Guiding Principles:`,

@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/drawer";
 import ArtStylePicker from '@/components/create/editor/ArtStylePicker';
 import CoverEditorPanel from '@/components/create/editor/CoverEditorPanel';
-import DetailsEditorPanel from '@/components/create/editor/DetailsEditorPanel'; // <-- Import new component
+import DetailsEditorPanel, { AdditionalCharacter } from '@/components/create/editor/DetailsEditorPanel'; // <-- Import new component
 import ManagePhotosPanel from '@/components/create/editor/ManagePhotosPanel'; // <-- Import Manage Photos panel
 import {
   AlertDialog,
@@ -74,6 +74,8 @@ export default function EditBookPage() {
   const [isCoverPanelOpen, setIsCoverPanelOpen] = useState(false); // <-- State for Cover panel
   // State for pending Cover changes
   const [pendingTitle, setPendingTitle] = useState('');
+  const [pendingChildName, setPendingChildName] = useState('');
+  const [pendingAdditionalCharacters, setPendingAdditionalCharacters] = useState<AdditionalCharacter[]>([]);
   const [pendingCoverAssetId, setPendingCoverAssetId] = useState<string | null | undefined>(undefined);
   const [isSavingCover, setIsSavingCover] = useState(false); // <-- Loading state for saving cover
   const [isGeneratingStory, setIsGeneratingStory] = useState(false); // <-- State for generation loading
@@ -305,6 +307,16 @@ export default function EditBookPage() {
       setPendingCoverAssetId(bookData?.coverAssetId);
     } else if (tab === 'details') { // Initialize pending details
       setPendingTitle(bookData?.title || '');
+      setPendingChildName(bookData?.childName || '');
+      // Parse JSON string to array
+      try {
+        const parsed = bookData?.additionalCharacters
+          ? JSON.parse(bookData.additionalCharacters)
+          : [];
+        setPendingAdditionalCharacters(parsed);
+      } catch {
+        setPendingAdditionalCharacters([]);
+      }
     }
     logger.info({ bookId, newTab: tab }, "Editor tab changed");
   };
@@ -495,10 +507,31 @@ export default function EditBookPage() {
   const handleSaveDetails = async () => {
     if (!bookData || isSavingDetails) return;
     setIsSavingDetails(true);
-    logger.info({ bookId, title: pendingTitle }, "Saving book details...");
+    logger.info({ bookId, title: pendingTitle, childName: pendingChildName }, "Saving book details...");
 
-    const updatePayload: { title?: string; } = {};
+    // Filter out empty character entries before saving
+    const validCharacters = pendingAdditionalCharacters.filter(
+      char => char.name.trim() !== '' && char.relationship.trim() !== ''
+    );
+
+    const updatePayload: {
+      title?: string;
+      childName?: string | null;
+      additionalCharacters?: AdditionalCharacter[];
+    } = {};
+
     if (pendingTitle !== bookData.title) updatePayload.title = pendingTitle;
+    if (pendingChildName !== (bookData.childName || '')) {
+      updatePayload.childName = pendingChildName || null;
+    }
+
+    // Compare characters
+    const currentCharacters: AdditionalCharacter[] = bookData.additionalCharacters
+      ? JSON.parse(bookData.additionalCharacters)
+      : [];
+    if (JSON.stringify(validCharacters) !== JSON.stringify(currentCharacters)) {
+      updatePayload.additionalCharacters = validCharacters;
+    }
 
     if (Object.keys(updatePayload).length === 0) {
       logger.info({ bookId }, "No changes detected in book details.");
@@ -521,6 +554,10 @@ export default function EditBookPage() {
         return {
             ...prevData,
             ...(updatePayload.title !== undefined && { title: updatePayload.title }),
+            ...(updatePayload.childName !== undefined && { childName: updatePayload.childName }),
+            ...(updatePayload.additionalCharacters !== undefined && {
+              additionalCharacters: JSON.stringify(updatePayload.additionalCharacters)
+            }),
         };
       });
 
@@ -1144,7 +1181,11 @@ export default function EditBookPage() {
                   <DrawerHeader><DrawerTitle>Book Details</DrawerTitle></DrawerHeader>
                   <DetailsEditorPanel
                     currentTitle={pendingTitle}
+                    currentChildName={pendingChildName}
+                    currentAdditionalCharacters={pendingAdditionalCharacters}
                     onTitleChange={handlePendingTitleChange}
+                    onChildNameChange={setPendingChildName}
+                    onAdditionalCharactersChange={setPendingAdditionalCharacters}
                     onSave={handleSaveDetails}
                     onCancel={() => setIsDetailsPanelOpen(false)}
                     isSaving={isSavingDetails}
@@ -1157,7 +1198,11 @@ export default function EditBookPage() {
                    <SheetHeader><SheetTitle>Book Details</SheetTitle></SheetHeader>
                    <DetailsEditorPanel
                     currentTitle={pendingTitle}
+                    currentChildName={pendingChildName}
+                    currentAdditionalCharacters={pendingAdditionalCharacters}
                     onTitleChange={handlePendingTitleChange}
+                    onChildNameChange={setPendingChildName}
+                    onAdditionalCharactersChange={setPendingAdditionalCharacters}
                     onSave={handleSaveDetails}
                     onCancel={() => setIsDetailsPanelOpen(false)}
                     isSaving={isSavingDetails}

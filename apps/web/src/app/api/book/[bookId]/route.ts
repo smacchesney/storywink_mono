@@ -4,11 +4,19 @@ import { db as prisma } from '@/lib/db';
 import { z } from 'zod'; // Import Zod
 import logger from '@/lib/logger'; // Import logger
 
+// Zod schema for additional characters in the story
+const additionalCharacterSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(50, 'Name too long'),
+  relationship: z.string().min(1, 'Relationship is required').max(50, 'Relationship too long'),
+});
+
 // Zod schema for validating PATCH request body
 const updateBookSchema = z.object({
   artStyle: z.string().nullable().optional(), // Allow null or undefined
   title: z.string().min(1, { message: 'Title cannot be empty.' }).optional(),
   coverAssetId: z.string().cuid().nullable().optional(), // For cover changes
+  childName: z.string().max(50, 'Name too long').nullable().optional(),
+  additionalCharacters: z.array(additionalCharacterSchema).max(5, 'Maximum 5 characters').optional(),
 }).strict(); // Ensure no extra fields are passed
 
 type RouteContext = { params: Promise<{ bookId: string }> };
@@ -133,6 +141,12 @@ export async function PATCH(
       }, 'API: Cover asset is being changed');
     }
 
+    // Prepare data for Prisma (serialize additionalCharacters to JSON string)
+    const dataForPrisma: Record<string, unknown> = { ...validatedData };
+    if (validatedData.additionalCharacters !== undefined) {
+      dataForPrisma.additionalCharacters = JSON.stringify(validatedData.additionalCharacters);
+    }
+
     // Use updateMany to ensure user owns the book AND the book exists
     const updateResult = await prisma.book.updateMany({
       where: {
@@ -140,7 +154,7 @@ export async function PATCH(
         userId: dbUser.id, // Use database user ID for ownership check
       },
       data: {
-        ...validatedData,
+        ...dataForPrisma,
         updatedAt: new Date(), // Manually update timestamp
       },
     });

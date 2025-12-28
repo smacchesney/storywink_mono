@@ -15,6 +15,14 @@ export interface User {
  */
 export type BookStatus = "DRAFT" | "GENERATING" | "STORY_READY" | "ILLUSTRATING" | "COMPLETED" | "FAILED" | "PARTIAL";
 
+/**
+ * Additional character in the story (e.g., parent, sibling)
+ */
+export interface AdditionalCharacter {
+  name: string;
+  relationship: string;
+}
+
 export interface Book {
   id: string;
   userId: string;
@@ -26,6 +34,8 @@ export interface Book {
   typography?: string | null;
   theme?: string | null;
   keyCharacters?: string | null;
+  childName?: string | null;
+  additionalCharacters?: string | null; // JSON string of AdditionalCharacter[]
   specialObjects?: string | null;
   excitementElement?: string | null;
   coverAssetId?: string | null;

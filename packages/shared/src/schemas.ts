@@ -9,10 +9,18 @@ export const createBookSchema = z.object({
   theme: z.string().optional(),
 });
 
+// Schema for additional characters in the story
+export const additionalCharacterSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(50, 'Name too long'),
+  relationship: z.string().min(1, 'Relationship is required').max(50, 'Relationship too long'),
+});
+
 export const updateBookSchema = z.object({
   title: z.string().optional(),
   artStyle: z.string().optional(),
   coverAssetId: z.string().optional(),
+  childName: z.string().max(50, 'Name too long').nullable().optional(),
+  additionalCharacters: z.array(additionalCharacterSchema).max(5, 'Maximum 5 characters').optional(),
 });
 
 export const updatePageSchema = z.object({
@@ -37,3 +45,4 @@ export type UpdateBookInput = z.infer<typeof updateBookSchema>;
 export type UpdatePageInput = z.infer<typeof updatePageSchema>;
 export type GenerateStoryInput = z.infer<typeof generateStorySchema>;
 export type GenerateIllustrationInput = z.infer<typeof generateIllustrationSchema>;
+export type AdditionalCharacterInput = z.infer<typeof additionalCharacterSchema>;
