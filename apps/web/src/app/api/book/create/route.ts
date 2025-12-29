@@ -118,6 +118,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Log error details explicitly for Railway visibility
+    console.error('>>> ERROR: Book creation failed!');
+    console.error('>>> Error type:', error?.constructor?.name);
+    console.error('>>> Error message:', error instanceof Error ? error.message : String(error));
+    if (error instanceof Error && error.stack) {
+      console.error('>>> Stack trace:', error.stack.split('\n').slice(0, 5).join('\n'));
+    }
+    // Also check for Prisma-specific error properties
+    if (error && typeof error === 'object') {
+      const prismaError = error as { code?: string; meta?: unknown };
+      if (prismaError.code) console.error('>>> Prisma error code:', prismaError.code);
+      if (prismaError.meta) console.error('>>> Prisma error meta:', JSON.stringify(prismaError.meta));
+    }
     logger.error({
       err: error,
       errorMessage: error instanceof Error ? error.message : String(error),
