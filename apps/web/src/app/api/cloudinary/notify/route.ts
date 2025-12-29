@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { assets, bookId } = body;
+    console.log(`>>> DEBUG: Cloudinary notify - dbUserId: ${dbUser.id}, assetCount: ${assets?.length || 0}, bookId: ${bookId || 'none'}`);
 
     if (!assets || !Array.isArray(assets)) {
       return NextResponse.json({ error: 'No assets provided' }, { status: 400 });
@@ -49,6 +50,7 @@ export async function POST(request: NextRequest) {
             },
           });
 
+          console.log(`>>> DEBUG: Asset created - id: ${newAsset.id}, userId: ${dbUser.id}, publicId: ${asset.publicId}`);
           logger.info({ assetId: newAsset.id, publicId: asset.publicId }, "Asset created in database");
 
           // If bookId was provided, create Page record
@@ -77,7 +79,11 @@ export async function POST(request: NextRequest) {
 
         createdAssets.push(createdData);
       } catch (error) {
-        logger.error({ asset: asset.publicId, error }, "Failed to create database record for asset");
+        logger.error({
+          asset: asset.publicId,
+          err: error,
+          errorMessage: error instanceof Error ? error.message : String(error)
+        }, "Failed to create database record for asset");
         // Continue with other assets even if one fails
       }
     }
@@ -103,7 +109,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    logger.error({ error }, 'Cloudinary notify endpoint error');
+    logger.error({
+      err: error,
+      errorMessage: error instanceof Error ? error.message : String(error)
+    }, 'Cloudinary notify endpoint error');
     return NextResponse.json({ 
       error: 'Failed to process uploaded assets',
       details: error instanceof Error ? error.message : 'Unknown error'

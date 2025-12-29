@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
       logger.info({ clerkId, dbUserId: dbUser.id }, 'API: Starting book creation transaction.');
 
       // Fetch Assets to get URLs - use database user ID, not Clerk ID
+      console.log(`>>> DEBUG: Querying assets - userId: ${dbUser.id}, assetIds: ${assetIds.join(', ')}`);
       const assets = await tx.asset.findMany({
         where: {
           id: { in: assetIds },
@@ -46,7 +47,8 @@ export async function POST(req: NextRequest) {
           thumbnailUrl: true,
         },
       });
-      
+      console.log(`>>> DEBUG: Found ${assets.length} of ${assetIds.length} assets for userId ${dbUser.id}`);
+
       // Create a map for easy lookup
       const assetMap = new Map(assets.map(a => [a.id, a]));
 
@@ -116,7 +118,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    logger.error({ error }, 'API: Error during book creation transaction.');
+    logger.error({
+      err: error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : undefined
+    }, 'API: Error during book creation transaction.');
     // Specific error handling (e.g., foreign key constraint if assetId doesn't exist)
     if (error instanceof Error && error.message.includes('Foreign key constraint failed')) {
         return NextResponse.json({ error: 'One or more provided asset IDs do not exist or belong to another user.' }, { status: 400 });
