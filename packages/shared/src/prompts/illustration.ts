@@ -71,7 +71,7 @@ DO NOT reimagine, stylize away, or invent features for any person. A parent must
         `Text: Add the title "${opts.bookTitle}" in a readable font matching the second image's text style. Position naturally without covering important subjects. Size appropriately (5-7% of image height).`,
       ]
     : [
-        `COMPOSITION: Create the illustration in the top ~82% of the image. Leave the bottom ~18% as PURE WHITE (#FFFFFF) empty space - this area will be used for text overlay. The illustration should fade softly into the pure white space with vignette-style edges (no hard horizontal line). All border areas and the text space must be pure white, not off-white or cream. DO NOT add any text to the image - the story text will be added programmatically afterward.`,
+        `COMPOSITION: Fill the entire image canvas with the illustration. No empty space or text areas needed. The illustration should extend to all edges. DO NOT add any text to the image.`,
       ];
 
   const prompt = [...base, ...dynamicEffectsBits, ...titleBits]

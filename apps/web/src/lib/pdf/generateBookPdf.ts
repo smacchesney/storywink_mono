@@ -2,6 +2,8 @@ import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { Book, Page } from '@storywink/database';
 import logger from '../logger'; // Use relative import
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 /**
  * Optimizes Cloudinary image URL for print quality.
@@ -30,11 +32,23 @@ const PAGE_WIDTH_PX = Math.round(PAGE_WIDTH_WITH_BLEED_IN * DPI); // 2625px
 const PAGE_HEIGHT_PX = Math.round(PAGE_HEIGHT_WITH_BLEED_IN * DPI); // 2625px
 
 /**
- * Generates HTML for a single book page.
- * TODO: Refine styling for text overlay, fonts, bleed, etc.
+ * Load Excalifont as base64 data URI for embedding in PDF HTML.
  */
-function generatePageHtml(page: Page, _bookTitle: string): string {
-  // Use inches for container to match PDF page dimensions exactly
+function loadFontBase64(): string {
+  try {
+    const fontPath = join(process.cwd(), 'public/fonts/Excalifont-Regular.woff2');
+    const fontBuffer = readFileSync(fontPath);
+    return fontBuffer.toString('base64');
+  } catch {
+    logger.warn('Could not load Excalifont for PDF embedding');
+    return '';
+  }
+}
+
+/**
+ * Generates HTML for a full-bleed illustration page.
+ */
+function generateIllustrationPageHtml(page: Page): string {
   const pageStyle = `
     width: ${PAGE_WIDTH_WITH_BLEED_IN}in;
     height: ${PAGE_HEIGHT_WITH_BLEED_IN}in;
@@ -50,19 +64,6 @@ function generatePageHtml(page: Page, _bookTitle: string): string {
     object-fit: cover;
     object-position: center center;
   `;
-  // const textStyle = `
-  //   position: absolute;
-  //   bottom: 5%; /* Position text near bottom */
-  //   left: 5%;
-  //   right: 5%;
-  //   text-align: center;
-  //   background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent background */
-  //   color: white;
-  //   padding: 15px;
-  //   font-size: 48px; /* Adjust font size based on DPI/desired look */
-  //   font-family: sans-serif; /* TODO: Use actual book font */
-  //   border-radius: 10px;
-  // `;
 
   return `
     <div class="page" style="${pageStyle}">
@@ -74,33 +75,117 @@ function generatePageHtml(page: Page, _bookTitle: string): string {
 }
 
 /**
+ * Generates HTML for a text-only page with centered story text.
+ */
+function generateTextPageHtml(page: Page): string {
+  const pageStyle = `
+    width: ${PAGE_WIDTH_WITH_BLEED_IN}in;
+    height: ${PAGE_HEIGHT_WITH_BLEED_IN}in;
+    position: relative;
+    overflow: hidden;
+    page-break-after: always;
+    background-color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `;
+  const textStyle = `
+    font-family: 'Excalifont', cursive, sans-serif;
+    font-size: 72px;
+    color: #1a1a1a;
+    text-align: center;
+    line-height: 1.4;
+    max-width: 80%;
+    word-wrap: break-word;
+  `;
+
+  const text = page.text || '';
+
+  return `
+    <div class="page" style="${pageStyle}">
+      <p style="${textStyle}">${text}</p>
+    </div>
+  `;
+}
+
+/**
+ * Generates a blank filler page for Lulu page count padding.
+ */
+function generateBlankPageHtml(): string {
+  const pageStyle = `
+    width: ${PAGE_WIDTH_WITH_BLEED_IN}in;
+    height: ${PAGE_HEIGHT_WITH_BLEED_IN}in;
+    page-break-after: always;
+    background-color: white;
+  `;
+
+  return `<div class="page" style="${pageStyle}"></div>`;
+}
+
+/**
+ * Pad page HTML array so total count is divisible by 4 (Lulu saddle stitch requirement).
+ */
+function padToMultipleOfFour(pageHtmlArray: string[]): string[] {
+  const remainder = pageHtmlArray.length % 4;
+  if (remainder === 0) return pageHtmlArray;
+
+  const paddingNeeded = 4 - remainder;
+  for (let i = 0; i < paddingNeeded; i++) {
+    pageHtmlArray.push(generateBlankPageHtml());
+  }
+  return pageHtmlArray;
+}
+
+/**
  * Generates a PDF buffer for the given book data.
+ * For story pages, emits interleaved text + illustration pages.
+ * Title pages emit a single illustration page.
  */
 export async function generateBookPdf(bookData: BookWithPages): Promise<Buffer> {
   logger.info({ bookId: bookData.id }, "Starting PDF generation...");
   let browser = null;
-  
+
   try {
-    // Generate HTML content for all pages
-    let fullHtml = `
+    // Load font for embedding
+    const fontBase64 = loadFontBase64();
+    const fontFace = fontBase64
+      ? `@font-face {
+          font-family: 'Excalifont';
+          src: url(data:font/woff2;base64,${fontBase64}) format('woff2');
+          font-weight: normal;
+          font-style: normal;
+        }`
+      : '';
+
+    // Build interleaved page HTML
+    const sortedPages = [...bookData.pages].sort((a, b) => a.pageNumber - b.pageNumber);
+    const pageHtmlArray: string[] = [];
+
+    for (const page of sortedPages) {
+      if (page.isTitlePage) {
+        // Title page: just the illustration
+        pageHtmlArray.push(generateIllustrationPageHtml(page));
+      } else {
+        // Story page: text page first, then illustration page
+        pageHtmlArray.push(generateTextPageHtml(page));
+        pageHtmlArray.push(generateIllustrationPageHtml(page));
+      }
+    }
+
+    // Generate HTML content
+    const fullHtml = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="UTF-8">
         <title>${bookData.title || 'My Storybook'}</title>
         <style>
+          ${fontFace}
           body { margin: 0; padding: 0; }
-          /* Page size handled by Puppeteer pdf() options - single source of truth */
         </style>
       </head>
       <body>
-    `;
-    // Sort pages just in case they aren't ordered
-    const sortedPages = [...bookData.pages].sort((a, b) => a.pageNumber - b.pageNumber);
-    sortedPages.forEach(page => {
-      fullHtml += generatePageHtml(page, bookData.title || 'Untitled');
-    });
-    fullHtml += `
+        ${pageHtmlArray.join('\n')}
       </body>
       </html>
     `;
@@ -108,7 +193,7 @@ export async function generateBookPdf(bookData: BookWithPages): Promise<Buffer> 
     // Launch Puppeteer - use system Chromium if available (via env var), otherwise @sparticuz/chromium
     const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || await chromium.executablePath();
 
-    logger.info({ bookId: bookData.id, executablePath }, "Launching browser...");
+    logger.info({ bookId: bookData.id, executablePath, totalPdfPages: pageHtmlArray.length }, "Launching browser...");
 
     browser = await puppeteer.launch({
       args: [
@@ -157,7 +242,7 @@ export async function generateBookPdf(bookData: BookWithPages): Promise<Buffer> 
     });
     // Convert Uint8Array to Buffer
     const pdfBuffer = Buffer.from(pdfUint8Array);
-    logger.info({ bookId: bookData.id, bufferSize: pdfBuffer.length }, "PDF buffer generated.");
+    logger.info({ bookId: bookData.id, bufferSize: pdfBuffer.length, pageCount: pageHtmlArray.length }, "PDF buffer generated.");
 
     return pdfBuffer;
 
@@ -175,4 +260,4 @@ export async function generateBookPdf(bookData: BookWithPages): Promise<Buffer> 
       logger.info({ bookId: bookData.id }, "Puppeteer browser closed.");
     }
   }
-} 
+}

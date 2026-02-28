@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import BookPageGallery from '@/components/book/BookPageGallery'; // Import the new component
-import FlipbookViewer, { FlipbookActions } from '@/components/book/FlipbookViewer'; // Import FlipbookViewer and FlipbookActions type
+import FlipbookViewer, { FlipbookActions, buildDisplayPages } from '@/components/book/FlipbookViewer'; // Import FlipbookViewer, FlipbookActions type, and buildDisplayPages
 import { showError, showInfo } from '@/lib/toast-utils'; // Import toast for feedback
 import { cn } from '@/lib/utils';
 
@@ -52,7 +52,7 @@ export default function BookPreviewPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0); // Example progress state
-  const [currentPageNumber, setCurrentPageNumber] = useState<number>(1); // State for selected page
+  const [currentDisplayIndex, setCurrentDisplayIndex] = useState<number>(1); // 1-based index into interleaved display pages
   const flipbookRef = useRef<FlipbookActions>(null); // Use FlipbookActions type for ref
   // Add state for PDF export loading
   const [isExportingPdf, setIsExportingPdf] = useState(false);
@@ -70,11 +70,9 @@ export default function BookPreviewPage() {
       const data = await fetchBookData(bookId);
       if (data) {
         setBook(data);
-        // Set initial page to 1 or the first available page number
-        const firstPageNum = data.pages[0]?.pageNumber ?? 1;
-        // Only set initial page if the book is loaded for the first time or page number is default
-        if (isLoading || currentPageNumber === 1) {
-             setCurrentPageNumber(firstPageNum);
+        // Set initial display index to 1 on first load
+        if (isLoading || currentDisplayIndex === 1) {
+             setCurrentDisplayIndex(1);
         }
 
         const illustratedPages = data.pages.filter(p => p.generatedImageUrl).length;
@@ -92,7 +90,7 @@ export default function BookPreviewPage() {
        }
     }
   // Update dependencies for useCallback
-  }, [bookId, isLoading, currentPageNumber]);
+  }, [bookId, isLoading, currentDisplayIndex]);
 
   useEffect(() => {
     loadBook();
@@ -113,25 +111,19 @@ export default function BookPreviewPage() {
     };
   }, [book?.status, loadBook]);
 
-  // Handler for selecting a page from the gallery
-  const handlePageSelect = (pageNumber: number) => {
-    setCurrentPageNumber(pageNumber);
-    // Tell Flipbook instance to turn to the selected page
-    // Need to access the pageFlip API via the ref passed to FlipbookViewer
-    // This assumes FlipbookViewer exposes its internal ref or a method to control it.
-    // We will need to forward the ref in FlipbookViewer.
-    // For now, we assume flipbookRef.current points to the pageFlip instance.
-    if (flipbookRef.current?.pageFlip) { 
-       // Adjust index if library is 0-based
-       const pageIndex = Math.max(0, Math.min(pageNumber - 1, (book?.pages?.length ?? 1) - 1));
-       flipbookRef.current.pageFlip().turnToPage(pageIndex); 
+  // Handler for selecting a display page from the gallery (1-based index)
+  const handleDisplayPageSelect = (displayIndex: number) => {
+    setCurrentDisplayIndex(displayIndex);
+    if (flipbookRef.current?.pageFlip) {
+       const totalDisplayPages = book ? buildDisplayPages(book.pages).length : 1;
+       const pageIndex = Math.max(0, Math.min(displayIndex - 1, totalDisplayPages - 1));
+       flipbookRef.current.pageFlip().turnToPage(pageIndex);
     }
   };
 
-  // Handler for when the page changes within the Flipbook component
-  const handleFlipbookPageChange = (pageNumber: number) => {
-     // Update the state to keep gallery and other potential components in sync
-     setCurrentPageNumber(pageNumber); 
+  // Handler for when the page changes within the Flipbook component (receives 1-based display index)
+  const handleFlipbookPageChange = (displayIndex: number) => {
+     setCurrentDisplayIndex(displayIndex);
   };
 
   // --- Flipbook Control Handlers --- 
@@ -303,10 +295,10 @@ export default function BookPreviewPage() {
   }
 
   if (book.status === BookStatus.COMPLETED) {
-    const totalPages = book.pages.length;
-    // Disable prev/next based on current page (adjust if library is 0-indexed)
-    const canFlipPrev = currentPageNumber > 1;
-    const canFlipNext = currentPageNumber < totalPages;
+    const totalDisplayPages = buildDisplayPages(book.pages).length;
+    // Disable prev/next based on current display index
+    const canFlipPrev = currentDisplayIndex > 1;
+    const canFlipNext = currentDisplayIndex < totalDisplayPages;
 
     return (
       <div className="flex flex-col h-[100dvh] bg-background">
@@ -390,8 +382,8 @@ export default function BookPreviewPage() {
             <BookPageGallery
               pages={book.pages}
               bookStatus={book.status}
-              currentPageNumber={currentPageNumber}
-              onPageSelect={handlePageSelect}
+              currentDisplayIndex={currentDisplayIndex}
+              onDisplayPageSelect={handleDisplayPageSelect}
             />
           </div>
         )}
@@ -401,9 +393,9 @@ export default function BookPreviewPage() {
           <FlipbookViewer
             ref={flipbookRef}
             pages={book.pages}
-            initialPageNumber={currentPageNumber}
+            initialPageNumber={currentDisplayIndex}
             onPageChange={handleFlipbookPageChange}
-            className="absolute inset-0" 
+            className="absolute inset-0"
           />
           
           {/* Floating Navigation Buttons */}
@@ -441,7 +433,7 @@ export default function BookPreviewPage() {
           )}>
             <div className="flex items-center bg-muted/20 rounded-full px-4 py-1">
               <span className="text-sm font-medium">
-                Page {currentPageNumber} of {totalPages}
+                Page {currentDisplayIndex} of {totalDisplayPages}
               </span>
             </div>
           </div>

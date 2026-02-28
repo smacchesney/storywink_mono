@@ -13,7 +13,7 @@ export const STYLE_LIBRARY = {
     ],
     // Reference with text for title pages (AI generates artistic title text)
     coverReferenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1764941361/Pencil_Vignette_title_ref_1_gbuznf.png',
-    description: "Create a vignette-style illustration filling the top ~82% of the image. The illustration should have soft, fading edges at the bottom that blend into PURE WHITE (#FFFFFF) space. Leave the bottom ~18% as empty pure white space for text overlay. All border areas must be pure white, not off-white or cream. Match the watercolor/pencil aesthetic, warm color palette, and hand-drawn quality shown in the reference images.",
+    description: "Create a vignette-style illustration with soft, organic edges that blend gently into the background. Match the watercolor/pencil aesthetic, warm color palette, and hand-drawn quality shown in the reference images. Fill the entire canvas with the illustration.",
   },
 } as const;
 

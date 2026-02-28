@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle, useMemo } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { Page } from '@prisma/client';
 import Image from 'next/image';
@@ -8,17 +8,39 @@ import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 import { coolifyImageUrl } from '@storywink/shared';
 
+// Display page types for interleaved layout
+export type DisplayPage =
+  | { type: 'illustration'; page: Page }
+  | { type: 'text'; page: Page };
+
 interface FlipbookViewerProps {
   pages: Page[];
   initialPageNumber?: number;
-  onPageChange?: (pageNumber: number) => void;
+  onPageChange?: (displayIndex: number) => void;
   className?: string;
-  // width and height props are removed as dimensions are now derived
 }
 
 // Define the type for the imperative handle
 export interface FlipbookActions {
   pageFlip: () => any; // Expose the pageFlip API instance
+}
+
+/**
+ * Build interleaved display pages:
+ * - Title pages → just illustration
+ * - Story pages → text page, then illustration page
+ */
+export function buildDisplayPages(pages: Page[]): DisplayPage[] {
+  const displayPages: DisplayPage[] = [];
+  for (const page of pages) {
+    if (page.isTitlePage) {
+      displayPages.push({ type: 'illustration', page });
+    } else {
+      displayPages.push({ type: 'text', page });
+      displayPages.push({ type: 'illustration', page });
+    }
+  }
+  return displayPages;
 }
 
 // Use forwardRef to allow passing ref from parent
@@ -28,13 +50,15 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     initialPageNumber = 1,
     onPageChange,
     className,
-    // width and height props removed from destructuring
   },
   ref // Receive the forwarded ref
 ) => {
   const flipBookInternalRef = useRef<any>(null);
   const [containerDimensions, setContainerDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null); // Ref for the container div
+
+  // Build interleaved display pages
+  const displayPages = useMemo(() => buildDisplayPages(pages), [pages]);
 
   // Expose the pageFlip instance via the forwarded ref
   useImperativeHandle(ref, () => ({
@@ -67,90 +91,86 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     const padding = 32; // Total padding to account for
     const availableWidth = width - padding;
     const availableHeight = height - padding;
-    
+
     // Smart adaptive logic for single vs double page view
     const aspectRatio = width / height;
     const isExtremeAspectRatio = aspectRatio > 2.5;
     const hasMinimumHeight = height >= 500;
     const shouldShowSpread = width >= 640 && hasMinimumHeight && !isExtremeAspectRatio;
-    
+
     // For single page view (mobile portrait, landscape with limited height)
     if (!shouldShowSpread) {
       // Use most of available width/height, maintaining aspect ratio
       const pageWidth = availableWidth;
       const pageHeight = availableHeight;
       const pageAspectRatio = 0.77; // Typical book page aspect ratio (1:1.3)
-      
+
       let finalWidth = pageWidth;
       let finalHeight = pageHeight;
-      
+
       // Adjust to maintain aspect ratio
       if (pageWidth / pageHeight > pageAspectRatio) {
         finalWidth = pageHeight * pageAspectRatio;
       } else {
         finalHeight = pageWidth / pageAspectRatio;
       }
-      
+
       return {
         width: Math.floor(finalWidth),
         height: Math.floor(finalHeight),
         isPortrait: true
       };
     }
-    
+
     // For desktop/tablet (double page spread view)
     const spreadAspectRatio = 1.54; // Double page spread (2:1.3)
     let spreadWidth = availableWidth;
     let spreadHeight = availableHeight;
-    
+
     if (spreadWidth / spreadHeight > spreadAspectRatio) {
       spreadWidth = spreadHeight * spreadAspectRatio;
     } else {
       spreadHeight = spreadWidth / spreadAspectRatio;
     }
-    
+
     const pageWidth = Math.floor(spreadWidth / 2);
     const pageHeight = Math.floor(spreadHeight);
-    
+
     return {
       width: pageWidth,
       height: pageHeight,
       isPortrait: false
     };
   };
-  
-  const { width: pageWidth, height: pageHeight, isPortrait } = 
+
+  const { width: pageWidth, height: pageHeight, isPortrait } =
     containerDimensions.width > 0 ? calculateBookDimensions() : { width: 0, height: 0, isPortrait: false };
 
   // Handler for page flip event from the library
   const handleFlip = useCallback((e: any) => {
-    // The event `e` usually contains the current page number (data)
-    const currentPage = e.data; 
-    console.log('Flipped to page:', currentPage);
+    const currentPage = e.data;
     if (onPageChange) {
-      onPageChange(currentPage + 1); // Library might be 0-indexed, adjust as needed
+      onPageChange(currentPage + 1); // Library is 0-indexed
     }
   }, [onPageChange]);
 
   // Add onInit handler to turn to initial page once ready
   const handleInit = useCallback(() => {
      if (flipBookInternalRef.current && initialPageNumber) {
-        // Ensure page number is within valid range (0 to pageCount - 1)
-        const pageIndex = Math.max(0, Math.min(initialPageNumber - 1, pages.length - 1));
-        console.log(`Flipbook initialized. Turning to initial page index: ${pageIndex}`);
+        const pageIndex = Math.max(0, Math.min(initialPageNumber - 1, displayPages.length - 1));
             try {
                flipBookInternalRef.current?.pageFlip()?.turnToPage(pageIndex);
             } catch (e) {
                console.error("Error turning page on init:", e);
             }
      }
-  }, [initialPageNumber, pages.length]);
+  }, [initialPageNumber, displayPages.length]);
 
   return (
-    <div 
-      ref={containerRef} 
+    <div
+      ref={containerRef}
       className={cn("w-full h-full flex items-center justify-center", className)}
-    > 
+    >
       {pageWidth > 0 && pageHeight > 0 && (
         <HTMLFlipBook
           ref={flipBookInternalRef}
@@ -158,7 +178,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
           height={pageHeight}
           size="fixed"
 
-          // Dummy "required" props to satisfy IProps (Option A)
+          // Dummy "required" props to satisfy IProps
           className=""
           style={{}}
           startPage={0}
@@ -166,15 +186,13 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
           minHeight={1}
           maxWidth={4096}
           maxHeight={4096}
-          // Adding more dummy props based on linter feedback and original values
-          startZIndex={0}          // Original: 0
-          autoSize={true}          // Original: true
-          showCover={false}        // Original: false
-          useMouseEvents={true}    // Original: true
-          // Adding the remaining missing props based on new linter feedback
-          swipeDistance={30}       // Original: 30
-          showPageCorners={true}   // Original: true
-          disableFlipByClick={false} // Original: false
+          startZIndex={0}
+          autoSize={true}
+          showCover={false}
+          useMouseEvents={true}
+          swipeDistance={30}
+          showPageCorners={true}
+          disableFlipByClick={false}
 
           // Real settings
           drawShadow
@@ -188,25 +206,33 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
           onFlip={handleFlip}
           onInit={handleInit}
         >
-          {pages.map((page, index) => ( // index can be used if page.pageNumber is not reliable for priority
-            <div key={page.id || index} className="bg-white border border-gray-200 flex justify-center items-center overflow-hidden">
-              {/* Page content - Render Image or loading/error state */}
-              {page.generatedImageUrl ? (
+          {displayPages.map((dp, index) => (
+            <div key={`${dp.page.id}-${dp.type}-${index}`} className="bg-white border border-gray-200 flex justify-center items-center overflow-hidden">
+              {dp.type === 'text' ? (
+                // Text page - white background with centered story text
+                <div className="w-full h-full flex items-center justify-center p-[10%]">
+                  <p className="font-playful text-[#1a1a1a] text-center leading-relaxed"
+                     style={{ fontSize: 'clamp(16px, 4vw, 28px)' }}>
+                    {dp.page.text}
+                  </p>
+                </div>
+              ) : dp.page.generatedImageUrl ? (
+                // Illustration page - full image
                 <div className="relative w-full h-full">
                    <Image
-                     src={coolifyImageUrl(page.generatedImageUrl)}
-                     alt={`Page ${page.pageNumber}`}
+                     src={coolifyImageUrl(dp.page.generatedImageUrl)}
+                     alt={`Page ${dp.page.pageNumber} illustration`}
                      fill
                      sizes={`(max-width: 768px) 90vw, ${pageWidth}px`}
                      style={{ objectFit: 'contain' }}
-                     priority={page.pageNumber <= 2} // Use page.pageNumber for priority
+                     priority={index <= 2}
                    />
                 </div>
               ) : (
                 // Placeholder for loading or failed state
                 <div className="text-center text-muted-foreground">
                   <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-                  <p>Loading page {page.pageNumber}...</p>
+                  <p>Loading page {dp.page.pageNumber}...</p>
                 </div>
               )}
             </div>
@@ -217,6 +243,6 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
   );
 });
 
-FlipbookViewer.displayName = "FlipbookViewer"; // Add display name for DevTools
+FlipbookViewer.displayName = "FlipbookViewer";
 
-export default FlipbookViewer; 
+export default FlipbookViewer;

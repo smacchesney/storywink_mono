@@ -97,8 +97,29 @@ export async function POST(
       );
     }
 
-    // Generate the interior PDF buffer (now with Lulu 8.5x8.5 specs)
-    logger.info({ bookId, pageCount: storyPages.length }, 'Generating interior PDF for Lulu...');
+    // Calculate interleaved page count: each story page becomes 2 PDF pages (text + illustration)
+    // The PDF generator handles padding to multiple of 4 for Lulu saddle stitch
+    const interiorPdfPageCount = storyPages.length * 2;
+    const paddedPageCount = interiorPdfPageCount % 4 === 0
+      ? interiorPdfPageCount
+      : interiorPdfPageCount + (4 - (interiorPdfPageCount % 4));
+
+    logger.info({
+      bookId,
+      storyPages: storyPages.length,
+      interiorPdfPages: interiorPdfPageCount,
+      paddedPages: paddedPageCount,
+    }, 'Generating interleaved interior PDF for Lulu...');
+
+    // Validate Lulu page count constraints (min 4, max 48 for saddle stitch)
+    if (paddedPageCount > 48) {
+      return NextResponse.json(
+        { error: `Too many pages for saddle stitch binding (${paddedPageCount} pages, max 48). Reduce the number of photos.` },
+        { status: 400 }
+      );
+    }
+
+    // Generate the interior PDF buffer (interleaved text + illustration pages)
     const pdfBuffer = await generateBookPdf({
       ...bookData,
       pages: storyPages,
@@ -114,7 +135,7 @@ export async function POST(
       success: true,
       url: uploadResult.url,
       dropboxPath: uploadResult.path,
-      pageCount: storyPages.length,  // Return story page count, not total
+      pageCount: paddedPageCount,  // Return padded PDF page count
     });
 
   } catch (error) {

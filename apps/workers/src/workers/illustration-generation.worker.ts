@@ -8,8 +8,8 @@ import util from 'util';
 import { createIllustrationPrompt, IllustrationPromptOptions } from '@storywink/shared/prompts/illustration';
 // Import STYLE_LIBRARY directly from styles module to avoid barrel export race condition
 import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
-// Text overlay for story pages, logo overlay for title pages, upscaling for print
-import { addTextToImage, addLogoToTitlePage, upscaleForPrint } from '../utils/text-overlay.js';
+// Logo overlay for title pages, upscaling for print
+import { addLogoToTitlePage, upscaleForPrint } from '../utils/image-processing.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -37,9 +37,7 @@ function isTransientError(error: Error): boolean {
     '429',
     'quota exceeded',
     'resource exhausted',
-    // Text overlay errors (retry-able)
-    'text overlay failed',
-    'font file not found',
+    // Image processing errors (retry-able)
     'sharp',
   ];
   return transientPatterns.some(pattern => message.includes(pattern));
@@ -381,8 +379,8 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     let moderationReasonText: string | null = null;
 
     try {
-       logger.info({ jobId: job.id, pageId, pageNumber }, 'Calling Gemini 3 Pro Image API...');
-       console.log(`[IllustrationWorker] Calling Gemini 3 Pro API for page ${pageNumber} with ${styleReferenceBuffers.length} style ref(s)...`);
+       logger.info({ jobId: job.id, pageId, pageNumber }, 'Calling Gemini 3.1 Flash Image API...');
+       console.log(`[IllustrationWorker] Calling Gemini 3.1 Flash API for page ${pageNumber} with ${styleReferenceBuffers.length} style ref(s)...`);
 
        // Build multi-image prompt for Gemini
        // Order: Content image, Style references, Text prompt
@@ -416,7 +414,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
        }, 'Prepared Gemini prompt with images');
 
        const result = await ai.models.generateContent({
-           model: "gemini-3-pro-image-preview",
+           model: "gemini-3.1-flash-image-preview",
            contents: prompt,
            config: {
                responseModalities: ['TEXT', 'IMAGE'],
@@ -428,7 +426,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
        });
 
        logger.info({ jobId: job.id, pageId, pageNumber }, 'Received response from Gemini.');
-       console.log(`[IllustrationWorker] Gemini API response received for page ${pageNumber}`);
+       console.log(`[IllustrationWorker] Gemini 3.1 Flash response received for page ${pageNumber}`);
 
         // Extract image data from Gemini response
         const imagePart = result?.candidates?.[0]?.content?.parts?.find((part: any) => part.inlineData);
@@ -467,7 +465,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
             isCopyrightIssue,
             isContentPolicyBlock,
             fullError: JSON.stringify(apiError, null, 2)
-        }, 'Error calling Gemini 3 Pro Image API.');
+        }, 'Error calling Gemini 3.1 Flash Image API.');
 
         console.error(`[IllustrationWorker] Gemini API error for page ${pageNumber}:`);
         console.error(`  - Error: ${errorMessage}`);
@@ -514,31 +512,6 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
               }, errorMessage);
               console.error(`[IllustrationWorker] Upscaling failed for page ${pageNumber}: ${upscaleError.message}`);
               throw new Error(errorMessage);
-          }
-
-          // Add text overlay for story pages (not title pages)
-          if (!isTitlePage && text && text.trim().length > 0) {
-              try {
-                  logger.info({ jobId: job.id, pageId, pageNumber }, 'Adding text overlay to story page...');
-                  console.log(`[IllustrationWorker] Adding text overlay to page ${pageNumber}: "${text.substring(0, 50)}..."`);
-                  generatedImageBuffer = await addTextToImage(generatedImageBuffer, text);
-                  logger.info({ jobId: job.id, pageId, pageNumber }, 'Text overlay added successfully.');
-                  console.log(`[IllustrationWorker] Text overlay complete for page ${pageNumber}`);
-              } catch (textOverlayError: any) {
-                  // Text overlay failure should be retried, not silently skipped
-                  const errorMessage = `Text overlay failed: ${textOverlayError.message}`;
-                  logger.error({
-                      jobId: job.id,
-                      pageId,
-                      pageNumber,
-                      error: textOverlayError.message,
-                      stack: textOverlayError.stack,
-                  }, errorMessage);
-                  console.error(`[IllustrationWorker] Text overlay failed for page ${pageNumber}: ${textOverlayError.message}`);
-                  console.error(`[IllustrationWorker] Stack: ${textOverlayError.stack}`);
-                  // Throw to trigger retry logic - will be marked FAILED after exhausting retries
-                  throw new Error(errorMessage);
-              }
           }
 
           // Add Storywink.ai logo to title pages
