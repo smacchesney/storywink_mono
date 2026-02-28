@@ -46,9 +46,9 @@ export function SiteHeader() {
             <Image
               src="https://res.cloudinary.com/storywink/image/upload/v1772291379/Screenshot_2026-02-28_at_10.55.32_PM_copy_xxjms6.png"
               alt="Storywink Mascot"
-              width={80}
+              width={160}
               height={80}
-              className="h-20 w-20"
+              className="h-12 w-auto"
             />
             <span className="hidden font-bold text-3xl sm:inline-block text-slate-900 dark:text-white font-playful">
               Storywin<span className="text-[#F76C5E]">k.ai</span>
@@ -62,9 +62,9 @@ export function SiteHeader() {
             <Image
               src="https://res.cloudinary.com/storywink/image/upload/v1772291379/Screenshot_2026-02-28_at_10.55.32_PM_copy_xxjms6.png"
               alt="Storywink Mascot"
-              width={64}
+              width={128}
               height={64}
-              className="h-16 w-16"
+              className="h-10 w-auto"
             />
             <span className="font-bold text-2xl sm:inline-block text-slate-900 dark:text-white font-playful">
               Storywin<span className="text-[#F76C5E]">k.ai</span>
