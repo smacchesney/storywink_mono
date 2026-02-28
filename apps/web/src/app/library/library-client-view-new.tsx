@@ -4,6 +4,7 @@ import React, { useState, useMemo, useTransition, useEffect, useCallback, useRef
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
+import Image from "next/image";
 import BookCard from "@/components/book-card";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@clerk/nextjs";
@@ -216,7 +217,16 @@ export function LibraryClientView() {
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Your Library</h1>
+        <div className="flex items-center gap-3">
+          <Image
+            src="https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.58.09_PM_gnknk5.png"
+            alt="Kai the Dino"
+            width={60}
+            height={60}
+            className="h-12 w-12 md:h-15 md:w-15"
+          />
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Your Library</h1>
+        </div>
         
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
           {/* Sort selector */}
