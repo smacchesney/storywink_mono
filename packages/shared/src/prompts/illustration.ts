@@ -48,13 +48,22 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
   // Character consistency section
   const characterConsistencySection = `PEOPLE - STRICT FIDELITY (non-negotiable):
 Every person in the illustration must be immediately recognizable from the source photo.
-- Face shape, features, expression: exact match to what's visible
+- Face shape, expression: match the source photo
 - Hair color, style, length: exact match to what's visible
 - Skin tone: exact match
 - Body proportions, clothing: exact match
 - If any feature is hidden (hat, angle, shadow): keep it hidden—never invent
 
-DO NOT reimagine, stylize away, or invent features for any person. A parent must look at your illustration and instantly recognize their child and family. Render people in the illustration style, but preserve their exact features—stylized execution, faithful likeness.`;
+FACIAL RENDERING STYLE (critical for consistency across pages):
+Render ALL faces using a simplified children's book style as shown in the reference images:
+- Eyes: small, simple dots or short curved lines — NOT detailed realistic eyes
+- Nose: tiny dot, small L-shape, or simple curved line — minimal and understated
+- Mouth: simple curved line for smiles, small open shape for expressions
+- Cheeks: soft rosy circles on cheeks for warmth
+- Keep facial details minimal and consistent — simpler faces are more consistent across pages
+This simplified face style must be applied uniformly to every person (adults and children alike) while still preserving each person's distinguishing features (hair, skin tone, face shape, glasses, facial hair, etc.) so they remain recognizable.
+
+DO NOT reimagine or invent features for any person. A parent must look at your illustration and instantly recognize their child and family.`;
 
   base.push(characterConsistencySection);
 
