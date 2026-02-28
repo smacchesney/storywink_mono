@@ -146,9 +146,9 @@ export default function Home() {
               <Image
                 src="https://res.cloudinary.com/storywink/image/upload/v1772291623/Screenshot_2026-02-28_at_11.12.00_PM_df2xpk.png"
                 alt="Kai the Dino FAQ"
-                width={80}
-                height={80}
-                className="h-16 w-16 md:h-20 md:w-20"
+                width={240}
+                height={240}
+                className="h-48 w-48 md:h-60 md:w-60"
               />
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 dark:text-white">
                 Frequently Asked Questions
