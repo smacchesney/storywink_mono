@@ -289,8 +289,6 @@ function ReviewPageContent() {
   // --- Effect to Manage Final Status Polling Interval --- 
   useEffect(() => {
     const bookIdToPoll = bookIdFromUrl;
-    // If the IllustrationProgressScreen is handling polling, this effect might be redundant or simplified.
-    // For now, we'll keep its structure but the actual polling logic is in IllustrationProgressScreen.
     if (isFetchingInitialData || !isAwaitingFinalStatus || !bookIdToPoll) {
       if (finalStatusPollingIntervalRef.current) {
         clearInterval(finalStatusPollingIntervalRef.current);
@@ -298,10 +296,6 @@ function ReviewPageContent() {
       }
       return;
     }
-
-    // The actual polling is now managed by IllustrationProgressScreen
-    // This effect is now mainly for ensuring cleanup if the component unmounts while isAwaitingFinalStatus is true
-    // but before IllustrationProgressScreen takes over or if it also unmounts.
 
     // Cleanup
     return () => {

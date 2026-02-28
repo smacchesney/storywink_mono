@@ -208,7 +208,7 @@ export function WritingProgressScreen({
         }}
       >
         <Image
-          src="/images/mascot/kai the dino writing.png"
+          src="https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.57.58_PM_mijhwv.png"
           alt="Kai the Dino writing a story"
           width={200}
           height={200}

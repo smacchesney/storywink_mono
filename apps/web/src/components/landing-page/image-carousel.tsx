@@ -14,14 +14,12 @@ interface ImageCarouselProps {
   imagePairs: ImagePair[];
   interval?: number; // Interval in milliseconds
   className?: string;
-  showMascot?: boolean; // Added prop to control mascot visibility
 }
 
 const ImageCarousel: React.FC<ImageCarouselProps> = ({
   imagePairs,
   interval = 5000, // Default to 5 seconds
   className,
-  showMascot = true, // Default to true
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   // const [isLoading, setIsLoading] = useState(true); // Track initial loading - unused
@@ -88,16 +86,6 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
 
         {/* Illustrated Image Panel */}
         <div className="relative w-full aspect-square rounded-lg shadow-lg bg-gray-100"> {/* Outer container, Added bg */}
-          {/* Conditionally render Action Mascot Image - Always relative to the container */}
-          {showMascot && (
-             <Image 
-               src="/images/mascot/Winky the TREX - action_creating.png"
-               alt="Winky creating magic"
-               width={80} 
-               height={80} 
-               className="absolute top-0 right-0 z-30 transform -translate-y-1/4 translate-x-1/4 pointer-events-none" 
-             />
-          )}
           {/* Sparkle Background - Rendered once behind everything */}
            <Image
              src="/images/assets/Background sparkle.png" 

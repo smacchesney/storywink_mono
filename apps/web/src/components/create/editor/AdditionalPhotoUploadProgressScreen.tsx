@@ -19,7 +19,7 @@ const AdditionalPhotoUploadProgressScreen = () => {
       {/* Kai the Dino Mascot - No effects */}
       <div className="mb-8 transform-none">
         <Image
-          src="/images/mascot/kai the dino uploading.png"
+          src="https://res.cloudinary.com/storywink/image/upload/v1772291379/Screenshot_2026-02-28_at_10.55.51_PM_iznwx3.png"
           alt="Kai the Dino uploading photos"
           width={200}
           height={200}

@@ -24,7 +24,7 @@ export function UploadProgressScreen({
       {/* Kai the Dino Mascot - Isolated from shimmer effects */}
       <div className="mb-8 transform-none">
         <Image
-          src="/images/mascot/kai the dino uploading.png"
+          src="https://res.cloudinary.com/storywink/image/upload/v1772291379/Screenshot_2026-02-28_at_10.55.51_PM_iznwx3.png"
           alt="Kai the Dino uploading files"
           width={200}
           height={200}

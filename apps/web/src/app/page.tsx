@@ -144,7 +144,7 @@ export default function Home() {
           <div className="text-center mb-8 md:mb-12">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-4">
               <Image
-                src="/images/mascot/kai the dino FAQ.png"
+                src="https://res.cloudinary.com/storywink/image/upload/v1772291623/Screenshot_2026-02-28_at_11.12.00_PM_df2xpk.png"
                 alt="Kai the Dino FAQ"
                 width={80}
                 height={80}
