@@ -244,8 +244,8 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
       );
     }
 
-    // Existing text/illustration rendering
-    const pageKey = 'page' in dp ? `${dp.page.id}-${dp.type}-${index}` : `${dp.type}-${index}`;
+    // Existing text/illustration rendering (dp is narrowed to text | illustration here)
+    const pageKey = `${dp.page.id}-${dp.type}-${index}`;
 
     return (
       <div key={pageKey} className="bg-white border border-gray-200 flex justify-center items-center overflow-hidden">
