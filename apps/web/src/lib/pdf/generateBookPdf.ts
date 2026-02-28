@@ -109,34 +109,6 @@ function generateTextPageHtml(page: Page): string {
 }
 
 /**
- * Generates a blank filler page for Lulu page count padding.
- */
-function generateBlankPageHtml(): string {
-  const pageStyle = `
-    width: ${PAGE_WIDTH_WITH_BLEED_IN}in;
-    height: ${PAGE_HEIGHT_WITH_BLEED_IN}in;
-    page-break-after: always;
-    background-color: white;
-  `;
-
-  return `<div class="page" style="${pageStyle}"></div>`;
-}
-
-/**
- * Pad page HTML array so total count is divisible by 4 (Lulu saddle stitch requirement).
- */
-function padToMultipleOfFour(pageHtmlArray: string[]): string[] {
-  const remainder = pageHtmlArray.length % 4;
-  if (remainder === 0) return pageHtmlArray;
-
-  const paddingNeeded = 4 - remainder;
-  for (let i = 0; i < paddingNeeded; i++) {
-    pageHtmlArray.push(generateBlankPageHtml());
-  }
-  return pageHtmlArray;
-}
-
-/**
  * Generates a PDF buffer for the given book data.
  * For story pages, emits interleaved text + illustration pages.
  * Title pages emit a single illustration page.
