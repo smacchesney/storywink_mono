@@ -6,7 +6,7 @@ import { Page, BookStatus } from '@prisma/client';
 import { Loader2, AlertTriangle, Type } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { coolifyImageUrl } from '@storywink/shared';
-import { buildDisplayPages, DisplayPage } from './FlipbookViewer';
+import { buildDisplayPages } from './FlipbookViewer';
 
 interface BookPageGalleryProps {
   pages: Page[];
