@@ -91,11 +91,11 @@ function generateTextPageHtml(page: Page): string {
   `;
   const textStyle = `
     font-family: 'Excalifont', cursive, sans-serif;
-    font-size: 72px;
+    font-size: 36px;
     color: #1a1a1a;
     text-align: center;
-    line-height: 1.4;
-    max-width: 80%;
+    line-height: 1.5;
+    max-width: 70%;
     word-wrap: break-word;
   `;
 
