@@ -207,16 +207,18 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     if (dp.type === 'dedication') {
       const displayName = dp.childName || dp.bookTitle || 'You';
       return (
-        <div key={`dedication-${index}`} className="w-full h-full bg-white border border-gray-200 flex flex-col justify-center items-center overflow-hidden relative">
-          <div className="text-center px-[10%]">
-            <p className="font-playful text-[#1a1a1a] leading-relaxed"
-               style={{ fontSize: 'clamp(14px, 3vw, 22px)' }}>
-              This book was made<br />especially for
-            </p>
-            <p className="font-playful text-[#F76C5E] font-bold mt-1"
-               style={{ fontSize: 'clamp(20px, 5vw, 36px)' }}>
-              {displayName}
-            </p>
+        <div key={`dedication-${index}`} className="bg-white border border-gray-200 overflow-hidden">
+          <div className="absolute inset-0 flex flex-col justify-center items-center">
+            <div className="text-center px-[10%]">
+              <p className="font-playful text-[#1a1a1a] leading-relaxed"
+                 style={{ fontSize: 'clamp(14px, 3vw, 22px)' }}>
+                This book was made<br />especially for
+              </p>
+              <p className="font-playful text-[#F76C5E] font-bold mt-1"
+                 style={{ fontSize: 'clamp(20px, 5vw, 36px)' }}>
+                {displayName}
+              </p>
+            </div>
           </div>
           <Image
             src={DEDICATION_MASCOT_URL}
@@ -233,51 +235,53 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     if (dp.type === 'ending') {
       const displayName = dp.childName || dp.bookTitle || 'You';
       return (
-        <div key={`ending-${index}`} className="w-full h-full bg-white border border-gray-200 flex flex-col justify-center items-center overflow-hidden">
-          <div className="text-center px-[10%]">
-            <p className="font-playful text-[#1a1a1a] font-bold"
-               style={{ fontSize: 'clamp(22px, 5vw, 38px)' }}>
-              The End
-            </p>
-            <p className="font-playful text-[#1a1a1a] mt-2 leading-relaxed"
-               style={{ fontSize: 'clamp(14px, 3vw, 22px)' }}>
-              Until next time,
-            </p>
-            <p className="font-playful text-[#F76C5E] font-bold mt-1"
-               style={{ fontSize: 'clamp(20px, 5vw, 36px)' }}>
-              {displayName}!
-            </p>
+        <div key={`ending-${index}`} className="bg-white border border-gray-200 overflow-hidden">
+          <div className="absolute inset-0 flex flex-col justify-center items-center">
+            <div className="text-center px-[10%]">
+              <p className="font-playful text-[#1a1a1a] font-bold"
+                 style={{ fontSize: 'clamp(22px, 5vw, 38px)' }}>
+                The End
+              </p>
+              <p className="font-playful text-[#1a1a1a] mt-2 leading-relaxed"
+                 style={{ fontSize: 'clamp(14px, 3vw, 22px)' }}>
+                Until next time,
+              </p>
+              <p className="font-playful text-[#F76C5E] font-bold mt-1"
+                 style={{ fontSize: 'clamp(20px, 5vw, 36px)' }}>
+                {displayName}!
+              </p>
+            </div>
+            <Image
+              src={ENDING_MASCOT_URL}
+              alt="Storywink mascot"
+              width={200}
+              height={200}
+              className="mt-4 object-contain"
+              style={{ height: '15%', width: 'auto' }}
+            />
           </div>
-          <Image
-            src={ENDING_MASCOT_URL}
-            alt="Storywink mascot"
-            width={200}
-            height={200}
-            className="mt-4 object-contain"
-            style={{ height: '15%', width: 'auto' }}
-          />
         </div>
       );
     }
 
     if (dp.type === 'back-cover') {
       return (
-        <div key={`back-cover-${index}`} className="w-full h-full bg-white border border-gray-200 flex flex-col justify-center items-center overflow-hidden">
-          {/* Branding - centered */}
-          <div className="text-center">
-            <span className="font-playful font-bold text-[#1a1a1a]" style={{ fontSize: 'clamp(18px, 4vw, 32px)' }}>
-              Storywin<span className="text-[#F76C5E]">k.ai</span>
-            </span>
+        <div key={`back-cover-${index}`} className="bg-white border border-gray-200 overflow-hidden">
+          <div className="absolute inset-0 flex flex-col justify-center items-center">
+            <div className="text-center">
+              <span className="font-playful font-bold text-[#1a1a1a]" style={{ fontSize: 'clamp(18px, 4vw, 32px)' }}>
+                Storywin<span className="text-[#F76C5E]">k.ai</span>
+              </span>
+            </div>
+            <Image
+              src={BACK_COVER_MASCOT_URL}
+              alt="Storywink mascot"
+              width={150}
+              height={150}
+              className="mt-4 object-contain"
+              style={{ height: '15%', width: 'auto' }}
+            />
           </div>
-          {/* Mascot: centered below text */}
-          <Image
-            src={BACK_COVER_MASCOT_URL}
-            alt="Storywink mascot"
-            width={150}
-            height={150}
-            className="mt-4 object-contain"
-            style={{ height: '15%', width: 'auto' }}
-          />
         </div>
       );
     }
@@ -286,10 +290,10 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     const pageKey = `${dp.page.id}-${dp.type}-${index}`;
 
     return (
-      <div key={pageKey} className="w-full h-full bg-white border border-gray-200 flex justify-center items-center overflow-hidden">
+      <div key={pageKey} className="bg-white border border-gray-200 overflow-hidden">
         {dp.type === 'text' ? (
           // Text page - white background with centered story text
-          <div className="w-full h-full flex items-center justify-center p-[10%]">
+          <div className="absolute inset-0 flex items-center justify-center p-[10%]">
             <p className="font-playful text-[#1a1a1a] text-center leading-relaxed"
                style={{ fontSize: 'clamp(16px, 4vw, 28px)' }}>
               {dp.page.text}
@@ -297,7 +301,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
           </div>
         ) : dp.page.generatedImageUrl ? (
           // Illustration page - full image
-          <div className="relative w-full h-full">
+          <div className="absolute inset-0">
              <Image
                src={coolifyImageUrl(dp.page.generatedImageUrl)}
                alt={`Page ${dp.page.pageNumber} illustration`}
@@ -309,7 +313,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
           </div>
         ) : (
           // Placeholder for loading or failed state
-          <div className="text-center text-muted-foreground">
+          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
             <p>Loading page {dp.page.pageNumber}...</p>
           </div>
