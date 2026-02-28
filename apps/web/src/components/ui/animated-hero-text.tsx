@@ -191,7 +191,7 @@ function AnimatedHeroText({
 
   return (
     <div className={`text-center ${className}`}>
-      <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-slate-900 dark:text-white mb-2 leading-tight px-2">
+      <h1 className="text-[26px] sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-slate-900 dark:text-white mb-2 leading-tight px-2">
         <span className="block sm:inline">Turn Memories Into a</span>{' '}
         <span className="block sm:inline">Picturebook Starring</span>{' '}
         <span className="whitespace-nowrap">Your Little</span>
