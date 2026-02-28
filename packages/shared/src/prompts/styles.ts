@@ -11,8 +11,12 @@ export const STYLE_LIBRARY = {
       'https://res.cloudinary.com/storywink/image/upload/v1772284892/Screenshot_2026-02-28_at_9.17.35_PM_kexvqz.png',
       'https://res.cloudinary.com/storywink/image/upload/v1772284894/Screenshot_2026-02-28_at_9.17.01_PM_xjwo5u.png',
     ],
-    // Reference with text for title pages (AI generates artistic title text)
-    coverReferenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1764941361/Pencil_Vignette_title_ref_1_gbuznf.png',
+    // Reference images for title pages (AI generates artistic title text)
+    coverReferenceImageUrls: [
+      'https://res.cloudinary.com/storywink/image/upload/v1772294382/Screenshot_2026-02-28_at_11.55.28_PM_u0akxv.png',
+      'https://res.cloudinary.com/storywink/image/upload/v1772294382/Screenshot_2026-02-28_at_11.55.43_PM_lizco0.png',
+      'https://res.cloudinary.com/storywink/image/upload/v1772294383/Screenshot_2026-02-28_at_11.56.00_PM_bfevpr.png',
+    ],
     description: "Create a vignette-style illustration with soft, organic edges that fade into PURE WHITE (#FFFFFF). The vignette edges and any background showing through must be pure white, not off-white, cream, or gray. Match the watercolor/pencil aesthetic, warm color palette, and hand-drawn quality shown in the reference images. Fill the entire canvas with the illustration.",
   },
 } as const;
@@ -24,7 +28,7 @@ export const STYLE_LIBRARY = {
 export interface StyleDefinition {
   label: string;
   referenceImageUrls: readonly string[];
-  coverReferenceImageUrl?: string;
+  coverReferenceImageUrls?: readonly string[];
   description?: string | null;
 }
 

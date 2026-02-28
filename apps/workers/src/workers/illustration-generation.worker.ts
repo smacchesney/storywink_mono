@@ -248,10 +248,10 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       throw new Error(`Invalid style key: ${styleKey}. Available styles: ${Object.keys(STYLE_LIBRARY).join(', ')}`);
     }
 
-    // Get style reference URLs - title pages use single cover ref, story pages use array of refs
+    // Get style reference URLs - title pages use cover refs, story pages use standard refs
     let styleReferenceUrls: string[];
-    if (isTitlePage && styleData.coverReferenceImageUrl) {
-      styleReferenceUrls = [styleData.coverReferenceImageUrl];
+    if (isTitlePage && styleData.coverReferenceImageUrls?.length) {
+      styleReferenceUrls = [...styleData.coverReferenceImageUrls];
     } else {
       // Spread to convert readonly array to mutable array
       styleReferenceUrls = [...styleData.referenceImageUrls];

@@ -77,7 +77,7 @@ DO NOT reimagine or invent features for any person. A parent must look at your i
 
   const titleBits = opts.isTitlePage
     ? [
-        `Text: Add the title "${opts.bookTitle}" in a readable font matching the second image's text style. Position naturally without covering important subjects. Size appropriately (5-7% of image height).`,
+        `Text: Add the title "${opts.bookTitle}" in a bold, readable hand-drawn font matching the reference images' text style. Use a Coral (#F76C5E) fill color with a black outline/stroke on the lettering. Position naturally without covering important subjects. Size appropriately (5-7% of image height).`,
       ]
     : [
         `COMPOSITION: Fill the entire image canvas with the illustration. No empty space or text areas needed. The illustration should extend to all edges. DO NOT add any text to the image.`,
@@ -116,7 +116,7 @@ export function buildDynamicEffectsSection(illustrationNotes: string): string {
 
 export function buildTextSection(isTitlePage: boolean, text: string | null, bookTitle: string | null): string {
   if (isTitlePage) {
-    return `Include the book title in the image: "${bookTitle}". Make it clearly readable and position it naturally within the scene without covering important elements from the first image. Style the text to match the aesthetic of the second image.`;
+    return `Include the book title in the image: "${bookTitle}". Make it clearly readable and position it naturally within the scene without covering important elements from the first image. Use a Coral (#F76C5E) fill color with a black outline/stroke on the lettering, matching the style shown in the reference images.`;
   } else {
     return `Add this text to the image: "${(text ?? '').trim()}". Render it exactly once, using a font style, size, color, and position that matches any text shown in the second image. Ensure the entire text is visible and not cut off.`;
   }
