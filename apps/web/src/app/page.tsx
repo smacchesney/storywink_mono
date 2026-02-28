@@ -148,7 +148,7 @@ export default function Home() {
                 alt="Kai the Dino FAQ"
                 width={240}
                 height={240}
-                className="h-48 w-48 md:h-60 md:w-60"
+                className="h-24 w-24 md:h-[120px] md:w-[120px]"
               />
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 dark:text-white">
                 Frequently Asked Questions

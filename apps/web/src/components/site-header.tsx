@@ -48,7 +48,7 @@ export function SiteHeader() {
               alt="Storywink Mascot"
               width={160}
               height={80}
-              className="h-12 w-auto"
+              className="h-[62px] w-auto"
             />
             <span className="hidden font-bold text-3xl sm:inline-block text-slate-900 dark:text-white font-playful">
               Storywin<span className="text-[#F76C5E]">k.ai</span>
@@ -64,7 +64,7 @@ export function SiteHeader() {
               alt="Storywink Mascot"
               width={128}
               height={64}
-              className="h-10 w-auto"
+              className="h-[52px] w-auto"
             />
             <span className="font-bold text-2xl sm:inline-block text-slate-900 dark:text-white font-playful">
               Storywin<span className="text-[#F76C5E]">k.ai</span>
