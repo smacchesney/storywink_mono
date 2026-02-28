@@ -5,11 +5,11 @@
 export const STYLE_LIBRARY = {
   vignette: {
     label: 'Vignette',
-    // Text-free references for story pages (text added programmatically)
-    // Two references for better style consistency with onomatopoeia examples
+    // Three references for style + facial consistency across pages
     referenceImageUrls: [
-      'https://res.cloudinary.com/storywink/image/upload/v1764939472/Pencil_Vignette_ref_1_evxxjl.jpg',
-      'https://res.cloudinary.com/storywink/image/upload/v1764939472/Pencil_Vignette_ref_2_tvaogo.jpg',
+      'https://res.cloudinary.com/storywink/image/upload/v1772284884/Screenshot_2026-02-28_at_9.17.44_PM_twxjzc.png',
+      'https://res.cloudinary.com/storywink/image/upload/v1772284892/Screenshot_2026-02-28_at_9.17.35_PM_kexvqz.png',
+      'https://res.cloudinary.com/storywink/image/upload/v1772284894/Screenshot_2026-02-28_at_9.17.01_PM_xjwo5u.png',
     ],
     // Reference with text for title pages (AI generates artistic title text)
     coverReferenceImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1764941361/Pencil_Vignette_title_ref_1_gbuznf.png',
