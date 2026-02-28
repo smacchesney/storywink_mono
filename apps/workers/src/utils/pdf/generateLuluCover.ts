@@ -8,6 +8,9 @@
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { Book, Page } from '@storywink/database';
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 /**
  * Optimizes Cloudinary image URL for print quality.
@@ -43,6 +46,23 @@ const CORAL_COLOR = '#F76C5E';
 const BACK_COVER_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291378/Screenshot_2026-02-28_at_10.57.29_PM_qwoqr0.png';
 
 /**
+ * Load Excalifont TTF as base64 for embedding in PDF HTML.
+ */
+function loadFontBase64(): string {
+  try {
+    const currentDir = typeof __dirname !== 'undefined'
+      ? __dirname
+      : dirname(fileURLToPath(import.meta.url));
+    const fontPath = join(currentDir, '../../assets/fonts/Excalifont.ttf');
+    const fontBuffer = readFileSync(fontPath);
+    return fontBuffer.toString('base64');
+  } catch {
+    console.warn('[PDF] Could not load Excalifont for cover PDF embedding');
+    return '';
+  }
+}
+
+/**
  * Generates the HTML for the Lulu cover spread.
  *
  * Layout (saddle stitch - no spine):
@@ -57,7 +77,16 @@ const BACK_COVER_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload
  * +------------------+------------------+
  *      8.625"              8.625"
  */
-function generateCoverHtml(titlePageImageUrl: string | null, bookTitle: string): string {
+function generateCoverHtml(titlePageImageUrl: string | null, bookTitle: string, fontBase64: string): string {
+  const fontFace = fontBase64
+    ? `@font-face {
+        font-family: 'Excalifont';
+        src: url(data:font/truetype;base64,${fontBase64}) format('truetype');
+        font-weight: normal;
+        font-style: normal;
+      }`
+    : '';
+
   // Use inches for all dimensions to match PDF page size exactly
   const containerStyle = `
     width: ${COVER_WIDTH_IN}in;
@@ -71,13 +100,11 @@ function generateCoverHtml(titlePageImageUrl: string | null, bookTitle: string):
   const backCoverStyle = `
     width: ${PANEL_WIDTH_IN}in;
     height: ${COVER_HEIGHT_IN}in;
-    background-color: ${CORAL_COLOR};
-    position: relative;
+    background-color: white;
     display: flex;
     flex-direction: column;
-    justify-content: flex-end;
+    justify-content: center;
     align-items: center;
-    padding-bottom: 0.5in;
     box-sizing: border-box;
   `;
 
@@ -95,14 +122,11 @@ function generateCoverHtml(titlePageImageUrl: string | null, bookTitle: string):
   `;
 
   const brandingStyle = `
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Excalifont', cursive, sans-serif;
     font-size: 48px;
-    color: white;
+    color: #1a1a1a;
     text-align: center;
-  `;
-
-  const logoTextStyle = `
-    font-weight: 600;
+    font-weight: bold;
   `;
 
   return `
@@ -112,6 +136,7 @@ function generateCoverHtml(titlePageImageUrl: string | null, bookTitle: string):
       <meta charset="UTF-8">
       <title>${bookTitle} - Cover</title>
       <style>
+        ${fontFace}
         /* Page size handled by Puppeteer pdf() options - single source of truth */
         html, body {
           margin: 0;
@@ -142,22 +167,21 @@ function generateCoverHtml(titlePageImageUrl: string | null, bookTitle: string):
       <div class="cover-spread" style="${containerStyle}">
         <!-- Back Cover (Left Side) -->
         <div style="${backCoverStyle}">
-          <!-- Mascot: small, bottom-right corner -->
+          <!-- Branding: centered -->
+          <div style="${brandingStyle}">
+            <span>Storywin</span><span style="color: ${CORAL_COLOR};">k.ai</span>
+          </div>
+          <!-- Mascot: centered below text -->
           <img
             src="${BACK_COVER_MASCOT_URL}"
             alt="Storywink mascot"
             style="
-              position: absolute;
-              bottom: 0.6in;
-              right: 0.4in;
+              margin-top: 0.4in;
               height: 12%;
               width: auto;
               object-fit: contain;
             "
           />
-          <div style="${brandingStyle}">
-            <span style="${logoTextStyle}">Storywink</span><span style="color: #fff;">.ai</span>
-          </div>
         </div>
 
         <!-- Front Cover (Right Side) -->
@@ -196,8 +220,11 @@ export async function generateLuluCover(bookData: BookWithPages): Promise<Buffer
 
     const coverImageUrl = titlePage?.generatedImageUrl || bookData.pages[0]?.generatedImageUrl;
 
+    // Load font for branding text
+    const fontBase64 = loadFontBase64();
+
     // Generate HTML
-    const coverHtml = generateCoverHtml(coverImageUrl, bookData.title || 'My Storybook');
+    const coverHtml = generateCoverHtml(coverImageUrl, bookData.title || 'My Storybook', fontBase64);
 
     // Launch Puppeteer
     const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || await chromium.executablePath();

@@ -8,8 +8,9 @@ import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 import { coolifyImageUrl } from '@storywink/shared';
 
-// Mascot URLs for dedication and back cover pages
+// Mascot URLs
 const DEDICATION_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.58.09_PM_gnknk5.png';
+const ENDING_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291378/Screenshot_2026-02-28_at_10.57.54_PM_sxcasb.png';
 const BACK_COVER_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291378/Screenshot_2026-02-28_at_10.57.29_PM_qwoqr0.png';
 
 // Display page types for interleaved layout
@@ -17,6 +18,7 @@ export type DisplayPage =
   | { type: 'illustration'; page: Page }
   | { type: 'text'; page: Page }
   | { type: 'dedication'; childName: string | null; bookTitle: string }
+  | { type: 'ending'; childName: string | null; bookTitle: string }
   | { type: 'back-cover' };
 
 export interface BuildDisplayPagesOptions {
@@ -61,6 +63,12 @@ export function buildDisplayPages(pages: Page[], options?: BuildDisplayPagesOpti
       displayPages.push({ type: 'illustration', page });
     }
   }
+  // Add ending page before back cover
+  displayPages.push({
+    type: 'ending',
+    childName: options?.childName ?? null,
+    bookTitle: options?.bookTitle ?? 'You',
+  });
   // Add back cover as the last page
   displayPages.push({ type: 'back-cover' });
   return displayPages;
@@ -199,7 +207,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     if (dp.type === 'dedication') {
       const displayName = dp.childName || dp.bookTitle || 'You';
       return (
-        <div key={`dedication-${index}`} className="bg-white border border-gray-200 flex flex-col justify-center items-center overflow-hidden">
+        <div key={`dedication-${index}`} className="bg-white border border-gray-200 flex flex-col justify-center items-center overflow-hidden relative">
           <div className="text-center px-[10%]">
             <p className="font-playful text-[#1a1a1a] leading-relaxed"
                style={{ fontSize: 'clamp(14px, 3vw, 22px)' }}>
@@ -215,6 +223,36 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
             alt="Storywink mascot"
             width={200}
             height={200}
+            className="absolute object-contain"
+            style={{ bottom: '6%', right: '6%', height: '15%', width: 'auto' }}
+          />
+        </div>
+      );
+    }
+
+    if (dp.type === 'ending') {
+      const displayName = dp.childName || dp.bookTitle || 'You';
+      return (
+        <div key={`ending-${index}`} className="bg-white border border-gray-200 flex flex-col justify-center items-center overflow-hidden">
+          <div className="text-center px-[10%]">
+            <p className="font-playful text-[#1a1a1a] font-bold"
+               style={{ fontSize: 'clamp(22px, 5vw, 38px)' }}>
+              The End
+            </p>
+            <p className="font-playful text-[#1a1a1a] mt-2 leading-relaxed"
+               style={{ fontSize: 'clamp(14px, 3vw, 22px)' }}>
+              Until next time,
+            </p>
+            <p className="font-playful text-[#F76C5E] font-bold mt-1"
+               style={{ fontSize: 'clamp(20px, 5vw, 36px)' }}>
+              {displayName}!
+            </p>
+          </div>
+          <Image
+            src={ENDING_MASCOT_URL}
+            alt="Storywink mascot"
+            width={200}
+            height={200}
             className="mt-4 object-contain"
             style={{ height: '15%', width: 'auto' }}
           />
@@ -224,22 +262,22 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
 
     if (dp.type === 'back-cover') {
       return (
-        <div key={`back-cover-${index}`} className="bg-[#F76C5E] border border-gray-200 flex flex-col justify-end items-center overflow-hidden relative">
-          {/* Mascot: small, bottom-right */}
+        <div key={`back-cover-${index}`} className="bg-white border border-gray-200 flex flex-col justify-center items-center overflow-hidden">
+          {/* Branding - centered */}
+          <div className="text-center">
+            <span className="font-playful font-bold text-[#1a1a1a]" style={{ fontSize: 'clamp(18px, 4vw, 32px)' }}>
+              Storywin<span className="text-[#F76C5E]">k.ai</span>
+            </span>
+          </div>
+          {/* Mascot: centered below text */}
           <Image
             src={BACK_COVER_MASCOT_URL}
             alt="Storywink mascot"
             width={150}
             height={150}
-            className="absolute object-contain"
-            style={{ bottom: '10%', right: '6%', height: '12%', width: 'auto' }}
+            className="mt-4 object-contain"
+            style={{ height: '15%', width: 'auto' }}
           />
-          {/* Branding */}
-          <div className="mb-6 text-center">
-            <span className="text-white font-semibold" style={{ fontSize: 'clamp(18px, 4vw, 32px)' }}>
-              Storywink<span className="text-white">.ai</span>
-            </span>
-          </div>
         </div>
       );
     }

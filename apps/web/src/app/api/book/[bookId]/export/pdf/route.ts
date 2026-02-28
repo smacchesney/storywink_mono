@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
 import { generateBookPdf } from '@/lib/pdf/generateBookPdf';
+import { isTitlePage } from '@storywink/shared/utils';
 import { Book, Page } from '@prisma/client';
 
 // Define the expected Book type with Pages for the PDF generator
@@ -27,26 +28,28 @@ export async function GET(
     const bookData = await prisma.book.findUnique({
       where: {
         id: bookId,
-        userId: dbUser.id, // Use database user ID for ownership check
+        userId: dbUser.id,
       },
       include: {
         pages: {
           orderBy: { index: 'asc' },
-          // Select all fields needed by generatePageHtml
           select: {
             id: true,
             pageNumber: true,
+            index: true,
+            assetId: true,
             text: true,
             generatedImageUrl: true,
-            // Include other fields if needed by generatePageHtml
-            originalImageUrl: true, // Might be useful for context? 
+            originalImageUrl: true,
             textConfirmed: true,
             pageType: true,
+            isTitlePage: true,
             createdAt: true,
             updatedAt: true,
-            bookId: true, // Need bookId if Page type is strictly checked
-            moderationStatus: true, // Include new fields
+            bookId: true,
+            moderationStatus: true,
             moderationReason: true,
+            illustrationNotes: true,
           }
         },
       },
@@ -57,13 +60,23 @@ export async function GET(
       return NextResponse.json({ error: 'Book not found or access denied' }, { status: 404 });
     }
 
-    // Basic check: Ensure the book is completed before allowing export?
-    // if (bookData.status !== 'COMPLETED') {
-    //   return NextResponse.json({ error: 'Book is not yet completed' }, { status: 400 });
-    // }
+    // Separate title page from story pages
+    const titlePageData = bookData.pages.find(
+      page => isTitlePage(page.assetId, bookData.coverAssetId)
+    );
+    const storyPages = bookData.pages.filter(
+      page => !isTitlePage(page.assetId, bookData.coverAssetId)
+    );
 
-    // 2. Generate the PDF buffer
-    const pdfBuffer = await generateBookPdf(bookData as BookWithPages);
+    // 2. Generate the PDF buffer (user mode: title → dedication → stories → back cover)
+    const pdfBuffer = await generateBookPdf(
+      { ...bookData, pages: storyPages } as BookWithPages,
+      {
+        titlePage: titlePageData as Page | undefined,
+        includeBackCover: true,
+        padToFour: false,
+      }
+    );
 
     // 3. Send the PDF as response
     return new NextResponse(pdfBuffer, {

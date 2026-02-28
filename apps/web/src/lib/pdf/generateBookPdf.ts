@@ -1,15 +1,12 @@
 /**
- * Generates interior PDF for Lulu print-on-demand.
+ * Generates book interior PDFs.
+ *
+ * Supports two modes:
+ * - Lulu mode (default): Dedication → text/illustration pairs → padded to 4x
+ * - User mode: Title page → dedication → text/illustration pairs → back cover
  *
  * Uses Puppeteer to render HTML pages to PDF.
  * Specifications: 8.5"x8.5" with 0.125" bleed (8.75"x8.75" total).
- *
- * Layout:
- * - Page 1 (right-hand/recto): Dedication page
- * - Pages 2+: Interleaved text (left) + illustration (right) spreads
- * - Padded to multiple of 4 for saddle stitch
- *
- * Callers should pre-filter out title pages before passing to this function.
  */
 
 import puppeteer from 'puppeteer-core';
@@ -45,8 +42,19 @@ const PAGE_HEIGHT_WITH_BLEED_IN = PAGE_HEIGHT_IN + 2 * BLEED_MARGIN_IN; // 8.75"
 const PAGE_WIDTH_PX = Math.round(PAGE_WIDTH_WITH_BLEED_IN * DPI); // 2625px
 const PAGE_HEIGHT_PX = Math.round(PAGE_HEIGHT_WITH_BLEED_IN * DPI); // 2625px
 
-// Dedication page mascot
+// Mascot URLs
 const DEDICATION_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.58.09_PM_gnknk5.png';
+const ENDING_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291378/Screenshot_2026-02-28_at_10.57.54_PM_sxcasb.png';
+const BACK_COVER_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291378/Screenshot_2026-02-28_at_10.57.29_PM_qwoqr0.png';
+
+export interface GenerateBookPdfOptions {
+  /** Include title page illustration as first page (user PDF only) */
+  titlePage?: Page;
+  /** Append back cover as last page (user PDF only) */
+  includeBackCover?: boolean;
+  /** Pad to multiple of 4 for Lulu saddle stitch (default: true) */
+  padToFour?: boolean;
+}
 
 /**
  * Load Excalifont as base64 data URI for embedding in PDF HTML.
@@ -168,8 +176,114 @@ function generateDedicationPageHtml(childName: string | null, bookTitle: string)
         src="${DEDICATION_MASCOT_URL}"
         alt="Storywink mascot"
         style="
+          position: absolute;
+          bottom: 0.5in;
+          right: 0.5in;
+          height: 15%;
+          width: auto;
+          object-fit: contain;
+        "
+      />
+    </div>
+  `;
+}
+
+/**
+ * Generates HTML for the ending page.
+ * Shows "The End / Until next time, [name]!" with mascot.
+ */
+function generateEndingPageHtml(childName: string | null, bookTitle: string): string {
+  const displayName = childName || bookTitle || 'You';
+
+  const pageStyle = `
+    width: ${PAGE_WIDTH_WITH_BLEED_IN}in;
+    height: ${PAGE_HEIGHT_WITH_BLEED_IN}in;
+    position: relative;
+    overflow: hidden;
+    page-break-after: always;
+    background-color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  `;
+
+  return `
+    <div class="page" style="${pageStyle}">
+      <div style="text-align: center; max-width: 70%;">
+        <p style="
+          font-family: 'Excalifont', cursive, sans-serif;
+          font-size: 42px;
+          color: #1a1a1a;
+          line-height: 1.3;
+          margin: 0 0 0.2in 0;
+          font-weight: bold;
+        ">The End</p>
+        <p style="
+          font-family: 'Excalifont', cursive, sans-serif;
+          font-size: 28px;
+          color: #1a1a1a;
+          line-height: 1.4;
+          margin: 0 0 0.1in 0;
+        ">Until next time,</p>
+        <p style="
+          font-family: 'Excalifont', cursive, sans-serif;
+          font-size: 48px;
+          color: #F76C5E;
+          line-height: 1.3;
+          margin: 0;
+          font-weight: bold;
+        ">${displayName}!</p>
+      </div>
+      <img
+        src="${ENDING_MASCOT_URL}"
+        alt="Storywink mascot"
+        style="
           margin-top: 0.4in;
           height: 15%;
+          width: auto;
+          object-fit: contain;
+        "
+      />
+    </div>
+  `;
+}
+
+/**
+ * Generates HTML for the back cover page (user PDF only).
+ * White background with centered "Storywink.ai" branding and mascot below.
+ */
+function generateBackCoverPageHtml(): string {
+  const pageStyle = `
+    width: ${PAGE_WIDTH_WITH_BLEED_IN}in;
+    height: ${PAGE_HEIGHT_WITH_BLEED_IN}in;
+    position: relative;
+    overflow: hidden;
+    page-break-after: always;
+    background-color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  `;
+
+  return `
+    <div class="page" style="${pageStyle}">
+      <div style="
+        font-family: 'Excalifont', cursive, sans-serif;
+        font-size: 48px;
+        color: #1a1a1a;
+        text-align: center;
+        font-weight: bold;
+      ">
+        <span>Storywin</span><span style="color: #F76C5E;">k.ai</span>
+      </div>
+      <img
+        src="${BACK_COVER_MASCOT_URL}"
+        alt="Storywink mascot"
+        style="
+          margin-top: 0.4in;
+          height: 12%;
           width: auto;
           object-fit: contain;
         "
@@ -209,13 +323,15 @@ function padToMultipleOfFour(pageHtmlArray: string[]): string[] {
 /**
  * Generates a PDF buffer for the given book data.
  *
- * Expects title pages to be pre-filtered out by callers.
- * Inserts a dedication page as page 1 (right-hand side), then
- * interleaves text (left) + illustration (right) for each story page.
- * Pads to multiple of 4 for Lulu saddle stitch.
+ * Options control the layout:
+ * - Lulu mode (default): Dedication → text/illustration pairs → padded to 4x
+ * - User mode: titlePage → dedication → text/illustration pairs → back cover
+ *
+ * Callers should pre-filter out title pages from bookData.pages.
  */
-export async function generateBookPdf(bookData: BookWithPages): Promise<Buffer> {
-  logger.info({ bookId: bookData.id }, "Starting PDF generation...");
+export async function generateBookPdf(bookData: BookWithPages, options?: GenerateBookPdfOptions): Promise<Buffer> {
+  const { titlePage, includeBackCover = false, padToFour = true } = options ?? {};
+  logger.info({ bookId: bookData.id, hasTitle: !!titlePage, includeBackCover, padToFour }, "Starting PDF generation...");
   let browser = null;
 
   try {
@@ -234,17 +350,32 @@ export async function generateBookPdf(bookData: BookWithPages): Promise<Buffer> 
     const sortedPages = [...bookData.pages].sort((a, b) => a.pageNumber - b.pageNumber);
     let pageHtmlArray: string[] = [];
 
-    // Page 1 (right-hand/recto): Dedication page
+    // Title page (user PDF only) - full bleed illustration as first page
+    if (titlePage) {
+      pageHtmlArray.push(generateIllustrationPageHtml(titlePage));
+    }
+
+    // Dedication page
     pageHtmlArray.push(generateDedicationPageHtml(bookData.childName, bookData.title));
 
-    // Pages 2+: Text (left/verso) + Illustration (right/recto) pairs
+    // Story pages: Text (left/verso) + Illustration (right/recto) pairs
     for (const page of sortedPages) {
       pageHtmlArray.push(generateTextPageHtml(page));
       pageHtmlArray.push(generateIllustrationPageHtml(page));
     }
 
-    // Pad to multiple of 4 for Lulu saddle stitch
-    pageHtmlArray = padToMultipleOfFour(pageHtmlArray);
+    // Ending page - "The End / Until next time, [name]!"
+    pageHtmlArray.push(generateEndingPageHtml(bookData.childName, bookData.title));
+
+    // Back cover (user PDF only)
+    if (includeBackCover) {
+      pageHtmlArray.push(generateBackCoverPageHtml());
+    }
+
+    // Pad to multiple of 4 for Lulu saddle stitch (skip for user PDF)
+    if (padToFour) {
+      pageHtmlArray = padToMultipleOfFour(pageHtmlArray);
+    }
 
     // Generate HTML content
     const fullHtml = `

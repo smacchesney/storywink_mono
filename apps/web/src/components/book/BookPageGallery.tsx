@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { Page, BookStatus } from '@prisma/client';
-import { Loader2, AlertTriangle, Type, Heart, BookOpen } from 'lucide-react';
+import { Loader2, AlertTriangle, Type, Heart, BookOpen, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { coolifyImageUrl } from '@storywink/shared';
 import { buildDisplayPages, type DisplayPage } from './FlipbookViewer';
@@ -57,6 +57,7 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
   /** Get the aria-label for a display page */
   const getAriaLabel = (dp: DisplayPage, isActive: boolean): string => {
     if (dp.type === 'dedication') return `Dedication page${isActive ? ' (current)' : ''}`;
+    if (dp.type === 'ending') return `Ending page${isActive ? ' (current)' : ''}`;
     if (dp.type === 'back-cover') return `Back cover${isActive ? ' (current)' : ''}`;
     return `${dp.type === 'text' ? 'Text' : 'Illustration'} - Page ${dp.page.pageNumber}${isActive ? ' (current)' : ''}`;
   };
@@ -64,6 +65,7 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
   /** Get the thumbnail label for a display page */
   const getThumbLabel = (dp: DisplayPage): string => {
     if (dp.type === 'dedication') return '\u2764';
+    if (dp.type === 'ending') return 'End';
     if (dp.type === 'back-cover') return 'Back';
     return `${dp.page.pageNumber}${dp.type === 'text' ? 'T' : ''}`;
   };
@@ -71,6 +73,7 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
   /** Get a unique key for each display page */
   const getKey = (dp: DisplayPage, index: number): string => {
     if (dp.type === 'dedication') return `dedication-${index}`;
+    if (dp.type === 'ending') return `ending-${index}`;
     if (dp.type === 'back-cover') return `back-cover-${index}`;
     return `${dp.page.id}-${dp.type}-${index}`;
   };
@@ -130,10 +133,15 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
                   <div className="w-full h-full bg-white flex items-center justify-center">
                     <Heart className="h-5 w-5 text-[#F76C5E]" />
                   </div>
+                ) : dp.type === 'ending' ? (
+                  // Ending page thumbnail
+                  <div className="w-full h-full bg-white flex items-center justify-center">
+                    <Star className="h-5 w-5 text-[#F76C5E]" />
+                  </div>
                 ) : dp.type === 'back-cover' ? (
                   // Back cover thumbnail
-                  <div className="w-full h-full bg-[#F76C5E] flex items-center justify-center">
-                    <BookOpen className="h-5 w-5 text-white" />
+                  <div className="w-full h-full bg-white flex items-center justify-center">
+                    <BookOpen className="h-5 w-5 text-[#1a1a1a]/60" />
                   </div>
                 ) : dp.type === 'text' ? (
                   // Text page thumbnail - white with text icon

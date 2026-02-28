@@ -45,8 +45,9 @@ const PAGE_HEIGHT_WITH_BLEED_IN = PAGE_HEIGHT_IN + 2 * BLEED_MARGIN_IN; // 8.75"
 const PAGE_WIDTH_PX = Math.round(PAGE_WIDTH_WITH_BLEED_IN * DPI); // 2625px
 const PAGE_HEIGHT_PX = Math.round(PAGE_HEIGHT_WITH_BLEED_IN * DPI); // 2625px
 
-// Dedication page mascot
+// Mascot URLs
 const DEDICATION_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.58.09_PM_gnknk5.png';
+const ENDING_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291378/Screenshot_2026-02-28_at_10.57.54_PM_sxcasb.png';
 
 /**
  * Load Excalifont TTF as base64 for embedding in PDF HTML.
@@ -171,6 +172,69 @@ function generateDedicationPageHtml(childName: string | null, bookTitle: string)
         src="${DEDICATION_MASCOT_URL}"
         alt="Storywink mascot"
         style="
+          position: absolute;
+          bottom: 0.5in;
+          right: 0.5in;
+          height: 15%;
+          width: auto;
+          object-fit: contain;
+        "
+      />
+    </div>
+  `;
+}
+
+/**
+ * Generates HTML for the ending page.
+ * Shows "The End / Until next time, [name]!" with mascot.
+ */
+function generateEndingPageHtml(childName: string | null, bookTitle: string): string {
+  const displayName = childName || bookTitle || 'You';
+
+  const pageStyle = `
+    width: ${PAGE_WIDTH_WITH_BLEED_IN}in;
+    height: ${PAGE_HEIGHT_WITH_BLEED_IN}in;
+    position: relative;
+    overflow: hidden;
+    page-break-after: always;
+    background-color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  `;
+
+  return `
+    <div class="page" style="${pageStyle}">
+      <div style="text-align: center; max-width: 70%;">
+        <p style="
+          font-family: 'Excalifont', cursive, sans-serif;
+          font-size: 42px;
+          color: #1a1a1a;
+          line-height: 1.3;
+          margin: 0 0 0.2in 0;
+          font-weight: bold;
+        ">The End</p>
+        <p style="
+          font-family: 'Excalifont', cursive, sans-serif;
+          font-size: 28px;
+          color: #1a1a1a;
+          line-height: 1.4;
+          margin: 0 0 0.1in 0;
+        ">Until next time,</p>
+        <p style="
+          font-family: 'Excalifont', cursive, sans-serif;
+          font-size: 48px;
+          color: #F76C5E;
+          line-height: 1.3;
+          margin: 0;
+          font-weight: bold;
+        ">${displayName}!</p>
+      </div>
+      <img
+        src="${ENDING_MASCOT_URL}"
+        alt="Storywink mascot"
+        style="
           margin-top: 0.4in;
           height: 15%;
           width: auto;
@@ -246,10 +310,13 @@ export async function generateBookPdf(bookData: BookWithPages): Promise<Buffer> 
       pageHtmlArray.push(generateIllustrationPageHtml(page));
     }
 
+    // Ending page - "The End / Until next time, [name]!"
+    pageHtmlArray.push(generateEndingPageHtml(bookData.childName, bookData.title));
+
     // Pad to multiple of 4 for Lulu saddle stitch
     pageHtmlArray = padToMultipleOfFour(pageHtmlArray);
 
-    console.log(`[PDF] Built ${pageHtmlArray.length} PDF pages (including dedication + padding)`);
+    console.log(`[PDF] Built ${pageHtmlArray.length} PDF pages (including dedication, ending + padding)`);
 
     // Generate HTML content
     const fullHtml = `

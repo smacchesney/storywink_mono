@@ -97,9 +97,9 @@ export async function POST(
       );
     }
 
-    // Calculate interleaved page count: 1 dedication page + each story page becomes 2 PDF pages (text + illustration)
+    // Calculate interleaved page count: dedication + ending + each story page becomes 2 PDF pages (text + illustration)
     // The PDF generator handles padding to multiple of 4 for Lulu saddle stitch
-    const interiorPdfPageCount = storyPages.length * 2 + 1; // +1 for dedication page
+    const interiorPdfPageCount = storyPages.length * 2 + 2; // +2 for dedication + ending pages
     const paddedPageCount = interiorPdfPageCount % 4 === 0
       ? interiorPdfPageCount
       : interiorPdfPageCount + (4 - (interiorPdfPageCount % 4));
