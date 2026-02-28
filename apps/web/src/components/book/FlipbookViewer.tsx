@@ -8,16 +8,29 @@ import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 import { coolifyImageUrl } from '@storywink/shared';
 
+// Mascot URLs for dedication and back cover pages
+const DEDICATION_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.58.09_PM_gnknk5.png';
+const BACK_COVER_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291378/Screenshot_2026-02-28_at_10.57.29_PM_qwoqr0.png';
+
 // Display page types for interleaved layout
 export type DisplayPage =
   | { type: 'illustration'; page: Page }
-  | { type: 'text'; page: Page };
+  | { type: 'text'; page: Page }
+  | { type: 'dedication'; childName: string | null; bookTitle: string }
+  | { type: 'back-cover' };
+
+export interface BuildDisplayPagesOptions {
+  childName?: string | null;
+  bookTitle?: string;
+}
 
 interface FlipbookViewerProps {
   pages: Page[];
   initialPageNumber?: number;
   onPageChange?: (displayIndex: number) => void;
   className?: string;
+  childName?: string | null;
+  bookTitle?: string;
 }
 
 // Define the type for the imperative handle
@@ -27,19 +40,29 @@ export interface FlipbookActions {
 
 /**
  * Build interleaved display pages:
- * - Title pages → just illustration
+ * - Title pages → just illustration (cover)
+ * - Dedication page → after title
  * - Story pages → text page, then illustration page
+ * - Back cover → at the end
  */
-export function buildDisplayPages(pages: Page[]): DisplayPage[] {
+export function buildDisplayPages(pages: Page[], options?: BuildDisplayPagesOptions): DisplayPage[] {
   const displayPages: DisplayPage[] = [];
   for (const page of pages) {
     if (page.isTitlePage) {
       displayPages.push({ type: 'illustration', page });
+      // Add dedication page right after the title/cover
+      displayPages.push({
+        type: 'dedication',
+        childName: options?.childName ?? null,
+        bookTitle: options?.bookTitle ?? 'You',
+      });
     } else {
       displayPages.push({ type: 'text', page });
       displayPages.push({ type: 'illustration', page });
     }
   }
+  // Add back cover as the last page
+  displayPages.push({ type: 'back-cover' });
   return displayPages;
 }
 
@@ -50,6 +73,8 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     initialPageNumber = 1,
     onPageChange,
     className,
+    childName,
+    bookTitle,
   },
   ref // Receive the forwarded ref
 ) => {
@@ -58,7 +83,10 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
   const containerRef = useRef<HTMLDivElement>(null); // Ref for the container div
 
   // Build interleaved display pages
-  const displayPages = useMemo(() => buildDisplayPages(pages), [pages]);
+  const displayPages = useMemo(
+    () => buildDisplayPages(pages, { childName, bookTitle }),
+    [pages, childName, bookTitle]
+  );
 
   // Expose the pageFlip instance via the forwarded ref
   useImperativeHandle(ref, () => ({
@@ -166,6 +194,92 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
      }
   }, [initialPageNumber, displayPages.length]);
 
+  /** Render a single display page */
+  const renderDisplayPage = (dp: DisplayPage, index: number) => {
+    if (dp.type === 'dedication') {
+      const displayName = dp.childName || dp.bookTitle || 'You';
+      return (
+        <div key={`dedication-${index}`} className="bg-white border border-gray-200 flex flex-col justify-center items-center overflow-hidden">
+          <div className="text-center px-[10%]">
+            <p className="font-playful text-[#1a1a1a] leading-relaxed"
+               style={{ fontSize: 'clamp(14px, 3vw, 22px)' }}>
+              This book was made<br />especially for
+            </p>
+            <p className="font-playful text-[#F76C5E] font-bold mt-1"
+               style={{ fontSize: 'clamp(20px, 5vw, 36px)' }}>
+              {displayName}
+            </p>
+          </div>
+          <Image
+            src={DEDICATION_MASCOT_URL}
+            alt="Storywink mascot"
+            width={200}
+            height={200}
+            className="mt-4 object-contain"
+            style={{ height: '15%', width: 'auto' }}
+          />
+        </div>
+      );
+    }
+
+    if (dp.type === 'back-cover') {
+      return (
+        <div key={`back-cover-${index}`} className="bg-[#F76C5E] border border-gray-200 flex flex-col justify-end items-center overflow-hidden relative">
+          {/* Mascot: small, bottom-right */}
+          <Image
+            src={BACK_COVER_MASCOT_URL}
+            alt="Storywink mascot"
+            width={150}
+            height={150}
+            className="absolute object-contain"
+            style={{ bottom: '10%', right: '6%', height: '12%', width: 'auto' }}
+          />
+          {/* Branding */}
+          <div className="mb-6 text-center">
+            <span className="text-white font-semibold" style={{ fontSize: 'clamp(18px, 4vw, 32px)' }}>
+              Storywink<span className="text-white">.ai</span>
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    // Existing text/illustration rendering
+    const pageKey = 'page' in dp ? `${dp.page.id}-${dp.type}-${index}` : `${dp.type}-${index}`;
+
+    return (
+      <div key={pageKey} className="bg-white border border-gray-200 flex justify-center items-center overflow-hidden">
+        {dp.type === 'text' ? (
+          // Text page - white background with centered story text
+          <div className="w-full h-full flex items-center justify-center p-[10%]">
+            <p className="font-playful text-[#1a1a1a] text-center leading-relaxed"
+               style={{ fontSize: 'clamp(16px, 4vw, 28px)' }}>
+              {dp.page.text}
+            </p>
+          </div>
+        ) : dp.page.generatedImageUrl ? (
+          // Illustration page - full image
+          <div className="relative w-full h-full">
+             <Image
+               src={coolifyImageUrl(dp.page.generatedImageUrl)}
+               alt={`Page ${dp.page.pageNumber} illustration`}
+               fill
+               sizes={`(max-width: 768px) 90vw, ${pageWidth}px`}
+               style={{ objectFit: 'contain' }}
+               priority={index <= 2}
+             />
+          </div>
+        ) : (
+          // Placeholder for loading or failed state
+          <div className="text-center text-muted-foreground">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+            <p>Loading page {dp.page.pageNumber}...</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div
       ref={containerRef}
@@ -206,37 +320,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
           onFlip={handleFlip}
           onInit={handleInit}
         >
-          {displayPages.map((dp, index) => (
-            <div key={`${dp.page.id}-${dp.type}-${index}`} className="bg-white border border-gray-200 flex justify-center items-center overflow-hidden">
-              {dp.type === 'text' ? (
-                // Text page - white background with centered story text
-                <div className="w-full h-full flex items-center justify-center p-[10%]">
-                  <p className="font-playful text-[#1a1a1a] text-center leading-relaxed"
-                     style={{ fontSize: 'clamp(16px, 4vw, 28px)' }}>
-                    {dp.page.text}
-                  </p>
-                </div>
-              ) : dp.page.generatedImageUrl ? (
-                // Illustration page - full image
-                <div className="relative w-full h-full">
-                   <Image
-                     src={coolifyImageUrl(dp.page.generatedImageUrl)}
-                     alt={`Page ${dp.page.pageNumber} illustration`}
-                     fill
-                     sizes={`(max-width: 768px) 90vw, ${pageWidth}px`}
-                     style={{ objectFit: 'contain' }}
-                     priority={index <= 2}
-                   />
-                </div>
-              ) : (
-                // Placeholder for loading or failed state
-                <div className="text-center text-muted-foreground">
-                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-                  <p>Loading page {dp.page.pageNumber}...</p>
-                </div>
-              )}
-            </div>
-          ))}
+          {displayPages.map((dp, index) => renderDisplayPage(dp, index))}
         </HTMLFlipBook>
       )}
     </div>

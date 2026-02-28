@@ -4,8 +4,12 @@
  * Uses Puppeteer to render HTML pages to PDF.
  * Specifications: 8.5"x8.5" with 0.125" bleed (8.75"x8.75" total).
  *
- * Layout: Story pages are interleaved as text page + illustration page.
- * Title pages are a single illustration page.
+ * Layout:
+ * - Page 1 (right-hand/recto): Dedication page
+ * - Pages 2+: Interleaved text (left) + illustration (right) spreads
+ * - Padded to multiple of 4 for saddle stitch
+ *
+ * Callers should pre-filter out title pages before passing to this function.
  */
 
 import puppeteer from 'puppeteer-core';
@@ -40,6 +44,9 @@ const PAGE_HEIGHT_WITH_BLEED_IN = PAGE_HEIGHT_IN + 2 * BLEED_MARGIN_IN; // 8.75"
 
 const PAGE_WIDTH_PX = Math.round(PAGE_WIDTH_WITH_BLEED_IN * DPI); // 2625px
 const PAGE_HEIGHT_PX = Math.round(PAGE_HEIGHT_WITH_BLEED_IN * DPI); // 2625px
+
+// Dedication page mascot
+const DEDICATION_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.58.09_PM_gnknk5.png';
 
 /**
  * Load Excalifont TTF as base64 for embedding in PDF HTML.
@@ -122,6 +129,59 @@ function generateTextPageHtml(page: Page): string {
 }
 
 /**
+ * Generates HTML for the dedication page (PDF page 1, right-hand side).
+ * Shows "This book was made especially for" + child's name in coral + mascot.
+ */
+function generateDedicationPageHtml(childName: string | null, bookTitle: string): string {
+  const displayName = childName || bookTitle || 'You';
+
+  const pageStyle = `
+    width: ${PAGE_WIDTH_WITH_BLEED_IN}in;
+    height: ${PAGE_HEIGHT_WITH_BLEED_IN}in;
+    position: relative;
+    overflow: hidden;
+    page-break-after: always;
+    background-color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  `;
+
+  return `
+    <div class="page" style="${pageStyle}">
+      <div style="text-align: center; max-width: 70%;">
+        <p style="
+          font-family: 'Excalifont', cursive, sans-serif;
+          font-size: 32px;
+          color: #1a1a1a;
+          line-height: 1.4;
+          margin: 0 0 0.15in 0;
+        ">This book was made<br>especially for</p>
+        <p style="
+          font-family: 'Excalifont', cursive, sans-serif;
+          font-size: 52px;
+          color: #F76C5E;
+          line-height: 1.3;
+          margin: 0;
+          font-weight: bold;
+        ">${displayName}</p>
+      </div>
+      <img
+        src="${DEDICATION_MASCOT_URL}"
+        alt="Storywink mascot"
+        style="
+          margin-top: 0.4in;
+          height: 15%;
+          width: auto;
+          object-fit: contain;
+        "
+      />
+    </div>
+  `;
+}
+
+/**
  * Generates a blank filler page for Lulu page count padding.
  */
 function generateBlankPageHtml(): string {
@@ -151,8 +211,10 @@ function padToMultipleOfFour(pageHtmlArray: string[]): string[] {
 
 /**
  * Generates a PDF buffer for the given book data.
- * For story pages, emits interleaved text + illustration pages.
- * Title pages emit a single illustration page.
+ *
+ * Expects title pages to be pre-filtered out by callers.
+ * Inserts a dedication page as page 1 (right-hand side), then
+ * interleaves text (left) + illustration (right) for each story page.
  * Pads to multiple of 4 for Lulu saddle stitch.
  */
 export async function generateBookPdf(bookData: BookWithPages): Promise<Buffer> {
@@ -175,21 +237,19 @@ export async function generateBookPdf(bookData: BookWithPages): Promise<Buffer> 
     const sortedPages = [...bookData.pages].sort((a, b) => a.pageNumber - b.pageNumber);
     let pageHtmlArray: string[] = [];
 
+    // Page 1 (right-hand/recto): Dedication page
+    pageHtmlArray.push(generateDedicationPageHtml(bookData.childName, bookData.title));
+
+    // Pages 2+: Text (left/verso) + Illustration (right/recto) pairs
     for (const page of sortedPages) {
-      if (page.isTitlePage) {
-        // Title page: just the illustration
-        pageHtmlArray.push(generateIllustrationPageHtml(page));
-      } else {
-        // Story page: text page first, then illustration page
-        pageHtmlArray.push(generateTextPageHtml(page));
-        pageHtmlArray.push(generateIllustrationPageHtml(page));
-      }
+      pageHtmlArray.push(generateTextPageHtml(page));
+      pageHtmlArray.push(generateIllustrationPageHtml(page));
     }
 
     // Pad to multiple of 4 for Lulu saddle stitch
     pageHtmlArray = padToMultipleOfFour(pageHtmlArray);
 
-    console.log(`[PDF] Built ${pageHtmlArray.length} PDF pages (including padding)`);
+    console.log(`[PDF] Built ${pageHtmlArray.length} PDF pages (including dedication + padding)`);
 
     // Generate HTML content
     const fullHtml = `

@@ -3,16 +3,18 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { Page, BookStatus } from '@prisma/client';
-import { Loader2, AlertTriangle, Type } from 'lucide-react';
+import { Loader2, AlertTriangle, Type, Heart, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { coolifyImageUrl } from '@storywink/shared';
-import { buildDisplayPages } from './FlipbookViewer';
+import { buildDisplayPages, type DisplayPage } from './FlipbookViewer';
 
 interface BookPageGalleryProps {
   pages: Page[];
   bookStatus: BookStatus;
   currentDisplayIndex: number; // 1-based index into displayPages
   onDisplayPageSelect: (displayIndex: number) => void; // 1-based
+  childName?: string | null;
+  bookTitle?: string;
 }
 
 const BookPageGallery: React.FC<BookPageGalleryProps> = ({
@@ -20,12 +22,17 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
   bookStatus,
   currentDisplayIndex,
   onDisplayPageSelect,
+  childName,
+  bookTitle,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const activeThumbRef = useRef<HTMLButtonElement>(null);
 
   // Build interleaved display pages (same logic as FlipbookViewer)
-  const displayPages = useMemo(() => buildDisplayPages(pages), [pages]);
+  const displayPages = useMemo(
+    () => buildDisplayPages(pages, { childName, bookTitle }),
+    [pages, childName, bookTitle]
+  );
 
   // Scroll active thumbnail into view when it changes
   useEffect(() => {
@@ -47,6 +54,27 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
     }
   }, [currentDisplayIndex]);
 
+  /** Get the aria-label for a display page */
+  const getAriaLabel = (dp: DisplayPage, isActive: boolean): string => {
+    if (dp.type === 'dedication') return `Dedication page${isActive ? ' (current)' : ''}`;
+    if (dp.type === 'back-cover') return `Back cover${isActive ? ' (current)' : ''}`;
+    return `${dp.type === 'text' ? 'Text' : 'Illustration'} - Page ${dp.page.pageNumber}${isActive ? ' (current)' : ''}`;
+  };
+
+  /** Get the thumbnail label for a display page */
+  const getThumbLabel = (dp: DisplayPage): string => {
+    if (dp.type === 'dedication') return '\u2764';
+    if (dp.type === 'back-cover') return 'Back';
+    return `${dp.page.pageNumber}${dp.type === 'text' ? 'T' : ''}`;
+  };
+
+  /** Get a unique key for each display page */
+  const getKey = (dp: DisplayPage, index: number): string => {
+    if (dp.type === 'dedication') return `dedication-${index}`;
+    if (dp.type === 'back-cover') return `back-cover-${index}`;
+    return `${dp.page.id}-${dp.type}-${index}`;
+  };
+
   return (
     <div className="w-full py-2" aria-label="Page gallery">
       <div
@@ -60,13 +88,16 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
         {displayPages.map((dp, index) => {
           const displayIndex = index + 1; // 1-based
           const isActive = displayIndex === currentDisplayIndex;
-          const hasImage = !!dp.page.generatedImageUrl;
-          const isPending = !hasImage && bookStatus === BookStatus.ILLUSTRATING;
-          const isFailed = !hasImage && bookStatus === BookStatus.FAILED;
+
+          // For text/illustration pages, check loading state
+          const hasPage = dp.type === 'text' || dp.type === 'illustration';
+          const hasImage = hasPage && !!dp.page.generatedImageUrl;
+          const isPending = hasPage && !hasImage && bookStatus === BookStatus.ILLUSTRATING;
+          const isFailed = hasPage && !hasImage && bookStatus === BookStatus.FAILED;
 
           return (
             <div
-              key={`${dp.page.id}-${dp.type}-${index}`}
+              key={getKey(dp, index)}
               className={cn(
                 'flex-shrink-0 snap-center',
                 'w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20',
@@ -87,14 +118,24 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
                     : 'ring-1 ring-muted/40 hover:ring-[#F76C5E]/50 transition-all duration-150',
                   (dp.type === 'illustration' && (isPending || isFailed)) && 'cursor-default'
                 )}
-                aria-label={`${dp.type === 'text' ? 'Text' : 'Illustration'} - Page ${dp.page.pageNumber}${isActive ? ' (current)' : ''}`}
+                aria-label={getAriaLabel(dp, isActive)}
                 aria-current={isActive}
                 style={{
                   transform: isActive ? 'scale(1.05)' : 'scale(1)',
                   transformOrigin: 'center center',
                 }}
               >
-                {dp.type === 'text' ? (
+                {dp.type === 'dedication' ? (
+                  // Dedication page thumbnail
+                  <div className="w-full h-full bg-white flex items-center justify-center">
+                    <Heart className="h-5 w-5 text-[#F76C5E]" />
+                  </div>
+                ) : dp.type === 'back-cover' ? (
+                  // Back cover thumbnail
+                  <div className="w-full h-full bg-[#F76C5E] flex items-center justify-center">
+                    <BookOpen className="h-5 w-5 text-white" />
+                  </div>
+                ) : dp.type === 'text' ? (
                   // Text page thumbnail - white with text icon
                   <div className="w-full h-full bg-white flex items-center justify-center">
                     <Type className="h-5 w-5 text-[#1a1a1a]/60" />
@@ -124,7 +165,7 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
                   "absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] py-0.5 font-medium text-center",
                   isActive && "bg-[#F76C5E]/80"
                 )}>
-                   {dp.page.pageNumber}{dp.type === 'text' ? 'T' : ''}
+                   {getThumbLabel(dp)}
                 </div>
               </button>
             </div>

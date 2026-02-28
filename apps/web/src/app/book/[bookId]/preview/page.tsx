@@ -115,7 +115,7 @@ export default function BookPreviewPage() {
   const handleDisplayPageSelect = (displayIndex: number) => {
     setCurrentDisplayIndex(displayIndex);
     if (flipbookRef.current?.pageFlip) {
-       const totalDisplayPages = book ? buildDisplayPages(book.pages).length : 1;
+       const totalDisplayPages = book ? buildDisplayPages(book.pages, { childName: book.childName, bookTitle: book.title }).length : 1;
        const pageIndex = Math.max(0, Math.min(displayIndex - 1, totalDisplayPages - 1));
        flipbookRef.current.pageFlip().turnToPage(pageIndex);
     }
@@ -295,7 +295,7 @@ export default function BookPreviewPage() {
   }
 
   if (book.status === BookStatus.COMPLETED) {
-    const totalDisplayPages = buildDisplayPages(book.pages).length;
+    const totalDisplayPages = buildDisplayPages(book.pages, { childName: book.childName, bookTitle: book.title }).length;
     // Disable prev/next based on current display index
     const canFlipPrev = currentDisplayIndex > 1;
     const canFlipNext = currentDisplayIndex < totalDisplayPages;
@@ -384,6 +384,8 @@ export default function BookPreviewPage() {
               bookStatus={book.status}
               currentDisplayIndex={currentDisplayIndex}
               onDisplayPageSelect={handleDisplayPageSelect}
+              childName={book.childName}
+              bookTitle={book.title}
             />
           </div>
         )}
@@ -396,6 +398,8 @@ export default function BookPreviewPage() {
             initialPageNumber={currentDisplayIndex}
             onPageChange={handleFlipbookPageChange}
             className="absolute inset-0"
+            childName={book.childName}
+            bookTitle={book.title}
           />
           
           {/* Floating Navigation Buttons */}

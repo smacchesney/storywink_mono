@@ -33,6 +33,9 @@ const PANEL_WIDTH_IN = COVER_WIDTH_IN / 2; // 8.625"
 // Brand colors
 const CORAL_COLOR = '#F76C5E';
 
+// Back cover mascot
+const BACK_COVER_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291378/Screenshot_2026-02-28_at_10.57.29_PM_qwoqr0.png';
+
 /**
  * Generates the HTML for the Lulu cover spread.
  *
@@ -63,6 +66,7 @@ function generateCoverHtml(titlePageImageUrl: string | null, bookTitle: string):
     width: ${PANEL_WIDTH_IN}in;
     height: ${COVER_HEIGHT_IN}in;
     background-color: ${CORAL_COLOR};
+    position: relative;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
@@ -132,6 +136,19 @@ function generateCoverHtml(titlePageImageUrl: string | null, bookTitle: string):
       <div class="cover-spread" style="${containerStyle}">
         <!-- Back Cover (Left Side) -->
         <div style="${backCoverStyle}">
+          <!-- Mascot: small, bottom-right corner -->
+          <img
+            src="${BACK_COVER_MASCOT_URL}"
+            alt="Storywink mascot"
+            style="
+              position: absolute;
+              bottom: 0.6in;
+              right: 0.4in;
+              height: 12%;
+              width: auto;
+              object-fit: contain;
+            "
+          />
           <div style="${brandingStyle}">
             <span style="${logoTextStyle}">Storywink</span><span style="color: #fff;">.ai</span>
           </div>
