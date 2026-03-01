@@ -90,6 +90,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
   const [containerDimensions, setContainerDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null); // Ref for the container div
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [isFlipping, setIsFlipping] = useState(false);
 
   // Build interleaved display pages
   const displayPages = useMemo(
@@ -184,18 +185,30 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     containerDimensions.width > 0 ? calculateBookDimensions() : { width: 0, height: 0, isPortrait: false };
 
   // Center front/back covers in spread mode (they only occupy half the spread area)
-  const isOnFrontCover = currentPageIndex === 0 && !isPortrait;
-  const isOnBackCover = currentPageIndex >= displayPages.length - 1 && !isPortrait;
-  const coverOffset = isOnFrontCover ? -pageWidth / 2 : isOnBackCover ? pageWidth / 2 : 0;
+  // When a flip starts, immediately uncenter so the shift animates WITH the page flip
+  const shouldCenterCover = !isPortrait && !isFlipping;
+  const coverOffset = shouldCenterCover
+    ? (currentPageIndex === 0 ? -pageWidth / 2 : currentPageIndex >= displayPages.length - 1 ? pageWidth / 2 : 0)
+    : 0;
 
   // Handler for page flip event from the library
   const handleFlip = useCallback((e: any) => {
     const currentPage = e.data;
     setCurrentPageIndex(currentPage);
+    setIsFlipping(false);
     if (onPageChange) {
       onPageChange(currentPage + 1); // Library is 0-indexed
     }
   }, [onPageChange]);
+
+  // Detect flip start so cover centering transitions simultaneously with page flip
+  const handleStateChange = useCallback((e: any) => {
+    if (e.data === 'flipping') {
+      setIsFlipping(true);
+    } else if (e.data === 'read') {
+      setIsFlipping(false);
+    }
+  }, []);
 
   // Add onInit handler to turn to initial page once ready
   const handleInit = useCallback(() => {
@@ -344,7 +357,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
       {pageWidth > 0 && pageHeight > 0 && (
         <div style={{
           transform: `translateX(${coverOffset}px)`,
-          transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+          transition: 'transform 0.7s cubic-bezier(0.4, 0, 0.2, 1)',
         }}>
         <HTMLFlipBook
           ref={flipBookInternalRef}
@@ -379,6 +392,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
           // Event handlers
           onFlip={handleFlip}
           onInit={handleInit}
+          onChangeState={handleStateChange}
         >
           {displayPages.map((dp, index) => renderDisplayPage(dp, index))}
         </HTMLFlipBook>
