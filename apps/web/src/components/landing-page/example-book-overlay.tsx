@@ -179,8 +179,19 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
                 </button>
               </div>
 
+              {/* Read Again button — always rendered, opacity-controlled to prevent layout shift */}
+              <div className="flex justify-center mt-3">
+                <button
+                  onClick={handleRestart}
+                  className={`flex items-center gap-2 px-4 py-1.5 text-sm font-playful text-[#F76C5E] hover:text-[#e55d4f] hover:bg-[#F76C5E]/5 border border-[#F76C5E]/40 rounded-full transition-all duration-300 cursor-pointer ${isAtEnd ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Read Again
+                </button>
+              </div>
+
               {/* Progress dots — matches PageTracker pattern from /create */}
-              <div className="flex gap-0.5 items-center justify-center mt-3 py-1">
+              <div className="flex gap-0.5 items-center justify-center mt-2 py-1">
                 {Array.from({ length: totalPages }).map((_, idx) => {
                   const isRead = idx < currentPage;
                   const isCurrent = idx === currentPage - 1;
@@ -196,19 +207,6 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
                   );
                 })}
               </div>
-
-              {/* Read Again button — appears at end of book */}
-              {isAtEnd && (
-                <div className="flex justify-center mt-3">
-                  <button
-                    onClick={handleRestart}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-playful text-[#F76C5E] hover:text-[#e55d4f] hover:bg-[#F76C5E]/5 rounded-full transition-all cursor-pointer"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    Read Again
-                  </button>
-                </div>
-              )}
 
               {/* CTA button */}
               <div className="flex justify-center mt-4">

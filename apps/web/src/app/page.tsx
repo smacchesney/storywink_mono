@@ -11,10 +11,6 @@ import { AnimatedHeroText } from "@/components/ui/animated-hero-text";
 import { EXAMPLE_BOOKS, ExampleBook } from "@/components/landing-page/example-books-data";
 
 // Lazy load components
-const StatsCounter = dynamic(() => import("@/components/landing-page/stats-counter"), {
-  loading: () => <div className="h-6" />,
-});
-
 const ExampleBookSelector = dynamic(() => import("@/components/landing-page/example-book-selector"), {
   ssr: false,
   loading: () => (
@@ -125,7 +121,6 @@ export default function Home() {
               />
             </div>
 
-            <StatsCounter count={1234} text="stories created" className="mt-3 text-sm text-slate-500" />
           </div>
         </section>
 

@@ -33,43 +33,44 @@ const ExampleBookSelector: React.FC<ExampleBookSelectorProps> = ({
 
   return (
     <div className={cn('flex flex-col items-center', className)}>
-      {/* Playful prompt — offset to top-left of books, tilted, with hand-drawn arrow */}
-      <motion.div
-        className="self-start ml-[8%] md:ml-[16%] mb-0"
-        animate={{ y: [0, 4, 0], rotate: -5 }}
-        transition={{
-          y: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' },
-          rotate: { duration: 0 },
-        }}
-      >
-        <p className="text-lg md:text-xl font-playful font-bold text-[#F76C5E]">
-          Peek inside!
-        </p>
-        {/* Hand-drawn curved arrow sweeping toward the books */}
-        <svg
-          className="w-10 h-12 md:w-12 md:h-14 ml-8 md:ml-12 -mt-1"
-          viewBox="0 0 40 55"
-          fill="none"
+      {/* Coral cloud bubble around books with "Peek inside!" */}
+      <div className="relative">
+        {/* Cloud outline behind the books */}
+        <motion.div
+          className="absolute -inset-4 md:-inset-6 -top-10 md:-top-12 z-0 pointer-events-none"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
         >
-          <path
-            d="M6 2Q4 14 8 24Q14 38 30 48"
-            stroke="#F76C5E"
-            strokeWidth="2.5"
-            strokeLinecap="round"
+          <svg
+            className="w-full h-full"
+            viewBox="0 0 500 340"
             fill="none"
-          />
-          <path
-            d="M22 41L30 49L34 39"
-            stroke="#F76C5E"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-          />
-        </svg>
-      </motion.div>
+            preserveAspectRatio="none"
+          >
+            <path
+              d="M80 45 Q120 10 250 18 Q380 10 430 50 Q480 85 470 150 Q485 220 440 270 Q400 310 250 315 Q100 310 60 270 Q15 220 30 150 Q15 85 80 45Z"
+              stroke="#F76C5E"
+              strokeWidth="2.5"
+              strokeDasharray="8 6"
+              strokeLinecap="round"
+              fill="none"
+              opacity="0.5"
+            />
+          </svg>
+        </motion.div>
 
-      <div className="flex items-end justify-center -mt-2">
+        {/* "Peek inside!" label floating above cloud */}
+        <motion.p
+          className="relative z-10 text-center font-playful font-bold text-[#F76C5E] text-lg md:text-xl mb-1"
+          animate={{ y: [0, -3, 0] }}
+          transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ transform: 'rotate(-3deg)' }}
+        >
+          Peek inside!
+        </motion.p>
+
+        <div className="relative z-10 flex items-end justify-center">
         {books.map((book, index) => {
           const config = fanConfigs[index] || fanConfigs[1];
 
@@ -142,6 +143,7 @@ const ExampleBookSelector: React.FC<ExampleBookSelectorProps> = ({
             </motion.button>
           );
         })}
+        </div>
       </div>
     </div>
   );
