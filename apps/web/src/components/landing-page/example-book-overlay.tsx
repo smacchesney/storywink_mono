@@ -36,8 +36,8 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
   const flipbookRef = useRef<FlipbookActions>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Total display pages: cover + dedication + (story pages * 2) + ending + back cover
-  const totalPages = book ? 2 * book.bookPages.length + 2 : 0;
+  // Total display pages: cover + blank + dedication + (story pages * 2) + ending + blank + back cover
+  const totalPages = book ? 2 * book.bookPages.length + 4 : 0;
 
   // Reset page on book change
   useEffect(() => {

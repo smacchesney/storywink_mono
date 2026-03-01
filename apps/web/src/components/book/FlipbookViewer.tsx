@@ -12,6 +12,7 @@ import { coolifyImageUrl } from '@storywink/shared';
 const DEDICATION_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.58.09_PM_gnknk5.png';
 const ENDING_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291378/Screenshot_2026-02-28_at_10.57.54_PM_sxcasb.png';
 const BACK_COVER_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291378/Screenshot_2026-02-28_at_10.57.29_PM_qwoqr0.png';
+const BLANK_PAGE_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291382/Screenshot_2026-02-28_at_10.54.21_PM_saradc.png';
 
 // Display page types for interleaved layout
 export type DisplayPage =
@@ -19,7 +20,8 @@ export type DisplayPage =
   | { type: 'text'; page: Page }
   | { type: 'dedication'; childName: string | null; bookTitle: string }
   | { type: 'ending'; childName: string | null; bookTitle: string }
-  | { type: 'back-cover' };
+  | { type: 'back-cover' }
+  | { type: 'blank' };
 
 export interface BuildDisplayPagesOptions {
   childName?: string | null;
@@ -41,35 +43,51 @@ export interface FlipbookActions {
 }
 
 /**
- * Build interleaved display pages:
- * - Title pages → just illustration (cover)
- * - Dedication page → after title
- * - Story pages → text page, then illustration page
- * - Back cover → at the end
+ * Build interleaved display pages matching the Lulu print layout:
+ *
+ * With showCover=true, index 0 is solo right (front cover) and the last
+ * index is solo left (back cover). Middle pages pair as (1,2), (3,4), etc.
+ * where odd indices are LEFT and even indices are RIGHT.
+ *
+ * Layout:
+ *   [0] Cover illustration (solo right)
+ *   [1] Blank inside front cover (left) — saddle stitch: inside covers not printable
+ *   [2] Dedication (right)
+ *   [3] Text story 1 (left)  +  [4] Illustration story 1 (right)
+ *   [5] Text story 2 (left)  +  [6] Illustration story 2 (right)
+ *   ...
+ *   [N] Ending (left)  +  [N+1] Blank padding (right)
+ *   [N+2] Back cover (solo left)
  */
 export function buildDisplayPages(pages: Page[], options?: BuildDisplayPagesOptions): DisplayPage[] {
   const displayPages: DisplayPage[] = [];
   for (const page of pages) {
     if (page.isTitlePage) {
+      // Cover page (index 0, solo right with showCover)
       displayPages.push({ type: 'illustration', page });
-      // Add dedication page right after the title/cover
+      // Blank inside front cover (index 1, left side of first spread)
+      displayPages.push({ type: 'blank' });
+      // Dedication (index 2, right side of first spread)
       displayPages.push({
         type: 'dedication',
         childName: options?.childName ?? null,
         bookTitle: options?.bookTitle ?? 'You',
       });
     } else {
+      // Text on left (verso), illustration on right (recto) — same spread
       displayPages.push({ type: 'text', page });
       displayPages.push({ type: 'illustration', page });
     }
   }
-  // Add ending page before back cover
+  // Ending page (left side of last story spread)
   displayPages.push({
     type: 'ending',
     childName: options?.childName ?? null,
     bookTitle: options?.bookTitle ?? 'You',
   });
-  // Add back cover as the last page
+  // Blank padding (right side, keeps middle page count even)
+  displayPages.push({ type: 'blank' });
+  // Back cover (solo left with showCover)
   displayPages.push({ type: 'back-cover' });
   return displayPages;
 }
@@ -230,6 +248,23 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     const nameSize = Math.max(16, Math.min(Math.round(pageWidth * 0.07), 30));
     const titleSize = Math.max(18, Math.min(Math.round(pageWidth * 0.08), 32));
     const brandSize = Math.max(16, Math.min(Math.round(pageWidth * 0.065), 28));
+
+    if (dp.type === 'blank') {
+      return (
+        <div key={`blank-${index}`} className="bg-white rounded-lg overflow-hidden border border-black/15">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Image
+              src={BLANK_PAGE_MASCOT_URL}
+              alt="Storywink mascots"
+              width={300}
+              height={300}
+              className="object-contain"
+              style={{ width: '40%', height: 'auto' }}
+            />
+          </div>
+        </div>
+      );
+    }
 
     if (dp.type === 'dedication') {
       const displayName = dp.childName || dp.bookTitle || 'You';

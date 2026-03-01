@@ -54,8 +54,17 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
     }
   }, [currentDisplayIndex]);
 
+  // Filter out blank pages but keep original indices for navigation
+  const galleryPages = useMemo(
+    () => displayPages
+      .map((dp, index) => ({ dp, originalIndex: index }))
+      .filter(({ dp }) => dp.type !== 'blank'),
+    [displayPages]
+  );
+
   /** Get the aria-label for a display page */
   const getAriaLabel = (dp: DisplayPage, isActive: boolean): string => {
+    if (dp.type === 'blank') return `Blank page${isActive ? ' (current)' : ''}`;
     if (dp.type === 'dedication') return `Dedication page${isActive ? ' (current)' : ''}`;
     if (dp.type === 'ending') return `Ending page${isActive ? ' (current)' : ''}`;
     if (dp.type === 'back-cover') return `Back cover${isActive ? ' (current)' : ''}`;
@@ -64,6 +73,7 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
 
   /** Get the thumbnail label for a display page */
   const getThumbLabel = (dp: DisplayPage): string => {
+    if (dp.type === 'blank') return '';
     if (dp.type === 'dedication') return '\u2764';
     if (dp.type === 'ending') return 'End';
     if (dp.type === 'back-cover') return 'Back';
@@ -72,6 +82,7 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
 
   /** Get a unique key for each display page */
   const getKey = (dp: DisplayPage, index: number): string => {
+    if (dp.type === 'blank') return `blank-${index}`;
     if (dp.type === 'dedication') return `dedication-${index}`;
     if (dp.type === 'ending') return `ending-${index}`;
     if (dp.type === 'back-cover') return `back-cover-${index}`;
@@ -88,8 +99,8 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
         {/* Spacer at the start to prevent first thumbnail border clipping */}
         <div className="flex-shrink-0 w-1"></div>
 
-        {displayPages.map((dp, index) => {
-          const displayIndex = index + 1; // 1-based
+        {galleryPages.map(({ dp, originalIndex }) => {
+          const displayIndex = originalIndex + 1; // 1-based, matches flipbook indexing
           const isActive = displayIndex === currentDisplayIndex;
 
           // For text/illustration pages, check loading state
@@ -100,7 +111,7 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
 
           return (
             <div
-              key={getKey(dp, index)}
+              key={getKey(dp, originalIndex)}
               className={cn(
                 'flex-shrink-0 snap-center',
                 'w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20',
