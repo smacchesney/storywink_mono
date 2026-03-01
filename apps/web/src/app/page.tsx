@@ -20,7 +20,7 @@ const ExampleBookSelector = dynamic(() => import("@/components/landing-page/exam
   loading: () => (
     <div className="flex justify-center gap-4">
       {[...Array(3)].map((_, i) => (
-        <div key={i} className="w-[120px] h-[120px] md:w-[180px] md:h-[180px] bg-[var(--cream-yellow)] rounded-xl animate-pulse" />
+        <div key={i} className="w-[140px] h-[140px] md:w-[180px] md:h-[180px] bg-[var(--cream-yellow)] rounded-xl animate-pulse" />
       ))}
     </div>
   ),
@@ -125,12 +125,12 @@ export default function Home() {
               />
             </div>
 
-            <StatsCounter count={1234} text="stories created" className="mt-5 text-sm text-slate-500" />
+            <StatsCounter count={1234} text="stories created" className="mt-3 text-sm text-slate-500" />
           </div>
         </section>
 
         {/* FAQ Section */}
-        <section className="py-12 md:py-16 px-4">
+        <section className="py-6 md:py-12 px-4">
           <div className="text-center mb-8 md:mb-12">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-4">
               <Image

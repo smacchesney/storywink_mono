@@ -33,9 +33,27 @@ const ExampleBookSelector: React.FC<ExampleBookSelectorProps> = ({
 
   return (
     <div className={cn('flex flex-col items-center', className)}>
-      <p className="text-sm md:text-base font-playful text-slate-600 mb-4">
-        Click a book to read it
-      </p>
+      {/* Playful bouncing prompt */}
+      <motion.div
+        className="flex items-center gap-1.5 mb-3"
+        animate={{ y: [0, 5, 0] }}
+        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+      >
+        <span className="text-sm md:text-base font-playful font-bold text-[#F76C5E]">
+          Peek inside
+        </span>
+        <svg
+          className="w-5 h-5 md:w-6 md:h-6 text-[#F76C5E]"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M7 10l5 5 5-5" />
+        </svg>
+      </motion.div>
 
       <div className="flex items-end justify-center">
         {books.map((book, index) => {
@@ -89,16 +107,16 @@ const ExampleBookSelector: React.FC<ExampleBookSelectorProps> = ({
                 />
               </div>
 
-              {/* Mobile cover */}
+              {/* Mobile cover — larger to fill screen */}
               <div
                 className="md:hidden relative rounded-lg overflow-hidden shadow-lg bg-[var(--cream-yellow)]"
-                style={{ width: 120, height: 120 }}
+                style={{ width: 140, height: 140 }}
               >
                 <Image
                   src={getCoverUrl(book)}
                   alt={book.coverAlt}
                   fill
-                  sizes="120px"
+                  sizes="140px"
                   className="object-cover"
                 />
               </div>
@@ -111,10 +129,6 @@ const ExampleBookSelector: React.FC<ExampleBookSelectorProps> = ({
           );
         })}
       </div>
-
-      <p className="text-xs text-slate-500 mt-4 md:hidden font-playful">
-        Tap a book to read it
-      </p>
     </div>
   );
 };
