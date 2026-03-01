@@ -131,7 +131,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     // Smart adaptive logic for single vs double page view
     const aspectRatio = width / height;
     const isExtremeAspectRatio = aspectRatio > 2.5;
-    const hasMinimumHeight = height >= 500;
+    const hasMinimumHeight = height >= 350;
     const shouldShowSpread = width >= 640 && hasMinimumHeight && !isExtremeAspectRatio;
 
     // For single page view (mobile portrait, landscape with limited height)
@@ -204,18 +204,25 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
 
   /** Render a single display page */
   const renderDisplayPage = (dp: DisplayPage, index: number) => {
+    // Container-relative font sizes (scale with page width, not viewport)
+    const bodySize = Math.max(12, Math.min(Math.round(pageWidth * 0.05), 22));
+    const smallBodySize = Math.max(11, Math.min(Math.round(pageWidth * 0.045), 18));
+    const nameSize = Math.max(16, Math.min(Math.round(pageWidth * 0.07), 30));
+    const titleSize = Math.max(18, Math.min(Math.round(pageWidth * 0.08), 32));
+    const brandSize = Math.max(16, Math.min(Math.round(pageWidth * 0.065), 28));
+
     if (dp.type === 'dedication') {
       const displayName = dp.childName || dp.bookTitle || 'You';
       return (
-        <div key={`dedication-${index}`} className="bg-white border border-gray-200 overflow-hidden">
+        <div key={`dedication-${index}`} className="bg-white rounded-lg overflow-hidden">
           <div className="absolute inset-0 flex flex-col justify-center items-center">
             <div className="text-center px-[10%]">
               <p className="font-playful text-[#1a1a1a] leading-relaxed"
-                 style={{ fontSize: 'clamp(14px, 3vw, 22px)' }}>
+                 style={{ fontSize: `${smallBodySize}px` }}>
                 This book was made<br />especially for
               </p>
               <p className="font-playful text-[#F76C5E] font-bold mt-1"
-                 style={{ fontSize: 'clamp(20px, 5vw, 36px)' }}>
+                 style={{ fontSize: `${nameSize}px` }}>
                 {displayName}
               </p>
             </div>
@@ -235,19 +242,19 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     if (dp.type === 'ending') {
       const displayName = dp.childName || dp.bookTitle || 'You';
       return (
-        <div key={`ending-${index}`} className="bg-white border border-gray-200 overflow-hidden">
+        <div key={`ending-${index}`} className="bg-white rounded-lg overflow-hidden">
           <div className="absolute inset-0 flex flex-col justify-center items-center">
             <div className="text-center px-[10%]">
               <p className="font-playful text-[#1a1a1a] font-bold"
-                 style={{ fontSize: 'clamp(22px, 5vw, 38px)' }}>
+                 style={{ fontSize: `${titleSize}px` }}>
                 The End
               </p>
               <p className="font-playful text-[#1a1a1a] mt-2 leading-relaxed"
-                 style={{ fontSize: 'clamp(14px, 3vw, 22px)' }}>
+                 style={{ fontSize: `${smallBodySize}px` }}>
                 Until next time,
               </p>
               <p className="font-playful text-[#F76C5E] font-bold mt-1"
-                 style={{ fontSize: 'clamp(20px, 5vw, 36px)' }}>
+                 style={{ fontSize: `${nameSize}px` }}>
                 {displayName}!
               </p>
             </div>
@@ -266,10 +273,10 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
 
     if (dp.type === 'back-cover') {
       return (
-        <div key={`back-cover-${index}`} className="bg-white border border-gray-200 overflow-hidden">
+        <div key={`back-cover-${index}`} className="bg-white rounded-lg overflow-hidden">
           <div className="absolute inset-0 flex flex-col justify-center items-center">
             <div className="text-center">
-              <span className="font-playful font-bold text-[#1a1a1a]" style={{ fontSize: 'clamp(18px, 4vw, 32px)' }}>
+              <span className="font-playful font-bold text-[#1a1a1a]" style={{ fontSize: `${brandSize}px` }}>
                 Storywin<span className="text-[#F76C5E]">k.ai</span>
               </span>
             </div>
@@ -290,12 +297,12 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     const pageKey = `${dp.page.id}-${dp.type}-${index}`;
 
     return (
-      <div key={pageKey} className="bg-white border border-gray-200 overflow-hidden">
+      <div key={pageKey} className="bg-white rounded-lg overflow-hidden">
         {dp.type === 'text' ? (
           // Text page - white background with centered story text
           <div className="absolute inset-0 flex items-center justify-center p-[10%]">
             <p className="font-playful text-[#1a1a1a] text-center leading-relaxed"
-               style={{ fontSize: 'clamp(16px, 4vw, 28px)' }}>
+               style={{ fontSize: `${bodySize}px` }}>
               {dp.page.text}
             </p>
           </div>
@@ -307,7 +314,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
                alt={`Page ${dp.page.pageNumber} illustration`}
                fill
                sizes={`(max-width: 768px) 90vw, ${pageWidth}px`}
-               style={{ objectFit: 'contain' }}
+               style={{ objectFit: 'cover' }}
                priority={index <= 2}
              />
           </div>
@@ -325,7 +332,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
   return (
     <div
       ref={containerRef}
-      className={cn("w-full h-full flex items-center justify-center", className)}
+      className={cn("w-full h-full flex items-center justify-center [&_.stf__item]:rounded-lg", className)}
     >
       {pageWidth > 0 && pageHeight > 0 && (
         <HTMLFlipBook
@@ -344,7 +351,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
           maxHeight={4096}
           startZIndex={0}
           autoSize={true}
-          showCover={false}
+          showCover={true}
           useMouseEvents={true}
           swipeDistance={30}
           showPageCorners={true}

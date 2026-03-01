@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ExampleBook } from './example-books-data';
 import { Page } from '@prisma/client';
 import dynamic from 'next/dynamic';
+import type { FlipbookActions } from '@/components/book/FlipbookViewer';
 
 const FlipbookViewer = dynamic(() => import('@/components/book/FlipbookViewer'), {
   ssr: false,
@@ -32,6 +33,16 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
 }) => {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<Element | null>(null);
+  const flipbookRef = useRef<FlipbookActions>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Total display pages: cover + dedication + (story pages * 2) + ending + back cover
+  const totalPages = book ? 2 * book.bookPages.length + 2 : 0;
+
+  // Reset page on book change
+  useEffect(() => {
+    if (book) setCurrentPage(1);
+  }, [book]);
 
   // Escape key handler
   useEffect(() => {
@@ -72,6 +83,16 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
     [onClose]
   );
 
+  const handlePrev = useCallback(() => {
+    flipbookRef.current?.pageFlip()?.flipPrev();
+  }, []);
+
+  const handleNext = useCallback(() => {
+    flipbookRef.current?.pageFlip()?.flipNext();
+  }, []);
+
+  const progress = totalPages > 0 ? Math.max(3, (currentPage / totalPages) * 100) : 0;
+
   return (
     <AnimatePresence>
       {book && (
@@ -89,7 +110,7 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
 
           {/* Content */}
           <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-8"
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -99,7 +120,7 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
             aria-label={book.title}
           >
             <motion.div
-              className="relative bg-[var(--bg-playful)] rounded-2xl w-[95vw] md:w-full max-w-2xl max-h-[90vh] overflow-y-auto p-3 md:p-6 shadow-2xl"
+              className="relative bg-[var(--bg-playful)] rounded-2xl w-[95vw] md:w-full max-w-4xl max-h-[90vh] overflow-x-hidden overflow-y-auto p-3 md:p-6 shadow-2xl"
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
@@ -121,17 +142,49 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
                 {book.title}
               </h2>
 
-              {/* FlipbookViewer — needs a container with explicit dimensions */}
-              <div className="relative w-full" style={{ height: 'min(55vh, 420px)' }}>
+              {/* FlipbookViewer with navigation arrows */}
+              <div className="relative w-full overflow-hidden" style={{ height: 'min(60vh, 520px)' }}>
                 <FlipbookViewer
+                  ref={flipbookRef}
                   pages={book.bookPages as unknown as Page[]}
                   childName={book.childName}
                   bookTitle={book.title}
+                  onPageChange={setCurrentPage}
                   className="absolute inset-0"
                 />
+
+                {/* Previous page arrow */}
+                <button
+                  onClick={handlePrev}
+                  disabled={currentPage <= 1}
+                  className="absolute left-1 md:left-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/80 hover:bg-white shadow-md flex items-center justify-center text-[#F76C5E] hover:text-[#e55d4f] transition-all disabled:opacity-0 disabled:pointer-events-none cursor-pointer"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="w-5 h-5 md:w-6 md:h-6" />
+                </button>
+
+                {/* Next page arrow */}
+                <button
+                  onClick={handleNext}
+                  disabled={currentPage >= totalPages}
+                  className="absolute right-1 md:right-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/80 hover:bg-white shadow-md flex items-center justify-center text-[#F76C5E] hover:text-[#e55d4f] transition-all disabled:opacity-0 disabled:pointer-events-none cursor-pointer"
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="w-5 h-5 md:w-6 md:h-6" />
+                </button>
               </div>
 
-              {/* CTA button — below flipbook, after user has browsed */}
+              {/* Progress bar */}
+              <div className="w-full max-w-xs mx-auto mt-3">
+                <div className="bg-gray-200/50 rounded-full h-1">
+                  <div
+                    className="bg-[#F76C5E] h-1 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* CTA button */}
               <div className="flex justify-center mt-4">
                 <Button
                   size="lg"
