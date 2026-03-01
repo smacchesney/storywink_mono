@@ -259,7 +259,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
               width={300}
               height={300}
               className="object-contain"
-              style={{ width: '40%', height: 'auto' }}
+              style={{ width: '24%', height: 'auto' }}
             />
           </div>
         </div>
