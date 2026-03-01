@@ -34,24 +34,42 @@ const ExampleBookSelector: React.FC<ExampleBookSelectorProps> = ({
   return (
     <div className={cn('flex flex-col items-center', className)}>
       {/* Playful bouncing prompt */}
+      {/* Playful prompt with hand-drawn curved arrow */}
       <motion.div
-        className="flex items-center gap-1.5 mb-3"
+        className="flex flex-col items-center mb-1"
         animate={{ y: [0, 5, 0] }}
         transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
       >
-        <span className="text-sm md:text-base font-playful font-bold text-[#F76C5E]">
-          Peek inside
+        <span className="text-lg md:text-xl font-playful font-bold text-[#F76C5E]">
+          Peek inside!
         </span>
+        {/* Hand-drawn curved arrow pointing down */}
         <svg
-          className="w-5 h-5 md:w-6 md:h-6 text-[#F76C5E]"
+          className="w-10 h-10 md:w-12 md:h-12 text-[#F76C5E] mt-0.5"
+          viewBox="0 0 60 60"
           fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          xmlns="http://www.w3.org/2000/svg"
         >
-          <path d="M7 10l5 5 5-5" />
+          <path
+            d="M30 6C28 14 24 20 22 28C20 34 21 40 26 46"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            style={{ filter: 'url(#hand-drawn)' }}
+          />
+          <path
+            d="M18 40L26 47L33 41"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <defs>
+            <filter id="hand-drawn">
+              <feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="2" result="noise" />
+              <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.5" />
+            </filter>
+          </defs>
         </svg>
       </motion.div>
 
