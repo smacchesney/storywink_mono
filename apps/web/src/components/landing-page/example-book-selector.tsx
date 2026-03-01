@@ -38,7 +38,7 @@ const ExampleBookSelector: React.FC<ExampleBookSelectorProps> = ({
         {/* Accent lines radiating from book stack */}
         <motion.div
           className="absolute z-0 pointer-events-none overflow-visible"
-          style={{ inset: -40 }}
+          style={{ inset: -24 }}
           initial={{ opacity: 0, scale: 0.85 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.3 }}
@@ -46,7 +46,7 @@ const ExampleBookSelector: React.FC<ExampleBookSelectorProps> = ({
           {/* Top-left cluster */}
           <span className="absolute block rounded-full" style={{ width: 3.5, height: 32, top: 2, left: '20%', transform: 'rotate(-22deg)', background: '#F76C5E', opacity: 0.6 }} />
           <span className="absolute block rounded-full" style={{ width: 3, height: 26, top: -4, left: '34%', transform: 'rotate(-8deg)', background: '#F76C5E', opacity: 0.5 }} />
-          <span className="absolute block rounded-full" style={{ width: 3.5, height: 30, top: 22, left: 2, transform: 'rotate(-52deg)', background: '#F76C5E', opacity: 0.55 }} />
+          <span className="absolute block rounded-full" style={{ width: 3.5, height: 30, top: 18, left: 6, transform: 'rotate(-52deg)', background: '#F76C5E', opacity: 0.55 }} />
 
           {/* Top-center accent */}
           <span className="absolute block rounded-full" style={{ width: 3, height: 28, top: -6, left: '50%', transform: 'translateX(-50%) rotate(2deg)', background: '#F76C5E', opacity: 0.5 }} />
@@ -54,23 +54,23 @@ const ExampleBookSelector: React.FC<ExampleBookSelectorProps> = ({
           {/* Top-right cluster */}
           <span className="absolute block rounded-full" style={{ width: 3.5, height: 32, top: 2, right: '20%', transform: 'rotate(22deg)', background: '#F76C5E', opacity: 0.6 }} />
           <span className="absolute block rounded-full" style={{ width: 3, height: 26, top: -4, right: '34%', transform: 'rotate(8deg)', background: '#F76C5E', opacity: 0.5 }} />
-          <span className="absolute block rounded-full" style={{ width: 3.5, height: 30, top: 22, right: 2, transform: 'rotate(52deg)', background: '#F76C5E', opacity: 0.55 }} />
+          <span className="absolute block rounded-full" style={{ width: 3.5, height: 30, top: 18, right: 6, transform: 'rotate(52deg)', background: '#F76C5E', opacity: 0.55 }} />
 
           {/* Left side */}
-          <span className="absolute block rounded-full" style={{ width: 3.5, height: 28, top: '36%', left: 0, transform: 'rotate(-82deg)', background: '#F76C5E', opacity: 0.55 }} />
-          <span className="absolute block rounded-full" style={{ width: 3, height: 24, top: '56%', left: 2, transform: 'rotate(-72deg)', background: '#F76C5E', opacity: 0.45 }} />
+          <span className="absolute block rounded-full" style={{ width: 3.5, height: 28, top: '36%', left: 8, transform: 'rotate(-82deg)', background: '#F76C5E', opacity: 0.55 }} />
+          <span className="absolute block rounded-full" style={{ width: 3, height: 24, top: '56%', left: 10, transform: 'rotate(-72deg)', background: '#F76C5E', opacity: 0.45 }} />
 
           {/* Right side */}
-          <span className="absolute block rounded-full" style={{ width: 3.5, height: 28, top: '36%', right: 0, transform: 'rotate(82deg)', background: '#F76C5E', opacity: 0.55 }} />
-          <span className="absolute block rounded-full" style={{ width: 3, height: 24, top: '56%', right: 2, transform: 'rotate(72deg)', background: '#F76C5E', opacity: 0.45 }} />
+          <span className="absolute block rounded-full" style={{ width: 3.5, height: 28, top: '36%', right: 8, transform: 'rotate(82deg)', background: '#F76C5E', opacity: 0.55 }} />
+          <span className="absolute block rounded-full" style={{ width: 3, height: 24, top: '56%', right: 10, transform: 'rotate(72deg)', background: '#F76C5E', opacity: 0.45 }} />
 
           {/* Bottom-left cluster */}
-          <span className="absolute block rounded-full" style={{ width: 3.5, height: 30, bottom: 10, left: '18%', transform: 'rotate(24deg)', background: '#F76C5E', opacity: 0.55 }} />
-          <span className="absolute block rounded-full" style={{ width: 3, height: 26, bottom: 16, left: '4%', transform: 'rotate(48deg)', background: '#F76C5E', opacity: 0.5 }} />
+          <span className="absolute block rounded-full" style={{ width: 3.5, height: 30, bottom: 10, left: '22%', transform: 'rotate(24deg)', background: '#F76C5E', opacity: 0.55 }} />
+          <span className="absolute block rounded-full" style={{ width: 3, height: 26, bottom: 14, left: '10%', transform: 'rotate(48deg)', background: '#F76C5E', opacity: 0.5 }} />
 
           {/* Bottom-right cluster */}
-          <span className="absolute block rounded-full" style={{ width: 3.5, height: 30, bottom: 10, right: '18%', transform: 'rotate(-24deg)', background: '#F76C5E', opacity: 0.55 }} />
-          <span className="absolute block rounded-full" style={{ width: 3, height: 26, bottom: 16, right: '4%', transform: 'rotate(-48deg)', background: '#F76C5E', opacity: 0.5 }} />
+          <span className="absolute block rounded-full" style={{ width: 3.5, height: 30, bottom: 10, right: '22%', transform: 'rotate(-24deg)', background: '#F76C5E', opacity: 0.55 }} />
+          <span className="absolute block rounded-full" style={{ width: 3, height: 26, bottom: 14, right: '10%', transform: 'rotate(-48deg)', background: '#F76C5E', opacity: 0.5 }} />
         </motion.div>
 
         <div className="relative z-10 flex items-end justify-center">
