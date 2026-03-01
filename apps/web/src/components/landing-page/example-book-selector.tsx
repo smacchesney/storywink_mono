@@ -33,47 +33,43 @@ const ExampleBookSelector: React.FC<ExampleBookSelectorProps> = ({
 
   return (
     <div className={cn('flex flex-col items-center', className)}>
-      {/* Playful bouncing prompt */}
-      {/* Playful prompt with hand-drawn curved arrow */}
+      {/* Playful prompt — offset to top-left of books, tilted, with hand-drawn arrow */}
       <motion.div
-        className="flex flex-col items-center mb-1"
-        animate={{ y: [0, 5, 0] }}
-        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        className="self-start ml-[8%] md:ml-[16%] mb-0"
+        animate={{ y: [0, 4, 0], rotate: -5 }}
+        transition={{
+          y: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' },
+          rotate: { duration: 0 },
+        }}
       >
-        <span className="text-lg md:text-xl font-playful font-bold text-[#F76C5E]">
+        <p className="text-lg md:text-xl font-playful font-bold text-[#F76C5E]">
           Peek inside!
-        </span>
-        {/* Hand-drawn curved arrow pointing down */}
+        </p>
+        {/* Hand-drawn curved arrow sweeping toward the books */}
         <svg
-          className="w-10 h-10 md:w-12 md:h-12 text-[#F76C5E] mt-0.5"
-          viewBox="0 0 60 60"
+          className="w-10 h-12 md:w-12 md:h-14 ml-8 md:ml-12 -mt-1"
+          viewBox="0 0 40 55"
           fill="none"
-          xmlns="http://www.w3.org/2000/svg"
         >
           <path
-            d="M30 6C28 14 24 20 22 28C20 34 21 40 26 46"
-            stroke="currentColor"
+            d="M6 2Q4 14 8 24Q14 38 30 48"
+            stroke="#F76C5E"
             strokeWidth="2.5"
             strokeLinecap="round"
-            style={{ filter: 'url(#hand-drawn)' }}
+            fill="none"
           />
           <path
-            d="M18 40L26 47L33 41"
-            stroke="currentColor"
+            d="M22 41L30 49L34 39"
+            stroke="#F76C5E"
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
+            fill="none"
           />
-          <defs>
-            <filter id="hand-drawn">
-              <feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="2" result="noise" />
-              <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.5" />
-            </filter>
-          </defs>
         </svg>
       </motion.div>
 
-      <div className="flex items-end justify-center">
+      <div className="flex items-end justify-center -mt-2">
         {books.map((book, index) => {
           const config = fanConfigs[index] || fanConfigs[1];
 
