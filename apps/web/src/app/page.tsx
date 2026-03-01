@@ -8,47 +8,34 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { AnimatedHeroText } from "@/components/ui/animated-hero-text";
+import { EXAMPLE_BOOKS, ExampleBook } from "@/components/landing-page/example-books-data";
 
 // Lazy load components
 const StatsCounter = dynamic(() => import("@/components/landing-page/stats-counter"), {
   loading: () => <div className="h-6" />,
 });
 
-// Lazy load flipbook (requires window/client-side only)
-const LandingFlipbook = dynamic(() => import("@/components/landing-page/landing-flipbook"), {
+const ExampleBookSelector = dynamic(() => import("@/components/landing-page/example-book-selector"), {
   ssr: false,
   loading: () => (
-    <div className="w-full max-w-md mx-auto">
-      <div
-        className="w-full bg-[var(--cream-yellow)] rounded-lg animate-pulse"
-        style={{ aspectRatio: '1' }}
-      />
+    <div className="flex justify-center gap-4">
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className="w-[120px] h-[120px] md:w-[180px] md:h-[180px] bg-[var(--cream-yellow)] rounded-xl animate-pulse" />
+      ))}
     </div>
   ),
 });
 
-// Demo book pages - Sample storybook for landing page flipbook
-const demoBookPages = [
-  "https://res.cloudinary.com/storywink/image/upload/v1764946351/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_1.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764946371/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_2.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764946350/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_3.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764946395/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_4.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764946392/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_5.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764946411/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_6.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764946436/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_7.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764946442/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_8.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764946449/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_9.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764946489/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_10.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764946495/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_11.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764946501/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_12.jpg",
-  "https://res.cloudinary.com/storywink/image/upload/v1764946536/storywink/cmiszcepw000zmz0dq0jzkgtq/generated/page_13.jpg",
-];
+const ExampleBookOverlay = dynamic(() => import("@/components/landing-page/example-book-overlay"), {
+  ssr: false,
+});
 
 export default function Home() {
   const { isLoaded, isSignedIn } = useAuth();
   const router = useRouter();
   const [isButtonLoading, setIsButtonLoading] = useState(true);
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
+  const [selectedBook, setSelectedBook] = useState<ExampleBook | null>(null);
 
   // Handle loading state for the button
   useEffect(() => {
@@ -132,7 +119,10 @@ export default function Home() {
             </div>
 
             <div className="mb-2 mt-3">
-              <LandingFlipbook pages={demoBookPages} />
+              <ExampleBookSelector
+                books={EXAMPLE_BOOKS}
+                onSelectBook={setSelectedBook}
+              />
             </div>
 
             <StatsCounter count={1234} text="stories created" className="mt-5 text-sm text-slate-500" />
@@ -187,6 +177,11 @@ export default function Home() {
             ))}
           </div>
         </section>
+        <ExampleBookOverlay
+          book={selectedBook}
+          onClose={() => setSelectedBook(null)}
+          onCtaClick={handleCreateStorybookClick}
+        />
       </main>
     </div>
   );

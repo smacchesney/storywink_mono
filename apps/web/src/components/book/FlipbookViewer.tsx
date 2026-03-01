@@ -139,7 +139,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
       // Use most of available width/height, maintaining aspect ratio
       const pageWidth = availableWidth;
       const pageHeight = availableHeight;
-      const pageAspectRatio = 0.77; // Typical book page aspect ratio (1:1.3)
+      const pageAspectRatio = 1.0; // Square pages (illustrations are 2048x2048)
 
       let finalWidth = pageWidth;
       let finalHeight = pageHeight;
@@ -159,7 +159,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     }
 
     // For desktop/tablet (double page spread view)
-    const spreadAspectRatio = 1.54; // Double page spread (2:1.3)
+    const spreadAspectRatio = 2.0; // Double page spread (two square pages side by side)
     let spreadWidth = availableWidth;
     let spreadHeight = availableHeight;
 
