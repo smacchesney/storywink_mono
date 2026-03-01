@@ -9,12 +9,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { getStripe, calculatePrintCost } from '@/lib/stripe';
+import { getStripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import {
   coolifyImageUrl,
   getAllowedCountries,
   buildStripeShippingOptions,
+  PRINT_PRICING,
 } from '@storywink/shared';
 import Stripe from 'stripe';
 
@@ -81,9 +82,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate pricing
+    // Pricing
     const pageCount = book._count.pages;
-    const printCostCents = calculatePrintCost(pageCount);
+    const printCostCents = PRINT_PRICING.RETAIL_PRICE_CENTS;
 
     // Get cover image URL
     const coverImageUrl = book.pages[0]?.generatedImageUrl;
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
       line_items: [
         {
           price_data: {
-            currency: 'usd',
+            currency: PRINT_PRICING.CURRENCY,
             product_data: {
               name: `${book.title || 'Untitled Book'} - Printed Book`,
               description: `${pageCount} page children's book (8.5" x 8.5")`,

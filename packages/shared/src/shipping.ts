@@ -1,11 +1,19 @@
 /**
- * Shipping configuration for Storywink print orders.
+ * Shipping & pricing configuration for Storywink print orders.
  *
  * Phase 1: Singapore & Malaysia only
  * Phase 2: Will expand to US, Canada, UK, Australia, Europe, etc.
  */
 
 import Stripe from 'stripe';
+
+/**
+ * Print retail pricing — what the customer pays (not Lulu's cost).
+ */
+export const PRINT_PRICING = {
+  RETAIL_PRICE_CENTS: 3500, // S$35.00
+  CURRENCY: 'sgd',
+} as const;
 
 export interface ShippingTier {
   key: string;
@@ -19,26 +27,17 @@ export interface ShippingTier {
 
 /**
  * Shipping tiers available for checkout.
- * Prices are based on Lulu's shipping costs + margin.
+ * Single flat rate for Phase 1 (SG/MY).
  */
 export const SHIPPING_TIERS = {
   SINGAPORE_MALAYSIA: {
     key: 'sg_my',
-    displayName: 'Standard Shipping',
-    priceCents: 1000, // $10 USD
+    displayName: 'Shipping',
+    priceCents: 2000, // S$20.00
     countries: ['SG', 'MY'],
     luluLevel: 'MAIL',
     deliveryDaysMin: 7,
     deliveryDaysMax: 14,
-  },
-  SINGAPORE_MALAYSIA_EXPRESS: {
-    key: 'sg_my_express',
-    displayName: 'Express Shipping',
-    priceCents: 2000, // $20 USD
-    countries: ['SG', 'MY'],
-    luluLevel: 'EXPEDITED',
-    deliveryDaysMin: 3,
-    deliveryDaysMax: 7,
   },
 } as const satisfies Record<string, ShippingTier>;
 
@@ -98,7 +97,7 @@ export function buildStripeShippingOptions(): Array<{
       type: 'fixed_amount' as const,
       fixed_amount: {
         amount: tier.priceCents,
-        currency: 'usd',
+        currency: PRINT_PRICING.CURRENCY,
       },
       display_name: tier.displayName,
       delivery_estimate: {

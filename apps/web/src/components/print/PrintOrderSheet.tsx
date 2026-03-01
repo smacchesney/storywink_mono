@@ -2,8 +2,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { Loader2, Truck, Zap } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import useMediaQuery from '@/hooks/useMediaQuery';
 import {
@@ -22,7 +21,7 @@ import {
   DrawerFooter,
 } from '@/components/ui/drawer';
 import { QuantitySelector } from './QuantitySelector';
-import { coolifyImageUrl } from '@storywink/shared';
+import { coolifyImageUrl, PRINT_PRICING } from '@storywink/shared';
 
 export interface PrintOrderBook {
   id: string;
@@ -37,34 +36,8 @@ interface PrintOrderSheetProps {
   onClose: () => void;
 }
 
-type ShippingOption = 'STANDARD' | 'EXPRESS';
-
-const SHIPPING_OPTIONS = {
-  STANDARD: {
-    label: 'Standard Shipping',
-    description: '7-14 business days',
-    price: 500, // cents
-    icon: Truck,
-  },
-  EXPRESS: {
-    label: 'Express Shipping',
-    description: '3-5 business days',
-    price: 1500, // cents
-    icon: Zap,
-  },
-} as const;
-
-// Estimated print cost calculation (should match server-side)
-function calculateEstimatedPrintCost(pageCount: number): number {
-  const baseCost = 500; // $5.00 base
-  const perPage = 50;   // $0.50 per page
-  const minPrice = 1000; // $10.00 minimum
-  const cost = baseCost + (pageCount * perPage);
-  return Math.max(cost, minPrice);
-}
-
 function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
+  return `S$${(cents / 100).toFixed(2)}`;
 }
 
 // Panel content (shared between Sheet and Drawer)
@@ -76,13 +49,11 @@ function PanelContent({
   onClose: () => void;
 }) {
   const [quantity, setQuantity] = useState(1);
-  const [shippingOption, setShippingOption] = useState<ShippingOption>('STANDARD');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const printCost = calculateEstimatedPrintCost(book.pageCount);
-  const shippingCost = SHIPPING_OPTIONS[shippingOption].price;
-  const totalEstimate = (printCost * quantity) + shippingCost;
+  const bookPrice = PRINT_PRICING.RETAIL_PRICE_CENTS;
+  const subtotal = bookPrice * quantity;
 
   const handleCheckout = async () => {
     setIsLoading(true);
@@ -98,7 +69,6 @@ function PanelContent({
         body: JSON.stringify({
           bookId: book.id,
           quantity,
-          shippingOption,
         }),
       });
 
@@ -150,7 +120,7 @@ function PanelContent({
               {book.pageCount} pages
             </p>
             <p className="text-sm font-medium text-[#F76C5E] mt-1">
-              {formatPrice(printCost)} per book
+              {formatPrice(bookPrice)} per book
             </p>
           </div>
         </div>
@@ -170,61 +140,21 @@ function PanelContent({
         />
       </div>
 
-      {/* Divider */}
-      <div className="border-t mx-4" />
-
-      {/* Shipping options */}
-      <div className="px-4 py-4 flex-grow">
-        <label className="block text-sm font-medium mb-3">Shipping</label>
-        <div className="space-y-2">
-          {(Object.entries(SHIPPING_OPTIONS) as [ShippingOption, typeof SHIPPING_OPTIONS[ShippingOption]][]).map(
-            ([key, option]) => {
-              const Icon = option.icon;
-              const isSelected = shippingOption === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setShippingOption(key)}
-                  className={cn(
-                    'w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all',
-                    isSelected
-                      ? 'border-[#F76C5E] bg-orange-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={cn(
-                        'w-4 h-4 rounded-full border-2 flex items-center justify-center',
-                        isSelected ? 'border-[#F76C5E]' : 'border-gray-300'
-                      )}
-                    >
-                      {isSelected && (
-                        <div className="w-2 h-2 rounded-full bg-[#F76C5E]" />
-                      )}
-                    </div>
-                    <Icon className={cn('h-4 w-4', isSelected ? 'text-[#F76C5E]' : 'text-gray-500')} />
-                    <div className="text-left">
-                      <p className="font-medium text-sm">{option.label}</p>
-                      <p className="text-xs text-muted-foreground">{option.description}</p>
-                    </div>
-                  </div>
-                  <span className="font-semibold text-sm">{formatPrice(option.price)}</span>
-                </button>
-              );
-            }
-          )}
-        </div>
-      </div>
+      {/* Spacer */}
+      <div className="flex-grow" />
 
       {/* Footer with total and checkout button */}
       <DrawerFooter className="border-t pt-4">
         {/* Price summary */}
-        <div className="flex justify-between items-center mb-3">
-          <span className="text-sm text-muted-foreground">Estimated Total</span>
-          <span className="text-lg font-bold">{formatPrice(totalEstimate)}</span>
+        <div className="flex justify-between items-center mb-1">
+          <span className="text-sm text-muted-foreground">
+            {quantity > 1 ? `${quantity} books` : '1 book'}
+          </span>
+          <span className="text-lg font-bold">{formatPrice(subtotal)}</span>
         </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          + S$20 shipping, calculated at checkout
+        </p>
 
         {error && (
           <p className="text-sm text-red-600 mb-2 text-center">{error}</p>
@@ -241,7 +171,7 @@ function PanelContent({
               Loading...
             </>
           ) : (
-            <>Checkout {formatPrice(totalEstimate)}</>
+            <>Checkout {formatPrice(subtotal)}</>
           )}
         </Button>
 
@@ -250,7 +180,7 @@ function PanelContent({
         </Button>
 
         <p className="text-xs text-muted-foreground text-center mt-2">
-          Tax calculated at checkout. Ships to US only.
+          Ships to Singapore &amp; Malaysia.
         </p>
       </DrawerFooter>
     </div>

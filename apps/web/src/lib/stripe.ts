@@ -22,38 +22,3 @@ export function getStripe(): Stripe {
   return _stripe;
 }
 
-/**
- * Fixed shipping rates (simpler than dynamic Lulu rates)
- */
-export const SHIPPING_OPTIONS = {
-  STANDARD: {
-    rate: 500, // $5.00 in cents
-    name: 'Standard Shipping',
-    deliveryMin: 7,
-    deliveryMax: 14,
-    luluLevel: 'MAIL',
-  },
-  EXPRESS: {
-    rate: 1500, // $15.00 in cents
-    name: 'Express Shipping',
-    deliveryMin: 3,
-    deliveryMax: 5,
-    luluLevel: 'EXPEDITED',
-  },
-} as const;
-
-/**
- * Print pricing - flat rate for simplicity
- * Based on Lulu's pricing for 8.5x8.5 saddle-stitch (up to 20 pages)
- */
-export const PRINT_PRICING = {
-  FLAT_COST_CENTS: 1500, // $15.00 flat rate
-  MAX_PAGES: 20,
-} as const;
-
-/**
- * Calculate print cost - flat rate
- */
-export function calculatePrintCost(_pageCount: number): number {
-  return PRINT_PRICING.FLAT_COST_CENTS;
-}
