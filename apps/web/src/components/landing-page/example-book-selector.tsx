@@ -33,42 +33,42 @@ const ExampleBookSelector: React.FC<ExampleBookSelectorProps> = ({
 
   return (
     <div className={cn('flex flex-col items-center', className)}>
-      {/* Coral cloud bubble around books with "Peek inside!" */}
-      <div className="relative">
-        {/* Cloud outline behind the books */}
+      {/* Book stack with accent lines and "Peek inside!" below */}
+      <div className="relative overflow-visible">
+        {/* Accent lines radiating from book stack */}
         <motion.div
-          className="absolute -inset-4 md:-inset-6 -top-10 md:-top-12 z-0 pointer-events-none"
-          initial={{ opacity: 0, scale: 0.95 }}
+          className="absolute z-0 pointer-events-none overflow-visible"
+          style={{ inset: -40 }}
+          initial={{ opacity: 0, scale: 0.85 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, ease: 'easeOut' }}
+          transition={{ duration: 0.5, delay: 0.3 }}
         >
-          <svg
-            className="w-full h-full"
-            viewBox="0 0 500 340"
-            fill="none"
-            preserveAspectRatio="none"
-          >
-            <path
-              d="M80 45 Q120 10 250 18 Q380 10 430 50 Q480 85 470 150 Q485 220 440 270 Q400 310 250 315 Q100 310 60 270 Q15 220 30 150 Q15 85 80 45Z"
-              stroke="#F76C5E"
-              strokeWidth="2.5"
-              strokeDasharray="8 6"
-              strokeLinecap="round"
-              fill="none"
-              opacity="0.5"
-            />
-          </svg>
-        </motion.div>
+          {/* Top-left cluster */}
+          <span className="absolute block rounded-full" style={{ width: 3.5, height: 32, top: 2, left: '20%', transform: 'rotate(-22deg)', background: '#F76C5E', opacity: 0.6 }} />
+          <span className="absolute block rounded-full" style={{ width: 3, height: 26, top: -4, left: '34%', transform: 'rotate(-8deg)', background: '#F76C5E', opacity: 0.5 }} />
+          <span className="absolute block rounded-full" style={{ width: 3.5, height: 30, top: 22, left: 2, transform: 'rotate(-52deg)', background: '#F76C5E', opacity: 0.55 }} />
 
-        {/* "Peek inside!" label floating above cloud */}
-        <motion.p
-          className="relative z-10 text-center font-playful font-bold text-[#F76C5E] text-lg md:text-xl mb-1"
-          animate={{ y: [0, -3, 0] }}
-          transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ transform: 'rotate(-3deg)' }}
-        >
-          Peek inside!
-        </motion.p>
+          {/* Top-right cluster */}
+          <span className="absolute block rounded-full" style={{ width: 3.5, height: 32, top: 2, right: '20%', transform: 'rotate(22deg)', background: '#F76C5E', opacity: 0.6 }} />
+          <span className="absolute block rounded-full" style={{ width: 3, height: 26, top: -4, right: '34%', transform: 'rotate(8deg)', background: '#F76C5E', opacity: 0.5 }} />
+          <span className="absolute block rounded-full" style={{ width: 3.5, height: 30, top: 22, right: 2, transform: 'rotate(52deg)', background: '#F76C5E', opacity: 0.55 }} />
+
+          {/* Left side */}
+          <span className="absolute block rounded-full" style={{ width: 3.5, height: 28, top: '36%', left: 0, transform: 'rotate(-82deg)', background: '#F76C5E', opacity: 0.55 }} />
+          <span className="absolute block rounded-full" style={{ width: 3, height: 24, top: '56%', left: 2, transform: 'rotate(-72deg)', background: '#F76C5E', opacity: 0.45 }} />
+
+          {/* Right side */}
+          <span className="absolute block rounded-full" style={{ width: 3.5, height: 28, top: '36%', right: 0, transform: 'rotate(82deg)', background: '#F76C5E', opacity: 0.55 }} />
+          <span className="absolute block rounded-full" style={{ width: 3, height: 24, top: '56%', right: 2, transform: 'rotate(72deg)', background: '#F76C5E', opacity: 0.45 }} />
+
+          {/* Bottom-left cluster */}
+          <span className="absolute block rounded-full" style={{ width: 3.5, height: 30, bottom: 10, left: '18%', transform: 'rotate(24deg)', background: '#F76C5E', opacity: 0.55 }} />
+          <span className="absolute block rounded-full" style={{ width: 3, height: 26, bottom: 16, left: '4%', transform: 'rotate(48deg)', background: '#F76C5E', opacity: 0.5 }} />
+
+          {/* Bottom-right cluster */}
+          <span className="absolute block rounded-full" style={{ width: 3.5, height: 30, bottom: 10, right: '18%', transform: 'rotate(-24deg)', background: '#F76C5E', opacity: 0.55 }} />
+          <span className="absolute block rounded-full" style={{ width: 3, height: 26, bottom: 16, right: '4%', transform: 'rotate(-48deg)', background: '#F76C5E', opacity: 0.5 }} />
+        </motion.div>
 
         <div className="relative z-10 flex items-end justify-center">
         {books.map((book, index) => {
@@ -144,6 +144,16 @@ const ExampleBookSelector: React.FC<ExampleBookSelectorProps> = ({
           );
         })}
         </div>
+
+        {/* "Peek inside!" below the book stack */}
+        <motion.p
+          className="relative z-10 text-center font-playful font-bold text-[#F76C5E] text-lg md:text-xl mt-3"
+          animate={{ y: [0, 3, 0] }}
+          transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ transform: 'rotate(-2deg)' }}
+        >
+          Peek inside!
+        </motion.p>
       </div>
     </div>
   );

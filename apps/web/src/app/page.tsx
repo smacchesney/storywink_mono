@@ -114,13 +114,12 @@ export default function Home() {
               </Button>
             </div>
 
-            <div className="mb-2 mt-3">
+            <div className="mt-3 mb-8 md:mb-12">
               <ExampleBookSelector
                 books={EXAMPLE_BOOKS}
                 onSelectBook={setSelectedBook}
               />
             </div>
-
           </div>
         </section>
 
