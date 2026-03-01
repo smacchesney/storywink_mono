@@ -15,6 +15,7 @@ import {
   coolifyImageUrl,
   getAllowedCountries,
   buildStripeShippingOptions,
+  calculatePrintedPageCount,
   PRINT_PRICING,
 } from '@storywink/shared';
 import Stripe from 'stripe';
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Pricing
-    const pageCount = book._count.pages;
+    const printedPageCount = calculatePrintedPageCount(book._count.pages);
     const printCostCents = PRINT_PRICING.RETAIL_PRICE_CENTS;
 
     // Get cover image URL
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
             currency: PRINT_PRICING.CURRENCY,
             product_data: {
               name: `${book.title || 'Untitled Book'} - Printed Book`,
-              description: `${pageCount} page children's book (8.5" x 8.5")`,
+              description: `${printedPageCount} page children's book (8.5" x 8.5")`,
               images: optimizedCoverUrl ? [optimizedCoverUrl] : [],
             },
             unit_amount: printCostCents,
@@ -125,7 +126,7 @@ export async function POST(request: NextRequest) {
         bookId: book.id,
         userId: user.id,
         quantity: qty.toString(),
-        pageCount: pageCount.toString(),
+        pageCount: printedPageCount.toString(),
         bookTitle: book.title || 'Untitled Book',
       },
     });

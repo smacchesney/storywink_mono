@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { BookStatus, Page } from '@prisma/client';
+import { BookStatus } from '@prisma/client';
 import {
   Card,
   CardFooter,
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Trash2, Eye, Loader2, AlertTriangle, RefreshCw, Download, Printer } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { coolifyImageUrl } from '@storywink/shared';
+import { coolifyImageUrl, calculatePrintedPageCount } from '@storywink/shared';
 import { TextShimmerWave } from '@/components/ui/text-shimmer-wave';
 import { PrintOrderSheet, PrintOrderBook } from '@/components/print/PrintOrderSheet';
 
@@ -28,7 +28,6 @@ export interface BookCardProps {
   title: string | null;
   status: BookStatus;
   updatedAt?: Date | null;
-  pages?: Page[];
   pageCount?: number;
   coverImageUrl?: string | null;
   onDeleteClick: () => void;
@@ -42,7 +41,6 @@ const BookCard: React.FC<BookCardProps> = ({
   title,
   updatedAt: _updatedAt,
   status,
-  pages,
   pageCount,
   coverImageUrl,
   onDeleteClick,
@@ -54,8 +52,7 @@ const BookCard: React.FC<BookCardProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const [showPrintSheet, setShowPrintSheet] = useState(false);
 
-  // Calculate page count from pages array or use explicit pageCount
-  const actualPageCount = pageCount ?? pages?.length ?? 0;
+  const actualPageCount = pageCount ?? 0;
 
   const handleViewClick = () => {
     router.push(`/book/${id}/preview`);
@@ -215,7 +212,7 @@ const BookCard: React.FC<BookCardProps> = ({
     id,
     title,
     coverImageUrl: coverImageUrl ?? null,
-    pageCount: actualPageCount,
+    pageCount: calculatePrintedPageCount(actualPageCount),
   };
 
   // COMPLETED STATE - Simplified card without status badge

@@ -103,3 +103,31 @@ export function optimizeCloudinaryUrl(
  * @deprecated Use optimizeCloudinaryUrl instead
  */
 export const coolifyImageUrl = optimizeCloudinaryUrl;
+
+/**
+ * Calculates the actual printed interior page count for a book.
+ *
+ * Interior layout (saddle stitch):
+ *   Page 1: Dedication
+ *   Pages 2..2N+1: [Text page + Illustration page] × N story photos
+ *   Page 2N+2: Ending ("The End")
+ *
+ * Title page is NOT in the interior — it's on the cover spread.
+ *
+ * @param totalDbPages - Total page rows in the database (includes title page)
+ * @param options.padToMultipleOf4 - Pad to multiple of 4 for Lulu saddle stitch (default false)
+ * @returns The number of printed interior pages
+ */
+export function calculatePrintedPageCount(
+  totalDbPages: number,
+  options?: { padToMultipleOf4?: boolean }
+): number {
+  const storyPhotos = Math.max(0, totalDbPages - 1); // exclude title page
+  const rawCount = 2 + storyPhotos * 2; // dedication + ending + (text + illustration) per photo
+
+  if (options?.padToMultipleOf4) {
+    return Math.ceil(rawCount / 4) * 4;
+  }
+
+  return rawCount;
+}

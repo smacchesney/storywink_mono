@@ -324,7 +324,7 @@ function BookGrid({
           title={book.title}
           status={book.status}
           updatedAt={new Date(book.updatedAt)}
-          pages={undefined}
+          pageCount={book.pages?.length ?? 0}
           coverImageUrl={getCoverImageUrl(book)}
           onDeleteClick={() => onDelete(book)}
           onRetryClick={() => onRetry(book.id)}

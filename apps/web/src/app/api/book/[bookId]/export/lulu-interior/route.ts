@@ -5,7 +5,7 @@ import logger from '@/lib/logger';
 import { generateBookPdf } from '@/lib/pdf/generateBookPdf';
 import { uploadPdfToDropbox } from '@/lib/dropbox';
 import { Book, Page } from '@prisma/client';
-import { isTitlePage } from '@storywink/shared/utils';
+import { isTitlePage, calculatePrintedPageCount } from '@storywink/shared/utils';
 
 // Define the expected Book type with Pages for the PDF generator
 type BookWithPages = Book & { pages: Page[] };
@@ -99,10 +99,8 @@ export async function POST(
 
     // Calculate interleaved page count: dedication + ending + each story page becomes 2 PDF pages (text + illustration)
     // The PDF generator handles padding to multiple of 4 for Lulu saddle stitch
-    const interiorPdfPageCount = storyPages.length * 2 + 2; // +2 for dedication + ending pages
-    const paddedPageCount = interiorPdfPageCount % 4 === 0
-      ? interiorPdfPageCount
-      : interiorPdfPageCount + (4 - (interiorPdfPageCount % 4));
+    const interiorPdfPageCount = calculatePrintedPageCount(bookData.pages.length);
+    const paddedPageCount = calculatePrintedPageCount(bookData.pages.length, { padToMultipleOf4: true });
 
     logger.info({
       bookId,
