@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ExampleBook } from './example-books-data';
 import { Page } from '@prisma/client';
@@ -91,6 +91,12 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
     flipbookRef.current?.pageFlip()?.flipNext();
   }, []);
 
+  const handleRestart = useCallback(() => {
+    flipbookRef.current?.pageFlip()?.turnToPage(0);
+    setCurrentPage(1);
+  }, []);
+
+  const isAtEnd = currentPage >= totalPages;
   const progress = totalPages > 0 ? Math.max(3, (currentPage / totalPages) * 100) : 0;
 
   return (
@@ -183,6 +189,19 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
                   />
                 </div>
               </div>
+
+              {/* Read Again button — appears at end of book */}
+              {isAtEnd && (
+                <div className="flex justify-center mt-3">
+                  <button
+                    onClick={handleRestart}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-playful text-[#F76C5E] hover:text-[#e55d4f] hover:bg-[#F76C5E]/5 rounded-full transition-all cursor-pointer"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Read Again
+                  </button>
+                </div>
+              )}
 
               {/* CTA button */}
               <div className="flex justify-center mt-4">

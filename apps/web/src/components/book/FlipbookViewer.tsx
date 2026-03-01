@@ -89,6 +89,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
   const flipBookInternalRef = useRef<any>(null);
   const [containerDimensions, setContainerDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null); // Ref for the container div
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
 
   // Build interleaved display pages
   const displayPages = useMemo(
@@ -182,9 +183,15 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
   const { width: pageWidth, height: pageHeight, isPortrait } =
     containerDimensions.width > 0 ? calculateBookDimensions() : { width: 0, height: 0, isPortrait: false };
 
+  // Center front/back covers in spread mode (they only occupy half the spread area)
+  const isOnFrontCover = currentPageIndex === 0 && !isPortrait;
+  const isOnBackCover = currentPageIndex >= displayPages.length - 1 && !isPortrait;
+  const coverOffset = isOnFrontCover ? -pageWidth / 2 : isOnBackCover ? pageWidth / 2 : 0;
+
   // Handler for page flip event from the library
   const handleFlip = useCallback((e: any) => {
     const currentPage = e.data;
+    setCurrentPageIndex(currentPage);
     if (onPageChange) {
       onPageChange(currentPage + 1); // Library is 0-indexed
     }
@@ -335,6 +342,10 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
       className={cn("w-full h-full flex items-center justify-center [&_.stf__item]:rounded-lg", className)}
     >
       {pageWidth > 0 && pageHeight > 0 && (
+        <div style={{
+          transform: `translateX(${coverOffset}px)`,
+          transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}>
         <HTMLFlipBook
           ref={flipBookInternalRef}
           width={pageWidth}
@@ -371,6 +382,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
         >
           {displayPages.map((dp, index) => renderDisplayPage(dp, index))}
         </HTMLFlipBook>
+        </div>
       )}
     </div>
   );
