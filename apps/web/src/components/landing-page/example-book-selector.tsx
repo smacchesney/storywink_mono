@@ -48,6 +48,9 @@ const ExampleBookSelector: React.FC<ExampleBookSelectorProps> = ({
           <span className="absolute block rounded-full" style={{ width: 3, height: 26, top: -4, left: '34%', transform: 'rotate(-8deg)', background: '#F76C5E', opacity: 0.5 }} />
           <span className="absolute block rounded-full" style={{ width: 3.5, height: 30, top: 22, left: 2, transform: 'rotate(-52deg)', background: '#F76C5E', opacity: 0.55 }} />
 
+          {/* Top-center accent */}
+          <span className="absolute block rounded-full" style={{ width: 3, height: 28, top: -6, left: '50%', transform: 'translateX(-50%) rotate(2deg)', background: '#F76C5E', opacity: 0.5 }} />
+
           {/* Top-right cluster */}
           <span className="absolute block rounded-full" style={{ width: 3.5, height: 32, top: 2, right: '20%', transform: 'rotate(22deg)', background: '#F76C5E', opacity: 0.6 }} />
           <span className="absolute block rounded-full" style={{ width: 3, height: 26, top: -4, right: '34%', transform: 'rotate(8deg)', background: '#F76C5E', opacity: 0.5 }} />
