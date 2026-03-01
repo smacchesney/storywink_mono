@@ -97,7 +97,6 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
   }, []);
 
   const isAtEnd = currentPage >= totalPages;
-  const progress = totalPages > 0 ? Math.max(3, (currentPage / totalPages) * 100) : 0;
 
   return (
     <AnimatePresence>
@@ -180,14 +179,22 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
                 </button>
               </div>
 
-              {/* Progress bar */}
-              <div className="w-full max-w-xs mx-auto mt-3">
-                <div className="bg-gray-200/50 rounded-full h-1">
-                  <div
-                    className="bg-[#F76C5E] h-1 rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
+              {/* Progress dots — matches PageTracker pattern from /create */}
+              <div className="flex gap-0.5 items-center justify-center mt-3 py-1">
+                {Array.from({ length: totalPages }).map((_, idx) => {
+                  const isRead = idx < currentPage;
+                  const isCurrent = idx === currentPage - 1;
+                  return (
+                    <div
+                      key={idx}
+                      className={`
+                        h-1.5 rounded-full transition-all duration-300
+                        ${isCurrent ? 'w-4' : 'w-1.5'}
+                        ${isRead || isCurrent ? 'bg-[#F76C5E]' : 'bg-gray-300'}
+                      `}
+                    />
+                  );
+                })}
               </div>
 
               {/* Read Again button — appears at end of book */}

@@ -234,7 +234,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     if (dp.type === 'dedication') {
       const displayName = dp.childName || dp.bookTitle || 'You';
       return (
-        <div key={`dedication-${index}`} className="bg-white rounded-lg overflow-hidden">
+        <div key={`dedication-${index}`} className="bg-white rounded-lg overflow-hidden border border-black/15">
           <div className="absolute inset-0 flex flex-col justify-center items-center">
             <div className="text-center px-[10%]">
               <p className="font-playful text-[#1a1a1a] leading-relaxed"
@@ -262,7 +262,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     if (dp.type === 'ending') {
       const displayName = dp.childName || dp.bookTitle || 'You';
       return (
-        <div key={`ending-${index}`} className="bg-white rounded-lg overflow-hidden">
+        <div key={`ending-${index}`} className="bg-white rounded-lg overflow-hidden border border-black/15">
           <div className="absolute inset-0 flex flex-col justify-center items-center">
             <div className="text-center px-[10%]">
               <p className="font-playful text-[#1a1a1a] font-bold"
@@ -293,7 +293,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
 
     if (dp.type === 'back-cover') {
       return (
-        <div key={`back-cover-${index}`} className="bg-white rounded-lg overflow-hidden">
+        <div key={`back-cover-${index}`} className="bg-white rounded-lg overflow-hidden border border-black/15">
           <div className="absolute inset-0 flex flex-col justify-center items-center">
             <div className="text-center">
               <span className="font-playful font-bold text-[#1a1a1a]" style={{ fontSize: `${brandSize}px` }}>
@@ -317,7 +317,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     const pageKey = `${dp.page.id}-${dp.type}-${index}`;
 
     return (
-      <div key={pageKey} className="bg-white rounded-lg overflow-hidden">
+      <div key={pageKey} className="bg-white rounded-lg overflow-hidden border border-black/15">
         {dp.type === 'text' ? (
           // Text page - white background with centered story text
           <div className="absolute inset-0 flex items-center justify-center p-[10%]">
