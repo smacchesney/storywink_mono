@@ -282,10 +282,10 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
             });
           }
 
-          // Update book status back to ILLUSTRATING
+          // Update book status back to ILLUSTRATING and persist qcRound
           await prisma.book.update({
             where: { id: bookId },
-            data: { status: 'ILLUSTRATING' },
+            data: { status: 'ILLUSTRATING', qcRound: nextRound },
           });
 
           // Create FlowProducer flow for re-illustration
@@ -371,11 +371,12 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
       console.log(`[BookFinalize/QC] Max QC rounds (${MAX_QC_ROUNDS}) reached for book ${bookId} — accepting current quality`);
     }
 
-    // Update book status
+    // Update book status (reset qcRound on completion so it's clean for future retries)
     await prisma.book.update({
       where: { id: bookId },
       data: {
         status: finalStatus,
+        qcRound: 0,
         updatedAt: new Date(),
       },
     });

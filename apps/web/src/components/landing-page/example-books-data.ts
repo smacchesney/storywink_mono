@@ -122,7 +122,109 @@ const KAI_AT_UNIVERSAL_PAGES: ExampleBookPage[] = [
   },
 ];
 
-// TODO: Add real data for books 2 & 3 — currently duplicates of book 1 with different titles
+// Book: "Winter Wonderland!" (cmm9gj6ei009cqt0dcuwdbz3c) — Origami style
+const WINTER_WONDERLAND_PAGES: ExampleBookPage[] = [
+  {
+    id: 'ww-p1',
+    pageNumber: 1,
+    isTitlePage: true,
+    generatedImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1772473184/storywink/cmm9gj6ei009cqt0dcuwdbz3c/generated/page_1.png',
+    text: null,
+  },
+  {
+    id: 'ww-p2',
+    pageNumber: 2,
+    isTitlePage: false,
+    generatedImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1772473180/storywink/cmm9gj6ei009cqt0dcuwdbz3c/generated/page_2.png',
+    text: "My name is Kai. I touch the big, shiny sign that says 'Christmas Wonderland'. WOW!",
+  },
+  {
+    id: 'ww-p3',
+    pageNumber: 3,
+    isTitlePage: false,
+    generatedImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1772473195/storywink/cmm9gj6ei009cqt0dcuwdbz3c/generated/page_3.png',
+    text: 'Tiny elves work and gears go whirr. I stand close and watch. Click, click!',
+  },
+  {
+    id: 'ww-p4',
+    pageNumber: 4,
+    isTitlePage: false,
+    generatedImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1772473243/storywink/cmm9gj6ei009cqt0dcuwdbz3c/generated/page_4.png',
+    text: "I peek into the toy workshop. Wheels spin and bells ring. I whisper, 'Hello!'",
+  },
+  {
+    id: 'ww-p5',
+    pageNumber: 5,
+    isTitlePage: false,
+    generatedImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1772473242/storywink/cmm9gj6ei009cqt0dcuwdbz3c/generated/page_5.png',
+    text: 'I reach for a glowing candy cane. Warm light tickles my hands. I giggle.',
+  },
+  {
+    id: 'ww-p6',
+    pageNumber: 6,
+    isTitlePage: false,
+    generatedImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1772473250/storywink/cmm9gj6ei009cqt0dcuwdbz3c/generated/page_6.png',
+    text: 'Dada lifts me up on his shoulders. I see tall twinkly trees. Wheee!',
+  },
+  {
+    id: 'ww-p7',
+    pageNumber: 7,
+    isTitlePage: false,
+    generatedImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1772473307/storywink/cmm9gj6ei009cqt0dcuwdbz3c/generated/page_7.png',
+    text: 'Mama and Dada hug me tight. The big tower looks like a cake. I feel so happy!',
+  },
+  {
+    id: 'ww-p8',
+    pageNumber: 8,
+    isTitlePage: false,
+    generatedImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1772473303/storywink/cmm9gj6ei009cqt0dcuwdbz3c/generated/page_8.png',
+    text: 'A giant bear and a smiley tree wave hello. Dada kneels and squeezes me. I make a silly face.',
+  },
+  {
+    id: 'ww-p9',
+    pageNumber: 9,
+    isTitlePage: false,
+    generatedImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1772473304/storywink/cmm9gj6ei009cqt0dcuwdbz3c/generated/page_9.png',
+    text: "Mama holds my hand. I hear the little train\u2014chug-chug, choo-choo. My tummy flips!",
+  },
+  {
+    id: 'ww-p10',
+    pageNumber: 10,
+    isTitlePage: false,
+    generatedImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1772473360/storywink/cmm9gj6ei009cqt0dcuwdbz3c/generated/page_10.png',
+    text: "The train's bright light blinks. ChoOo! I press my face to see the light.",
+  },
+  {
+    id: 'ww-p11',
+    pageNumber: 11,
+    isTitlePage: false,
+    generatedImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1772473370/storywink/cmm9gj6ei009cqt0dcuwdbz3c/generated/page_11.png',
+    text: "We ride in a tiny train car. Mama sits with me. Wheee\u2014my giggles zoom!",
+  },
+  {
+    id: 'ww-p12',
+    pageNumber: 12,
+    isTitlePage: false,
+    generatedImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1772473367/storywink/cmm9gj6ei009cqt0dcuwdbz3c/generated/page_12.png',
+    text: 'Look! Santa zooms across the sky. Sparks sparkle and whoosh. I clap my hands.',
+  },
+  {
+    id: 'ww-p13',
+    pageNumber: 13,
+    isTitlePage: false,
+    generatedImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1772473420/storywink/cmm9gj6ei009cqt0dcuwdbz3c/generated/page_13.png',
+    text: 'I see Elmo and friends on stage. I raise my hand and clap. Yay, music!',
+  },
+  {
+    id: 'ww-p14',
+    pageNumber: 14,
+    isTitlePage: false,
+    generatedImageUrl: 'https://res.cloudinary.com/storywink/image/upload/v1772473435/storywink/cmm9gj6ei009cqt0dcuwdbz3c/generated/page_14.png',
+    text: "They bow and sing, 'Ho ho ho!' I wave goodbye. Goodnight, Winter Wonderland!",
+  },
+];
+
+// TODO: Add real data for book 3 — currently duplicate of book 1 with different title
 export const EXAMPLE_BOOKS: ExampleBook[] = [
   {
     id: 'example-kai',
@@ -132,11 +234,11 @@ export const EXAMPLE_BOOKS: ExampleBook[] = [
     bookPages: KAI_AT_UNIVERSAL_PAGES,
   },
   {
-    id: 'example-book-2',
-    title: "Max's Magic Paintbrush",
-    childName: 'Max',
-    coverAlt: 'A personalized storybook about Max',
-    bookPages: KAI_AT_UNIVERSAL_PAGES, // TODO: Replace with real book 2 pages
+    id: 'example-winter-wonderland',
+    title: 'Winter Wonderland!',
+    childName: 'Kai',
+    coverAlt: 'A personalized storybook about Kai at a Christmas wonderland in origami style',
+    bookPages: WINTER_WONDERLAND_PAGES,
   },
   {
     id: 'example-book-3',

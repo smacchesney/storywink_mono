@@ -61,6 +61,7 @@ model Book {
   excitementElement String?
   coverAssetId      String?
   characterIdentity Json?     // Canonical character description for illustration consistency
+  qcRound           Int            @default(0) // Current QC iteration (0 = first pass, 1+ = re-illustration)
   promptTokens      Int?
   completionTokens  Int?
   totalTokens       Int?

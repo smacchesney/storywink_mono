@@ -37,6 +37,7 @@ type LibraryBook = {
   id: string;
   title: string;
   status: BookStatus;
+  qcRound?: number;
   createdAt: string;
   updatedAt: string;
   pages: Array<{
@@ -323,6 +324,7 @@ function BookGrid({
           id={book.id}
           title={book.title}
           status={book.status}
+          qcRound={book.qcRound}
           updatedAt={new Date(book.updatedAt)}
           pageCount={book.pages?.length ?? 0}
           coverImageUrl={getCoverImageUrl(book)}

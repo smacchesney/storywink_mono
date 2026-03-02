@@ -7,11 +7,11 @@
 // This forces synchronous, unbuffered writes so Railway captures all logs.
 // Must be set BEFORE any imports that might write to stdout/stderr.
 // ============================================================================
-if (process.stdout._handle?.setBlocking) {
-  process.stdout._handle.setBlocking(true);
+if ((process.stdout as any)._handle?.setBlocking) {
+  (process.stdout as any)._handle.setBlocking(true);
 }
-if (process.stderr._handle?.setBlocking) {
-  process.stderr._handle.setBlocking(true);
+if ((process.stderr as any)._handle?.setBlocking) {
+  (process.stderr as any)._handle.setBlocking(true);
 }
 
 // Disable Pino's internal buffering for immediate log writes

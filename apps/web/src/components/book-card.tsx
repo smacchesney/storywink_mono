@@ -27,6 +27,7 @@ export interface BookCardProps {
   id: string;
   title: string | null;
   status: BookStatus;
+  qcRound?: number;
   updatedAt?: Date | null;
   pageCount?: number;
   coverImageUrl?: string | null;
@@ -41,6 +42,7 @@ const BookCard: React.FC<BookCardProps> = ({
   title,
   updatedAt: _updatedAt,
   status,
+  qcRound = 0,
   pageCount,
   coverImageUrl,
   onDeleteClick,
@@ -104,10 +106,10 @@ const BookCard: React.FC<BookCardProps> = ({
               scaleDistance={1.1}
               rotateYDistance={20}
             >
-              Creating illustrations...
+              {qcRound > 0 ? 'Polishing illustrations...' : 'Creating illustrations...'}
             </TextShimmerWave>
             <p className="text-sm text-white/70 mt-2">
-              This usually takes 10-15 minutes
+              {qcRound > 0 ? 'Almost done!' : 'This usually takes 10-15 minutes'}
             </p>
           </div>
         </div>
