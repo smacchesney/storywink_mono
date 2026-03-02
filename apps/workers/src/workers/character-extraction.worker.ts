@@ -1,7 +1,7 @@
 import { Job, FlowProducer } from 'bullmq';
 import prisma from '../database/index.js';
 import { CharacterExtractionJob, CharacterIdentity, QUEUE_NAMES } from '@storywink/shared';
-import { GoogleGenAI } from '@google/genai';
+import OpenAI from 'openai';
 import { createBullMQConnection } from '@storywink/shared/redis';
 import pino from 'pino';
 import {
@@ -10,20 +10,9 @@ import {
   CHARACTER_IDENTITY_RESPONSE_SCHEMA,
   CharacterExtractionInput,
 } from '@storywink/shared/prompts/character-identity';
+import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
-
-/**
- * Fetch an image from a URL and return it as base64 with its MIME type.
- */
-async function fetchImageAsBase64(url: string): Promise<{ data: string; mimeType: string }> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
-  const contentType = response.headers.get('content-type');
-  const mimeType = contentType?.startsWith('image/') ? contentType.split(';')[0] : 'image/jpeg';
-  const buffer = Buffer.from(await response.arrayBuffer());
-  return { data: buffer.toString('base64'), mimeType };
-}
 
 export async function processCharacterExtraction(job: Job<CharacterExtractionJob>) {
   const { bookId, userId, artStyle } = job.data;
@@ -72,42 +61,45 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
 
     const promptText = createCharacterExtractionPrompt(extractionInput);
 
-    // 5. Fetch all images as base64
-    const imageParts: Array<{ inlineData: { mimeType: string; data: string } }> = [];
+    // 5. Build image content parts from URLs directly (no base64 fetching)
+    const contentParts: Array<
+      | { type: 'input_text'; text: string }
+      | { type: 'input_image'; image_url: string; detail: 'high' }
+    > = [];
+
     for (const page of extractionInput.storyPages) {
       if (page.imageUrl) {
-        try {
-          const { data, mimeType } = await fetchImageAsBase64(page.imageUrl);
-          imageParts.push({ inlineData: { mimeType, data } });
-        } catch (err) {
-          logger.warn({ bookId, pageNumber: page.pageNumber, error: (err as Error).message }, 'Failed to fetch page image for extraction');
-        }
+        const url = optimizeCloudinaryUrlForVision(convertHeicToJpeg(page.imageUrl));
+        contentParts.push({ type: 'input_image', image_url: url, detail: 'high' });
       }
     }
 
-    if (imageParts.length === 0) {
+    if (contentParts.length === 0) {
       logger.warn({ bookId }, 'No images available for character extraction');
     } else {
-      // 6. Call Gemini vision
-      const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
+      // Add the text prompt after all images
+      contentParts.push({ type: 'input_text', text: promptText.text });
 
-      const result = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: [
-          ...imageParts,
-          promptText,
-        ],
-        config: {
-          systemInstruction: CHARACTER_IDENTITY_SYSTEM_PROMPT,
-          responseMimeType: 'application/json',
-          responseSchema: CHARACTER_IDENTITY_RESPONSE_SCHEMA as any,
-          maxOutputTokens: 8000,
+      // 6. Call OpenAI vision
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      const result = await openai.responses.create({
+        model: 'gpt-5-mini',
+        instructions: CHARACTER_IDENTITY_SYSTEM_PROMPT,
+        input: [{ role: 'user', content: contentParts }],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'character_identity',
+            strict: true,
+            schema: CHARACTER_IDENTITY_RESPONSE_SCHEMA as Record<string, unknown>,
+          },
         },
       });
 
-      const rawResult = result.text;
+      const rawResult = result.output_text;
       if (!rawResult) {
-        logger.error({ bookId }, 'Gemini returned empty response for character extraction');
+        logger.error({ bookId }, 'OpenAI returned empty response for character extraction');
       } else {
         characterIdentity = JSON.parse(rawResult);
 

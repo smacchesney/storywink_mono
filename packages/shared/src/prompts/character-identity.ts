@@ -1,7 +1,7 @@
 /**
  * Character Identity Extraction Prompt
  *
- * Analyzes all uploaded photos together via Gemini vision to produce a canonical
+ * Analyzes all uploaded photos together via vision model to produce a canonical
  * character description. This is generated once per book and injected into every
  * illustration prompt for cross-page consistency.
  */
@@ -60,7 +60,7 @@ The illustrator will use YOUR description as the canonical reference for maintai
   };
 }
 
-// Response schema for Gemini structured output
+// Response schema for structured output (OpenAI strict mode)
 export const CHARACTER_IDENTITY_RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
@@ -71,7 +71,7 @@ export const CHARACTER_IDENTITY_RESPONSE_SCHEMA = {
         properties: {
           characterId: { type: 'string' },
           role: { type: 'string' },
-          name: { type: 'string', nullable: true },
+          name: { type: ['string', 'null'] },
           physicalTraits: {
             type: 'object',
             properties: {
@@ -85,19 +85,22 @@ export const CHARACTER_IDENTITY_RESPONSE_SCHEMA = {
                 items: { type: 'string' }
               }
             },
-            required: ['apparentAge', 'hairColor', 'hairStyle', 'skinTone', 'bodyBuild', 'distinguishingFeatures']
+            required: ['apparentAge', 'hairColor', 'hairStyle', 'skinTone', 'bodyBuild', 'distinguishingFeatures'],
+            additionalProperties: false,
           },
           typicalClothing: { type: 'string' },
           styleTranslation: { type: 'string' },
           appearsOnPages: {
             type: 'array',
-            items: { type: 'integer' }
+            items: { type: 'number' }
           }
         },
-        required: ['characterId', 'role', 'physicalTraits', 'typicalClothing', 'styleTranslation', 'appearsOnPages']
+        required: ['characterId', 'role', 'name', 'physicalTraits', 'typicalClothing', 'styleTranslation', 'appearsOnPages'],
+        additionalProperties: false,
       }
     },
     sceneContext: { type: 'string' }
   },
-  required: ['characters', 'sceneContext']
+  required: ['characters', 'sceneContext'],
+  additionalProperties: false,
 } as const;

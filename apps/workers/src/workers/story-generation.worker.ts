@@ -1,7 +1,7 @@
 import { Job } from 'bullmq';
 import prisma from '../database/index.js';
 import { StoryGenerationJob } from '@storywink/shared/types';
-import { GoogleGenAI } from '@google/genai';
+import OpenAI from 'openai';
 import pino from 'pino';
 import {
   createStoryGenerationPrompt,
@@ -9,44 +9,10 @@ import {
   STORY_GENERATION_SYSTEM_PROMPT,
   StoryResponse,
   STORY_RESPONSE_SCHEMA,
-  StoryPromptPart,
 } from '@storywink/shared/prompts/story';
+import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
-
-/**
- * Fetch an image from a URL and return it as base64 with its MIME type.
- * Same pattern used by the illustration worker.
- */
-async function fetchImageAsBase64(url: string): Promise<{ data: string; mimeType: string }> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
-  const contentType = response.headers.get('content-type');
-  const mimeType = contentType?.startsWith('image/') ? contentType.split(';')[0] : 'image/jpeg';
-  const buffer = Buffer.from(await response.arrayBuffer());
-  return { data: buffer.toString('base64'), mimeType };
-}
-
-/**
- * Resolve StoryPromptParts into Gemini-compatible content parts.
- * Text parts pass through. Image placeholders are fetched and converted to base64.
- */
-async function resolvePromptParts(
-  parts: StoryPromptPart[]
-): Promise<Array<{ text: string } | { inlineData: { mimeType: string; data: string } }>> {
-  const resolved: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
-
-  for (const part of parts) {
-    if ('type' in part && part.type === 'image_placeholder') {
-      const { data, mimeType } = await fetchImageAsBase64(part.imageUrl);
-      resolved.push({ inlineData: { mimeType, data } });
-    } else if ('text' in part) {
-      resolved.push({ text: part.text });
-    }
-  }
-
-  return resolved;
-}
 
 export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
   // Wrap everything in try-catch to catch early errors
@@ -60,14 +26,14 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
       throw new Error('Job data is undefined');
     }
 
-    // Validate Google API key
-    if (!process.env.GOOGLE_API_KEY) {
-      throw new Error('Google API key not configured');
+    // Validate OpenAI API key
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OpenAI API key not configured');
     }
 
-    // Initialize Gemini client
-    const ai = new GoogleGenAI({
-      apiKey: process.env.GOOGLE_API_KEY,
+    // Initialize OpenAI client
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
     });
 
     // Safe access to job data
@@ -160,31 +126,46 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
       })),
     };
 
-    // Create the prompt parts and resolve image placeholders to base64
+    // Create the prompt parts and map to OpenAI content parts
     const promptParts = createStoryGenerationPrompt(storyInput);
-    const resolvedParts = await resolvePromptParts(promptParts);
+    const contentParts: Array<
+      | { type: 'input_text'; text: string }
+      | { type: 'input_image'; image_url: string; detail: 'high' }
+    > = [];
 
-    // Call Gemini with vision for story generation
-    const result = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: resolvedParts,
-      config: {
-        systemInstruction: STORY_GENERATION_SYSTEM_PROMPT,
-        responseMimeType: 'application/json',
-        responseSchema: STORY_RESPONSE_SCHEMA as any,
-        maxOutputTokens: 8000,
+    for (const part of promptParts) {
+      if ('type' in part && part.type === 'image_placeholder') {
+        const url = optimizeCloudinaryUrlForVision(convertHeicToJpeg(part.imageUrl));
+        contentParts.push({ type: 'input_image', image_url: url, detail: 'high' });
+      } else if ('text' in part) {
+        contentParts.push({ type: 'input_text', text: part.text });
+      }
+    }
+
+    // Call OpenAI with vision for story generation
+    const result = await openai.responses.create({
+      model: 'gpt-5-mini',
+      instructions: STORY_GENERATION_SYSTEM_PROMPT,
+      input: [{ role: 'user', content: contentParts }],
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'story_response',
+          strict: true,
+          schema: STORY_RESPONSE_SCHEMA as Record<string, unknown>,
+        },
       },
     });
 
-    const rawResult = result.text;
+    const rawResult = result.output_text;
     if (!rawResult) {
-      throw new Error('Gemini returned empty response');
+      throw new Error('OpenAI returned empty response');
     }
 
     // Log raw response for debugging
-    logger.info({ bookId, rawResponse: rawResult.substring(0, 500) }, 'Raw Gemini response received');
+    logger.info({ bookId, rawResponse: rawResult.substring(0, 500) }, 'Raw OpenAI response received');
 
-    // Strip markdown code block wrapping if present (Gemini sometimes wraps JSON despite responseMimeType)
+    // Defensive: strip markdown code block wrapping if present
     let cleanedResult = rawResult.trim();
     if (cleanedResult.startsWith('```')) {
       cleanedResult = cleanedResult.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
@@ -200,14 +181,14 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
     let pageUpdates: PageUpdateData[] = [];
 
     try {
-      // Response format: { "1": { "text": "...", "illustrationNotes": "..." }, ... }
+      // Response format: { pages: [{ pageNumber, text, illustrationNotes }, ...] }
       const storyResponse: StoryResponse = JSON.parse(cleanedResult);
 
-      logger.info({ bookId, responseKeys: Object.keys(storyResponse) }, 'Parsing story response');
+      logger.info({ bookId, pageCount: storyResponse.pages?.length }, 'Parsing story response');
 
       // Validate that all expected pages are present in response
-      const expectedPageNumbers = storyPages.map((_, i) => (i + 1).toString());
-      const receivedPageNumbers = Object.keys(storyResponse);
+      const expectedPageNumbers = storyPages.map((_, i) => i + 1);
+      const receivedPageNumbers = storyResponse.pages?.map(p => p.pageNumber) || [];
       const missingPages = expectedPageNumbers.filter(p => !receivedPageNumbers.includes(p));
 
       if (missingPages.length > 0) {
@@ -216,16 +197,13 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
           missingPages,
           expectedCount: expectedPageNumbers.length,
           receivedCount: receivedPageNumbers.length
-        }, 'Some pages missing from Gemini response');
+        }, 'Some pages missing from OpenAI response');
       }
-
-      // Create a map for easier lookup
-      const responseMap = new Map(Object.entries(storyResponse));
 
       // Prepare update data for all story pages
       pageUpdates = storyPages.map((page, index) => {
         const storyPosition = index + 1; // 1-based position
-        const content = responseMap.get(storyPosition.toString());
+        const content = storyResponse.pages?.find(p => p.pageNumber === storyPosition);
 
         if (!content) {
           logger.warn({
@@ -271,8 +249,8 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
         rawResponseFirst500: rawResult.substring(0, 500),
         rawResponseLast200: rawResult.substring(rawResult.length - 200),
         cleanedResultFirst500: cleanedResult.substring(0, 500),
-      }, 'Failed to parse Gemini response');
-      throw new Error(`Invalid JSON response from Gemini: ${parseError instanceof Error ? parseError.message : 'unknown error'}`);
+      }, 'Failed to parse OpenAI response');
+      throw new Error(`Invalid JSON response from OpenAI: ${parseError instanceof Error ? parseError.message : 'unknown error'}`);
     }
 
     logger.info({
@@ -340,7 +318,6 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
         missingPageIndices: pagesWithoutText.map(p => p.index),
         pageUpdatesCreated: pageUpdates.length,
         expectedStoryPages: storyPages.length,
-        geminiResponseKeys: Object.keys(JSON.parse(rawResult))
       }, 'CRITICAL: Some pages missing text after batch update - applying fallback');
 
       // Fix pages that didn't get text

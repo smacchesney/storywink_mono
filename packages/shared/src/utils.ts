@@ -34,8 +34,18 @@ export function getTitlePage<T extends { assetId: string | null }>(
 }
 
 /**
+ * Optimizes a Cloudinary URL for AI vision model input.
+ * Caps images at 2048px (OpenAI's max before auto-downscale) with quality optimization.
+ * Reduces bandwidth without quality loss for vision API calls.
+ */
+export function optimizeCloudinaryUrlForVision(url: string): string {
+  if (!url || !url.includes('/upload/')) return url;
+  return url.replace('/upload/', '/upload/c_limit,w_2048,h_2048,q_auto/');
+}
+
+/**
  * Converts HEIC images to JPEG format using Cloudinary transformation
- * OpenAI Vision API only supports: png, jpeg, gif, webp (NOT heic)
+ * Vision APIs only support: png, jpeg, gif, webp (NOT heic)
  * This function automatically converts HEIC to JPEG for AI model compatibility
  *
  * Note: First-time HEIC conversions may be slow. Consider:

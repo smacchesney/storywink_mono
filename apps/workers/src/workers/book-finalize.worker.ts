@@ -4,7 +4,8 @@ import { BookFinalizeJob, CharacterIdentity, BookQCResult } from '@storywink/sha
 import { QUEUE_NAMES } from '@storywink/shared/constants';
 import { categorizePages, isTitlePage } from '@storywink/shared/utils';
 import { createBullMQConnection } from '@storywink/shared/redis';
-import { GoogleGenAI } from '@google/genai';
+import OpenAI from 'openai';
+import { optimizeCloudinaryUrlForVision } from '@storywink/shared/utils';
 import { createQCPrompt, QC_SYSTEM_PROMPT, QC_RESPONSE_SCHEMA } from '@storywink/shared/prompts/quality-check';
 import pino from 'pino';
 
@@ -13,19 +14,7 @@ const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 const MAX_QC_ROUNDS = 2;
 
 /**
- * Fetch an image from a URL and return it as base64 with its MIME type.
- */
-async function fetchImageAsBase64(url: string): Promise<{ data: string; mimeType: string }> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
-  const contentType = response.headers.get('content-type');
-  const mimeType = contentType?.startsWith('image/') ? contentType.split(';')[0] : 'image/jpeg';
-  const buffer = Buffer.from(await response.arrayBuffer());
-  return { data: buffer.toString('base64'), mimeType };
-}
-
-/**
- * Run quality check on all generated illustrations using Gemini vision.
+ * Run quality check on all generated illustrations using OpenAI vision.
  * Returns null if QC cannot be run (no API key, no images, etc.)
  */
 async function runQualityCheck(
@@ -33,8 +22,8 @@ async function runQualityCheck(
   pages: Array<{ pageNumber: number; pageId: string; generatedImageUrl: string | null }>,
   characterIdentity: CharacterIdentity | null,
 ): Promise<BookQCResult | null> {
-  if (!process.env.GOOGLE_API_KEY) {
-    logger.warn({ bookId }, 'Skipping QC: GOOGLE_API_KEY not configured');
+  if (!process.env.OPENAI_API_KEY) {
+    logger.warn({ bookId }, 'Skipping QC: OPENAI_API_KEY not configured');
     return null;
   }
 
@@ -47,49 +36,47 @@ async function runQualityCheck(
   logger.info({ bookId, pageCount: illustratedPages.length }, 'Running quality check on illustrations');
   console.log(`[BookFinalize/QC] Running QC on ${illustratedPages.length} illustrations for book ${bookId}`);
 
-  // Fetch all generated images as base64
-  const imageParts: Array<{ inlineData: { mimeType: string; data: string } }> = [];
+  // Build image content parts from URLs directly (no base64 fetching)
+  const contentParts: Array<
+    | { type: 'input_text'; text: string }
+    | { type: 'input_image'; image_url: string; detail: 'high' }
+  > = [];
   const pageMapping: Array<{ pageNumber: number; pageId: string }> = [];
 
   for (const page of illustratedPages) {
-    try {
-      const { data, mimeType } = await fetchImageAsBase64(page.generatedImageUrl!);
-      imageParts.push({ inlineData: { mimeType, data } });
-      pageMapping.push({ pageNumber: page.pageNumber, pageId: page.pageId });
-    } catch (err) {
-      logger.warn({
-        bookId,
-        pageNumber: page.pageNumber,
-        error: (err as Error).message,
-      }, 'Failed to fetch illustration for QC');
-    }
+    const url = optimizeCloudinaryUrlForVision(page.generatedImageUrl!);
+    contentParts.push({ type: 'input_image', image_url: url, detail: 'high' });
+    pageMapping.push({ pageNumber: page.pageNumber, pageId: page.pageId });
   }
 
-  if (imageParts.length < 2) {
-    logger.warn({ bookId }, 'Skipping QC: could not fetch enough images');
+  if (contentParts.length < 2) {
+    logger.warn({ bookId }, 'Skipping QC: not enough images');
     return null;
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
-  const promptText = createQCPrompt(characterIdentity, imageParts.length);
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const promptText = createQCPrompt(characterIdentity, contentParts.length);
 
-  const result = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: [
-      ...imageParts,
-      { text: promptText },
-    ],
-    config: {
-      systemInstruction: QC_SYSTEM_PROMPT,
-      responseMimeType: 'application/json',
-      responseSchema: QC_RESPONSE_SCHEMA as any,
-      maxOutputTokens: 8000,
+  // Add the text prompt after all images
+  contentParts.push({ type: 'input_text', text: promptText });
+
+  const result = await openai.responses.create({
+    model: 'gpt-5-mini',
+    instructions: QC_SYSTEM_PROMPT,
+    input: [{ role: 'user', content: contentParts }],
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'qc_response',
+        strict: true,
+        schema: QC_RESPONSE_SCHEMA as Record<string, unknown>,
+      },
     },
   });
 
-  const rawResult = result.text;
+  const rawResult = result.output_text;
   if (!rawResult) {
-    logger.error({ bookId }, 'Gemini QC returned empty response');
+    logger.error({ bookId }, 'OpenAI QC returned empty response');
     return null;
   }
 
@@ -103,7 +90,7 @@ async function runQualityCheck(
       styleConsistencyScore: number;
       overallScore: number;
       issues: string[];
-      suggestedPromptAdditions?: string | null;
+      suggestedPromptAdditions: string | null;
     }>;
   };
 

@@ -2,36 +2,52 @@
 // IMPORTS & TYPES
 // ----------------------------------
 
-// Gemini-compatible prompt part types
-export interface GeminiTextPart { text: string }
-export interface GeminiImagePlaceholder {
+// Prompt part types for multi-modal story generation
+export interface TextPart { text: string }
+export interface ImagePlaceholder {
   type: 'image_placeholder';
   imageUrl: string;
   pageNumber: number;
 }
-export type StoryPromptPart = GeminiTextPart | GeminiImagePlaceholder;
+export type StoryPromptPart = TextPart | ImagePlaceholder;
 
-// JSON Schema for Gemini structured story response output
-// Uses Gemini's responseJsonSchema format (nullable instead of type unions)
+// Backwards compatibility aliases
+/** @deprecated Use TextPart instead */
+export type GeminiTextPart = TextPart;
+/** @deprecated Use ImagePlaceholder instead */
+export type GeminiImagePlaceholder = ImagePlaceholder;
+
+// JSON Schema for OpenAI structured output (strict mode)
+// Array-based format: { pages: [{ pageNumber, text, illustrationNotes }, ...] }
 export const STORY_RESPONSE_SCHEMA = {
   type: 'object',
-  description: 'Story text and illustration notes for each page, keyed by page number',
-  properties: {},
-  additionalProperties: {
-    type: 'object',
-    properties: {
-      text: {
-        type: 'string',
-        description: 'The story text for this page (1-3 sentences, max 35 words)'
-      },
-      illustrationNotes: {
-        type: 'string',
-        nullable: true,
-        description: 'Visual effects suggestion for the illustration, or null if none'
+  properties: {
+    pages: {
+      type: 'array',
+      description: 'Story text and illustration notes for each page',
+      items: {
+        type: 'object',
+        properties: {
+          pageNumber: {
+            type: 'number',
+            description: 'The 1-based page number'
+          },
+          text: {
+            type: 'string',
+            description: 'The story text for this page (1-3 sentences, max 35 words)'
+          },
+          illustrationNotes: {
+            type: ['string', 'null'],
+            description: 'Visual effects suggestion for the illustration, or null if none'
+          }
+        },
+        required: ['pageNumber', 'text', 'illustrationNotes'],
+        additionalProperties: false,
       }
-    },
-    required: ['text', 'illustrationNotes'],
-  }
+    }
+  },
+  required: ['pages'],
+  additionalProperties: false,
 } as const;
 
 // Simplified Input Type - Expects pre-filtered/sorted pages
@@ -54,10 +70,10 @@ export interface StoryGenerationInput {
 // ----------------------------------
 
 export const STORY_GENERATION_SYSTEM_PROMPT =
-  "You are an expert children's picture‑book author for toddlers (ages 2-4). Parents will read this story aloud to their children. Your task is to write engaging, age-appropriate story text for a personalised picture book based on the user's photos and inputs.";
+  "You are an expert children's picture\u2011book author for toddlers (ages 2-4). Parents will read this story aloud to their children. Your task is to write engaging, age-appropriate story text for a personalised picture book based on the user's photos and inputs.";
 
 // ----------------------------------
-// STORY GENERATION – GEMINI PROMPT
+// STORY GENERATION PROMPT
 // ----------------------------------
 
 export function createStoryGenerationPrompt(
@@ -125,7 +141,7 @@ export function createStoryGenerationPrompt(
   ].join('\n');
 
   const illustrationNotesInstructions = [
-    `\n- For **each** page, also suggest \"illustrationNotes\" to dynamically enhance the image with fun effects:`,
+    `\n- For **each** page, also suggest "illustrationNotes" to dynamically enhance the image with fun effects:`,
     `  - Focus on **amplifying the specific action in the scene**:`,
     `    - Movement/Running: motion lines, speed streaks, "ZOOM!", "WHOOSH!"`,
     `    - Water/Splashing: water droplets, ripples, "SPLASH!", "SPLISH!"`,
@@ -137,11 +153,11 @@ export function createStoryGenerationPrompt(
     `  - Match the effect to the specific action - if a kid is eating, suggest food effects, not sparkles.`,
     `  - NEVER alter faces, poses, or introduce new characters.`,
     `  - **Specifically for illustrationNotes ONLY:** Use visual language (e.g., 'the boy in red', 'the girl with pigtails') instead of character names. The illustration AI doesn't know names.`,
-    `  - If no dynamic effect fits, set \"illustrationNotes\" to null or empty.`,
+    `  - If no dynamic effect fits, set "illustrationNotes" to null or empty.`,
     `\n- Effects must feel playful but natural, blending into the scene without overwhelming it.`,
     `\n- Final Output:`,
-    `\nReturn ONLY a valid JSON object. The keys must be page numbers as strings (e.g., \"1\", \"2\"). The value for each key must be an object with two keys: \"text\" (string, the story text) and \"illustrationNotes\" (string or null, the visual suggestion).`,
-    `Example format: {\"1\":{\"text\":\"Sample text...\",\"illustrationNotes\":\"Suggestion...\"},\"2\":{\"text\":\"More text...\",\"illustrationNotes\":null}}`
+    `\nReturn ONLY a valid JSON object with a "pages" array. Each element must have "pageNumber" (number), "text" (string), and "illustrationNotes" (string or null).`,
+    `Example format: {"pages":[{"pageNumber":1,"text":"Sample text...","illustrationNotes":"Suggestion..."},{"pageNumber":2,"text":"More text...","illustrationNotes":null}]}`
   ].join('');
 
   parts.push({
@@ -157,12 +173,13 @@ export const createVisionStoryGenerationPrompt = createStoryGenerationPrompt;
 
 // Export types for response parsing
 export interface StoryPageResponse {
+  pageNumber: number;
   text: string;
   illustrationNotes?: string | null;
 }
 
 export interface StoryResponse {
-  [pageNumber: string]: StoryPageResponse;
+  pages: StoryPageResponse[];
 }
 
 // Backwards compatibility alias (deprecated)

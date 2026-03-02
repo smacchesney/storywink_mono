@@ -35,7 +35,7 @@ if (result.error) {
 }
 
 // Verify critical environment variables are loaded
-const requiredEnvVars = ['REDIS_URL', 'GOOGLE_API_KEY', 'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'];
+const requiredEnvVars = ['REDIS_URL', 'GOOGLE_API_KEY', 'OPENAI_API_KEY', 'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'];
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingVars.length > 0) {
