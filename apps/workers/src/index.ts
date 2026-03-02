@@ -173,6 +173,7 @@ const storyWorker = new Worker(
   {
     connection: redis,
     concurrency: STORY_CONCURRENCY,
+    lockDuration: 300000, // 5 minutes for multi-image vision API calls
   }
 );
 
