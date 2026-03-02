@@ -167,14 +167,12 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
     // Call Gemini with vision for story generation
     const result = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: [
-        { role: 'user' as const, parts: resolvedParts }
-      ],
+      contents: resolvedParts,
       config: {
         systemInstruction: STORY_GENERATION_SYSTEM_PROMPT,
         responseMimeType: 'application/json',
         responseSchema: STORY_RESPONSE_SCHEMA as any,
-        maxOutputTokens: 4000,
+        maxOutputTokens: 8000,
       },
     });
 
@@ -184,7 +182,13 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
     }
 
     // Log raw response for debugging
-    logger.info({ bookId, rawResponse: rawResult }, 'Raw Gemini response received');
+    logger.info({ bookId, rawResponse: rawResult.substring(0, 500) }, 'Raw Gemini response received');
+
+    // Strip markdown code block wrapping if present (Gemini sometimes wraps JSON despite responseMimeType)
+    let cleanedResult = rawResult.trim();
+    if (cleanedResult.startsWith('```')) {
+      cleanedResult = cleanedResult.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+    }
 
     // Parse the response and prepare update data (not promises yet)
     interface PageUpdateData {
@@ -197,7 +201,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
 
     try {
       // Response format: { "1": { "text": "...", "illustrationNotes": "..." }, ... }
-      const storyResponse: StoryResponse = JSON.parse(rawResult);
+      const storyResponse: StoryResponse = JSON.parse(cleanedResult);
 
       logger.info({ bookId, responseKeys: Object.keys(storyResponse) }, 'Parsing story response');
 
@@ -259,9 +263,16 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
           textConfirmed: trimmedText.length > 0,
         };
       });
-    } catch (error) {
-      logger.error({ bookId, rawResult }, 'Failed to parse Gemini response');
-      throw new Error('Invalid JSON response from Gemini');
+    } catch (parseError) {
+      logger.error({
+        bookId,
+        parseError: parseError instanceof Error ? parseError.message : 'Unknown parse error',
+        rawResponseLength: rawResult.length,
+        rawResponseFirst500: rawResult.substring(0, 500),
+        rawResponseLast200: rawResult.substring(rawResult.length - 200),
+        cleanedResultFirst500: cleanedResult.substring(0, 500),
+      }, 'Failed to parse Gemini response');
+      throw new Error(`Invalid JSON response from Gemini: ${parseError instanceof Error ? parseError.message : 'unknown error'}`);
     }
 
     logger.info({
