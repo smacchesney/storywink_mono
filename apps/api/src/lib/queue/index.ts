@@ -44,6 +44,7 @@ export enum QueueName {
   IllustrationGeneration = "illustration-generation",
   BookFinalize = "book-finalize",
   PrintFulfillment = "print-fulfillment",
+  CharacterExtraction = "character-extraction",
 }
 
 // Function to create or get a queue instance

@@ -293,7 +293,7 @@ export function CloudinaryUploaderAuto({
     sources: ['local', 'camera'] as ('local' | 'camera')[],
     multiple: true,
     maxFiles: BOOK_CONSTRAINTS.MAX_PHOTOS,
-    // Only allow formats that OpenAI Vision API supports (no HEIC/HEIF)
+    // Only allow common web-safe image formats
     clientAllowedFormats: ['jpg', 'jpeg', 'png', 'webp'],
     maxFileSize: 10485760, // 10MB
     showAdvancedOptions: false,

@@ -60,6 +60,7 @@ model Book {
   specialObjects       String?
   excitementElement String?
   coverAssetId      String?
+  characterIdentity Json?     // Canonical character description for illustration consistency
   promptTokens      Int?
   completionTokens  Int?
   totalTokens       Int?

@@ -42,6 +42,14 @@
       "types": "./dist/prompts/styles.d.ts",
       "import": "./dist/prompts/styles.js"
     },
+    "./prompts/character-identity": {
+      "types": "./dist/prompts/character-identity.d.ts",
+      "import": "./dist/prompts/character-identity.js"
+    },
+    "./prompts/quality-check": {
+      "types": "./dist/prompts/quality-check.d.ts",
+      "import": "./dist/prompts/quality-check.js"
+    },
     "./redis": {
       "types": "./dist/redis.d.ts",
       "import": "./dist/redis.js"

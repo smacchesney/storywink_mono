@@ -13,7 +13,6 @@ import {
   ensureDbUser,
   AuthenticatedRequest,
 } from "../middleware/ensureDbUser.js";
-import { flowProducer } from "../lib/queue/index.js";
 
 // Create Redis connection
 // Uses family: 0 for IPv6 support on Railway private networking
@@ -24,26 +23,9 @@ const storyQueue = new Queue(QUEUE_NAMES.STORY_GENERATION, {
   connection: redis,
 });
 
-// Note: illustrationQueue is now handled by FlowProducer
-// Individual queue instances are created automatically by FlowProducer
-
-// Job data interfaces
-interface IllustrationGenerationJobData {
-  userId: string;
-  bookId: string;
-  pageId: string;
-  pageNumber: number;
-  text: string | null;
-  artStyle: string | null | undefined;
-  bookTitle: string | null | undefined;
-  isTitlePage: boolean;
-  illustrationNotes: string | null | undefined;
-}
-
-interface BookFinalizeJobData {
-  bookId: string;
-  userId: string;
-}
+const characterExtractionQueue = new Queue(QUEUE_NAMES.CHARACTER_EXTRACTION, {
+  connection: redis,
+});
 
 export const generateRouter = Router();
 
@@ -219,76 +201,34 @@ generateRouter.post(
         return;
       }
 
-      // Create child job definitions for each page (matching Next.js API pattern)
-      const pageChildren = pagesToIllustrate.map((page) => {
-        // Use the isTitlePage field directly for consistency
-        const isActualTitlePage = page.isTitlePage;
-
-        const illustrationJobData: IllustrationGenerationJobData = {
-          userId,
+      // Queue character extraction job
+      // The extraction worker will analyze all photos for character identity,
+      // then create the FlowProducer illustration flow with characterIdentity
+      // baked into each illustration job's data.
+      const extractionJob = await characterExtractionQueue.add(
+        `extract-characters-${bookId}`,
+        {
           bookId,
-          pageId: page.id,
-          pageNumber: page.pageNumber,
-          text: page.text,
-          artStyle: book.artStyle,
-          bookTitle: book.title,
-          isTitlePage: isActualTitlePage,
-          illustrationNotes: page.illustrationNotes,
-        };
-
-        const jobName = `generate-illustration-${bookId}-p${page.pageNumber}`;
-        console.log(`[Express API] Creating job: ${jobName}`);
-        console.log(`    - Page ID: ${page.id}`);
-        console.log(`    - Is Title: ${isActualTitlePage}`);
-        console.log(`    - Has Text: ${!!page.text} (${page.text?.length || 0} chars)`);
-        
-        return {
-          name: jobName,
-          queueName: QUEUE_NAMES.ILLUSTRATION_GENERATION,
-          data: illustrationJobData,
-          opts: {
-            attempts: 5, // Increased from 3 to give more chances for transient failures
-            backoff: { type: 'exponential', delay: 10000 },
-            removeOnComplete: { count: 1000 },
-            removeOnFail: { count: 5000 },
-            failParentOnFailure: false,
-            removeDependencyOnFailure: true,
-          },
-        };
-      });
-
-      // Create parent finalize job
-      const finalizeJobData: BookFinalizeJobData = {
-        bookId,
-        userId,
-      };
-
-      console.log(`[Express API] Creating FlowProducer job:`);
-      console.log(`  - Parent: finalize-book-${bookId}`);
-      console.log(`  - Children: ${pageChildren.length} illustration jobs`);
-
-      // Add the flow (parent job + children) atomically
-      const flow = await flowProducer.add({
-        name: `finalize-book-${bookId}`,
-        queueName: QUEUE_NAMES.BOOK_FINALIZE,
-        data: finalizeJobData,
-        opts: {
+          userId,
+          artStyle: book.artStyle || 'vignette',
+        },
+        {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 10000 },
           removeOnComplete: { count: 100 },
           removeOnFail: { count: 500 },
-        },
-        children: pageChildren,
-      });
+        }
+      );
 
-      console.log(`[Express API] Flow created successfully:`);
-      console.log(`  - Flow Job ID: ${flow.job.id}`);
-      console.log(`  - Parent Job: ${flow.job.name}`);
-      console.log(`  - Child Jobs: ${flow.children?.length || 0}`);
+      console.log(`[Express API] Character extraction job queued for book ${bookId}`);
+      console.log(`  - Extraction Job ID: ${extractionJob.id}`);
+      console.log(`  - Pages to illustrate: ${pagesToIllustrate.length}`);
 
       res.json({
         success: true,
-        message: `Illustration generation started for ${pagesToIllustrate.length} pages`,
+        message: `Character extraction started. ${pagesToIllustrate.length} pages will be illustrated after extraction.`,
         processed: pagesToIllustrate.length,
-        flowJobId: flow.job.id,
+        extractionJobId: extractionJob.id,
       });
     } catch (error) {
       console.error(`[Express API] Error in illustration generation:`, error);

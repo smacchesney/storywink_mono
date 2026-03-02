@@ -2,19 +2,21 @@
 // IMPORTS & TYPES
 // ----------------------------------
 
-import { convertHeicToJpeg } from '../utils.js';
+// Gemini-compatible prompt part types
+export interface GeminiTextPart { text: string }
+export interface GeminiImagePlaceholder {
+  type: 'image_placeholder';
+  imageUrl: string;
+  pageNumber: number;
+}
+export type StoryPromptPart = GeminiTextPart | GeminiImagePlaceholder;
 
-// Content types for OpenAI Responses API (GPT-5.1)
-// Using explicit types that match OpenAI SDK expectations
-type InputText = { type: 'input_text'; text: string };
-type InputImage = { type: 'input_image'; image_url: string; detail: 'low' | 'high' | 'auto' };
-type MessageContentPart = InputText | InputImage;
-
-// JSON Schema for structured story response output
+// JSON Schema for Gemini structured story response output
+// Uses Gemini's responseJsonSchema format (nullable instead of type unions)
 export const STORY_RESPONSE_SCHEMA = {
   type: 'object',
   description: 'Story text and illustration notes for each page, keyed by page number',
-  properties: {}, // Required by OpenAI - empty because we use dynamic keys via additionalProperties
+  properties: {},
   additionalProperties: {
     type: 'object',
     properties: {
@@ -23,12 +25,12 @@ export const STORY_RESPONSE_SCHEMA = {
         description: 'The story text for this page (1-3 sentences, max 35 words)'
       },
       illustrationNotes: {
-        type: ['string', 'null'],
+        type: 'string',
+        nullable: true,
         description: 'Visual effects suggestion for the illustration, or null if none'
       }
     },
     required: ['text', 'illustrationNotes'],
-    additionalProperties: false
   }
 } as const;
 
@@ -55,43 +57,39 @@ export const STORY_GENERATION_SYSTEM_PROMPT =
   "You are an expert children's picture‑book author for toddlers (ages 2-4). Parents will read this story aloud to their children. Your task is to write engaging, age-appropriate story text for a personalised picture book based on the user's photos and inputs.";
 
 // ----------------------------------
-// STORY GENERATION – VISION PROMPT
+// STORY GENERATION – GEMINI PROMPT
 // ----------------------------------
 
-export function createVisionStoryGenerationPrompt(
+export function createStoryGenerationPrompt(
   input: StoryGenerationInput
-): MessageContentPart[] {
-  const msg: MessageContentPart[] = [];
+): StoryPromptPart[] {
+  const parts: StoryPromptPart[] = [];
 
   // ---------- CONFIG ----------
-  msg.push({
-    type: 'input_text',
+  parts.push({
     text: `# Configuration\nBook Title: ${
       input.bookTitle || 'My Special Story'
     }\nPage Count: ${input.storyPages.length}`,
   });
 
   // ---------- STORYBOARD (IMAGES) ----------
-  msg.push({ type: 'input_text', text: '# Storyboard Sequence' });
+  parts.push({ text: '# Storyboard Sequence' });
 
   input.storyPages.forEach((page) => {
-    msg.push({ type: 'input_text', text: `--- Page ${page.pageNumber} ---` });
+    parts.push({ text: `--- Page ${page.pageNumber} ---` });
     if (page.originalImageUrl) {
-      // Convert HEIC to JPEG for OpenAI compatibility
-      const convertedUrl = convertHeicToJpeg(page.originalImageUrl);
-      msg.push({
-        type: 'input_image',
-        image_url: convertedUrl,
-        detail: 'high',
+      parts.push({
+        type: 'image_placeholder',
+        imageUrl: page.originalImageUrl,
+        pageNumber: page.pageNumber,
       });
     } else {
-      msg.push({
-        type: 'input_text',
+      parts.push({
         text: `[No Image Provided for Page ${page.pageNumber}]`,
       });
     }
   });
-  msg.push({ type: 'input_text', text: '--- End Storyboard ---' });
+  parts.push({ text: '--- End Storyboard ---' });
 
   // ---------- INSTRUCTIONS ----------
   // Build character instruction dynamically based on provided names
@@ -146,13 +144,16 @@ export function createVisionStoryGenerationPrompt(
     `Example format: {\"1\":{\"text\":\"Sample text...\",\"illustrationNotes\":\"Suggestion...\"},\"2\":{\"text\":\"More text...\",\"illustrationNotes\":null}}`
   ].join('');
 
-  msg.push({
-    type: 'input_text',
+  parts.push({
     text: `${baseInstructions}\n${illustrationNotesInstructions}`,
   });
 
-  return msg;
+  return parts;
 }
+
+// Backwards compatibility alias
+/** @deprecated Use createStoryGenerationPrompt instead */
+export const createVisionStoryGenerationPrompt = createStoryGenerationPrompt;
 
 // Export types for response parsing
 export interface StoryPageResponse {

@@ -19,6 +19,21 @@ export const STYLE_LIBRARY = {
     ],
     description: "Create a vignette-style illustration with soft, organic edges that fade into PURE WHITE (#FFFFFF). The vignette edges and any background showing through must be pure white, not off-white, cream, or gray. Match the watercolor/pencil aesthetic, warm color palette, and hand-drawn quality shown in the reference images. Fill the entire canvas with the illustration.",
   },
+  origami: {
+    label: 'Paper Origami',
+    // First URL is used as the style preview thumbnail
+    referenceImageUrls: [
+      'https://res.cloudinary.com/storywink/image/upload/v1772469317/Gemini_Generated_Image_3jhwbs3jhwbs3jhw_gmjywo.png',
+      'https://res.cloudinary.com/storywink/image/upload/v1772469317/Gemini_Generated_Image_sh134wsh134wsh13_ljrnxm.png',
+      'https://res.cloudinary.com/storywink/image/upload/v1772469317/Gemini_Generated_Image_eo1k8eo1k8eo1k8e_ce0obt.png',
+    ],
+    coverReferenceImageUrls: [
+      'https://res.cloudinary.com/storywink/image/upload/v1772469248/Gemini_Generated_Image_du037ldu037ldu03_lerc6b.png',
+      'https://res.cloudinary.com/storywink/image/upload/v1772469249/Gemini_Generated_Image_hin85shin85shin8_zdynyv.png',
+      'https://res.cloudinary.com/storywink/image/upload/v1772469249/Gemini_Generated_Image_nh6rb1nh6rb1nh6r_itqekg.png',
+    ],
+    description: "Create a paper origami / paper craft illustration. Every element — characters, objects, backgrounds — must look like it's physically constructed from folded, cut, and layered colored paper. Show visible paper folds, creases, and dimensional layering. Use soft shadows between paper layers to create depth. Backgrounds should be simple paper diorama scenes. Match the construction technique, color palette, and tactile paper quality shown in the reference images. Fill the entire canvas with the illustration.",
+  },
 } as const;
 
 // ----------------------------------

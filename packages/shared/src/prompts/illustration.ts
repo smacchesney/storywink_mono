@@ -1,4 +1,5 @@
 import { StyleKey, getStyleDefinition } from './styles.js';
+import { CharacterIdentity } from '../types.js';
 
 // ----------------------------------
 // TYPES
@@ -11,6 +12,9 @@ export interface IllustrationPromptOptions {
   isTitlePage?: boolean;
   illustrationNotes?: string | null;
   referenceImageCount?: number; // Number of style reference images (1 for title, 2 for story pages)
+  characterIdentity?: CharacterIdentity | null;
+  pageNumber?: number;
+  qcFeedback?: string | null;
 }
 
 // ----------------------------------
@@ -66,6 +70,50 @@ This simplified face style must be applied uniformly to every person (adults and
 DO NOT reimagine or invent features for any person. A parent must look at your illustration and instantly recognize their child and family.`;
 
   base.push(characterConsistencySection);
+
+  // Character identity injection (from extraction phase)
+  if (opts.characterIdentity?.characters?.length) {
+    const relevantCharacters = opts.pageNumber
+      ? opts.characterIdentity.characters.filter(
+          c => c.appearsOnPages.includes(opts.pageNumber!) || c.appearsOnPages.length === 0
+        )
+      : opts.characterIdentity.characters;
+
+    if (relevantCharacters.length > 0) {
+      const charDescriptions = relevantCharacters.map(c => {
+        const traits = c.physicalTraits;
+        return [
+          `- ${c.name || c.characterId} (${c.role}):`,
+          `  Age: ${traits.apparentAge}`,
+          `  Hair: ${traits.hairColor}, ${traits.hairStyle}`,
+          `  Skin tone: ${traits.skinTone}`,
+          `  Build: ${traits.bodyBuild}`,
+          traits.distinguishingFeatures.length > 0
+            ? `  Distinguishing features: ${traits.distinguishingFeatures.join(', ')}`
+            : null,
+          `  Clothing: ${c.typicalClothing}`,
+          c.styleTranslation ? `  Style rendering: ${c.styleTranslation}` : null,
+        ].filter(Boolean).join('\n');
+      }).join('\n');
+
+      base.push(
+        `CHARACTER IDENTITY (MANDATORY - override any visual ambiguity with these specifications):\n` +
+        `The following characters appear in this scene. Their appearance MUST match these exact descriptions across ALL pages. ` +
+        `If the source photo is ambiguous (lighting, angle, shadow), defer to these canonical descriptions:\n` +
+        charDescriptions
+      );
+    }
+  }
+
+  // QC feedback injection (from previous QC round)
+  if (opts.qcFeedback) {
+    base.push(
+      `CRITICAL CORRECTIONS (from quality check - MUST be addressed):\n` +
+      `A previous version of this illustration was flagged for the following issues. ` +
+      `You MUST fix ALL of the following problems in this version:\n` +
+      opts.qcFeedback
+    );
+  }
 
   // Dynamic effects always included when illustrationNotes are provided
   const dynamicEffectsBits = opts.illustrationNotes

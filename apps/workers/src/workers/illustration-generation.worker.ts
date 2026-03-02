@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import prisma from '../database/index.js';
-import { IllustrationGenerationJob } from '@storywink/shared/types';
+import { IllustrationGenerationJobV2 } from '@storywink/shared/types';
 import { GoogleGenAI } from '@google/genai';
 import { v2 as cloudinary } from 'cloudinary';
 import pino from 'pino';
@@ -58,7 +58,7 @@ function isLastAttempt(job: Job): boolean {
 // avoiding log spam while still capturing critical runtime information.
 let firstJobExecuted = false;
 
-export async function processIllustrationGeneration(job: Job<IllustrationGenerationJob>) {
+export async function processIllustrationGeneration(job: Job<IllustrationGenerationJobV2>) {
 
   // ============================================================================
   // DIAGNOSTIC: Write job start entry IMMEDIATELY (before ANY processing)
@@ -92,7 +92,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     console.error('[DIAGNOSTIC] Failed to write job start diagnostic:', dbError);
   }
 
-  const { bookId, pageId, userId, pageNumber, artStyle, illustrationNotes, isTitlePage, bookTitle, text } = job.data;
+  const { bookId, pageId, userId, pageNumber, artStyle, illustrationNotes, isTitlePage, bookTitle, text, characterIdentity, qcRound, qcFeedback } = job.data;
 
   console.log(`[IllustrationWorker] Starting job ${job.id} for page ${pageNumber} of book ${bookId}`);
   console.log(`  - PageId: ${pageId}`);
@@ -100,6 +100,9 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
   console.log(`  - Art Style: ${artStyle}`);
   console.log(`  - Has Text: ${!!text} (${text?.length || 0} chars)`);
   console.log(`  - Illustration Notes: ${illustrationNotes ? 'Yes' : 'None'}`);
+  console.log(`  - Character Identity: ${characterIdentity ? `${characterIdentity.characters.length} characters` : 'None'}`);
+  console.log(`  - QC Round: ${qcRound || 0}`);
+  if (qcFeedback) console.log(`  - QC Feedback: ${qcFeedback.substring(0, 200)}...`);
 
   try {
     // Validate prerequisites
@@ -354,11 +357,14 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
 
     const promptInput: IllustrationPromptOptions = {
         style: styleKey,
-        pageText: text, // Use text from job data
-        bookTitle: bookTitle, // Use bookTitle from job data
-        isTitlePage: isTitlePage, // Use isTitlePage from job data
+        pageText: text,
+        bookTitle: bookTitle,
+        isTitlePage: isTitlePage,
         illustrationNotes: illustrationNotes,
-        referenceImageCount: styleReferenceBuffers.length, // Tell prompt how many refs we're sending
+        referenceImageCount: styleReferenceBuffers.length,
+        characterIdentity: characterIdentity || null,
+        pageNumber: pageNumber,
+        qcFeedback: qcFeedback || null,
     };
     
     logger.info({ jobId: job.id, pageId, promptInput }, "Constructed promptInput for createIllustrationPrompt");

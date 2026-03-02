@@ -7,7 +7,7 @@ import { BookStatus } from '@prisma/client';
 // Import shared prisma instance
 import { db as prisma } from '@/lib/db'; 
 import logger from '@/lib/logger';
-import type { StoryGenerationInput } from '@/lib/openai/prompts'; // Import type for context
+import type { StoryGenerationInput } from '@storywink/shared';
 
 // REMOVED local BookStatus enum workaround (Task 7.8)
 
