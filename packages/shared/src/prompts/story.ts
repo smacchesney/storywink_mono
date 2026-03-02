@@ -34,7 +34,7 @@ export const STORY_RESPONSE_SCHEMA = {
           },
           text: {
             type: 'string',
-            description: 'The story text for this page (1-3 sentences, max 35 words)'
+            description: 'The story text for this page (2-4 sentences, max 50 words)'
           },
           illustrationNotes: {
             type: ['string', 'null'],
@@ -125,19 +125,30 @@ export function createStoryGenerationPrompt(
 
   const baseInstructions = [
     `# Instructions & Guiding Principles:`,
-    `- You are an award-winning children's book author and illustrator.`,
-    `- Your task is to craft a **cohesive and delightful story** matching the provided sequence of user-uploaded images.`,
-    `- Each story should have a **clear beginning, middle, and end**, grounded in the sequence order.`,
-    `- Write from a **toddler's perspective**, highlighting familiar experiences and relatable emotions (joy, frustration, silliness, pride).`,
-    `- Keep sentences **short, simple, and concrete**. Use vivid nouns, strong action verbs, and sensory language.`,
-    `- Use **rhythm, repetition, and fun sounds (onomatopoeia)** naturally to enhance read-aloud appeal.`,
-    `- Incorporate **gentle, age-appropriate humor** (mild mischief, small surprises) when fitting.`,
-    `- **Seamlessly weave in** user details where applicable:`,
+    `- Imagine a parent curled up with their toddler at bedtime, reading aloud. Every sentence should feel warm, playful, and alive in a parent's voice.`,
+    `- Craft a **cohesive story** matching the provided sequence of user-uploaded images, with a **clear beginning, middle, and end**.`,
+    `- Write from the **toddler's perspective** — what they see, feel, touch, hear, and wonder about. Ground every moment in their sensory experience.`,
+    ``,
+    `## Voice & Rhythm (critical for read-aloud quality):`,
+    `- **Vary sentence structure**: mix short punchy fragments ("Splish!") with slightly longer flowing sentences. Avoid monotonous Subject-Verb-Object patterns.`,
+    `- **Use questions and exclamations** to pull the listener in: "What's that sound?", "Look!", "Can you guess what happens next?"`,
+    `- **Onomatopoeia and sound words** should feel organic to the scene — rumble, swoosh, crunch, pitter-pat — not forced.`,
+    `- **Repetition with variation** builds anticipation: repeat a phrase across pages but change one element each time.`,
+    `- Sentences should have a **musical quality** when read aloud — rhythm matters more than vocabulary.`,
+    ``,
+    `## Emotional Texture:`,
+    `- Capture the **small moments** that make a toddler's day magical — the wonder of a new texture, the thrill of a puddle, the safety of a parent's hand.`,
+    `- Show emotions through **actions and senses**, not labels: instead of "Kai was happy", write "Kai's eyes go wide. He squeezes Mama's hand tight."`,
+    `- Include **gentle humor** — mild mischief, silly surprises, funny sounds.`,
+    ``,
+    `## Characters:`,
     characterInstruction,
     `  - Book Title: \"${input.bookTitle || '(Not Provided)'}\"`,
-    `- Generate **1-3 simple sentences per page, maximum 35 words** (for the ${input.storyPages.length} pages provided).`,
-    `  - This 35 word limit is STRICT - text will be displayed in a small area.`,
-    `  - Adjust slightly across pages to maintain good narrative flow.`
+    ``,
+    `## Length:`,
+    `- **2-4 sentences per page, maximum 50 words** (for the ${input.storyPages.length} pages provided).`,
+    `  - This 50 word limit is STRICT — text is displayed on its own page but must stay concise for toddler attention spans.`,
+    `  - Vary length across pages for rhythm: some pages deserve a single punchy line, others need a beat more.`
   ].join('\n');
 
   const illustrationNotesInstructions = [
