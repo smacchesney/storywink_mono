@@ -8,26 +8,25 @@ const Toaster = ({ ...props }: ToasterProps) => {
   
   return (
     <Sonner
-      theme="system"
+      theme="light"
       className="toaster group"
       style={
         {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-          // Success - coral
-          "--success-bg": "#F76C5E",
-          "--success-text": "white",
+          "--normal-bg": "white",
+          "--normal-text": "#1a1a1a",
+          "--normal-border": "#F76C5E",
+          "--success-bg": "white",
+          "--success-text": "#1a1a1a",
           "--success-border": "#F76C5E",
-          // Info - coral
-          "--info-bg": "#F76C5E",
-          "--info-text": "white",
+          "--info-bg": "white",
+          "--info-text": "#1a1a1a",
           "--info-border": "#F76C5E",
-          // Warning - coral
-          "--warning-bg": "#F76C5E",
-          "--warning-text": "white",
+          "--warning-bg": "white",
+          "--warning-text": "#1a1a1a",
           "--warning-border": "#F76C5E",
-          // Error - uses Sonner defaults (red)
+          "--error-bg": "white",
+          "--error-text": "#1a1a1a",
+          "--error-border": "#F76C5E",
         } as React.CSSProperties
       }
       {...props}

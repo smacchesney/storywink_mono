@@ -235,7 +235,7 @@ export function WritingProgressScreen({
       <div className="h-8 flex items-center justify-center mb-2">
         <p
           key={messageIndex}
-          className="text-sm md:text-base text-gray-500 font-medium text-center"
+          className="text-sm md:text-base text-[#F76C5E] font-playful font-medium text-center"
           style={{
             animation: 'fade-message 4s ease-in-out',
           }}
