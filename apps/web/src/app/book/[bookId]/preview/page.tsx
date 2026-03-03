@@ -11,7 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import BookPageGallery from '@/components/book/BookPageGallery'; // Import the new component
 import FlipbookViewer, { FlipbookActions, buildDisplayPages } from '@/components/book/FlipbookViewer'; // Import FlipbookViewer, FlipbookActions type, and buildDisplayPages
-import { showError, showInfo } from '@/lib/toast-utils'; // Import toast for feedback
+import { showError } from '@/lib/toast-utils';
 import { cn } from '@/lib/utils';
 
 // Define a type for the book data we expect, including pages
@@ -146,8 +146,6 @@ export default function BookPreviewPage() {
   const handleExportPdf = async () => {
     if (!bookId) return;
     setIsExportingPdf(true);
-    showInfo("Preparing your PDF download...", "This may take a few moments");
-
     try {
       // Trigger download by navigating to the API endpoint
       // The browser will handle the download based on Content-Disposition header

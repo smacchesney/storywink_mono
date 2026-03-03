@@ -221,7 +221,7 @@ function ReviewPageContent() {
                       setPages(updatedPageData);
                       setConfirmed(fetchedBook.pages.map((p: Page) => p.textConfirmed || p.isTitlePage)); 
                       setIsLoadingText(false);
-                      toast.success("Story text generated successfully!");
+                      console.log("Review Page: Story text generated successfully");
                   } else {
                       throw new Error("Fetched book content missing pages data.");
                   }
@@ -411,7 +411,6 @@ function ReviewPageContent() {
   const handleIllustrate = async () => {
     const bookIdToUse = bookIdFromUrl;
     if (!bookIdToUse || !allConfirmed || isLoadingText) {
-       toast.warning("Cannot start illustration. Ensure all pages are confirmed and story text is loaded.");
        return;
      }
      if (isStartingIllustration || isAwaitingFinalStatus) return;

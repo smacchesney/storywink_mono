@@ -123,7 +123,6 @@ export default function CreateBookPage() {
           setIsUploading(false);
         }
       } else {
-        toast.warning("No assets were created");
         setIsUploading(false);
       }
     } catch (error) {
@@ -167,7 +166,7 @@ export default function CreateBookPage() {
   };
 
   const handleImportFromGooglePhotos = () => {
-    toast.info("Import from Google Photos is coming soon!");
+    // TODO: Implement Google Photos import
   };
 
   return (

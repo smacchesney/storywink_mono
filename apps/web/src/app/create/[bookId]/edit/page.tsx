@@ -626,7 +626,6 @@ export default function EditBookPage() {
       // Refresh book data
       await fetchBookData();
       
-      toast.success(`Successfully added ${cloudinaryAssets.length} photo(s)`);
       setShowPhotoUploadProgress(false);
       setShowCloudinaryUploader(false);
     } catch (error) {
@@ -737,7 +736,6 @@ export default function EditBookPage() {
       setPagesResetKey(prev => prev + 1);
       setPagesConfirmed(false);
 
-      toast.success("Photo removed from book");
       setPageToDelete(null);
 
     } catch (error) {
@@ -762,7 +760,6 @@ export default function EditBookPage() {
        const files = Array.from(event.target.files);
        setIsPhotoSheetOpen(false); 
        setShowPhotoUploadProgress(true); // <-- Show progress screen
-       toast.info(`Uploading ${files.length} additional photo(s)...`);
        logger.info({ bookId, fileCount: files.length }, "Additional photo upload initiated");
        
        const formData = new FormData();
@@ -790,10 +787,9 @@ export default function EditBookPage() {
           // or { success: true, data: { assets: [...] } } for multiple files
           if (result.success && result.data) {
               // Call completion handler which triggers refetch
-              handleAddPhotoUploadComplete(); 
-              toast.success(`Successfully uploaded ${files.length} photo(s)`);
+              handleAddPhotoUploadComplete();
           } else {
-              toast.warning("Upload completed, but no new assets were processed.");
+              logger.warn({ bookId }, "Upload completed, but no new assets were processed.");
           }
        } catch (error) {
           console.error("Add Photo Upload Error:", error);
@@ -807,7 +803,7 @@ export default function EditBookPage() {
   
   // Placeholder for Google Photos import
   const handleImportFromGooglePhotos = () => {
-    toast.info("Import from Google Photos is coming soon!");
+    // TODO: Implement Google Photos import
   };
 
   // -----------------------------------------------------
@@ -853,7 +849,6 @@ export default function EditBookPage() {
         });
 
         if (response.status === 202) {
-            toast.info("Story generation started!");
             setShowGenerationProgress(true); // <-- Show the progress screen
         } else {
             const errorData = await response.json().catch(() => ({ error: "Unknown API error" }));

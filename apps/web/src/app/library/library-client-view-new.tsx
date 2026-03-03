@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { showError, showErrorWithRetry, showSuccess } from '@/lib/toast-utils';
+import { showError, showErrorWithRetry } from '@/lib/toast-utils';
 import { useRouter } from 'next/navigation';
 import { SortDesc } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -145,7 +145,6 @@ export function LibraryClientView() {
         const response = await apiClient.deleteBook(bookToDelete.id, token);
         if (response.success) {
           setBooks(books.filter(book => book.id !== bookToDelete.id));
-          showSuccess('Book deleted successfully');
           setIsDeleteDialogOpen(false);
           setBookToDelete(null);
         } else {
@@ -183,7 +182,6 @@ export function LibraryClientView() {
       });
 
       if (response.ok) {
-        showSuccess('Retrying illustrations...');
         // Refresh books to get updated status
         await fetchBooks(false);
       } else {
