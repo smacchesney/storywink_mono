@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { TextShimmerWave } from '@/components/ui/text-shimmer-wave';
 import { BookStatus } from '@prisma/client';
@@ -12,15 +12,6 @@ interface WritingProgressScreenProps {
 }
 
 const POLLING_INTERVAL = 5000; // Check status every 5 seconds
-
-// Whimsical rotating messages
-const STORY_MESSAGES = [
-  "Sprinkling in some adventure...",
-  "Adding a dash of magic...",
-  "Mixing in giggles and wonder...",
-  "Weaving in cozy moments...",
-  "Stirring up a happy ending...",
-];
 
 // Sparkle component for floating elements
 const Sparkle = ({
@@ -76,16 +67,6 @@ export function WritingProgressScreen({
 }: WritingProgressScreenProps) {
   const pollCountRef = useRef(0);
   const MAX_POLLS = 24; // Timeout after 2 minutes (24 * 5 seconds)
-  const [messageIndex, setMessageIndex] = useState(0);
-
-  // Rotate through story messages
-  useEffect(() => {
-    const messageInterval = setInterval(() => {
-      setMessageIndex((prev) => (prev + 1) % STORY_MESSAGES.length);
-    }, 4000);
-
-    return () => clearInterval(messageInterval);
-  }, []);
 
   // Poll for book status
   useEffect(() => {
@@ -168,17 +149,6 @@ export function WritingProgressScreen({
           }
         }
 
-        @keyframes fade-message {
-          0%, 100% {
-            opacity: 0;
-            transform: translateY(4px);
-          }
-          10%, 90% {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
         @media (prefers-reduced-motion: reduce) {
           @keyframes sparkle-drift {
             0%, 100% { transform: none; opacity: 0.1; }
@@ -229,19 +199,6 @@ export function WritingProgressScreen({
         >
           Brewing a Bedtime adventure...
         </TextShimmerWave>
-      </div>
-
-      {/* Rotating story ingredient message */}
-      <div className="h-8 flex items-center justify-center mb-2">
-        <p
-          key={messageIndex}
-          className="text-sm md:text-base text-[#F76C5E] font-playful font-medium text-center"
-          style={{
-            animation: 'fade-message 4s ease-in-out',
-          }}
-        >
-          {STORY_MESSAGES[messageIndex]}
-        </p>
       </div>
 
       {/* Progress dots */}
