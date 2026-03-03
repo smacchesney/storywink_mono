@@ -142,14 +142,14 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
                 <X className="w-5 h-5" />
               </button>
 
-              {/* Title + Style badge */}
+              {/* Title + Style */}
               <div className="text-center mb-3 pr-12">
-                <h2 className="text-lg md:text-xl font-playful font-bold text-[#1a1a1a]">
+                <h2 className="text-xl md:text-2xl font-playful font-bold text-[#1a1a1a]">
                   {book.title}
                 </h2>
-                <span className="inline-block mt-1 px-3 py-0.5 text-xs font-medium text-[#F76C5E] bg-[#F76C5E]/10 border border-[#F76C5E]/20 rounded-full">
-                  {book.styleLabel} style
-                </span>
+                <p className="font-playful text-sm md:text-base mt-0.5">
+                  Style: <span className="text-[#F76C5E]">{book.styleLabel}</span>
+                </p>
               </div>
 
               {/* FlipbookViewer with navigation arrows */}

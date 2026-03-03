@@ -363,7 +363,7 @@ export const EXAMPLE_BOOKS: ExampleBook[] = [
     title: 'Kai at Universal',
     childName: 'Kai',
     coverAlt: 'A personalized storybook about Kai at Universal Studios',
-    styleLabel: 'Vignette',
+    styleLabel: 'Pen & Pencil',
     bookPages: KAI_AT_UNIVERSAL_PAGES,
   },
 ];
