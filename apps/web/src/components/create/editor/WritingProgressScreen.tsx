@@ -205,7 +205,7 @@ export function WritingProgressScreen({
       <ProgressDots />
 
       {/* Keep page open notice */}
-      <p className="text-xs text-gray-400 mt-8 text-center max-w-xs">
+      <p className="text-xs text-[#F76C5E] font-playful mt-8 text-center max-w-xs">
         Please don&apos;t close this page while your story is being written.
       </p>
     </div>
