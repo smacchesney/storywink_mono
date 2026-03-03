@@ -215,6 +215,123 @@ function origamiCoverPrompt(ctx: StylePromptContext): string {
 }
 
 // ----------------------------------
+// KAWAII STYLE
+// ----------------------------------
+
+/**
+ * Shared kawaii base prompt sections (used by both interior and cover).
+ * Returns the sections as an array for the caller to extend.
+ */
+function kawaiiBaseSections(): string[] {
+  return [
+    `LINE WORK:
+- Soft, rounded black outlines with a hand-drawn brush pen quality
+- Lines are slightly thicker on outer contours, slightly thinner on interior details
+- All corners and edges are rounded — nothing sharp or angular
+- Lines are clean but not perfectly mechanical — gentle, organic warmth`,
+
+    `COLORING & TEXTURE:
+- Soft, warm pastel-leaning colors with subtle watercolor/crayon grain texture throughout
+- Nothing is perfectly smooth or flat — gentle textured quality as if applied with colored pencil or soft watercolor
+- Warm and muted palette: sage green, soft pink, warm cream/yellow, light sky blue, tan, dusty rose, warm brown, soft coral, muted orange
+- No harsh or neon colors`,
+
+    `CHARACTER PROPORTIONS:
+- Children: large round head (~1:2 head-to-body ratio), chunky short limbs, small rounded hands, soft rounded body shapes
+- Adults: smaller head relative to body (~1:3.5 ratio), still soft and rounded
+- All characters have soft, rounded forms`,
+
+    `FACES (CRITICAL — apply to EVERY character):
+- Eyes: small solid black oval dots, slightly vertical, placed low on face with wide spacing. Or happy closed eyes (downward-curved arcs) when showing joy.
+- Eyebrows: simple thin curved arcs — subtle but always present
+- Nose: tiny dot or absent
+- Mouth: small open happy smile or closed gentle curved line
+- Blush: ALWAYS soft pink/rosy circular blush marks on both cheeks of EVERY character
+- Expression: universally warm, gentle, happy`,
+
+    `HAIR:
+- Solid color shape with a few interior lines suggesting strands
+- Slightly darker shadow tone at the base
+- Soft, rounded silhouette
+- Match the reference photo exactly for color and style`,
+
+    `CLOTHING & APPEARANCE:
+- Characters' clothing and appearance must match the reference photo
+- Simplified but recognizable — solid color fills with minimal detail
+- Patterns simplified to basic versions`,
+  ];
+}
+
+function kawaiiInteriorPrompt(ctx: StylePromptContext): string {
+  const refCount = ctx.referenceImageCount || 1;
+
+  const sections = [
+    `Create a warm, gentle children's book illustration in a soft storybook style ${imageCountText(refCount)} The aesthetic combines clean digital illustration with a subtle watercolor/crayon texture, creating a cozy, nurturing feel. The image should be in landscape format (wider than tall) with softly rounded corners.`,
+
+    ...kawaiiBaseSections(),
+
+    `BACKGROUNDS & ENVIRONMENTS:
+- Full scene backgrounds — NOT a vignette on white. The environment fills the entire frame.
+- Backgrounds are detailed and cozy, filled with recognizable objects that add warmth and context (toys, plants, furniture, kitchen items, etc.)
+- Background elements are fully rendered but slightly softer and less defined than foreground characters
+- Soft, diffused warm lighting throughout — no harsh shadows, no dramatic lighting
+- The environment should feel lived-in, cozy, and inviting`,
+  ];
+
+  // Dynamic effects
+  if (ctx.illustrationNotes) {
+    sections.push(
+      `DYNAMIC EFFECTS: Add visual effects to enhance the action. Draw onomatopoeia text (like "SPLASH!", "ZOOM!", "MUNCH!") in the same soft brush-pen style — warm, rounded hand-drawn lettering that matches the illustration's cozy aesthetic. Keep effects minimal (under 15% of image area) and directly relevant to the scene. Do not alter character faces or poses.`,
+      `Specific effect to add: ${ctx.illustrationNotes}`,
+    );
+  }
+
+  sections.push(
+    `COMPOSITION:
+- Characters are the clear focal point, sized prominently in the frame
+- The scene tells a clear story moment — characters are actively engaged in an activity
+- Balanced composition with environmental details framing the characters
+- Slight rounded-rectangle framing feel to the overall image
+- DO NOT add any text to the image.`,
+
+    `Recreate the scene from the reference photo in this warm storybook illustration style. The illustration should feel like a page from a high-quality children's picture book — cozy, gentle, and full of warmth.`,
+  );
+
+  return sections.filter(Boolean).join(' ');
+}
+
+function kawaiiCoverPrompt(ctx: StylePromptContext): string {
+  const refCount = ctx.referenceImageCount || 1;
+
+  const sections = [
+    `Create a warm, gentle children's book COVER illustration in a soft storybook style ${imageCountText(refCount)} The scene is a focused vignette on a pure white background — NOT a full-bleed scene. Square format.`,
+
+    `Match the exact illustration style shown in the style reference images: soft brush-pen outlines, warm pastel watercolor/crayon texture, rosy blush cheeks on all characters, small dot eyes, cozy warmth. The new illustration must look like it belongs in the same book as these reference images.`,
+
+    ...kawaiiBaseSections(),
+
+    `TITLE TEXT:
+- Display the title "${ctx.bookTitle}" above the illustration
+- Rounded, bubbly hand-drawn lettering — like a toddler board book cover
+- Text color is coral (#F76C5E) with a clean black outline around each letter for readability against the white background
+- Letters can vary slightly in size or angle for a playful, hand-stamped feel
+- The title should be modestly sized — readable but not overpowering. The illustration is the hero, the title is a complement.`,
+
+    `COMPOSITION:
+- Pure white background for the entire image
+- Title sits neatly above the illustration with comfortable spacing
+- The illustration is the dominant element, taking up most of the frame
+- The vignette is grounded slightly at the bottom with a small soft shadow or ground element (grass, rug, floor) but fades naturally into the white background at the edges — no hard border
+- Clean, uncluttered, centered
+- The overall layout is balanced and simple`,
+
+    `Recreate the scene from the reference photo as a toddler book cover in this style. The cover should feel like something you'd find in the board book section of a bookstore — adorable vignette, clean white space, instant warmth.`,
+  ];
+
+  return sections.filter(Boolean).join(' ');
+}
+
+// ----------------------------------
 // STYLE LIBRARY
 // ----------------------------------
 
@@ -248,6 +365,23 @@ export const STYLE_LIBRARY = {
     ],
     buildInteriorPrompt: origamiInteriorPrompt,
     buildCoverPrompt: origamiCoverPrompt,
+  },
+  kawaii: {
+    label: 'Kawaii',
+    referenceImageUrls: [
+      'https://res.cloudinary.com/storywink/image/upload/v1772552143/Screenshot_2026-03-03_210304_vzwqhj.png',
+      'https://res.cloudinary.com/storywink/image/upload/v1772552144/Screenshot_2026-03-03_210150_tqtloy.png',
+      'https://res.cloudinary.com/storywink/image/upload/v1772552144/Screenshot_2026-03-03_210329_zzdrzn.png',
+      'https://res.cloudinary.com/storywink/image/upload/v1772552149/Screenshot_2026-03-03_210236_ia063u.png',
+    ],
+    coverReferenceImageUrls: [
+      'https://res.cloudinary.com/storywink/image/upload/v1772551692/Gemini_Generated_Image_fbsrpjfbsrpjfbsr_az5jkg.png',
+      'https://res.cloudinary.com/storywink/image/upload/v1772551692/Gemini_Generated_Image_9fnhqs9fnhqs9fnh_szlc8j.png',
+      'https://res.cloudinary.com/storywink/image/upload/v1772551692/Gemini_Generated_Image_szqw7rszqw7rszqw_oko5z0.png',
+      'https://res.cloudinary.com/storywink/image/upload/v1772551692/Gemini_Generated_Image_d4gguyd4gguyd4gg_apxvoz.png',
+    ],
+    buildInteriorPrompt: kawaiiInteriorPrompt,
+    buildCoverPrompt: kawaiiCoverPrompt,
   },
 } satisfies Record<string, StyleDefinition>;
 
