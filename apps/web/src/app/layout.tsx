@@ -102,7 +102,7 @@ export default function RootLayout({
         >
           <PlayfulBackground variant="default" showCornerDoodles={false} />
           <SiteHeader />
-          <main className="flex-grow relative z-10">{children}</main>
+          <main className="flex-grow relative z-10 pt-[28px]">{children}</main>
           <SiteFooter />
           <Toaster 
             position="bottom-right"

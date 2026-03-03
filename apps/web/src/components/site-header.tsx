@@ -38,7 +38,7 @@ export function SiteHeader() {
   }, [isMobileMenuOpen]);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-[#B8E4DC]/30 bg-[rgba(184,228,220,0.35)] dark:bg-background/80 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full bg-white dark:bg-background/80">
       <div className="w-full flex h-14 items-center px-6 md:px-8 justify-between max-w-none">
         {/* Desktop Logo and Nav */}
         <div className="hidden md:flex items-center">
@@ -147,6 +147,37 @@ export function SiteHeader() {
           </nav>
         </div>
       )}
+      {/* Cloud/scallop bottom edge — 320px wide tile with 5 varied bumps */}
+      <svg
+        className="absolute left-0 right-0 pointer-events-none z-30"
+        style={{ bottom: '-28px' }}
+        width="100%"
+        height="28"
+        aria-hidden="true"
+      >
+        <defs>
+          <pattern
+            id="cloud-scallop"
+            x="0"
+            y="0"
+            width="320"
+            height="28"
+            patternUnits="userSpaceOnUse"
+          >
+            <path
+              d="M0,0 L0,1.5 C2,14 60,13 62,2.5 C65,30 142,28 145,1 C147,18 198,16 200,3 C203,32 272,30 275,1.5 C277,17 318,18 320,1.5 L320,0 Z"
+              fill="white"
+            />
+            <path
+              d="M0,1.5 C2,14 60,13 62,2.5 C65,30 142,28 145,1 C147,18 198,16 200,3 C203,32 272,30 275,1.5 C277,17 318,18 320,1.5"
+              fill="none"
+              stroke="#F76C5E"
+              strokeWidth="2.5"
+            />
+          </pattern>
+        </defs>
+        <rect width="100%" height="28" fill="url(#cloud-scallop)" />
+      </svg>
     </header>
   );
 } 
