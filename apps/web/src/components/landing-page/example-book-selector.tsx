@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import { ExampleBook, getCoverUrl } from './example-books-data';
+import { ExampleBook, getCoverUrl, getAllImageUrls } from './example-books-data';
 
 interface ExampleBookSelectorProps {
   books: ExampleBook[];
@@ -23,12 +23,24 @@ const ExampleBookSelector: React.FC<ExampleBookSelectorProps> = ({
   onSelectBook,
   className,
 }) => {
-  // Preload cover images
+  // Preload cover images immediately, then all page images after a short delay
   useEffect(() => {
     books.forEach((book) => {
       const img = new window.Image();
       img.src = getCoverUrl(book);
     });
+
+    // Preload all page images so flipbook opens instantly
+    const timer = setTimeout(() => {
+      books.forEach((book) => {
+        getAllImageUrls(book).forEach((url) => {
+          const img = new window.Image();
+          img.src = url;
+        });
+      });
+    }, 1000);
+
+    return () => clearTimeout(timer);
   }, [books]);
 
   return (
