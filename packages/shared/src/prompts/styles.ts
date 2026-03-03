@@ -337,7 +337,7 @@ function kawaiiCoverPrompt(ctx: StylePromptContext): string {
 
 export const STYLE_LIBRARY = {
   vignette: {
-    label: 'Vignette',
+    label: 'Pen & Pencil',
     referenceImageUrls: [
       'https://res.cloudinary.com/storywink/image/upload/v1772284884/Screenshot_2026-02-28_at_9.17.44_PM_twxjzc.png',
       'https://res.cloudinary.com/storywink/image/upload/v1772284892/Screenshot_2026-02-28_at_9.17.35_PM_kexvqz.png',
