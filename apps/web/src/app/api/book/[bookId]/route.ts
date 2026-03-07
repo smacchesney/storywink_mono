@@ -14,6 +14,7 @@ const additionalCharacterSchema = z.object({
 const updateBookSchema = z.object({
   artStyle: z.string().nullable().optional(), // Allow null or undefined
   title: z.string().min(1, { message: 'Title cannot be empty.' }).optional(),
+  language: z.enum(['en', 'ja']).optional(),
   coverAssetId: z.string().cuid().nullable().optional(), // For cover changes
   childName: z.string().max(50, 'Name too long').nullable().optional(),
   additionalCharacters: z.array(additionalCharacterSchema).max(5, 'Maximum 5 characters').optional(),

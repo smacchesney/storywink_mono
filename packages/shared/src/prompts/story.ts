@@ -57,6 +57,7 @@ export interface StoryGenerationInput {
   artStyle?: string;
   childName?: string;
   additionalCharacters?: { name: string; relationship: string }[];
+  language?: string; // "en" | "ja", defaults to "en"
   storyPages: {
     pageId: string;
     pageNumber: number;
@@ -151,6 +152,20 @@ export function createStoryGenerationPrompt(
     `  - Vary length across pages for rhythm: some pages deserve a single punchy line, others need a beat more.`
   ].join('\n');
 
+  // Language-specific instructions (appended when not English)
+  const languageInstruction = input.language === 'ja'
+    ? [
+        `\n## Language — Japanese (日本語):`,
+        `- Write ALL story text ("text" field) in **Japanese**.`,
+        `- Use **hiragana** primarily, as this book is for toddlers (ages 2-4). **No kanji at all.** Katakana is OK for onomatopoeia and foreign words.`,
+        `- Maintain the same warm, playful, read-aloud quality described above, adapted for Japanese.`,
+        `- Use Japanese onomatopoeia naturally (ざぶーん, どきどき, ぴょんぴょん, きらきら, etc.).`,
+        `- Character names should remain as provided (do not transliterate to katakana unless they are clearly non-Japanese names).`,
+        `- **Length constraint (replaces the English rule above):** 2-4 sentences per page, **maximum 80 characters** per page.`,
+        `- The "illustrationNotes" field must remain in **English** (the illustration AI only understands English).`,
+      ].join('\n')
+    : '';
+
   const illustrationNotesInstructions = [
     `\n- For **each** page, also suggest "illustrationNotes" to dynamically enhance the image with fun effects:`,
     `  - Focus on **amplifying the specific action in the scene**:`,
@@ -172,7 +187,7 @@ export function createStoryGenerationPrompt(
   ].join('');
 
   parts.push({
-    text: `${baseInstructions}\n${illustrationNotesInstructions}`,
+    text: `${baseInstructions}${languageInstruction}\n${illustrationNotesInstructions}`,
   });
 
   return parts;

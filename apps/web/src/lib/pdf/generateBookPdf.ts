@@ -15,6 +15,7 @@ import { Book, Page } from '@storywink/database';
 import logger from '../logger';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { PAGE_TEXT } from '@storywink/shared/constants';
 
 /**
  * Optimizes Cloudinary image URL for print quality.
@@ -71,6 +72,27 @@ function loadFontBase64(): string {
 }
 
 /**
+ * Load Zen Maru Gothic TTF as base64 for Japanese text in PDFs.
+ */
+function loadJapaneseFontBase64(): string {
+  try {
+    const fontPath = join(process.cwd(), 'public/fonts/ZenMaruGothic-Regular.ttf');
+    const fontBuffer = readFileSync(fontPath);
+    return fontBuffer.toString('base64');
+  } catch {
+    logger.warn('Could not load Zen Maru Gothic for PDF embedding');
+    return '';
+  }
+}
+
+/** Returns the CSS font-family for story text based on language. */
+function storyFontFamily(language: string): string {
+  return language === 'ja'
+    ? "'Zen Maru Gothic', 'Hiragino Maru Gothic Pro', sans-serif"
+    : "'Excalifont', cursive, sans-serif";
+}
+
+/**
  * Generates HTML for a full-bleed illustration page.
  */
 function generateIllustrationPageHtml(page: Page): string {
@@ -102,7 +124,7 @@ function generateIllustrationPageHtml(page: Page): string {
 /**
  * Generates HTML for a text-only page with centered story text.
  */
-function generateTextPageHtml(page: Page): string {
+function generateTextPageHtml(page: Page, language: string): string {
   const pageStyle = `
     width: ${PAGE_WIDTH_WITH_BLEED_IN}in;
     height: ${PAGE_HEIGHT_WITH_BLEED_IN}in;
@@ -115,13 +137,14 @@ function generateTextPageHtml(page: Page): string {
     justify-content: center;
   `;
   const textStyle = `
-    font-family: 'Excalifont', cursive, sans-serif;
+    font-family: ${storyFontFamily(language)};
     font-size: 36px;
     color: #1a1a1a;
     text-align: center;
     line-height: 1.5;
     max-width: 70%;
     word-wrap: break-word;
+    word-break: ${language === 'ja' ? 'auto-phrase' : 'normal'};
   `;
 
   const text = page.text || '';
@@ -137,8 +160,10 @@ function generateTextPageHtml(page: Page): string {
  * Generates HTML for the dedication page (PDF page 1, right-hand side).
  * Shows "This book was made especially for" + child's name in coral + mascot.
  */
-function generateDedicationPageHtml(childName: string | null, bookTitle: string): string {
+function generateDedicationPageHtml(childName: string | null, bookTitle: string, language: string): string {
   const displayName = childName || bookTitle || 'You';
+  const texts = PAGE_TEXT[language as keyof typeof PAGE_TEXT] || PAGE_TEXT.en;
+  const fontFamily = storyFontFamily(language);
 
   const pageStyle = `
     width: ${PAGE_WIDTH_WITH_BLEED_IN}in;
@@ -153,24 +178,29 @@ function generateDedicationPageHtml(childName: string | null, bookTitle: string)
     justify-content: center;
   `;
 
+  // Japanese: "この えほんは [name] のために つくりました"
+  // English: "This book was made / especially for / [name]"
+  const dedicationHtml = language === 'ja'
+    ? `<p style="font-family: ${fontFamily}; font-size: 32px; color: #1a1a1a; line-height: 1.4; margin: 0 0 0.15in 0;">
+        ${texts.dedicationLine1}
+      </p>
+      <p style="font-family: ${fontFamily}; font-size: 52px; color: #F76C5E; line-height: 1.3; margin: 0 0 0.15in 0; font-weight: bold;">
+        ${displayName}
+      </p>
+      <p style="font-family: ${fontFamily}; font-size: 32px; color: #1a1a1a; line-height: 1.4; margin: 0;">
+        ${texts.dedicationLine2}
+      </p>`
+    : `<p style="font-family: ${fontFamily}; font-size: 32px; color: #1a1a1a; line-height: 1.4; margin: 0 0 0.15in 0;">
+        ${texts.dedicationLine1}<br>${texts.dedicationLine2}
+      </p>
+      <p style="font-family: ${fontFamily}; font-size: 52px; color: #F76C5E; line-height: 1.3; margin: 0; font-weight: bold;">
+        ${displayName}
+      </p>`;
+
   return `
     <div class="page" style="${pageStyle}">
       <div style="text-align: center; max-width: 70%;">
-        <p style="
-          font-family: 'Excalifont', cursive, sans-serif;
-          font-size: 32px;
-          color: #1a1a1a;
-          line-height: 1.4;
-          margin: 0 0 0.15in 0;
-        ">This book was made<br>especially for</p>
-        <p style="
-          font-family: 'Excalifont', cursive, sans-serif;
-          font-size: 52px;
-          color: #F76C5E;
-          line-height: 1.3;
-          margin: 0;
-          font-weight: bold;
-        ">${displayName}</p>
+        ${dedicationHtml}
       </div>
       <img
         src="${DEDICATION_MASCOT_URL}"
@@ -192,8 +222,10 @@ function generateDedicationPageHtml(childName: string | null, bookTitle: string)
  * Generates HTML for the ending page.
  * Shows "The End / Until next time, [name]!" with mascot.
  */
-function generateEndingPageHtml(childName: string | null, bookTitle: string): string {
+function generateEndingPageHtml(childName: string | null, bookTitle: string, language: string): string {
   const displayName = childName || bookTitle || 'You';
+  const texts = PAGE_TEXT[language as keyof typeof PAGE_TEXT] || PAGE_TEXT.en;
+  const fontFamily = storyFontFamily(language);
 
   const pageStyle = `
     width: ${PAGE_WIDTH_WITH_BLEED_IN}in;
@@ -212,22 +244,22 @@ function generateEndingPageHtml(childName: string | null, bookTitle: string): st
     <div class="page" style="${pageStyle}">
       <div style="text-align: center; max-width: 70%;">
         <p style="
-          font-family: 'Excalifont', cursive, sans-serif;
+          font-family: ${fontFamily};
           font-size: 42px;
           color: #1a1a1a;
           line-height: 1.3;
           margin: 0 0 0.2in 0;
           font-weight: bold;
-        ">The End</p>
+        ">${texts.endingTitle}</p>
         <p style="
-          font-family: 'Excalifont', cursive, sans-serif;
+          font-family: ${fontFamily};
           font-size: 28px;
           color: #1a1a1a;
           line-height: 1.4;
           margin: 0 0 0.1in 0;
-        ">Until next time,</p>
+        ">${texts.endingLine}</p>
         <p style="
-          font-family: 'Excalifont', cursive, sans-serif;
+          font-family: ${fontFamily};
           font-size: 48px;
           color: #F76C5E;
           line-height: 1.3;
@@ -335,6 +367,8 @@ export async function generateBookPdf(bookData: BookWithPages, options?: Generat
   let browser = null;
 
   try {
+    const language = bookData.language || 'en';
+
     // Load font for embedding
     const fontBase64 = loadFontBase64();
     const fontFace = fontBase64
@@ -346,6 +380,19 @@ export async function generateBookPdf(bookData: BookWithPages, options?: Generat
         }`
       : '';
 
+    // Load Japanese font if needed
+    const jaFontFace = language === 'ja' ? (() => {
+      const jaFontBase64 = loadJapaneseFontBase64();
+      return jaFontBase64
+        ? `@font-face {
+            font-family: 'Zen Maru Gothic';
+            src: url(data:font/truetype;base64,${jaFontBase64}) format('truetype');
+            font-weight: normal;
+            font-style: normal;
+          }`
+        : '';
+    })() : '';
+
     // Build interleaved page HTML
     const sortedPages = [...bookData.pages].sort((a, b) => a.pageNumber - b.pageNumber);
     let pageHtmlArray: string[] = [];
@@ -356,16 +403,16 @@ export async function generateBookPdf(bookData: BookWithPages, options?: Generat
     }
 
     // Dedication page
-    pageHtmlArray.push(generateDedicationPageHtml(bookData.childName, bookData.title));
+    pageHtmlArray.push(generateDedicationPageHtml(bookData.childName, bookData.title, language));
 
     // Story pages: Text (left/verso) + Illustration (right/recto) pairs
     for (const page of sortedPages) {
-      pageHtmlArray.push(generateTextPageHtml(page));
+      pageHtmlArray.push(generateTextPageHtml(page, language));
       pageHtmlArray.push(generateIllustrationPageHtml(page));
     }
 
     // Ending page - "The End / Until next time, [name]!"
-    pageHtmlArray.push(generateEndingPageHtml(bookData.childName, bookData.title));
+    pageHtmlArray.push(generateEndingPageHtml(bookData.childName, bookData.title, language));
 
     // Back cover (user PDF only)
     if (includeBackCover) {
@@ -386,6 +433,7 @@ export async function generateBookPdf(bookData: BookWithPages, options?: Generat
         <title>${bookData.title || 'My Storybook'}</title>
         <style>
           ${fontFace}
+          ${jaFontFace}
           body { margin: 0; padding: 0; }
         </style>
       </head>

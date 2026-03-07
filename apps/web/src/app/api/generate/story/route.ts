@@ -143,6 +143,7 @@ export async function POST(req: NextRequest) {
         bookTitle: book.title,
         artStyle: book.artStyle,
         isDoubleSpread: false,
+        language: book.language || 'en',
       },
       storyPages: pagesForStory,
     };

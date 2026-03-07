@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 import { coolifyImageUrl } from '@storywink/shared';
+import { PAGE_TEXT } from '@storywink/shared/constants';
 
 // Mascot URLs
 const DEDICATION_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.58.09_PM_gnknk5.png';
@@ -17,15 +18,16 @@ const BLANK_PAGE_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload
 // Display page types for interleaved layout
 export type DisplayPage =
   | { type: 'illustration'; page: Page }
-  | { type: 'text'; page: Page }
-  | { type: 'dedication'; childName: string | null; bookTitle: string }
-  | { type: 'ending'; childName: string | null; bookTitle: string }
+  | { type: 'text'; page: Page; language: string }
+  | { type: 'dedication'; childName: string | null; bookTitle: string; language: string }
+  | { type: 'ending'; childName: string | null; bookTitle: string; language: string }
   | { type: 'back-cover' }
   | { type: 'blank' };
 
 export interface BuildDisplayPagesOptions {
   childName?: string | null;
   bookTitle?: string;
+  language?: string;
 }
 
 interface FlipbookViewerProps {
@@ -35,6 +37,7 @@ interface FlipbookViewerProps {
   className?: string;
   childName?: string | null;
   bookTitle?: string;
+  language?: string;
 }
 
 // Define the type for the imperative handle
@@ -61,6 +64,7 @@ export interface FlipbookActions {
  */
 export function buildDisplayPages(pages: Page[], options?: BuildDisplayPagesOptions): DisplayPage[] {
   const displayPages: DisplayPage[] = [];
+  const language = options?.language || 'en';
   for (const page of pages) {
     if (page.isTitlePage) {
       // Cover page (index 0, solo right with showCover)
@@ -72,10 +76,11 @@ export function buildDisplayPages(pages: Page[], options?: BuildDisplayPagesOpti
         type: 'dedication',
         childName: options?.childName ?? null,
         bookTitle: options?.bookTitle ?? 'You',
+        language,
       });
     } else {
       // Text on left (verso), illustration on right (recto) — same spread
-      displayPages.push({ type: 'text', page });
+      displayPages.push({ type: 'text', page, language });
       displayPages.push({ type: 'illustration', page });
     }
   }
@@ -84,6 +89,7 @@ export function buildDisplayPages(pages: Page[], options?: BuildDisplayPagesOpti
     type: 'ending',
     childName: options?.childName ?? null,
     bookTitle: options?.bookTitle ?? 'You',
+    language,
   });
   // Blank padding (right side, keeps middle page count even)
   displayPages.push({ type: 'blank' });
@@ -101,6 +107,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     className,
     childName,
     bookTitle,
+    language = 'en',
   },
   ref // Receive the forwarded ref
 ) => {
@@ -112,8 +119,8 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
 
   // Build interleaved display pages
   const displayPages = useMemo(
-    () => buildDisplayPages(pages, { childName, bookTitle }),
-    [pages, childName, bookTitle]
+    () => buildDisplayPages(pages, { childName, bookTitle, language }),
+    [pages, childName, bookTitle, language]
   );
 
   // Expose the pageFlip instance via the forwarded ref
@@ -268,18 +275,39 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
 
     if (dp.type === 'dedication') {
       const displayName = dp.childName || dp.bookTitle || 'You';
+      const texts = PAGE_TEXT[dp.language as keyof typeof PAGE_TEXT] || PAGE_TEXT.en;
+      const fontClass = dp.language === 'ja' ? 'font-japanese' : 'font-playful';
       return (
         <div key={`dedication-${index}`} className="bg-white rounded-lg overflow-hidden border border-black/15">
           <div className="absolute inset-0 flex flex-col justify-center items-center">
             <div className="text-center px-[10%]">
-              <p className="font-playful text-[#1a1a1a] leading-relaxed"
-                 style={{ fontSize: `${smallBodySize}px` }}>
-                This book was made<br />especially for
-              </p>
-              <p className="font-playful text-[#F76C5E] font-bold mt-1"
-                 style={{ fontSize: `${nameSize}px` }}>
-                {displayName}
-              </p>
+              {dp.language === 'ja' ? (
+                <>
+                  <p className={`${fontClass} text-[#1a1a1a] leading-relaxed`}
+                     style={{ fontSize: `${smallBodySize}px` }}>
+                    {texts.dedicationLine1}
+                  </p>
+                  <p className={`${fontClass} text-[#F76C5E] font-bold mt-1`}
+                     style={{ fontSize: `${nameSize}px` }}>
+                    {displayName}
+                  </p>
+                  <p className={`${fontClass} text-[#1a1a1a] leading-relaxed mt-1`}
+                     style={{ fontSize: `${smallBodySize}px` }}>
+                    {texts.dedicationLine2}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className={`${fontClass} text-[#1a1a1a] leading-relaxed`}
+                     style={{ fontSize: `${smallBodySize}px` }}>
+                    {texts.dedicationLine1}<br />{texts.dedicationLine2}
+                  </p>
+                  <p className={`${fontClass} text-[#F76C5E] font-bold mt-1`}
+                     style={{ fontSize: `${nameSize}px` }}>
+                    {displayName}
+                  </p>
+                </>
+              )}
             </div>
           </div>
           <Image
@@ -296,19 +324,21 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
 
     if (dp.type === 'ending') {
       const displayName = dp.childName || dp.bookTitle || 'You';
+      const texts = PAGE_TEXT[dp.language as keyof typeof PAGE_TEXT] || PAGE_TEXT.en;
+      const fontClass = dp.language === 'ja' ? 'font-japanese' : 'font-playful';
       return (
         <div key={`ending-${index}`} className="bg-white rounded-lg overflow-hidden border border-black/15">
           <div className="absolute inset-0 flex flex-col justify-center items-center">
             <div className="text-center px-[10%]">
-              <p className="font-playful text-[#1a1a1a] font-bold"
+              <p className={`${fontClass} text-[#1a1a1a] font-bold`}
                  style={{ fontSize: `${titleSize}px` }}>
-                The End
+                {texts.endingTitle}
               </p>
-              <p className="font-playful text-[#1a1a1a] mt-2 leading-relaxed"
+              <p className={`${fontClass} text-[#1a1a1a] mt-2 leading-relaxed`}
                  style={{ fontSize: `${smallBodySize}px` }}>
-                Until next time,
+                {texts.endingLine}
               </p>
-              <p className="font-playful text-[#F76C5E] font-bold mt-1"
+              <p className={`${fontClass} text-[#F76C5E] font-bold mt-1`}
                  style={{ fontSize: `${nameSize}px` }}>
                 {displayName}!
               </p>
@@ -350,13 +380,14 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
 
     // Existing text/illustration rendering (dp is narrowed to text | illustration here)
     const pageKey = `${dp.page.id}-${dp.type}-${index}`;
+    const textFontClass = dp.type === 'text' && dp.language === 'ja' ? 'font-japanese' : 'font-playful';
 
     return (
       <div key={pageKey} className="bg-white rounded-lg overflow-hidden border border-black/15">
         {dp.type === 'text' ? (
           // Text page - white background with centered story text
           <div className="absolute inset-0 flex items-center justify-center p-[10%]">
-            <p className="font-playful text-[#1a1a1a] text-center leading-relaxed"
+            <p className={`${textFontClass} text-[#1a1a1a] text-center leading-relaxed`}
                style={{ fontSize: `${bodySize}px` }}>
               {dp.page.text}
             </p>

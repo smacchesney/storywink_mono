@@ -15,6 +15,7 @@ interface BookPageGalleryProps {
   onDisplayPageSelect: (displayIndex: number) => void; // 1-based
   childName?: string | null;
   bookTitle?: string;
+  language?: string;
 }
 
 const BookPageGallery: React.FC<BookPageGalleryProps> = ({
@@ -24,14 +25,15 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
   onDisplayPageSelect,
   childName,
   bookTitle,
+  language,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const activeThumbRef = useRef<HTMLButtonElement>(null);
 
   // Build interleaved display pages (same logic as FlipbookViewer)
   const displayPages = useMemo(
-    () => buildDisplayPages(pages, { childName, bookTitle }),
-    [pages, childName, bookTitle]
+    () => buildDisplayPages(pages, { childName, bookTitle, language }),
+    [pages, childName, bookTitle, language]
   );
 
   // Scroll active thumbnail into view when it changes

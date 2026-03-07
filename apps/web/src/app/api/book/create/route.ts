@@ -8,6 +8,7 @@ import { BookStatus, PageType } from '@prisma/client';
 // Zod schema for request body validation
 const createBookSchema = z.object({
   assetIds: z.array(z.string().cuid()).min(1, { message: 'At least one asset ID is required.' }),
+  language: z.enum(['en', 'ja']).default('en'),
 });
 
 export async function POST(req: NextRequest) {
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    const { assetIds } = validatedData;
+    const { assetIds, language } = validatedData;
 
     // Use a transaction to ensure atomicity
     const newBook = await prisma.$transaction(async (tx) => {
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest) {
           title: '', // Start with empty title as per new requirements
           status: BookStatus.DRAFT,
           pageLength: assetIds.length, // Set page length based on provided assets
+          language,
           coverAssetId: assetIds[0], // First photo becomes the cover
           // Other fields like artStyle will be set later in the editor
         },

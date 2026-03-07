@@ -29,6 +29,7 @@ export interface Book {
   title: string;
   status: BookStatus;
   pageLength: number;
+  language: string;
   artStyle?: string | null;
   tone?: string | null;
   typography?: string | null;

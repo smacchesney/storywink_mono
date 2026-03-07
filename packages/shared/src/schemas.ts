@@ -1,9 +1,14 @@
 import { z } from 'zod';
 
+// Supported book languages
+export const SUPPORTED_LANGUAGES = ['en', 'ja'] as const;
+export type BookLanguage = typeof SUPPORTED_LANGUAGES[number];
+
 // API Request/Response schemas
 export const createBookSchema = z.object({
   assetIds: z.array(z.string()).min(1, "At least one photo is required"),
   pageLength: z.number().int().min(6).max(20).default(10),
+  language: z.enum(SUPPORTED_LANGUAGES).default('en'),
   artStyle: z.string().optional(),
   tone: z.string().optional(),
   theme: z.string().optional(),
@@ -17,6 +22,7 @@ export const additionalCharacterSchema = z.object({
 
 export const updateBookSchema = z.object({
   title: z.string().optional(),
+  language: z.enum(SUPPORTED_LANGUAGES).optional(),
   artStyle: z.string().optional(),
   coverAssetId: z.string().optional(),
   childName: z.string().max(50, 'Name too long').nullable().optional(),

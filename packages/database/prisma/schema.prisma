@@ -50,6 +50,7 @@ model Book {
   title             String
   status            BookStatus     @default(DRAFT)
   pageLength        Int // 8, 12, or 16
+  language          String     @default("en") // "en" or "ja"
   artStyle          String?
   tone              String?
   typography        String?

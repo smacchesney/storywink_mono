@@ -3,7 +3,15 @@
   src: url('/fonts/Excalifont-Regular.woff2') format('woff2');
   font-weight: normal;
   font-style: normal;
-  font-display: swap; 
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Zen Maru Gothic';
+  src: url('/fonts/ZenMaruGothic-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
 }
 
 @import "tailwindcss";
@@ -153,6 +161,11 @@
 /* Accent font utility class - use sparingly for logo, CTA, hero words */
 .font-playful {
   font-family: 'Excalifont', cursive;
+}
+
+/* Japanese story text font */
+.font-japanese {
+  font-family: 'Zen Maru Gothic', 'Hiragino Maru Gothic Pro', sans-serif;
 }
 
 /* Hide scrollbar but keep functionality */

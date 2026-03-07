@@ -10,6 +10,7 @@ import { CloudinaryUploaderAuto } from '@/components/cloudinary-uploader-auto';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@clerk/nextjs';
 import logger from '@/lib/logger';
+import type { BookLanguage } from '@storywink/shared/schemas';
 
 // Type for Cloudinary asset from uploader
 interface CloudinaryAsset {
@@ -32,6 +33,7 @@ interface Asset {
 export default function CreateBookPage() {
   const router = useRouter();
   const { getToken, isLoaded } = useAuth();
+  const [language, setLanguage] = useState<BookLanguage>('en');
   const [isUploading, setIsUploading] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showCloudinaryUploader, setShowCloudinaryUploader] = useState(false);
@@ -84,6 +86,7 @@ export default function CreateBookPage() {
     try {
       const response = await apiClient.createBook({
         assetIds,
+        language,
       }, token);
 
       if (!response.success || !response.data) {
@@ -189,6 +192,28 @@ export default function CreateBookPage() {
           <p className="mt-4 md:mt-6 text-lg md:text-xl text-gray-600 font-medium">
             Start Creating
           </p>
+
+          {/* Language selector */}
+          <div className="mt-5 flex items-center gap-1.5 rounded-full bg-gray-100/80 p-1">
+            {([
+              { value: 'en' as const, label: 'English' },
+              { value: 'ja' as const, label: '日本語' },
+            ]).map(({ value, label }) => (
+              <button
+                key={value}
+                onClick={() => setLanguage(value)}
+                className={`
+                  font-playful text-sm px-4 py-1.5 rounded-full transition-all duration-200
+                  ${language === value
+                    ? 'bg-[#F76C5E] text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                  }
+                `}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
           <PhotoSourceSheet
             isOpen={isSheetOpen}

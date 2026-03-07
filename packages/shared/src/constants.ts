@@ -48,6 +48,28 @@ export const ART_STYLES = [
   { id: 'anime', name: 'Anime', description: 'Japanese anime-inspired artwork' },
 ] as const;
 
+// Language configuration
+export const LANGUAGE_LABELS: Record<string, string> = {
+  en: 'English',
+  ja: '日本語',
+} as const;
+
+// Language-specific page text for dedication & ending pages
+export const PAGE_TEXT = {
+  en: {
+    dedicationLine1: 'This book was made',
+    dedicationLine2: 'especially for',
+    endingTitle: 'The End',
+    endingLine: 'Until next time,',
+  },
+  ja: {
+    dedicationLine1: 'この えほんは',
+    dedicationLine2: 'のために つくりました',
+    endingTitle: 'おしまい',
+    endingLine: 'またね、',
+  },
+} as const;
+
 // Book status messages
 export const STATUS_MESSAGES = {
   DRAFT: 'Setting up your storybook',
