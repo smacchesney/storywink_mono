@@ -159,8 +159,9 @@ export function SiteHeader() {
              </SignedIn>
           </div>
 
-          {/* Mobile: Notification Bell + Menu Trigger */}
+          {/* Mobile: Language + Notification Bell + Menu Trigger */}
           <div className="flex items-center md:hidden">
+            <LanguageSwitcher />
             <SignedIn>
               <NotificationBell />
             </SignedIn>
@@ -183,7 +184,6 @@ export function SiteHeader() {
           className="absolute top-14 left-0 right-0 z-40 bg-white dark:bg-background shadow-md md:hidden"
         >
           <nav className="container flex flex-col space-y-2 p-4">
-            <LanguageSwitcher className="self-end" />
             <SignedIn>
               <Link
                 href="/library"
