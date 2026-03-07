@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { BookStatus, Page, Book } from '@prisma/client';
@@ -32,6 +33,7 @@ const POLLING_INTERVAL = 5000; // Check every 5 seconds
 function ReviewPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams(); // <-- Get search params
+  const t = useTranslations('review');
   // Keep context for now, but don't rely on it for bookId
   // const { bookData: contextBookData, setBookData } = useBookCreation(); // Unused 
 
@@ -80,7 +82,7 @@ function ReviewPageContent() {
       const bookIdToFetch = bookIdFromUrl;
 
       if (!bookIdToFetch) { // <-- Check bookId from URL
-        toast.error("Book ID not found in URL. Cannot load review data.");
+        toast.error(t('bookIdNotFound'));
         setIsFetchingInitialData(false);
         return;
       }
@@ -163,7 +165,7 @@ function ReviewPageContent() {
       } catch (error) {
         console.error("Error fetching initial review data:", error);
         if (isMountedRef.current) {
-          toast.error(`Error loading review data: ${error instanceof Error ? error.message : String(error)}`);
+          toast.error(t('errorLoadingReviewData', { error: error instanceof Error ? error.message : String(error) }));
           // Optionally redirect or show a persistent error state
         }
       } finally {
@@ -187,7 +189,7 @@ function ReviewPageContent() {
       if (!isMountedRef.current) return;
       if (!statusRes.ok) {
         const errorText = await statusRes.text().catch(() => `HTTP error ${statusRes.status}`);
-        throw new Error(`Failed to fetch book status: ${errorText}`);
+        throw new Error(t('errorFetchingStatus', { error: errorText }));
       }
       const statusData = await statusRes.json();
       if (!isMountedRef.current) return;
@@ -229,7 +231,7 @@ function ReviewPageContent() {
                   console.error("Error fetching or processing book content:", contentError);
                   if (isMountedRef.current) {
                       setIsLoadingText(false);
-                      toast.error(`Error loading book content: ${contentError instanceof Error ? contentError.message : String(contentError)}`);
+                      toast.error(t('errorLoadingContent', { error: contentError instanceof Error ? contentError.message : String(contentError) }));
                   }
               }
           } else {
@@ -242,7 +244,7 @@ function ReviewPageContent() {
           setNeedsTextPolling(false);
           setIsLoadingText(false);
           console.error("Story generation failed.");
-          toast.error("Story generation failed. Please check the book status or try again.");
+          toast.error(t('storyGenerationFailed'));
       } else {
           console.log("Still generating text, continuing poll...");
       }
@@ -252,7 +254,7 @@ function ReviewPageContent() {
       if (isMountedRef.current) { 
           setNeedsTextPolling(false); 
           setIsLoadingText(false);
-          toast.error(`Error checking text status: ${error instanceof Error ? error.message : String(error)}`);
+          toast.error(t('errorCheckingStatus', { error: error instanceof Error ? error.message : String(error) }));
       }
     }
   }, [bookIdFromUrl, needsTextPolling, isLoadingText]); // <-- Update dependencies
@@ -341,7 +343,7 @@ function ReviewPageContent() {
 
     // No bookId or trying to confirm non-existent page index
     if (!bookIdToUse || !currentPage) { 
-        toast.error("Cannot confirm: Missing book or page data.");
+        toast.error(t('cannotConfirm'));
         return; 
     }
     
@@ -437,7 +439,7 @@ function ReviewPageContent() {
      } catch (error) {
         console.error("Error initiating illustration generation:", error);
         if (isMountedRef.current) {
-           toast.error(`Error starting illustration: ${error instanceof Error ? error.message : String(error)}`);
+           toast.error(t('errorStartingIllustration', { error: error instanceof Error ? error.message : String(error) }));
            setIsStartingIllustration(false);
         }
      }
@@ -460,11 +462,11 @@ function ReviewPageContent() {
 
   // Handle loading/redirect state before rendering main UI
   if (isFetchingInitialData) {
-      return <div className="p-6 flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin mr-2" /> Loading review data...</div>;
+      return <div className="p-6 flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin mr-2" /> {t('loadingReviewData')}</div>;
   }
 
   if (pages.length === 0 && !isFetchingInitialData) {
-      return <div className="p-6 text-red-600">Error: Could not load pages for review. Please go back and try again.</div>;
+      return <div className="p-6 text-red-600">{t('errorLoadingPages')}</div>;
   }
 
   const currentPageData = pages[currentIndex];
@@ -518,8 +520,9 @@ function ReviewPageContent() {
 
 // Default export wraps the content component with Suspense
 export default function ReviewPage() {
+  const t = useTranslations('review');
   return (
-    <Suspense fallback={<div className="p-6 flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin mr-2" /> Loading review page...</div>}>
+    <Suspense fallback={<div className="p-6 flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin mr-2" /> {t('loadingReviewPage')}</div>}>
       <ReviewPageContent />
     </Suspense>
   );

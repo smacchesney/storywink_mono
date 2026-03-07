@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { showError, showErrorWithRetry } from '@/lib/toast-utils';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { SortDesc } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -50,6 +51,8 @@ type LibraryBook = {
 type SortOption = 'updatedAt' | 'title';
 
 export function LibraryClientView() {
+  const t = useTranslations('library');
+  const tc = useTranslations('common');
   const { getToken, isLoaded } = useAuth();
   const [books, setBooks] = useState<LibraryBook[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,12 +82,12 @@ export function LibraryClientView() {
       if (response.success && response.data) {
         setBooks(response.data as LibraryBook[]);
       } else if (showLoadingState) {
-        showError(response.error || 'Failed to load books', 'Unable to load your library');
+        showError(response.error || 'Failed to load books', t('unableToLoad'));
       }
     } catch (error) {
       console.error('Error fetching books:', error);
       if (showLoadingState) {
-        showErrorWithRetry(error, 'Unable to load your library', () => window.location.reload());
+        showErrorWithRetry(error, t('unableToLoad'), () => window.location.reload());
       }
     } finally {
       if (showLoadingState) {
@@ -148,11 +151,11 @@ export function LibraryClientView() {
           setIsDeleteDialogOpen(false);
           setBookToDelete(null);
         } else {
-          showError(response.error || 'Failed to delete book', 'Unable to delete book');
+          showError(response.error || 'Failed to delete book', t('unableToDelete'));
         }
       } catch (error) {
         console.error('Error deleting book:', error);
-        showErrorWithRetry(error, 'Unable to delete book', handleDeleteBook);
+        showErrorWithRetry(error, t('unableToDelete'), handleDeleteBook);
       }
     });
   };
@@ -219,12 +222,12 @@ export function LibraryClientView() {
         <div className="flex items-center gap-3">
           <Image
             src="https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.58.09_PM_gnknk5.png"
-            alt="Kai the Dino"
+            alt={t('mascotAlt')}
             width={60}
             height={60}
             className="h-12 w-12 md:h-15 md:w-15"
           />
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Your Library</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('yourLibrary')}</h1>
         </div>
         
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
@@ -232,11 +235,11 @@ export function LibraryClientView() {
           <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
             <SelectTrigger className="w-full sm:w-[180px]">
               <SortDesc className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Sort by" />
+              <SelectValue placeholder={t('sortBy')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="updatedAt">Recent</SelectItem>
-              <SelectItem value="title">Title</SelectItem>
+              <SelectItem value="updatedAt">{t('sortRecent')}</SelectItem>
+              <SelectItem value="title">{t('sortTitle')}</SelectItem>
             </SelectContent>
           </Select>
 
@@ -250,7 +253,7 @@ export function LibraryClientView() {
               >
                 <path d="M12 0L14.59 8.41L23 11L14.59 13.59L12 22L9.41 13.59L1 11L9.41 8.41L12 0Z" />
               </svg>
-              Create New Book
+              {t('createNewBook')}
             </Button>
           </Link>
         </div>
@@ -269,19 +272,19 @@ export function LibraryClientView() {
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Book</AlertDialogTitle>
+            <AlertDialogTitle>{t('deleteBook')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{bookToDelete?.title}"? This action cannot be undone.
+              {t('deleteConfirmation', { title: bookToDelete?.title || '' })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tc('cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteBook}
               disabled={isDeleting}
               className="bg-red-600 hover:bg-red-700"
             >
-              {isDeleting ? 'Deleting...' : 'Delete'}
+              {isDeleting ? tc('deleting') : tc('delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -304,11 +307,13 @@ function BookGrid({
   onRetry: (bookId: string) => void;
   isRetrying: string | null;
 }) {
+  const t = useTranslations('library');
+
   if (books.length === 0) {
     return (
       <Card className="p-8 text-center">
         <CardContent>
-          <p className="text-slate-500 dark:text-slate-400">No books yet. Create your first storybook!</p>
+          <p className="text-slate-500 dark:text-slate-400">{t('noBooks')}</p>
         </CardContent>
       </Card>
     );

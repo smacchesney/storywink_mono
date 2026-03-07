@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -40,6 +41,8 @@ const PageCard = ({
   onTextChange,
   onConfirm
 }: PageCardProps) => {
+  const t = useTranslations('review');
+  const tc = useTranslations('common');
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(text || '');
   
@@ -50,7 +53,7 @@ const PageCard = ({
 
   const handleSaveText = () => {
     if (editedText.trim().length === 0) {
-      toast.error("Text cannot be empty");
+      toast.error(t('textCannotBeEmpty'));
       return;
     }
     
@@ -63,7 +66,7 @@ const PageCard = ({
       {/* Page Label - Centered above image */}
       <div className="text-center mb-3">
         <h3 className="text-sm font-medium text-[#F76C5E]">
-          {isTitlePage ? 'Title Page' : `Page ${pageNumber}`}
+          {isTitlePage ? t('titlePage') : t('page', { n: pageNumber })}
         </h3>
       </div>
 
@@ -72,7 +75,7 @@ const PageCard = ({
         {imageUrl ? (
           <Image
             src={coolifyImageUrl(imageUrl)}
-            alt={isTitlePage ? 'Title Page' : `Page ${pageNumber}`}
+            alt={isTitlePage ? t('titlePage') : t('page', { n: pageNumber })}
             fill
             sizes="(max-width: 768px) 100vw, 50vh"
             className="object-contain"
@@ -81,7 +84,7 @@ const PageCard = ({
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <span className="text-2xl font-semibold text-muted-foreground">
-              {isTitlePage ? 'Title Page' : `Page ${pageNumber}`}
+              {isTitlePage ? t('titlePage') : t('page', { n: pageNumber })}
             </span>
           </div>
         )}
@@ -90,7 +93,7 @@ const PageCard = ({
         {moderationStatus === 'FLAGGED' && (
           <div className="absolute bottom-2 left-2 bg-amber-100 text-amber-800 px-2 py-1 rounded-md text-xs flex items-center">
             <AlertTriangle className="h-3 w-3 mr-1" />
-            <span>Content flagged</span>
+            <span>{t('contentFlagged')}</span>
           </div>
         )}
       </div>
@@ -104,7 +107,7 @@ const PageCard = ({
             disabled={isSaving || isEditing}
             className="px-3 text-gray-600 hover:bg-gray-100"
           >
-            <Pencil className="h-4 w-4 mr-1" /> Edit
+            <Pencil className="h-4 w-4 mr-1" /> {t('edit')}
           </Button>
           <Button
             className={`flex-1 text-white ${
@@ -118,15 +121,15 @@ const PageCard = ({
             {isSaving ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
+                {tc('saving')}
               </>
             ) : isConfirmed ? (
               <>
                 <Check className="h-4 w-4 mr-2" />
-                Confirmed
+                {t('confirmed')}
               </>
             ) : (
-              "Confirm Text"
+              t('confirmText')
             )}
           </Button>
         </div>
@@ -142,7 +145,7 @@ const PageCard = ({
                 value={editedText}
                 onChange={(e) => setEditedText(e.target.value)}
                 className="w-full text-center font-semibold text-lg p-3"
-                placeholder="Enter a title for your book..."
+                placeholder={t('enterTitle')}
               />
             ) : (
               // Regular page textarea
@@ -150,7 +153,7 @@ const PageCard = ({
                 value={editedText}
                 onChange={(e) => setEditedText(e.target.value)}
                 className="w-full min-h-[100px] p-3"
-                placeholder={`Enter text for page ${pageNumber}...`}
+                placeholder={t('enterPageText', { n: pageNumber })}
               />
             )}
             
@@ -164,13 +167,13 @@ const PageCard = ({
                 }}
                 className="flex-1"
               >
-                Cancel
+                {tc('cancel')}
               </Button>
               <Button 
                 onClick={handleSaveText}
                 className="flex-1 bg-[#F76C5E] hover:bg-[#F76C5E]/90 text-white"
               >
-                Save Changes
+                {t('saveChanges')}
               </Button>
             </div>
           </>
@@ -178,13 +181,13 @@ const PageCard = ({
           <div className={`text-content p-3 min-h-[40px] border rounded-md text-center font-semibold text-lg ${
             isConfirmed ? 'bg-green-50 border-green-200' : 'bg-white'
           }`}>
-            {text || "Enter a title for your book"}
+            {text || t('enterTitleFallback')}
           </div>
         ) : (
           <div className={`text-content p-3 max-h-[35vh] overflow-y-auto border rounded-md ${
             isConfirmed ? 'bg-green-50 border-green-200' : 'bg-white'
           }`}>
-            {text || "No text yet."}
+            {text || t('noTextYet')}
           </div>
         )}
       </div>

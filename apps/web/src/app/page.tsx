@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import { useTranslations } from 'next-intl';
 import { AnimatedHeroText } from "@/components/ui/animated-hero-text";
 import { EXAMPLE_BOOKS, ExampleBook } from "@/components/landing-page/example-books-data";
 
@@ -29,6 +30,8 @@ const ExampleBookOverlay = dynamic(() => import("@/components/landing-page/examp
 export default function Home() {
   const { isLoaded, isSignedIn } = useAuth();
   const router = useRouter();
+  const t = useTranslations('landing');
+  const tc = useTranslations('common');
   const [isButtonLoading, setIsButtonLoading] = useState(true);
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
   const [selectedBook, setSelectedBook] = useState<ExampleBook | null>(null);
@@ -57,26 +60,11 @@ export default function Home() {
   };
 
   const faqItems = [
-    {
-      question: "How does Storywink.ai create personalized storybooks?",
-      answer: "Simply upload photos of your child, and our AI will transform them into beautiful illustrated characters. We then craft engaging stories around their adventures, making them the hero of their own tale."
-    },
-    {
-      question: "What age group is Storywink.ai designed for?",
-      answer: "Our storybooks are perfect for toddlers and young children aged 2-8 years old. The stories are crafted with age-appropriate language and themes that engage young minds."
-    },
-    {
-      question: "How long does it take to create a storybook?",
-      answer: "Most storybooks are ready within minutes! Our AI works quickly to process your photos and generate beautiful illustrations along with an engaging storyline."
-    },
-    {
-      question: "Can I customize the stories?",
-      answer: "Yes! You can guide the story direction, choose themes, and even specify settings or adventures you'd like your child to experience in their personalized storybook."
-    },
-    {
-      question: "Is my child's data and photos safe?",
-      answer: "Absolutely. We take privacy seriously and use industry-standard security measures to protect all uploaded photos and personal information. Your data is never shared with third parties."
-    }
+    { question: t('faq1Q'), answer: t('faq1A') },
+    { question: t('faq2Q'), answer: t('faq2A') },
+    { question: t('faq3Q'), answer: t('faq3A') },
+    { question: t('faq4Q'), answer: t('faq4A') },
+    { question: t('faq5Q'), answer: t('faq5A') },
   ];
 
   return (
@@ -88,7 +76,7 @@ export default function Home() {
             <AnimatedHeroText />
 
             <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 mb-5 max-w-2xl mx-auto">
-              Upload photos, and let <span className="font-bold font-playful">Storywin<span className="text-[#F76C5E]">k.ai</span></span> turn everyday adventures into charming stories.
+              {t('heroSubtitle')}
             </p>
 
             <div className="flex flex-col sm:flex-row justify-center items-center gap-3 mb-6">
@@ -99,7 +87,7 @@ export default function Home() {
                 onClick={handleCreateStorybookClick}
                 disabled={!isLoaded}
               >
-                {isButtonLoading ? "Loading..." : (
+                {isButtonLoading ? tc('loading') : (
                   <>
                     <svg
                       className="mr-2 h-5 w-5 transition-transform group-hover:scale-125 group-hover:rotate-12"
@@ -108,7 +96,7 @@ export default function Home() {
                     >
                       <path d="M12 0L14.59 8.41L23 11L14.59 13.59L12 22L9.41 13.59L1 11L9.41 8.41L12 0Z" />
                     </svg>
-                    Create Your Storybook
+                    {t('createYourStorybook')}
                   </>
                 )}
               </Button>
@@ -135,7 +123,7 @@ export default function Home() {
                 className="h-24 w-24 md:h-[120px] md:w-[120px]"
               />
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 dark:text-white">
-                Frequently Asked Questions
+                {t('faq')}
               </h2>
             </div>
           </div>

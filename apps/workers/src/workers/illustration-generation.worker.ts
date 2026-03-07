@@ -92,7 +92,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     console.error('[DIAGNOSTIC] Failed to write job start diagnostic:', dbError);
   }
 
-  const { bookId, pageId, userId, pageNumber, artStyle, illustrationNotes, isTitlePage, bookTitle, text, characterIdentity, qcRound, qcFeedback } = job.data;
+  const { bookId, pageId, userId, pageNumber, artStyle, illustrationNotes, isTitlePage, bookTitle, text, characterIdentity, qcRound, qcFeedback, language } = job.data;
 
   console.log(`[IllustrationWorker] Starting job ${job.id} for page ${pageNumber} of book ${bookId}`);
   console.log(`  - PageId: ${pageId}`);
@@ -361,6 +361,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         bookTitle: bookTitle,
         isTitlePage: isTitlePage,
         illustrationNotes: illustrationNotes,
+        language: language || 'en',
         referenceImageCount: styleReferenceBuffers.length,
         characterIdentity: characterIdentity || null,
         pageNumber: pageNumber,

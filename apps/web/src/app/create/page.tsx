@@ -10,6 +10,7 @@ import { CloudinaryUploaderAuto } from '@/components/cloudinary-uploader-auto';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@clerk/nextjs';
 import logger from '@/lib/logger';
+import { useTranslations, useLocale } from 'next-intl';
 import type { BookLanguage } from '@storywink/shared/schemas';
 
 // Type for Cloudinary asset from uploader
@@ -32,8 +33,10 @@ interface Asset {
 
 export default function CreateBookPage() {
   const router = useRouter();
+  const t = useTranslations('create');
+  const locale = useLocale();
   const { getToken, isLoaded } = useAuth();
-  const [language, setLanguage] = useState<BookLanguage>('en');
+  const [language, setLanguage] = useState<BookLanguage>((locale === 'ja' ? 'ja' : 'en') as BookLanguage);
   const [isUploading, setIsUploading] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showCloudinaryUploader, setShowCloudinaryUploader] = useState(false);
@@ -190,7 +193,7 @@ export default function CreateBookPage() {
           </Button>
 
           <p className="mt-4 md:mt-6 text-lg md:text-xl text-gray-600 font-medium">
-            Start Creating
+            {t('startCreating')}
           </p>
 
           {/* Language selector */}

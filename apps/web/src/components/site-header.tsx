@@ -4,11 +4,69 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import Image from "next/image";
-import { MenuIcon, ArrowRight } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { MenuIcon, ArrowRight, Globe } from "lucide-react";
+import { useState, useEffect, useRef, useTransition } from "react";
+import { useTranslations, useLocale } from 'next-intl';
 import { NotificationBell } from "@/components/notification-bell";
+import { LANGUAGE_LABELS } from '@storywink/shared/constants';
+import { SUPPORTED_LANGUAGES } from '@storywink/shared/schemas';
+
+function LanguageSwitcher({ className }: { className?: string }) {
+  const locale = useLocale();
+  const [isOpen, setIsOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  function switchLocale(newLocale: string) {
+    if (newLocale === locale) { setIsOpen(false); return; }
+    startTransition(async () => {
+      await fetch('/api/user/language', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: newLocale }),
+      });
+      window.location.reload();
+    });
+  }
+
+  return (
+    <div ref={ref} className={`relative ${className || ''}`}>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={isPending}
+        aria-label="Language"
+      >
+        <Globe className="h-5 w-5" />
+      </Button>
+      {isOpen && (
+        <div className="absolute right-0 top-full mt-1 bg-white rounded-md shadow-lg border py-1 min-w-[120px] z-50">
+          {SUPPORTED_LANGUAGES.map(lang => (
+            <button
+              key={lang}
+              onClick={() => switchLocale(lang)}
+              className={`w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 ${lang === locale ? 'font-bold text-[#F76C5E]' : ''}`}
+            >
+              {LANGUAGE_LABELS[lang] || lang}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function SiteHeader() {
+  const t = useTranslations('header');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -45,7 +103,7 @@ export function SiteHeader() {
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <Image
               src="https://res.cloudinary.com/storywink/image/upload/v1772291379/Screenshot_2026-02-28_at_10.55.32_PM_copy_xxjms6.png"
-              alt="Storywink Mascot"
+              alt={t('mascotAlt')}
               width={160}
               height={80}
               className="h-[62px] w-auto"
@@ -61,7 +119,7 @@ export function SiteHeader() {
           <Link href="/" className="flex items-center space-x-2">
             <Image
               src="https://res.cloudinary.com/storywink/image/upload/v1772291379/Screenshot_2026-02-28_at_10.55.32_PM_copy_xxjms6.png"
-              alt="Storywink Mascot"
+              alt={t('mascotAlt')}
               width={128}
               height={64}
               className="h-[52px] w-auto"
@@ -77,11 +135,12 @@ export function SiteHeader() {
           {/* Auth buttons - visible on desktop screens */}
           <div className="hidden md:flex items-center space-x-3">
              <SignedOut>
+                <LanguageSwitcher />
                 <Button asChild variant="ghost">
-                  <Link href="/sign-in">Sign In</Link>
+                  <Link href="/sign-in">{t('signIn')}</Link>
                 </Button>
                 <Button asChild>
-                  <Link href="/sign-up">Sign Up</Link>
+                  <Link href="/sign-up">{t('signUp')}</Link>
                 </Button>
              </SignedOut>
              <SignedIn>
@@ -89,10 +148,11 @@ export function SiteHeader() {
                   href="/library"
                   className="inline-flex items-center gap-2 px-4 py-2 bg-[#F76C5E] text-white rounded-md font-playful text-sm hover:bg-[#e55d4f] transition-all group"
                 >
-                  To my stories
+                  {t('toMyStories')}
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Link>
                  <NotificationBell />
+                 <LanguageSwitcher />
                  <div className="flex items-center ml-2">
                    <UserButton afterSignOutUrl="/" />
                  </div>
@@ -107,7 +167,7 @@ export function SiteHeader() {
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Open menu"
+              aria-label={t('openMenu')}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               ref={menuButtonRef}
             >
@@ -123,13 +183,14 @@ export function SiteHeader() {
           className="absolute top-14 left-0 right-0 z-40 bg-white dark:bg-background shadow-md md:hidden"
         >
           <nav className="container flex flex-col space-y-2 p-4">
+            <LanguageSwitcher className="self-end" />
             <SignedIn>
               <Link
                 href="/library"
                 className="inline-flex items-center gap-2 px-4 py-2 bg-[#F76C5E] text-white rounded-md font-playful text-sm hover:bg-[#e55d4f] transition-all group w-fit"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                To my stories
+                {t('toMyStories')}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
               <div className="py-2">
@@ -138,10 +199,10 @@ export function SiteHeader() {
             </SignedIn>
             <SignedOut>
               <Button asChild variant="ghost" onClick={() => setIsMobileMenuOpen(false)}>
-                <Link href="/sign-in">Sign In</Link>
+                <Link href="/sign-in">{t('signIn')}</Link>
               </Button>
               <Button asChild onClick={() => setIsMobileMenuOpen(false)}>
-                <Link href="/sign-up">Sign Up</Link>
+                <Link href="/sign-up">{t('signUp')}</Link>
               </Button>
             </SignedOut>
           </nav>

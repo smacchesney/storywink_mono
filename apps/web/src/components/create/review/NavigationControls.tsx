@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -24,6 +25,7 @@ const NavigationControls = ({
   onPrevious,
   onNext
 }: NavigationControlsProps) => {
+  const t = useTranslations('review');
   return (
     <div className="navigation-controls p-3 border-t flex justify-between items-center sticky bottom-0 bg-white z-10 shadow-md">
       <Button 
@@ -33,11 +35,11 @@ const NavigationControls = ({
         size="sm"
         className="flex-1 max-w-[120px] border-[#F76C5E] text-[#F76C5E] hover:bg-[#F76C5E] hover:text-white"
       >
-        <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+        <ChevronLeft className="h-4 w-4 mr-1" /> {t('previous')}
       </Button>
       
       <span className="text-sm text-gray-500 mx-2">
-        {currentPage + 1} of {totalPages}
+        {t('pageCounter', { current: currentPage + 1, total: totalPages })}
       </span>
       
       <Button 
@@ -47,7 +49,7 @@ const NavigationControls = ({
         size="sm"
         className="flex-1 max-w-[120px] border-[#F76C5E] text-[#F76C5E] hover:bg-[#F76C5E] hover:text-white"
       >
-        Next <ChevronRight className="h-4 w-4 ml-1" />
+        {t('next')} <ChevronRight className="h-4 w-4 ml-1" />
       </Button>
     </div>
   );

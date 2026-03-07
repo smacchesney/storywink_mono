@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 import { TextShimmerWave } from '@/components/ui/text-shimmer-wave';
 import { BookStatus } from '@prisma/client';
 
@@ -65,6 +66,7 @@ export function WritingProgressScreen({
   onComplete,
   onError,
 }: WritingProgressScreenProps) {
+  const t = useTranslations('create');
   const pollCountRef = useRef(0);
   const MAX_POLLS = 24; // Timeout after 2 minutes (24 * 5 seconds)
 
@@ -179,7 +181,7 @@ export function WritingProgressScreen({
       >
         <Image
           src="https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.57.58_PM_mijhwv.png"
-          alt="Kai the Dino writing a story"
+          alt={t('mascotAlt')}
           width={200}
           height={200}
           className="w-28 h-28 md:w-36 md:h-36 object-contain"
@@ -197,7 +199,7 @@ export function WritingProgressScreen({
           scaleDistance={1.05}
           rotateYDistance={15}
         >
-          Brewing a Bedtime adventure...
+          {t('brewingStory')}
         </TextShimmerWave>
       </div>
 
@@ -206,7 +208,7 @@ export function WritingProgressScreen({
 
       {/* Keep page open notice */}
       <p className="text-xs text-[#F76C5E] font-playful mt-8 text-center max-w-xs">
-        Please don&apos;t close this page while your story is being written.
+        {t('dontClosePage')}
       </p>
     </div>
   );

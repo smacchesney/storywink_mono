@@ -1,7 +1,9 @@
-// v2.1.0
+// v2.2.0
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs';
+import { NextIntlClientProvider } from 'next-intl';
+import { getLocale, getMessages } from 'next-intl/server';
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -80,14 +82,17 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
     <ClerkProvider>
-      <html lang="en" suppressHydrationWarning>
+      <html lang={locale} suppressHydrationWarning>
         <head>
           {/* Preload Cloudinary upload widget script to prevent race condition on /create page */}
           <link
@@ -100,10 +105,12 @@ export default function RootLayout({
           className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
           style={{ backgroundColor: 'var(--bg-playful)' }}
         >
-          <PlayfulBackground variant="default" showCornerDoodles={false} />
-          <SiteHeader />
-          <main className="flex-grow relative z-10 pt-[28px]">{children}</main>
-          <SiteFooter />
+          <NextIntlClientProvider messages={messages}>
+            <PlayfulBackground variant="default" showCornerDoodles={false} />
+            <SiteHeader />
+            <main className="flex-grow relative z-10 pt-[28px]">{children}</main>
+            <SiteFooter />
+          </NextIntlClientProvider>
           <Toaster 
             position="bottom-right"
             expand={false}

@@ -15,6 +15,7 @@ export interface IllustrationPromptOptions {
   characterIdentity?: CharacterIdentity | null;
   pageNumber?: number;
   qcFeedback?: string | null;
+  language?: string;
 }
 
 // ----------------------------------
@@ -95,6 +96,7 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
     pageText: opts.pageText,
     illustrationNotes: opts.illustrationNotes ?? null,
     referenceImageCount: opts.referenceImageCount || 1,
+    language: opts.language,
   };
 
   // 1. Style-specific prompt (the bulk of the prompt)

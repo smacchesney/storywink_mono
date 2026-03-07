@@ -23,7 +23,8 @@
     "db:generate": "turbo run db:generate",
     "db:push": "turbo run db:push",
     "db:migrate": "turbo run db:migrate",
-    "db:studio": "turbo run db:studio"
+    "db:studio": "turbo run db:studio",
+    "i18n:check": "npx tsx scripts/check-translations.ts"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

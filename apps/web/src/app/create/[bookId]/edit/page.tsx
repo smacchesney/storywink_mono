@@ -46,12 +46,15 @@ import useMediaQuery from '@/hooks/useMediaQuery'; // Import the hook
 import Joyride, { Step, EVENTS, STATUS, CallBackProps } from 'react-joyride'; // <-- Add Joyride imports
 import { cn } from '@/lib/utils';
 import { useAuth } from '@clerk/nextjs';
+import { useTranslations } from 'next-intl';
 
 // Book editor page with character personalization
 export default function EditBookPage() {
   const params = useParams();
   const router = useRouter();
   const { getToken } = useAuth();
+  const t = useTranslations('editor');
+  const tc = useTranslations('common');
   const bookId = params.bookId as string; // Get bookId from dynamic route
   const isDesktop = useMediaQuery('(min-width: 768px)'); // Tailwind md breakpoint
 
@@ -104,8 +107,8 @@ export default function EditBookPage() {
   // --- Fetch Book Data (Defined earlier with useCallback) ---
   const fetchBookData = useCallback(async () => {
     if (!bookId) {
-      toast.error("Book ID is missing.");
-      setError("Book ID is missing from the URL.");
+      toast.error(t('bookIdMissing'));
+      setError(t('bookIdMissing'));
       setIsLoading(false);
       return;
     }
@@ -137,7 +140,7 @@ export default function EditBookPage() {
     } catch (err) {
       console.error("Error fetching book:", err);
       const message = err instanceof Error ? err.message : "An unknown error occurred";
-      toast.error(`Error loading book: ${message}`);
+      toast.error(t('errorLoadingBook', { message }));
       setError(message);
       // Optionally redirect if book not found (e.g., status 404)
       // if (err instanceof Error && err.message.includes('404')) { 
@@ -221,7 +224,7 @@ export default function EditBookPage() {
       const steps: Step[] = [
         {
           target: '[data-tourid="details-button"]',
-          content: "Input your Book Title here.",
+          content: t('tourTitle'),
           placement: 'top',
           isFixed: true,
           disableScrolling: true,
@@ -229,7 +232,7 @@ export default function EditBookPage() {
         },
         {
           target: '[data-tourid="cover-button"]',
-          content: 'Select your front cover photo by clicking here.',
+          content: t('tourCover'),
           placement: 'top',
           isFixed: true,
           disableScrolling: true,
@@ -237,7 +240,7 @@ export default function EditBookPage() {
         },
         {
           target: '[data-tourid="pages-button"]',
-          content: 'Arrange the order of your photos & story pages in this section.',
+          content: t('tourPages'),
           placement: 'top',
           isFixed: true,
           disableScrolling: true,
@@ -245,7 +248,7 @@ export default function EditBookPage() {
         },
         {
           target: '[data-tourid="art-style-button"]',
-          content: 'Select art style for the illustration here.',
+          content: t('tourStyle'),
           placement: 'top',
           isFixed: true,
           disableScrolling: true,
@@ -253,7 +256,7 @@ export default function EditBookPage() {
         },
         {
           target: '[data-tourid="photos-button"]',
-          content: 'Manage your photos here - add more or remove unwanted ones.',
+          content: t('tourPhotos'),
           placement: 'top',
           isFixed: true,
           disableScrolling: true,
@@ -261,7 +264,7 @@ export default function EditBookPage() {
         },
         {
           target: '[data-tourid="generate-story-button"]',
-          content: 'Once previous steps are done, click this to create your story!',
+          content: t('tourGenerate'),
           placement: 'bottom',
           isFixed: true,
           disableScrolling: true,
@@ -373,7 +376,7 @@ export default function EditBookPage() {
        setPagesConfirmed(true); // Mark pages as confirmed by user
     } catch (error) {
         logger.error({ bookId, error }, "Failed to save storyboard order");
-        toast.error(`Failed to save page order: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        toast.error(t('failedSavePageOrder', { error: error instanceof Error ? error.message : 'Unknown error' }));
     } finally {
         setIsSavingOrder(false);
     }
@@ -430,7 +433,7 @@ export default function EditBookPage() {
 
     } catch (error) {
       logger.error({ bookId, error }, "Failed to save art style");
-      toast.error(`Failed to save art style: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(t('failedSaveArtStyle', { error: error instanceof Error ? error.message : 'Unknown error' }));
     } finally {
       setIsSavingArtStyle(false);
     }
@@ -493,7 +496,7 @@ export default function EditBookPage() {
        setIsCoverPanelOpen(false); // Close panel on success
     } catch (error) {
       logger.error({ bookId, error }, "Failed to save cover details");
-      toast.error(`Failed to save cover: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(t('failedSaveCover', { error: error instanceof Error ? error.message : 'Unknown error' }));
     } finally {
       setIsSavingCover(false);
     }
@@ -565,7 +568,7 @@ export default function EditBookPage() {
        setIsDetailsPanelOpen(false);
     } catch (error) {
       logger.error({ bookId, error }, "Failed to save book details");
-      toast.error(`Failed to save details: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(t('failedSaveDetails', { error: error instanceof Error ? error.message : 'Unknown error' }));
     } finally {
       setIsSavingDetails(false);
     }
@@ -630,7 +633,7 @@ export default function EditBookPage() {
       setShowCloudinaryUploader(false);
     } catch (error) {
       logger.error({ error }, "Failed to process additional uploads");
-      toast.error(`Failed to add photos: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(t('failedAddPhotos', { error: error instanceof Error ? error.message : 'Unknown error' }));
       setShowPhotoUploadProgress(false);
       setShowCloudinaryUploader(false);
     }
@@ -673,14 +676,14 @@ export default function EditBookPage() {
   // Handler for page delete request from Manage Photos panel
   const handleDeletePageRequest = (pageId: string, isCover: boolean) => {
     if (isCover) {
-      toast.error("Cannot delete the cover photo. Please select a different cover first.");
+      toast.error(t('cannotDeleteCover'));
       return;
     }
 
     // Check minimum pages
     const totalPages = bookData?.pages.length || 0;
     if (totalPages <= 2) {
-      toast.error("Your book must have at least 2 photos.");
+      toast.error(t('minPhotosRequired'));
       return;
     }
 
@@ -740,7 +743,7 @@ export default function EditBookPage() {
 
     } catch (error) {
       logger.error({ bookId, pageId: pageToDelete.id, error }, "Failed to delete page");
-      toast.error(`Failed to delete: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(t('failedDelete', { error: error instanceof Error ? error.message : 'Unknown error' }));
     } finally {
       setIsDeletingPage(false);
     }
@@ -769,7 +772,7 @@ export default function EditBookPage() {
            formData.append('bookId', bookId);
        } else {
            logger.error("Cannot add photo: bookId is missing in editor page state.");
-           toast.error("Cannot add photo: Book ID is missing.");
+           toast.error(t('cannotAddPhotoMissing'));
            setShowPhotoUploadProgress(false);
            if (fileInputRef.current) fileInputRef.current.value = ''; 
            return;
@@ -927,7 +930,7 @@ export default function EditBookPage() {
   if (isLoading) {
     return (
       <UploadProgressScreen
-        message="Uploading your photos..."
+        message={tc('loading')}
         progress={undefined}
       />
     );
@@ -939,7 +942,7 @@ export default function EditBookPage() {
         <p className="mb-4">Error loading book:</p>
         <p className="mb-4">{error}</p>
         <button onClick={() => router.push('/create')} className="px-4 py-2 bg-pink-500 text-white rounded hover:bg-pink-600">
-          Go Back
+          {tc('goBack')}
         </button>
       </div>
     );
@@ -949,7 +952,7 @@ export default function EditBookPage() {
     // This state might be brief if loading finishes but data is null before error is set
     return (
       <div className="flex items-center justify-center min-h-screen">
-        Book not found or failed to load.
+        {t('bookNotFound')}
       </div>
     );
   }
@@ -1098,12 +1101,12 @@ export default function EditBookPage() {
                  <TooltipProvider delayDuration={100}>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={handleHelpClick} aria-label="Show help tour">
+                        <Button variant="ghost" size="icon" onClick={handleHelpClick} aria-label={t('showHelpTour')}>
                           <HelpCircle className="h-12 w-12 text-gray-600 hover:text-[#F76C5E]" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Show Editor Hints</p>
+                        <p>{t('showEditorHints')}</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -1140,13 +1143,13 @@ export default function EditBookPage() {
                             ) : (
                               <CheckCircle2 className="h-4 w-4 mr-1" />
                             )}
-                            Generate Story
+                            {t('generateStory')}
                           </Button>
                        </span>
                     </TooltipTrigger>
                     {!canGenerate && (
                         <TooltipContent>
-                            <p>Please set Book Title and Art Style first.</p>
+                            <p>{t('setTitleAndStyleFirst')}</p>
                         </TooltipContent>
                     )}
                  </Tooltip>
@@ -1174,7 +1177,7 @@ export default function EditBookPage() {
             isDesktop ? (
               <Drawer open={isDetailsPanelOpen} onOpenChange={setIsDetailsPanelOpen} modal={false} shouldScaleBackground={false}>
                 <DrawerContent className="h-full w-[380px] mt-0 fixed left-0 rounded-none border-r">
-                  <DrawerHeader><DrawerTitle>Book Details</DrawerTitle></DrawerHeader>
+                  <DrawerHeader><DrawerTitle>{t('bookDetails')}</DrawerTitle></DrawerHeader>
                   <DetailsEditorPanel
                     currentTitle={pendingTitle}
                     currentChildName={pendingChildName}
@@ -1191,7 +1194,7 @@ export default function EditBookPage() {
             ) : (
               <Sheet open={isDetailsPanelOpen} onOpenChange={setIsDetailsPanelOpen}>
                  <SheetContent side="bottom" className="h-[85vh] flex flex-col">
-                   <SheetHeader><SheetTitle>Book Details</SheetTitle></SheetHeader>
+                   <SheetHeader><SheetTitle>{t('bookDetails')}</SheetTitle></SheetHeader>
                    <DetailsEditorPanel
                     currentTitle={pendingTitle}
                     currentChildName={pendingChildName}
@@ -1213,14 +1216,14 @@ export default function EditBookPage() {
             isDesktop ? (
               <Drawer open={isCoverPanelOpen} onOpenChange={setIsCoverPanelOpen} modal={false} shouldScaleBackground={false}>
                 <DrawerContent className="h-full w-[380px] mt-0 fixed left-0 rounded-none border-r"> 
-                  <DrawerHeader><DrawerTitle>Select your front cover</DrawerTitle></DrawerHeader>
+                  <DrawerHeader><DrawerTitle>{t('selectFrontCover')}</DrawerTitle></DrawerHeader>
                   {CoverPanelContent} 
                 </DrawerContent>
               </Drawer>
             ) : (
               <Sheet open={isCoverPanelOpen} onOpenChange={setIsCoverPanelOpen}>
                  <SheetContent side="bottom" className="h-[85vh] flex flex-col"> 
-                   <SheetHeader><SheetTitle>Select your front cover</SheetTitle></SheetHeader>
+                   <SheetHeader><SheetTitle>{t('selectFrontCover')}</SheetTitle></SheetHeader>
                    {CoverPanelContent} 
                  </SheetContent>
               </Sheet>
@@ -1233,8 +1236,8 @@ export default function EditBookPage() {
               <Drawer open={isPagesPanelOpen} onOpenChange={setIsPagesPanelOpen} modal={false} shouldScaleBackground={false}>
                 <DrawerContent className="h-full w-[380px] mt-0 fixed left-0 rounded-none border-r">
                   <DrawerHeader>
-                      <DrawerTitle>Pages Overview</DrawerTitle>
-                      <DrawerDescription>Drag photos to rearrange pages.</DrawerDescription>
+                      <DrawerTitle>{t('pagesOverview')}</DrawerTitle>
+                      <DrawerDescription>{t('dragToRearrange')}</DrawerDescription>
                   </DrawerHeader>
                   {StoryboardPanelContent}
                 </DrawerContent>
@@ -1243,8 +1246,8 @@ export default function EditBookPage() {
               <Sheet open={isPagesPanelOpen} onOpenChange={setIsPagesPanelOpen}>
                  <SheetContent side="bottom" className="h-[85vh] flex flex-col">
                    <SheetHeader>
-                       <SheetTitle>Pages Overview</SheetTitle>
-                       <DrawerDescription>Drag photos to rearrange pages.</DrawerDescription>
+                       <SheetTitle>{t('pagesOverview')}</SheetTitle>
+                       <DrawerDescription>{t('dragToRearrange')}</DrawerDescription>
                    </SheetHeader>
                    {StoryboardPanelContent}
                  </SheetContent>
@@ -1257,14 +1260,14 @@ export default function EditBookPage() {
             isDesktop ? (
               <Drawer open={isArtStylePanelOpen} onOpenChange={setIsArtStylePanelOpen} modal={false} shouldScaleBackground={false}>
                 <DrawerContent className="h-full w-[380px] mt-0 fixed left-0 rounded-none border-r">
-                  <DrawerHeader><DrawerTitle>Choose Art Style</DrawerTitle></DrawerHeader>
+                  <DrawerHeader><DrawerTitle>{t('chooseArtStyle')}</DrawerTitle></DrawerHeader>
                   {ArtStylePanelContent}
                 </DrawerContent>
               </Drawer>
             ) : (
               <Sheet open={isArtStylePanelOpen} onOpenChange={setIsArtStylePanelOpen}>
                  <SheetContent side="bottom" className="h-[85vh] flex flex-col">
-                   <SheetHeader><SheetTitle>Choose Art Style</SheetTitle></SheetHeader>
+                   <SheetHeader><SheetTitle>{t('chooseArtStyle')}</SheetTitle></SheetHeader>
                    {ArtStylePanelContent}
                  </SheetContent>
               </Sheet>
@@ -1308,13 +1311,13 @@ export default function EditBookPage() {
           <AlertDialog open={!!pageToDelete} onOpenChange={(open) => !open && setPageToDelete(null)}>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete Photo?</AlertDialogTitle>
+                <AlertDialogTitle>{t('deletePhoto')}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will remove the photo from your book. This action cannot be undone.
+                  {t('deletePhotoDesc')}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel disabled={isDeletingPage}>Cancel</AlertDialogCancel>
+                <AlertDialogCancel disabled={isDeletingPage}>{tc('cancel')}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleConfirmDeletePage}
                   disabled={isDeletingPage}
@@ -1323,10 +1326,10 @@ export default function EditBookPage() {
                   {isDeletingPage ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Deleting...
+                      {tc('deleting')}
                     </>
                   ) : (
-                    'Delete'
+                    tc('delete')
                   )}
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -1345,11 +1348,11 @@ export default function EditBookPage() {
               scrollToFirstStep={false}
               debug={true}
               locale={{
-                next: 'Next',
-                back: 'Back',
-                skip: 'Skip',
-                last: 'Done',
-                close: 'Close',
+                next: t('tourNext'),
+                back: t('tourBack'),
+                skip: t('tourSkip'),
+                last: t('tourDone'),
+                close: t('tourClose'),
               }}
               // Styles to match brand color and improve mobile experience
               styles={{

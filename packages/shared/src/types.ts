@@ -126,6 +126,7 @@ export interface IllustrationGenerationJob {
   isTitlePage: boolean;
   illustrationNotes?: string | null;
   originalImageUrl?: string | null;
+  language?: string;
 }
 
 export interface BookFinalizeJob {

@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Trash2, Eye, Loader2, AlertTriangle, RefreshCw, Download, Printer } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { coolifyImageUrl, calculatePrintedPageCount } from '@storywink/shared';
 import { TextShimmerWave } from '@/components/ui/text-shimmer-wave';
 import { PrintOrderSheet, PrintOrderBook } from '@/components/print/PrintOrderSheet';
@@ -51,6 +52,8 @@ const BookCard: React.FC<BookCardProps> = ({
   isRetrying = false,
 }) => {
   const router = useRouter();
+  const t = useTranslations('bookCard');
+  const tc = useTranslations('common');
   const [isExporting, setIsExporting] = useState(false);
   const [showPrintSheet, setShowPrintSheet] = useState(false);
 
@@ -85,7 +88,7 @@ const BookCard: React.FC<BookCardProps> = ({
           {displayImageUrl ? (
             <Image
               src={coolifyImageUrl(displayImageUrl)}
-              alt={`${title || 'Book'} cover`}
+              alt={t('coverAlt', { title: title || t('untitledBook') })}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 45vw, 25vw"
               className="object-cover blur-sm scale-105"
@@ -106,17 +109,17 @@ const BookCard: React.FC<BookCardProps> = ({
               scaleDistance={1.1}
               rotateYDistance={20}
             >
-              {qcRound > 0 ? 'Polishing illustrations...' : 'Creating illustrations...'}
+              {qcRound > 0 ? t('polishingIllustrations') : t('creatingIllustrations')}
             </TextShimmerWave>
             <p className="text-sm text-white/70 mt-2">
-              {qcRound > 0 ? 'Almost done!' : 'This usually takes 10-15 minutes'}
+              {qcRound > 0 ? t('almostDone') : t('usuallyTakes')}
             </p>
           </div>
         </div>
 
         {/* Content below image - matches completed card structure */}
         <CardHeader className="pb-2 pt-4 px-4">
-          <CardTitle className="text-lg truncate text-center">{title || 'Untitled Book'}</CardTitle>
+          <CardTitle className="text-lg truncate text-center">{title || t('untitledBook')}</CardTitle>
         </CardHeader>
 
         {/* Footer with disabled buttons */}
@@ -128,15 +131,15 @@ const BookCard: React.FC<BookCardProps> = ({
               className="flex-grow mr-2 bg-slate-300 hover:bg-slate-300 text-slate-500 cursor-not-allowed rounded-full font-playful"
             >
               <Eye className="h-4 w-4 mr-1.5" />
-              View Preview
+              {t('viewPreview')}
             </Button>
             <Button variant="outline" size="icon" disabled className="cursor-not-allowed">
               <MoreHorizontal className="h-4 w-4" />
-              <span className="sr-only">Book Actions</span>
+              <span className="sr-only">{t('bookActions')}</span>
             </Button>
           </div>
           <p className="text-xs text-slate-400 text-center">
-            Available when illustrations complete
+            {t('availableWhenComplete')}
           </p>
         </CardFooter>
       </Card>
@@ -152,25 +155,25 @@ const BookCard: React.FC<BookCardProps> = ({
           {displayImageUrl ? (
             <Image
               src={coolifyImageUrl(displayImageUrl)}
-              alt={`${title || 'Book'} cover`}
+              alt={t('coverAlt', { title: title || t('untitledBook') })}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 45vw, 25vw"
               className="object-cover"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <span className="text-xs text-muted-foreground">No Preview</span>
+              <span className="text-xs text-muted-foreground">{t('noPreview')}</span>
             </div>
           )}
         </div>
 
         {/* Content below image */}
         <CardHeader className="pb-2 pt-4 px-4">
-          <CardTitle className="text-lg truncate text-center">{title || 'Untitled Book'}</CardTitle>
+          <CardTitle className="text-lg truncate text-center">{title || t('untitledBook')}</CardTitle>
           <div className="flex items-center justify-center gap-1.5 text-red-600 dark:text-red-400 mt-1">
             <AlertTriangle className="h-4 w-4" />
             <span className="text-sm">
-              {status === BookStatus.FAILED ? 'Illustration failed' : 'Some illustrations failed'}
+              {status === BookStatus.FAILED ? t('illustrationFailed') : t('someIllustrationsFailed')}
             </span>
           </div>
         </CardHeader>
@@ -188,7 +191,7 @@ const BookCard: React.FC<BookCardProps> = ({
             ) : (
               <RefreshCw className="h-4 w-4 mr-1.5" />
             )}
-            {isRetrying ? 'Retrying...' : 'Retry Illustrations'}
+            {isRetrying ? t('retrying') : t('retryIllustrations')}
           </Button>
           <Button
             variant="outline"
@@ -202,7 +205,7 @@ const BookCard: React.FC<BookCardProps> = ({
             ) : (
               <Trash2 className="h-4 w-4" />
             )}
-            <span className="sr-only">Delete</span>
+            <span className="sr-only">{tc('delete')}</span>
           </Button>
         </CardFooter>
       </Card>
@@ -226,21 +229,21 @@ const BookCard: React.FC<BookCardProps> = ({
           {displayImageUrl ? (
             <Image
               src={coolifyImageUrl(displayImageUrl)}
-              alt={`${title || 'Book'} cover`}
+              alt={t('coverAlt', { title: title || t('untitledBook') })}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 45vw, 25vw"
               className="object-cover"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <span className="text-xs text-muted-foreground">No Preview</span>
+              <span className="text-xs text-muted-foreground">{t('noPreview')}</span>
             </div>
           )}
         </div>
 
         {/* Content below image */}
         <CardHeader className="pb-2 pt-4 px-4">
-          <CardTitle className="text-lg truncate text-center">{title || 'Untitled Book'}</CardTitle>
+          <CardTitle className="text-lg truncate text-center">{title || t('untitledBook')}</CardTitle>
         </CardHeader>
 
         {/* Footer with View, Order Print, and dropdown */}
@@ -254,7 +257,7 @@ const BookCard: React.FC<BookCardProps> = ({
               className="flex-1 rounded-full font-playful"
             >
               <Eye className="h-4 w-4 mr-1.5" />
-              View
+              {t('view')}
             </Button>
             <Button
               onClick={() => setShowPrintSheet(true)}
@@ -262,7 +265,7 @@ const BookCard: React.FC<BookCardProps> = ({
               className="flex-1 bg-[#F76C5E] hover:bg-[#E55A4C] rounded-full font-playful"
             >
               <Printer className="h-4 w-4 mr-1.5" />
-              Order Print
+              {t('orderPrint')}
             </Button>
           </div>
 
@@ -276,12 +279,12 @@ const BookCard: React.FC<BookCardProps> = ({
                   ) : (
                     <MoreHorizontal className="h-4 w-4" />
                   )}
-                  <span className="sr-only">Book Actions</span>
+                  <span className="sr-only">{t('bookActions')}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={handleExportPdf} disabled={isExporting}>
-                  <Download className="mr-2 h-4 w-4" /> Export PDF
+                  <Download className="mr-2 h-4 w-4" /> {t('exportPdf')}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -289,7 +292,7 @@ const BookCard: React.FC<BookCardProps> = ({
                   onClick={onDeleteClick}
                   disabled={isDeleting}
                 >
-                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                  <Trash2 className="mr-2 h-4 w-4" /> {tc('delete')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

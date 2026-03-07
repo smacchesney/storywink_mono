@@ -11,6 +11,32 @@ export interface StylePromptContext {
   pageText: string | null;
   illustrationNotes: string | null;
   referenceImageCount: number;
+  language?: string;
+}
+
+// ----------------------------------
+// LANGUAGE-AWARE ONOMATOPOEIA
+// ----------------------------------
+
+const ONOMATOPOEIA_EXAMPLES: Record<string, { splash: string; zoom: string; munch: string }> = {
+  en: { splash: 'SPLASH!', zoom: 'ZOOM!', munch: 'MUNCH!' },
+  ja: { splash: 'ざぶーん!', zoom: 'びゅーん!', munch: 'もぐもぐ!' },
+};
+
+// Language constraint appended to DYNAMIC EFFECTS when not English
+const ILLUSTRATION_LANGUAGE_CONSTRAINTS: Record<string, string> = {
+  ja: 'All text rendered in the illustration (onomatopoeia, sound effects) MUST be in Japanese script (hiragana/katakana). Do NOT use any English or Latin text.',
+};
+
+function getOnomatopoeiaExamples(language?: string): string {
+  const lang = language && language in ONOMATOPOEIA_EXAMPLES ? language : 'en';
+  const o = ONOMATOPOEIA_EXAMPLES[lang];
+  return `"${o.splash}", "${o.zoom}", "${o.munch}"`;
+}
+
+function getLanguageConstraint(language?: string): string {
+  if (!language || language === 'en') return '';
+  return ILLUSTRATION_LANGUAGE_CONSTRAINTS[language] || '';
 }
 
 export interface StyleDefinition {
@@ -67,8 +93,9 @@ DO NOT reimagine or invent features for any person. A parent must look at your i
 
   // Dynamic effects
   if (ctx.illustrationNotes) {
+    const langConstraint = getLanguageConstraint(ctx.language);
     sections.push(
-      `DYNAMIC EFFECTS: Add visual effects to enhance the action. Draw onomatopoeia text (like "SPLASH!", "ZOOM!", "MUNCH!") in the same BLACK PENCIL-SKETCH STYLE shown in the reference images - using black hand-drawn lettering with sketch-like lines and strokes that match the illustration's aesthetic. Keep effects minimal (under 15% of image area) and directly relevant to the scene - avoid generic sparkles unless the scene involves magic or wonder. Do not alter character faces or poses.`,
+      `DYNAMIC EFFECTS: Add visual effects to enhance the action. Draw onomatopoeia text (like ${getOnomatopoeiaExamples(ctx.language)}) in the same BLACK PENCIL-SKETCH STYLE shown in the reference images - using black hand-drawn lettering with sketch-like lines and strokes that match the illustration's aesthetic. Keep effects minimal (under 15% of image area) and directly relevant to the scene - avoid generic sparkles unless the scene involves magic or wonder. Do not alter character faces or poses.${langConstraint ? ' ' + langConstraint : ''}`,
       `Specific effect to add: ${ctx.illustrationNotes}`,
     );
   }
@@ -168,8 +195,9 @@ function origamiInteriorPrompt(ctx: StylePromptContext): string {
 
   // Dynamic effects in paper-craft style
   if (ctx.illustrationNotes) {
+    const langConstraint = getLanguageConstraint(ctx.language);
     sections.push(
-      `DYNAMIC EFFECTS: Add visual effects to enhance the action. Draw onomatopoeia text (like "SPLASH!", "ZOOM!", "MUNCH!") as flat cut paper letters in the same craft-paper style — chunky angular shapes cut from colored card stock. Keep effects minimal (under 15% of image area) and directly relevant to the scene. Do not alter character faces or poses.`,
+      `DYNAMIC EFFECTS: Add visual effects to enhance the action. Draw onomatopoeia text (like ${getOnomatopoeiaExamples(ctx.language)}) as flat cut paper letters in the same craft-paper style — chunky angular shapes cut from colored card stock. Keep effects minimal (under 15% of image area) and directly relevant to the scene. Do not alter character faces or poses.${langConstraint ? ' ' + langConstraint : ''}`,
       `Specific effect to add: ${ctx.illustrationNotes}`,
     );
   }
@@ -280,8 +308,9 @@ function kawaiiInteriorPrompt(ctx: StylePromptContext): string {
 
   // Dynamic effects
   if (ctx.illustrationNotes) {
+    const langConstraint = getLanguageConstraint(ctx.language);
     sections.push(
-      `DYNAMIC EFFECTS: Add visual effects to enhance the action. Draw onomatopoeia text (like "SPLASH!", "ZOOM!", "MUNCH!") in the same soft brush-pen style — warm, rounded hand-drawn lettering that matches the illustration's cozy aesthetic. Keep effects minimal (under 15% of image area) and directly relevant to the scene. Do not alter character faces or poses.`,
+      `DYNAMIC EFFECTS: Add visual effects to enhance the action. Draw onomatopoeia text (like ${getOnomatopoeiaExamples(ctx.language)}) in the same soft brush-pen style — warm, rounded hand-drawn lettering that matches the illustration's cozy aesthetic. Keep effects minimal (under 15% of image area) and directly relevant to the scene. Do not alter character faces or poses.${langConstraint ? ' ' + langConstraint : ''}`,
       `Specific effect to add: ${ctx.illustrationNotes}`,
     );
   }

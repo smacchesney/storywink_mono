@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -26,6 +27,7 @@ const PageTracker = ({
   isProcessing,
   onIllustrate
 }: PageTrackerProps) => {
+  const t = useTranslations('review');
   return (
     <div className="page-tracker py-2 px-3 border-b bg-white sticky top-0 z-10">
       <div className="flex items-center justify-between mb-1">
@@ -47,12 +49,12 @@ const PageTracker = ({
                     ${isCurrent ? 'scale-y-150' : ''}
                     ${isConfirmed ? 'bg-green-500' : 'bg-gray-300'}
                   `}
-                  aria-label={`Go to page ${idx + 1}`}
+                  aria-label={t('goToPage', { n: idx + 1 })}
                 />
                 
                 {/* Hoverable tooltip */}
                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap">
-                  {isTitle ? 'Title Page' : `Page ${idx}`}
+                  {isTitle ? t('titlePage') : t('page', { n: idx })}
                   {isConfirmed && ' ✓'}
                 </div>
               </div>
@@ -73,11 +75,11 @@ const PageTracker = ({
           )}
         >
           {isProcessing ? (
-            <>Working...</>
+            <>{t('working')}</>
           ) : (
             <>
-              <CheckCircle className="h-4 w-4 mr-1" /> 
-              Illustrate Book
+              <CheckCircle className="h-4 w-4 mr-1" />
+              {t('illustrateBook')}
             </>
           )}
         </Button>

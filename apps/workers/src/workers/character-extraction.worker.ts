@@ -212,6 +212,7 @@ async function createIllustrationFlow(
       illustrationNotes: page.illustrationNotes,
       originalImageUrl: page.originalImageUrl,
       characterIdentity,
+      language: book.language,
     },
     opts: {
       attempts: 5,
