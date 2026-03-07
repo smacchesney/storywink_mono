@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 // import { Loader2 } from 'lucide-react'; // Remove Loader2
 import { TextShimmerWave } from '@/components/ui/text-shimmer-wave'; // Import TextShimmerWave
 
@@ -13,6 +14,7 @@ import { TextShimmerWave } from '@/components/ui/text-shimmer-wave'; // Import T
 
 // Adjust component definition to not use React.FC with an empty interface
 const AdditionalPhotoUploadProgressScreen = () => {
+  const t = useTranslations('editor');
   return (
     // Change background to white, match layout of UploadProgressScreen
     <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-50">
@@ -20,7 +22,7 @@ const AdditionalPhotoUploadProgressScreen = () => {
       <div className="mb-8 transform-none">
         <Image
           src="https://res.cloudinary.com/storywink/image/upload/v1772291379/Screenshot_2026-02-28_at_10.55.51_PM_iznwx3.png"
-          alt="Kai the Dino uploading photos"
+          alt={t('uploadingMascotAlt')}
           width={200}
           height={200}
           className="w-20 h-20 md:w-28 md:h-28 object-contain"
@@ -38,7 +40,7 @@ const AdditionalPhotoUploadProgressScreen = () => {
           scaleDistance={1.1}
           rotateYDistance={20}       
         >
-          Adding your photos...
+          {t('addingPhotos')}
         </TextShimmerWave>
       </div>
     </div>

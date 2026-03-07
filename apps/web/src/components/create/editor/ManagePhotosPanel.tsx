@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 import { X, Plus, Camera } from 'lucide-react';
 import { StoryboardPage, optimizeCloudinaryUrl, BOOK_CONSTRAINTS } from '@storywink/shared';
 import { cn } from '@/lib/utils';
@@ -45,6 +46,7 @@ function PhotoThumbnail({
   onDeleteClick: () => void;
   canDelete: boolean;
 }) {
+  const t = useTranslations('editor');
   const imageUrl = page.asset?.thumbnailUrl || (page.asset?.url ? optimizeCloudinaryUrl(page.asset.url) : null);
 
   return (
@@ -53,7 +55,7 @@ function PhotoThumbnail({
       {imageUrl ? (
         <Image
           src={imageUrl}
-          alt={`Page ${page.pageNumber}`}
+          alt={t('pageAlt', { n: page.pageNumber })}
           fill
           sizes="(max-width: 768px) 25vw, 80px"
           style={{ objectFit: 'cover' }}
@@ -61,14 +63,14 @@ function PhotoThumbnail({
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">
-          No image
+          {t('noImage')}
         </div>
       )}
 
       {/* Cover badge */}
       {isCover && (
         <div className="absolute bottom-1 left-1 z-10 bg-[#F76C5E] text-white text-[9px] font-semibold px-1.5 py-0.5 rounded">
-          Cover
+          {t('coverBadge')}
         </div>
       )}
 
@@ -85,8 +87,8 @@ function PhotoThumbnail({
             ? 'bg-[#F76C5E] text-white hover:bg-[#E55A4C] hover:scale-110 active:scale-95 cursor-pointer'
             : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
         )}
-        aria-label={isCover ? 'Cannot delete cover photo' : `Delete page ${page.pageNumber}`}
-        title={isCover ? 'Select a different cover first' : canDelete ? 'Delete photo' : 'Minimum 2 photos required'}
+        aria-label={isCover ? t('cannotDeleteCoverTitle') : t('pageAlt', { n: page.pageNumber })}
+        title={isCover ? t('selectDifferentCover') : canDelete ? t('deletePhotoAria') : t('minPhotosDeleteTitle')}
       >
         <X className="h-3 w-3" strokeWidth={3} />
       </button>
@@ -103,6 +105,8 @@ function PanelContent({
   onClose,
   minPagesReached,
 }: Omit<ManagePhotosPanelProps, 'isOpen'>) {
+  const t = useTranslations('editor');
+  const tc = useTranslations('common');
   // Sort pages by index
   const sortedPages = [...pages].sort((a, b) => a.index - b.index);
   const photoCount = sortedPages.length;
@@ -118,16 +122,16 @@ function PanelContent({
           <div className="flex items-center gap-2">
             <Camera className="w-4 h-4 text-gray-500" />
             <span className="text-sm font-medium text-gray-700">
-              {photoCount} / {maxPhotos} photos
+              {t('photoCount', { count: photoCount, max: maxPhotos })}
             </span>
           </div>
           {isAtMaxPhotos ? (
             <span className="text-xs text-amber-600 font-medium">
-              Maximum reached
+              {t('maximumReached')}
             </span>
           ) : (
             <span className="text-xs text-gray-500">
-              {remainingPhotos} more allowed
+              {t('moreAllowed', { count: remainingPhotos })}
             </span>
           )}
         </div>
@@ -148,7 +152,7 @@ function PanelContent({
         {minPagesReached && (
           <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
             <p className="text-xs text-amber-700 text-center">
-              You need at least 2 photos in your book
+              {t('minPhotosWarning')}
             </p>
           </div>
         )}
@@ -173,7 +177,7 @@ function PanelContent({
 
         {sortedPages.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-8">
-            No photos in this book yet.
+            {t('noPhotosYet')}
           </p>
         )}
       </div>
@@ -192,10 +196,10 @@ function PanelContent({
           )}
         >
           <Plus className="w-4 h-4 mr-2" />
-          {isAtMaxPhotos ? `Maximum ${maxPhotos} photos reached` : 'Add More Photos'}
+          {isAtMaxPhotos ? t('maxPhotosReached', { max: maxPhotos }) : t('addMorePhotos')}
         </Button>
         <Button onClick={onClose} className="w-full bg-[#F76C5E] hover:bg-[#E55A4C]">
-          Done
+          {tc('done')}
         </Button>
       </DrawerFooter>
     </>
@@ -211,6 +215,7 @@ export function ManagePhotosPanel({
   onAddPhotosClick,
   minPagesReached,
 }: ManagePhotosPanelProps) {
+  const t = useTranslations('editor');
   const isDesktop = useMediaQuery('(min-width: 768px)');
 
   if (isDesktop) {
@@ -218,8 +223,8 @@ export function ManagePhotosPanel({
       <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()} modal={false} shouldScaleBackground={false}>
         <DrawerContent className="h-full w-[380px] mt-0 fixed left-0 rounded-none border-r">
           <DrawerHeader>
-            <DrawerTitle>Manage Photos</DrawerTitle>
-            <DrawerDescription>Add or remove photos from your book</DrawerDescription>
+            <DrawerTitle>{t('managePhotos')}</DrawerTitle>
+            <DrawerDescription>{t('managePhotosDesc')}</DrawerDescription>
           </DrawerHeader>
           <PanelContent
             pages={pages}
@@ -238,8 +243,8 @@ export function ManagePhotosPanel({
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="bottom" className="h-[85vh] flex flex-col">
         <SheetHeader>
-          <SheetTitle>Manage Photos</SheetTitle>
-          <SheetDescription>Add or remove photos from your book</SheetDescription>
+          <SheetTitle>{t('managePhotos')}</SheetTitle>
+          <SheetDescription>{t('managePhotosDesc')}</SheetDescription>
         </SheetHeader>
         <PanelContent
           pages={pages}

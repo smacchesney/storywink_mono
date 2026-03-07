@@ -939,7 +939,7 @@ export default function EditBookPage() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-red-600">
-        <p className="mb-4">Error loading book:</p>
+        <p className="mb-4">{t('errorLoadingBookLabel')}</p>
         <p className="mb-4">{error}</p>
         <button onClick={() => router.push('/create')} className="px-4 py-2 bg-pink-500 text-white rounded hover:bg-pink-600">
           {tc('goBack')}
@@ -998,17 +998,17 @@ export default function EditBookPage() {
           className="flex-grow bg-[#F76C5E] hover:bg-[#F76C5E]/90 text-white"
         >
           {isSavingOrder ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Done
+          {tc('done')}
         </Button>
         <DrawerClose asChild>
-          <Button variant="outline" className="flex-grow" disabled={isSavingOrder}>Cancel</Button>
+          <Button variant="outline" className="flex-grow" disabled={isSavingOrder}>{tc('cancel')}</Button>
         </DrawerClose>
       </DrawerFooter>
     </>
   );
   // --------------------------------------------------------------------------------
 
-  // ---- Helper to render Art Style content + footer ---- 
+  // ---- Helper to render Art Style content + footer ----
   const ArtStylePanelContent = (
     <>
       <div className="flex-grow overflow-auto py-4 px-2">
@@ -1020,16 +1020,16 @@ export default function EditBookPage() {
         )}
       </div>
       <DrawerFooter className="pt-2 flex-row">
-        <Button 
-          onClick={handleSaveArtStyle} 
+        <Button
+          onClick={handleSaveArtStyle}
           disabled={isSavingArtStyle}
           className="flex-grow bg-[#F76C5E] hover:bg-[#F76C5E]/90 text-white"
         >
           {isSavingArtStyle ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Done
-        </Button> 
+          {tc('done')}
+        </Button>
         <DrawerClose asChild>
-          <Button variant="outline" className="flex-grow" disabled={isSavingArtStyle}>Cancel</Button>
+          <Button variant="outline" className="flex-grow" disabled={isSavingArtStyle}>{tc('cancel')}</Button>
         </DrawerClose>
       </DrawerFooter>
     </>
@@ -1042,8 +1042,8 @@ export default function EditBookPage() {
       <div className="flex-grow overflow-auto py-4 px-2">
         {bookData && (
           <CoverEditorPanel
-            allBookAssets={allBookAssets} 
-            currentCoverAssetId={pendingCoverAssetId} 
+            allBookAssets={allBookAssets}
+            currentCoverAssetId={pendingCoverAssetId}
             // currentTitle={pendingTitle} // Removed
             // currentChildName={pendingChildName} // Removed
             onCoverAssetSelect={handlePendingCoverAssetSelect}
@@ -1053,16 +1053,16 @@ export default function EditBookPage() {
         )}
       </div>
       <DrawerFooter className="pt-2 flex-row">
-        <Button 
-          onClick={handleSaveCover} 
+        <Button
+          onClick={handleSaveCover}
           disabled={isSavingCover}
           className="flex-grow bg-[#F76C5E] hover:bg-[#F76C5E]/90 text-white"
         >
           {isSavingCover ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Done
-        </Button> 
+          {tc('done')}
+        </Button>
         <DrawerClose asChild>
-          <Button variant="outline" className="flex-grow" disabled={isSavingCover}>Cancel</Button>
+          <Button variant="outline" className="flex-grow" disabled={isSavingCover}>{tc('cancel')}</Button>
         </DrawerClose>
       </DrawerFooter>
     </>

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { STYLE_LIBRARY } from '@storywink/shared/prompts/styles';
@@ -21,6 +22,8 @@ export function ArtStylePicker({
   currentStyle,
   onStyleChange,
 }: ArtStylePickerProps) {
+  const t = useTranslations('editor');
+  const styleLabels: Record<string, string> = { vignette: t('styleVignette'), origami: t('styleOrigami'), kawaii: t('styleKawaii') };
   const styles = Object.entries(STYLE_LIBRARY) as [string, StyleDefinition][];
 
   return (
@@ -40,7 +43,7 @@ export function ArtStylePicker({
               <CardContent className="p-0 aspect-square relative max-h-[120px]">
                 <Image
                   src={optimizeCloudinaryUrl(style.referenceImageUrls[0])}
-                  alt={style.label}
+                  alt={styleLabels[key] || style.label}
                   fill
                   sizes="(max-width: 768px) 50vw, 33vw"
                   style={{ objectFit: "cover" }}
@@ -51,7 +54,7 @@ export function ArtStylePicker({
                         "absolute bottom-0 left-0 right-0 px-2 py-1 bg-gradient-to-t from-black/70 to-transparent text-white"
                     )}
                 >
-                    <p className="text-[10px] md:text-xs font-medium truncate">{style.label}</p>
+                    <p className="text-[10px] md:text-xs font-medium truncate">{styleLabels[key] || style.label}</p>
                 </div>
               </CardContent>
             </Card>

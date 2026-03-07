@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { BookOpen, LayoutGrid, Palette, Images, FileText, Check } from 'lucide-react';
@@ -14,11 +15,11 @@ interface BottomToolbarProps {
   completedSteps: Set<EditorTab>;
 }
 
-const tabs: { id: EditorTab; label: string; stepNumber: number; icon: React.ElementType, tourId?: string }[] = [
-  { id: 'details', label: 'Details', stepNumber: 1, icon: FileText, tourId: 'details-button' },
-  { id: 'cover', label: 'Cover', stepNumber: 2, icon: BookOpen, tourId: 'cover-button' },
-  { id: 'pages', label: 'Pages', stepNumber: 3, icon: LayoutGrid, tourId: 'pages-button' },
-  { id: 'artStyle', label: 'Art Style', stepNumber: 4, icon: Palette, tourId: 'art-style-button' },
+const tabs: { id: EditorTab; stepNumber: number; icon: React.ElementType, tourId?: string }[] = [
+  { id: 'details', stepNumber: 1, icon: FileText, tourId: 'details-button' },
+  { id: 'cover', stepNumber: 2, icon: BookOpen, tourId: 'cover-button' },
+  { id: 'pages', stepNumber: 3, icon: LayoutGrid, tourId: 'pages-button' },
+  { id: 'artStyle', stepNumber: 4, icon: Palette, tourId: 'art-style-button' },
 ];
 
 export default function BottomToolbar({
@@ -27,6 +28,14 @@ export default function BottomToolbar({
   onPhotosClick,
   completedSteps
 }: BottomToolbarProps) {
+  const t = useTranslations('editor');
+  const tabLabels: Record<EditorTab, string> = {
+    details: t('tabDetails'),
+    cover: t('tabCover'),
+    pages: t('tabPages'),
+    artStyle: t('tabArtStyle'),
+  };
+
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg">
       <div className="px-4 py-3 md:px-6 md:py-4 max-w-6xl mx-auto">
@@ -84,7 +93,7 @@ export default function BottomToolbar({
                       "font-medium text-center leading-tight max-w-full text-[10px] sm:text-xs",
                       isActive ? "text-white font-semibold" : isCompleted ? "text-green-700" : "text-gray-600"
                     )}>
-                      {tab.label}
+                      {tabLabels[tab.id]}
                     </span>
                   </Button>
                 </div>
@@ -109,7 +118,7 @@ export default function BottomToolbar({
               )}
             >
               <Images className="w-4 h-4 mb-1.5 text-[#F76C5E]" />
-              <span className="text-[#F76C5E] font-medium leading-tight">Photos</span>
+              <span className="text-[#F76C5E] font-medium leading-tight">{t('tabPhotos')}</span>
             </Button>
           </div>
         </div>

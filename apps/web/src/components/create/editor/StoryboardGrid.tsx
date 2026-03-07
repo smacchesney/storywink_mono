@@ -20,6 +20,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 import { StoryboardPage, optimizeCloudinaryUrl } from '@storywink/shared';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +31,7 @@ interface StoryboardGridProps {
 
 // Individual Sortable Item Component
 function SortablePageItem({ id, page, visualIndex }: { id: string; page: StoryboardPage; visualIndex: number }) {
+  const t = useTranslations('editor');
   const {
     attributes,
     listeners,
@@ -69,14 +71,14 @@ function SortablePageItem({ id, page, visualIndex }: { id: string; page: Storybo
       {page.asset?.thumbnailUrl || page.asset?.url ? (
         <Image
           src={page.asset.thumbnailUrl || optimizeCloudinaryUrl(page.asset.url)}
-          alt={`Page ${visualIndex + 1}`}
+          alt={t('pageAlt', { n: visualIndex + 1 })}
           fill
           sizes="(max-width: 768px) 33vw, 120px"
           style={{ objectFit: "cover" }}
           className="pointer-events-none"
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">No Thumb</div>
+        <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">{t('noThumb')}</div>
       )}
       {/* Page Number Overlay - Updated Style */}
       <div
@@ -86,7 +88,7 @@ function SortablePageItem({ id, page, visualIndex }: { id: string; page: Storybo
           "text-[10px] font-medium leading-none" // Font styling
         )}
       >
-        Pg. {visualIndex + 1} {/* Added "Pg. " prefix */}
+        {t('pageLabel', { n: visualIndex + 1 })}
       </div>
     </div>
   );

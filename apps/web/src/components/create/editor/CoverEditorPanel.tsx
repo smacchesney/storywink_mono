@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 import { Asset } from '@prisma/client';
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -19,6 +20,7 @@ export function CoverEditorPanel({
   currentCoverAssetId,
   onCoverAssetSelect,
 }: CoverEditorPanelProps) {
+  const t = useTranslations('editor');
   // const [activeSubTab, setActiveSubTab] = useState("photo"); // No longer needed
 
   // const currentCoverAsset = allBookAssets.find(a => a.id === currentCoverAssetId); // Unused
@@ -66,7 +68,7 @@ export function CoverEditorPanel({
                     )
                 })}
                 {allBookAssets.length === 0 && (
-                    <p className="col-span-3 text-sm text-muted-foreground text-center py-4">No photos found for this book.</p>
+                    <p className="col-span-3 text-sm text-muted-foreground text-center py-4">{t('noPhotosFound')}</p>
                 )}
             </div>
           </div>

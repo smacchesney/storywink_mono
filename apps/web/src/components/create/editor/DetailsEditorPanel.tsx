@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -33,17 +34,18 @@ function CharacterRow({
   onUpdate: (char: AdditionalCharacter) => void;
   onRemove: () => void;
 }) {
+  const t = useTranslations('editor');
   return (
     <div className="flex gap-2 items-start p-3 bg-gray-50 rounded-lg">
       <div className="flex-1 space-y-2">
         <Input
-          placeholder="Name (e.g., Sarah)"
+          placeholder={t('characterNamePlaceholder')}
           value={character.name}
           onChange={(e) => onUpdate({ ...character, name: e.target.value })}
           className="h-9 text-sm"
         />
         <Input
-          placeholder="Role (e.g., Mom, Baby Brother)"
+          placeholder={t('characterRolePlaceholder')}
           value={character.relationship}
           onChange={(e) => onUpdate({ ...character, relationship: e.target.value })}
           className="h-9 text-sm"
@@ -52,7 +54,7 @@ function CharacterRow({
       <button
         onClick={onRemove}
         className="mt-1 p-1.5 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-600 transition-colors"
-        aria-label={`Remove ${character.name || 'character'}`}
+        aria-label={t('removeCharacter', { name: character.name || 'character' })}
       >
         <X className="h-3.5 w-3.5" />
       </button>
@@ -71,6 +73,9 @@ export function DetailsEditorPanel({
   onCancel,
   isSaving,
 }: DetailsEditorPanelProps) {
+  const t = useTranslations('editor');
+  const tc = useTranslations('common');
+
   const handleAddCharacter = () => {
     if (currentAdditionalCharacters.length < 5) {
       onAdditionalCharactersChange([
@@ -103,11 +108,11 @@ export function DetailsEditorPanel({
         {/* Book Title */}
         <div className="space-y-1.5">
           <Label htmlFor="details-title" className="text-sm font-semibold">
-            Book Title
+            {t('bookTitle')}
           </Label>
           <Input
             id="details-title"
-            placeholder={currentTitle.trim() === '' ? "e.g., The Magical Adventure" : ""}
+            placeholder={currentTitle.trim() === '' ? t('bookTitlePlaceholder') : ""}
             value={currentTitle}
             onChange={(e) => onTitleChange(e.target.value)}
             data-tourid="details-title-input"
@@ -117,14 +122,14 @@ export function DetailsEditorPanel({
         {/* Child Name */}
         <div className="space-y-1.5">
           <Label htmlFor="child-name" className="text-sm font-semibold">
-            Child&apos;s Name
+            {t('childName')}
           </Label>
           <p className="text-xs text-muted-foreground">
-            This name will be used throughout the story
+            {t('childNameHint')}
           </p>
           <Input
             id="child-name"
-            placeholder="e.g., Emma"
+            placeholder={t('childNamePlaceholder')}
             value={currentChildName}
             onChange={(e) => onChildNameChange(e.target.value)}
           />
@@ -133,9 +138,9 @@ export function DetailsEditorPanel({
         {/* Additional Characters */}
         <div className="space-y-3">
           <div>
-            <Label className="text-sm font-semibold">Other Characters</Label>
+            <Label className="text-sm font-semibold">{t('otherCharacters')}</Label>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Add family members or friends who appear in photos
+              {t('otherCharactersHint')}
             </p>
           </div>
 
@@ -161,13 +166,13 @@ export function DetailsEditorPanel({
               className="w-full border-dashed border-2 border-[#F76C5E] text-[#F76C5E] hover:bg-orange-50 hover:text-[#F76C5E]"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add Character
+              {t('addCharacter')}
             </Button>
           )}
 
           {currentAdditionalCharacters.length > 0 && (
             <p className="text-xs text-muted-foreground text-center">
-              {currentAdditionalCharacters.length}/5 characters
+              {t('characterCount', { count: currentAdditionalCharacters.length })}
             </p>
           )}
         </div>
@@ -180,10 +185,10 @@ export function DetailsEditorPanel({
           className="flex-grow bg-[#F76C5E] hover:bg-[#F76C5E]/90 text-white"
         >
           {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Done
+          {tc('done')}
         </Button>
         <Button variant="outline" className="flex-grow" onClick={onCancel} disabled={isSaving}>
-          Cancel
+          {tc('cancel')}
         </Button>
       </DrawerFooter>
     </>

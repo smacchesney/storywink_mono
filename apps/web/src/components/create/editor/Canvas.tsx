@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import useEmblaCarousel from 'embla-carousel-react';
 import type { EmblaOptionsType, EmblaCarouselType } from 'embla-carousel'; // Import types from base package
 import Image from 'next/image';
@@ -16,6 +17,7 @@ interface CanvasProps {
 }
 
 export function Canvas({ bookData, options, onTitlePlaceholderClick }: CanvasProps) {
+  const t = useTranslations('editor');
   const [emblaRef, emblaApi] = useEmblaCarousel(options);
   const [prevBtnDisabled, setPrevBtnDisabled] = useState(true);
   const [nextBtnDisabled, setNextBtnDisabled] = useState(true);
@@ -71,7 +73,7 @@ export function Canvas({ bookData, options, onTitlePlaceholderClick }: CanvasPro
               {(page.asset?.url || page.originalImageUrl) ? (
                 <Image
                   src={optimizeCloudinaryUrl(page.asset?.url || page.originalImageUrl || '')}
-                  alt={`Page ${displayIndex + 1}`}
+                  alt={t('pageAlt', { n: displayIndex + 1 })}
                   fill
                   sizes="(max-width: 768px) 100vw, 448px"
                   style={{ objectFit: "cover" }}
@@ -79,7 +81,7 @@ export function Canvas({ bookData, options, onTitlePlaceholderClick }: CanvasPro
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400">
-                  Missing Image
+                  {t('missingImage')}
                 </div>
               )}
               
@@ -98,11 +100,11 @@ export function Canvas({ bookData, options, onTitlePlaceholderClick }: CanvasPro
                                  hover:opacity-80 active:opacity-60
                                  transition-opacity cursor-pointer"
                     >
-                      Tap to add title
+                      {t('tapToAddTitle')}
                     </button>
                   ) : (
                     <h2 className="text-white text-2xl md:text-3xl font-bold text-center shadow-text">
-                      Insert Title in Details below
+                      {t('insertTitleHint')}
                     </h2>
                   )}
                 </div>
@@ -142,7 +144,7 @@ export function Canvas({ bookData, options, onTitlePlaceholderClick }: CanvasPro
               "w-2 h-2 rounded-full transition-colors duration-200 ease-in-out",
               index === selectedIndex ? 'bg-[#F76C5E]' : 'bg-gray-300 hover:bg-gray-400' // Coral color for active dot
             )}
-            aria-label={`Go to page ${index + 1}`}
+            aria-label={t('goToPage', { n: index + 1 })}
           />
         ))}
       </div>
