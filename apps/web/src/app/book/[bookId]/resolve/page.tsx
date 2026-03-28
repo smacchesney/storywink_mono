@@ -20,6 +20,7 @@ import {
 import {
   Check,
   AlertTriangle,
+  Trash2,
   ImagePlus,
   Loader2,
   Pencil,
@@ -287,18 +288,20 @@ export default function BookResolvePage() {
     }
   };
 
-  // --- Done ---
-  const handleViewBook = async () => {
+  // --- Done: advance to next flagged page or view book ---
+  const handleNextOrViewBook = async () => {
     const response = await fetch(`/api/book/${bookId}`);
     const data = await response.json();
     if (data.status === BookStatus.COMPLETED) {
       router.push(`/book/${bookId}/preview`);
     } else {
-      // Still PARTIAL — show remaining flagged pages
-      await fetchBook();
-      setSelectedPage(null);
+      // Still PARTIAL — advance to next flagged page
+      setBook(data);
+      const nextFlagged = data.pages.find((p: PageData) => p.moderationStatus === 'FLAGGED');
+      setSelectedPage(nextFlagged || null);
       setStep('overview');
       setNewIllustrationUrl(null);
+      setGeneratedText('');
     }
   };
 
@@ -417,20 +420,22 @@ export default function BookResolvePage() {
                 <p className="text-sm text-muted-foreground mt-1">
                   {t('photoCouldntBeIllustrated')}
                 </p>
-                <div className="flex flex-col gap-3 mt-4">
+                <div className="flex gap-3 mt-4">
                   <Button
                     onClick={handleReplaceClick}
-                    className="bg-[#F76C5E] hover:bg-[#E55A4C] text-white rounded-full font-playful"
+                    className="flex-1 bg-[#F76C5E] hover:bg-[#E55A4C] text-white rounded-full font-playful"
                   >
                     <ImagePlus className="h-4 w-4 mr-1.5" />
                     {t('replacePhoto')}
                   </Button>
-                  <button
+                  <Button
+                    variant="outline"
                     onClick={() => setShowDeleteDialog(true)}
-                    className="text-sm text-muted-foreground hover:text-red-500 underline underline-offset-2 transition-colors"
+                    className="flex-1 rounded-full font-playful border-slate-300 text-slate-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
                   >
-                    {t('orRemovePage')}
-                  </button>
+                    <Trash2 className="h-4 w-4 mr-1.5" />
+                    {t('removePage')}
+                  </Button>
                 </div>
               </div>
             </div>
@@ -499,23 +504,31 @@ export default function BookResolvePage() {
       )}
 
       {/* Step: Done */}
-      {step === 'done' && newIllustrationUrl && (
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <div className="relative w-48 h-48 mx-auto rounded-lg overflow-hidden mb-4 border">
-              <Image src={newIllustrationUrl} alt="New illustration" fill className="object-cover" sizes="192px" />
-            </div>
-            <h3 className="font-semibold text-slate-900 mb-2 font-playful">{t('pageFixed')}</h3>
-            <Button
-              onClick={handleViewBook}
-              className="bg-[#F76C5E] hover:bg-[#E55A4C] text-white rounded-full font-playful"
-            >
-              {t('viewBook')}
-              <ArrowRight className="h-4 w-4 ml-1.5" />
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      {step === 'done' && newIllustrationUrl && (() => {
+        const remainingFlagged = flaggedPages.filter(p => p.id !== selectedPage?.id).length;
+        return (
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <div className="relative w-48 h-48 mx-auto rounded-lg overflow-hidden mb-4 border">
+                <Image src={newIllustrationUrl} alt="New illustration" fill className="object-cover" sizes="192px" />
+              </div>
+              <h3 className="font-semibold text-slate-900 mb-1 font-playful">{t('pageFixed')}</h3>
+              {remainingFlagged > 0 && (
+                <p className="text-sm text-muted-foreground mb-4">
+                  {t('pagesRemaining', { count: remainingFlagged })}
+                </p>
+              )}
+              <Button
+                onClick={handleNextOrViewBook}
+                className="bg-[#F76C5E] hover:bg-[#E55A4C] text-white rounded-full font-playful"
+              >
+                {remainingFlagged > 0 ? t('fixNextPage') : t('viewBook')}
+                <ArrowRight className="h-4 w-4 ml-1.5" />
+              </Button>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
