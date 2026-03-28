@@ -397,6 +397,11 @@ export default function BookResolvePage() {
       {selectedPage && step === 'overview' && (
         <Card className="border-amber-200 bg-amber-50/50">
           <CardContent className="pt-6">
+            {flaggedPages.length > 1 && (
+              <p className="text-xs text-amber-700 mb-3 font-medium">
+                {t('tapToSwitch', { current: flaggedPages.findIndex(p => p.id === selectedPage.id) + 1, total: flaggedPages.length })}
+              </p>
+            )}
             <div className="flex items-start gap-4">
               <div className="relative w-20 h-20 rounded-lg overflow-hidden shrink-0 border">
                 {selectedPhotoUrl ? (
@@ -422,7 +427,7 @@ export default function BookResolvePage() {
                   </Button>
                   <button
                     onClick={() => setShowDeleteDialog(true)}
-                    className="text-sm text-muted-foreground hover:text-red-500 underline-offset-2 hover:underline transition-colors"
+                    className="text-sm text-muted-foreground hover:text-red-500 underline underline-offset-2 transition-colors"
                   >
                     {t('orRemovePage')}
                   </button>
