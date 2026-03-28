@@ -21,6 +21,9 @@
   "landing": {
     "heroSubtitle": "Upload photos, and let Storywink.ai turn everyday adventures into charming stories.",
     "createYourStorybook": "Create Your Storybook",
+    "howItWorksPrefix": "How it",
+    "howItWorksSuffix": "works...",
+    "howItWorksAlt": "How Storywink works: pick your photos, we bring it to life, a book they'll treasure",
     "faq": "Frequently Asked Questions",
     "faq1Q": "How does Storywink.ai create personalized storybooks?",
     "faq1A": "Simply upload photos of your child, and our AI will transform them into beautiful illustrated characters. We then craft engaging stories around their adventures, making them the hero of their own tale.",

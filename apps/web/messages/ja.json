@@ -21,6 +21,9 @@
   "landing": {
     "heroSubtitle": "写真をアップロードするだけで、Storywink.ai が毎日の冒険を素敵なストーリーに変えます。",
     "createYourStorybook": "絵本をつくる",
+    "howItWorksPrefix": "使い方は",
+    "howItWorksSuffix": "かんたん...",
+    "howItWorksAlt": "Storywinkの使い方：写真を選ぶ、ストーリーが生まれる、届く絵本",
     "faq": "よくある質問",
     "faq1Q": "Storywink.ai はどうやってオリジナル絵本をつくるの？",
     "faq1A": "お子さまの写真をアップロードするだけで、AI が写真をもとにイラストを描き、お子さまが主人公の楽しいストーリーをつくります。",

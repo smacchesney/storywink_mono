@@ -111,6 +111,24 @@ export default function Home() {
           </div>
         </section>
 
+        {/* How It Works Section */}
+        <section className="py-6 md:py-12 px-4">
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 dark:text-white text-center mb-8 md:mb-12">
+              <span className="font-playful">{t('howItWorksPrefix')}</span>{' '}
+              <span className="font-playful" style={{ color: '#F76C5E' }}>{t('howItWorksSuffix')}</span>
+            </h2>
+            <Image
+              src="https://res.cloudinary.com/storywink/image/upload/v1774702929/use-this-how-to_vq0hey.png"
+              alt={t('howItWorksAlt')}
+              width={1200}
+              height={600}
+              className="w-full h-auto"
+              priority={false}
+            />
+          </div>
+        </section>
+
         {/* FAQ Section */}
         <section className="py-6 md:py-12 px-4">
           <div className="text-center mb-8 md:mb-12">
