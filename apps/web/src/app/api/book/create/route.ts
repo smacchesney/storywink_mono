@@ -7,7 +7,7 @@ import { BookStatus, PageType } from '@prisma/client';
 
 // Zod schema for request body validation
 const createBookSchema = z.object({
-  assetIds: z.array(z.string().cuid()).min(1, { message: 'At least one asset ID is required.' }),
+  assetIds: z.array(z.string().cuid()).min(1, { message: 'At least one asset ID is required.' }).max(23, { message: 'Maximum 23 photos per book.' }),
   language: z.enum(['en', 'ja']).default('en'),
 });
 

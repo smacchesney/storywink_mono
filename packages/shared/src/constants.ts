@@ -24,10 +24,10 @@ export const QUEUE_NAMES = {
 // Book constraints
 export const BOOK_CONSTRAINTS = {
   MIN_PAGES: 6,
-  MAX_PAGES: 20,
+  MAX_PAGES: 23,
   DEFAULT_PAGES: 10,
   MIN_PHOTOS: 1,
-  MAX_PHOTOS: 20,
+  MAX_PHOTOS: 23,
   MAX_TITLE_LENGTH: 100,
   MAX_CHILD_NAME_LENGTH: 50,
 } as const;

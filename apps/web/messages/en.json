@@ -38,7 +38,8 @@
     "brewingStory": "Brewing a Bedtime adventure...",
     "dontClosePage": "Please don't close this page while your story is being written.",
     "mascotAlt": "Kai the Dino writing a story",
-    "uploadingPhotos": "Uploading your photos..."
+    "uploadingPhotos": "Uploading your photos...",
+    "photoLimit": "Up to {max} photos per book"
   },
   "editor": {
     "bookIdMissing": "Book ID is missing.",

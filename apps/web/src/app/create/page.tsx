@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import PhotoSourceSheet from '@/components/create/PhotoSourceSheet';
 import { CloudinaryUploaderAuto } from '@/components/cloudinary-uploader-auto';
@@ -12,6 +12,7 @@ import { useAuth } from '@clerk/nextjs';
 import logger from '@/lib/logger';
 import { useTranslations, useLocale } from 'next-intl';
 import type { BookLanguage } from '@storywink/shared/schemas';
+import { BOOK_CONSTRAINTS } from '@storywink/shared';
 
 // Type for Cloudinary asset from uploader
 interface CloudinaryAsset {
@@ -195,6 +196,13 @@ export default function CreateBookPage() {
           <p className="mt-4 md:mt-6 text-lg md:text-xl text-gray-600 font-medium">
             {t('startCreating')}
           </p>
+
+          <div className="mt-4 md:mt-5 flex items-center gap-2 rounded-full bg-gray-100/80 px-4 py-2">
+            <Camera className="w-4 h-4 text-[#F76C5E] shrink-0" />
+            <p className="text-sm text-gray-500">
+              {t('photoLimit', { max: BOOK_CONSTRAINTS.MAX_PHOTOS })}
+            </p>
+          </div>
 
           {/* Language selector */}
           <div className="mt-5 flex items-center gap-1.5 rounded-full bg-gray-100/80 p-1">

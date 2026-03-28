@@ -6,8 +6,8 @@ export type BookLanguage = typeof SUPPORTED_LANGUAGES[number];
 
 // API Request/Response schemas
 export const createBookSchema = z.object({
-  assetIds: z.array(z.string()).min(1, "At least one photo is required"),
-  pageLength: z.number().int().min(6).max(20).default(10),
+  assetIds: z.array(z.string()).min(1, "At least one photo is required").max(23, "Maximum 23 photos allowed"),
+  pageLength: z.number().int().min(6).max(23).default(10),
   language: z.enum(SUPPORTED_LANGUAGES).default('en'),
   artStyle: z.string().optional(),
   tone: z.string().optional(),
