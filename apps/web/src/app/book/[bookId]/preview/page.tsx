@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Book, Page, BookStatus } from '@prisma/client'; // Assuming prisma client types are available
 import { Loader2, AlertTriangle, ChevronLeft, ChevronRight, Library, Download, ArrowLeft, Maximize2, Minimize2, Eye, EyeOff } from 'lucide-react'; // Added fullscreen icons
@@ -45,7 +45,7 @@ async function fetchBookData(bookId: string): Promise<BookWithPages | null> {
 
 export default function BookPreviewPage() {
   const params = useParams();
-  // const router = useRouter(); // Commented out - currently unused
+  const router = useRouter();
   const bookId = params.bookId as string; // Get bookId from URL
 
   const [book, setBook] = useState<BookWithPages | null>(null);
@@ -442,6 +442,16 @@ export default function BookPreviewPage() {
             </div>
           </div>
         )}
+      </div>
+    );
+  }
+
+  // PARTIAL books: redirect to resolution screen
+  if (book.status === BookStatus.PARTIAL) {
+    router.replace(`/book/${bookId}/resolve`);
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="h-6 w-6 animate-spin text-[#F76C5E]" />
       </div>
     );
   }

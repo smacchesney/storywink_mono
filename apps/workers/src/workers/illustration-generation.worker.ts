@@ -385,6 +385,20 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     let moderationBlocked = false;
     let moderationReasonText: string | null = null;
 
+    const MAX_CONTENT_POLICY_RETRIES = 2;
+    for (let contentPolicyAttempt = 0; contentPolicyAttempt <= MAX_CONTENT_POLICY_RETRIES; contentPolicyAttempt++) {
+    // Reset for each attempt
+    moderationBlocked = false;
+    moderationReasonText = null;
+    generatedImageBase64 = null;
+
+    if (contentPolicyAttempt > 0) {
+        const delayMs = 3000 + Math.random() * 2000; // 3-5s jittered delay
+        console.log(`[IllustrationWorker] Content policy retry ${contentPolicyAttempt}/${MAX_CONTENT_POLICY_RETRIES} for page ${pageNumber}, waiting ${Math.round(delayMs)}ms...`);
+        logger.info({ jobId: job.id, pageNumber, attempt: contentPolicyAttempt + 1, maxAttempts: MAX_CONTENT_POLICY_RETRIES + 1 }, 'Retrying after content policy block...');
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+
     try {
        logger.info({ jobId: job.id, pageId, pageNumber }, 'Calling Gemini 3.1 Flash Image API...');
        console.log(`[IllustrationWorker] Calling Gemini 3.1 Flash API for page ${pageNumber} with ${styleReferenceBuffers.length} style ref(s)...`);
@@ -443,7 +457,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         } else {
             moderationBlocked = true;
             moderationReasonText = "Image generation failed or blocked by content policy (no image data in response).";
-            logger.warn({ jobId: job.id, pageId, pageNumber, response: JSON.stringify(result) }, 'Gemini response did not contain image data.');
+            logger.warn({ jobId: job.id, pageId, pageNumber, attempt: contentPolicyAttempt + 1, maxAttempts: MAX_CONTENT_POLICY_RETRIES + 1 }, 'Gemini response did not contain image data.');
         }
 
     } catch (apiError: any) {
@@ -482,11 +496,15 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         if (isCopyrightIssue) console.error(`  - Type: COPYRIGHT/PROPRIETARY ISSUE`);
         if (errorDetails) console.error(`  - Details: ${JSON.stringify(errorDetails)}`);
 
-        // Content policy violations are PERMANENT - mark as FLAGGED, complete job successfully (no retry)
+        // Content policy violations - retry up to MAX_CONTENT_POLICY_RETRIES times before giving up
         if (isContentPolicyBlock) {
             moderationBlocked = true;
             moderationReasonText = `${errorMessage}${errorCode ? ` (Code: ${errorCode})` : ''}${isSafetyBlock ? ' [SAFETY]' : ''}${isCopyrightIssue ? ' [COPYRIGHT]' : ''}`;
-            console.log(`[IllustrationWorker] Content policy block - marking as FLAGGED, job will complete successfully (no retry)`);
+            if (contentPolicyAttempt < MAX_CONTENT_POLICY_RETRIES) {
+                console.log(`[IllustrationWorker] Content policy block on attempt ${contentPolicyAttempt + 1}/${MAX_CONTENT_POLICY_RETRIES + 1} for page ${pageNumber}, will retry...`);
+                continue; // retry loop
+            }
+            console.log(`[IllustrationWorker] Content policy block after ${MAX_CONTENT_POLICY_RETRIES + 1} attempts - marking as FLAGGED`);
             // Don't throw - let job complete successfully with FLAGGED status
         } else {
             // Other API errors (possibly transient) - re-throw to trigger outer catch block retry logic
@@ -494,7 +512,22 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
             throw apiError;
         }
     }
-    
+
+    // If we got image data, break out of retry loop
+    if (generatedImageBase64 && !moderationBlocked) {
+        break;
+    }
+
+    // If no image data but not from an API error (response had no image), handle retry
+    if (moderationBlocked && contentPolicyAttempt < MAX_CONTENT_POLICY_RETRIES) {
+        console.log(`[IllustrationWorker] Content policy block on attempt ${contentPolicyAttempt + 1}/${MAX_CONTENT_POLICY_RETRIES + 1} for page ${pageNumber}, will retry...`);
+        continue;
+    }
+
+    // All retries exhausted or success — break out
+    break;
+    } // end content policy retry loop
+
     let finalImageUrl: string | undefined = undefined;
     if (generatedImageBase64 && !moderationBlocked) {
       try {

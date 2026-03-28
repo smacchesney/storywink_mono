@@ -9,6 +9,7 @@ import logger from '@/lib/logger';
 // Define the expected input schema using Zod
 const illustrationRequestSchema = z.object({
   bookId: z.string().cuid({ message: "Valid Book ID (CUID) is required" }),
+  pageIds: z.array(z.string().cuid()).optional(),
 });
 
 // Job data is now assembled by the character-extraction worker, not this endpoint.
@@ -96,7 +97,28 @@ export async function POST(request: Request) {
     const isRetry = book.status === BookStatus.PARTIAL || book.status === BookStatus.FAILED;
 
     let pagesToProcess = book.pages;
-    if (isRetry) {
+
+    // If specific pageIds were requested, filter to those pages only
+    if (requestData.pageIds && requestData.pageIds.length > 0) {
+      const requestedIds = new Set(requestData.pageIds);
+      pagesToProcess = book.pages.filter((page) => requestedIds.has(page.id));
+
+      // Reset moderation status for requested pages so they get re-processed
+      for (const page of pagesToProcess) {
+        await prisma.page.update({
+          where: { id: page.id },
+          data: { moderationStatus: 'PENDING', generatedImageUrl: null },
+        });
+      }
+
+      logger.info({
+        clerkId,
+        dbUserId: dbUser.id,
+        bookId: book.id,
+        requestedPageIds: requestData.pageIds,
+        matchedPages: pagesToProcess.length,
+      }, 'Specific pageIds requested for illustration');
+    } else if (isRetry) {
       pagesToProcess = book.pages.filter((page) => {
         // Skip pages with successful illustrations (OK status)
         if (page.moderationStatus === 'OK' && page.generatedImageUrl) {

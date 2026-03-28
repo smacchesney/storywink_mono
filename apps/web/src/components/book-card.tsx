@@ -181,7 +181,7 @@ const BookCard: React.FC<BookCardProps> = ({
         {/* Footer with retry and delete buttons - aligned with completed cards */}
         <CardFooter className="flex justify-between items-center pt-2 px-4 pb-3">
           <Button
-            onClick={onRetryClick}
+            onClick={status === BookStatus.PARTIAL ? () => router.push(`/book/${id}/resolve`) : onRetryClick}
             size="sm"
             className="flex-grow mr-2 bg-[#F76C5E] hover:bg-[#E55A4C] rounded-full font-playful"
             disabled={isRetrying}
@@ -191,7 +191,7 @@ const BookCard: React.FC<BookCardProps> = ({
             ) : (
               <RefreshCw className="h-4 w-4 mr-1.5" />
             )}
-            {isRetrying ? t('retrying') : t('retryIllustrations')}
+            {isRetrying ? t('retrying') : (status === BookStatus.PARTIAL ? t('fixIssues') : t('retryIllustrations'))}
           </Button>
           <Button
             variant="outline"

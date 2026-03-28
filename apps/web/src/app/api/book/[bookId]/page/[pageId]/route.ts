@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from '@/lib/db';
+import { BookStatus } from '@prisma/client';
 import { z } from 'zod';
 import logger from '@/lib/logger';
 
@@ -117,7 +118,10 @@ export async function DELETE(
     // Fetch book with all pages to validate constraints
     const book = await prisma.book.findUnique({
       where: { id: bookId, userId: dbUser.id },
-      include: {
+      select: {
+        id: true,
+        coverAssetId: true,
+        status: true,
         pages: {
           select: { id: true, assetId: true, index: true },
           orderBy: { index: 'asc' },
@@ -191,6 +195,26 @@ export async function DELETE(
         'API: Page deletion transaction committed'
       );
     });
+
+    // Auto-complete: if book is PARTIAL and all remaining pages are now OK, mark as COMPLETED
+    if (book.status === BookStatus.PARTIAL) {
+      const remainingPages = await prisma.page.findMany({
+        where: { bookId },
+        select: { moderationStatus: true, generatedImageUrl: true, isTitlePage: true },
+      });
+
+      const allOk = remainingPages.every(
+        (p) => p.moderationStatus === 'OK' && p.generatedImageUrl
+      );
+
+      if (allOk) {
+        await prisma.book.update({
+          where: { id: bookId },
+          data: { status: BookStatus.COMPLETED },
+        });
+        logger.info({ bookId }, 'API: PARTIAL book auto-completed after removing flagged page');
+      }
+    }
 
     return NextResponse.json({ message: 'Page deleted successfully' }, { status: 200 });
   } catch (error) {
