@@ -214,7 +214,10 @@ export default function BookResolvePage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ assets }),
       });
-      if (!assetResponse.ok) throw new Error('Failed to create asset record');
+      if (!assetResponse.ok) {
+        const err = await assetResponse.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to create asset record');
+      }
       const assetData = await assetResponse.json();
       const newAssetId = assetData.data.assets[0].id;
 
@@ -223,7 +226,10 @@ export default function BookResolvePage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ assetId: newAssetId }),
       });
-      if (!replaceResponse.ok) throw new Error('Failed to replace photo');
+      if (!replaceResponse.ok) {
+        const err = await replaceResponse.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to replace photo');
+      }
 
       fetchBook();
 

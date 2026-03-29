@@ -50,16 +50,19 @@ export async function POST(
     // Verify the page exists, belongs to this book, and is FLAGGED
     const page = await prisma.page.findFirst({
       where: { id: pageId, bookId },
-      select: { id: true, moderationStatus: true },
+      select: { id: true, moderationStatus: true, generatedImageUrl: true },
     });
 
     if (!page) {
       return NextResponse.json({ error: 'Page not found in this book.' }, { status: 404 });
     }
 
-    if (page.moderationStatus !== 'FLAGGED') {
+    // Allow replacement on pages that need work (FLAGGED or PENDING without illustration)
+    const canReplace = page.moderationStatus === 'FLAGGED' ||
+      (page.moderationStatus === 'PENDING' && !page.generatedImageUrl);
+    if (!canReplace) {
       return NextResponse.json(
-        { error: 'Only FLAGGED pages can have their photo replaced.' },
+        { error: 'This page already has a completed illustration.' },
         { status: 400 }
       );
     }
