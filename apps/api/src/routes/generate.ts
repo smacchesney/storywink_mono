@@ -96,9 +96,13 @@ generateRouter.post(
       const userId = req.dbUser!.id;
       const { bookId, pageIds } = generateIllustrationSchema.parse(req.body);
 
-      console.log(`[Express API] Starting illustration generation for book ${bookId}`);
+      console.log(
+        `[Express API] Starting illustration generation for book ${bookId}`,
+      );
       console.log(`  - User ID: ${userId}`);
-      console.log(`  - Specific Page IDs: ${pageIds ? pageIds.join(', ') : 'All pages'}`);
+      console.log(
+        `  - Specific Page IDs: ${pageIds ? pageIds.join(", ") : "All pages"}`,
+      );
 
       // Verify book ownership and get detailed book data
       const book = await prisma.book.findFirst({
@@ -108,7 +112,7 @@ generateRouter.post(
             include: {
               asset: true,
             },
-            orderBy: { pageNumber: 'asc' },
+            orderBy: { pageNumber: "asc" },
           },
         },
       });
@@ -123,21 +127,26 @@ generateRouter.post(
       }
 
       // Prevent re-illustration of already completed books (but allow retry for PARTIAL/FAILED)
-      if (book.status === 'COMPLETED') {
-        console.warn(`[Express API] Rejected illustration request for already-completed book ${bookId} (status: ${book.status})`);
+      if (book.status === "COMPLETED") {
+        console.warn(
+          `[Express API] Rejected illustration request for already-completed book ${bookId} (status: ${book.status})`,
+        );
         res.status(409).json({
           success: false,
           error: "Book already illustrated",
-          message: "This book has already been illustrated and cannot be re-illustrated.",
+          message:
+            "This book has already been illustrated and cannot be re-illustrated.",
           status: book.status,
         });
         return;
       }
 
       // Allow retry for PARTIAL/FAILED books
-      const allowedStatuses = ['STORY_READY', 'PARTIAL', 'FAILED'];
+      const allowedStatuses = ["STORY_READY", "PARTIAL", "FAILED"];
       if (!allowedStatuses.includes(book.status)) {
-        console.warn(`[Express API] Book ${bookId} not in correct state for illustration (status: ${book.status})`);
+        console.warn(
+          `[Express API] Book ${bookId} not in correct state for illustration (status: ${book.status})`,
+        );
         res.status(409).json({
           success: false,
           error: `Book must be in STORY_READY, PARTIAL, or FAILED state to start illustration (current: ${book.status})`,
@@ -146,8 +155,10 @@ generateRouter.post(
       }
 
       // Log if this is a retry
-      if (book.status === 'PARTIAL' || book.status === 'FAILED') {
-        console.log(`[Express API] Retrying illustration for failed/partial book ${bookId}`);
+      if (book.status === "PARTIAL" || book.status === "FAILED") {
+        console.log(
+          `[Express API] Retrying illustration for failed/partial book ${bookId}`,
+        );
       }
 
       console.log(`[Express API] Book found: ${book.title}`);
@@ -167,7 +178,17 @@ generateRouter.post(
       if (pageIds) {
         // Specific pages requested
         pagesToIllustrate = book.pages.filter((p) => pageIds.includes(p.id));
-        console.log(`[Express API] Filtering by specific page IDs: ${pageIds.join(', ')}`);
+        console.log(
+          `[Express API] Filtering by specific page IDs: ${pageIds.join(", ")}`,
+        );
+
+        // Reset moderation status for requested pages so they get re-processed
+        for (const page of pagesToIllustrate) {
+          await prisma.page.update({
+            where: { id: page.id },
+            data: { moderationStatus: "PENDING", generatedImageUrl: null },
+          });
+        }
       } else {
         // Process all pages that need illustrations
         // Include title pages (they don't need text) and story pages with text
@@ -181,7 +202,9 @@ generateRouter.post(
 
           console.log(`[Express API] Page ${p.pageNumber} analysis:`);
           console.log(`    - Is Title Page: ${isTitle}`);
-          console.log(`    - Has Text: ${hasText} (${p.text?.length || 0} chars)`);
+          console.log(
+            `    - Has Text: ${hasText} (${p.text?.length || 0} chars)`,
+          );
           console.log(`    - Has Existing Image: ${hasExistingImage}`);
           console.log(`    - Will Process: ${shouldInclude}`);
 
@@ -189,8 +212,10 @@ generateRouter.post(
         });
       }
 
-      console.log(`[Express API] Pages to illustrate: ${pagesToIllustrate.length}/${book.pages.length}`);
-      
+      console.log(
+        `[Express API] Pages to illustrate: ${pagesToIllustrate.length}/${book.pages.length}`,
+      );
+
       if (pagesToIllustrate.length === 0) {
         console.warn(`[Express API] No pages to illustrate for book ${bookId}`);
         res.json({
@@ -210,17 +235,20 @@ generateRouter.post(
         {
           bookId,
           userId,
-          artStyle: book.artStyle || 'vignette',
+          artStyle: book.artStyle || "vignette",
+          ...(pageIds?.length && { pageIds }),
         },
         {
           attempts: 3,
-          backoff: { type: 'exponential', delay: 10000 },
+          backoff: { type: "exponential", delay: 10000 },
           removeOnComplete: { count: 100 },
           removeOnFail: { count: 500 },
-        }
+        },
       );
 
-      console.log(`[Express API] Character extraction job queued for book ${bookId}`);
+      console.log(
+        `[Express API] Character extraction job queued for book ${bookId}`,
+      );
       console.log(`  - Extraction Job ID: ${extractionJob.id}`);
       console.log(`  - Pages to illustrate: ${pagesToIllustrate.length}`);
 

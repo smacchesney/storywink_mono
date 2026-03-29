@@ -228,6 +228,7 @@ export async function POST(request: Request) {
         bookId: book.id,
         userId: dbUser.id,
         artStyle: book.artStyle || 'vignette',
+        ...(requestData.pageIds?.length && { pageIds: requestData.pageIds }),
       },
       {
         attempts: 3,

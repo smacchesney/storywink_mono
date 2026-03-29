@@ -15,7 +15,7 @@ import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/sh
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
 export async function processCharacterExtraction(job: Job<CharacterExtractionJob>) {
-  const { bookId, userId, artStyle } = job.data;
+  const { bookId, userId, artStyle, pageIds } = job.data;
 
   logger.info({ bookId, userId, artStyle }, 'Starting character identity extraction');
 
@@ -125,7 +125,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
 
   // 8. Create the illustration FlowProducer flow
   // This runs regardless of whether extraction succeeded (graceful degradation)
-  await createIllustrationFlow(bookId, userId, characterIdentity);
+  await createIllustrationFlow(bookId, userId, characterIdentity, pageIds);
 
   return { success: true, characterCount: characterIdentity?.characters?.length ?? 0 };
 }
@@ -139,6 +139,7 @@ async function createIllustrationFlow(
   bookId: string,
   userId: string,
   characterIdentity: CharacterIdentity | null,
+  pageIds?: string[],
 ): Promise<void> {
   // Re-fetch book to get latest page data
   const book = await prisma.book.findUnique({
@@ -164,31 +165,45 @@ async function createIllustrationFlow(
 
   if (!book) throw new Error('Book not found when creating illustration flow');
 
-  // Smart retry: filter pages that need illustration
-  const isRetry = book.status === 'PARTIAL' || book.status === 'FAILED';
-
+  // Determine which pages to process
   let pagesToProcess = book.pages;
-  if (isRetry) {
-    pagesToProcess = book.pages.filter((page) => {
-      if (page.moderationStatus === 'OK' && page.generatedImageUrl) return false;
-      if (page.moderationStatus === 'FLAGGED') return false;
-      return true;
-    });
+
+  if (pageIds && pageIds.length > 0) {
+    // Explicit page IDs provided — only illustrate those specific pages
+    const requestedIds = new Set(pageIds);
+    pagesToProcess = book.pages.filter((page) => requestedIds.has(page.id));
 
     logger.info({
       bookId,
-      totalPages: book.pages.length,
-      pagesToRetry: pagesToProcess.length,
-      skippedOk: book.pages.filter(p => p.moderationStatus === 'OK' && p.generatedImageUrl).length,
-      skippedFlagged: book.pages.filter(p => p.moderationStatus === 'FLAGGED').length,
-    }, 'Smart retry - filtering to failed/missing pages only');
+      requestedPageIds: pageIds,
+      matchedPages: pagesToProcess.length,
+    }, 'Filtering to explicitly requested pageIds');
   } else {
-    // For first-time illustration, filter to pages that need processing
-    pagesToProcess = book.pages.filter((p) => {
-      const isTitle = p.isTitlePage;
-      const hasText = !!(p.text && p.text.trim());
-      return isTitle || hasText;
-    });
+    // No specific pages requested — use existing smart retry / first-run logic
+    const isRetry = book.status === 'PARTIAL' || book.status === 'FAILED';
+
+    if (isRetry) {
+      pagesToProcess = book.pages.filter((page) => {
+        if (page.moderationStatus === 'OK' && page.generatedImageUrl) return false;
+        if (page.moderationStatus === 'FLAGGED') return false;
+        return true;
+      });
+
+      logger.info({
+        bookId,
+        totalPages: book.pages.length,
+        pagesToRetry: pagesToProcess.length,
+        skippedOk: book.pages.filter(p => p.moderationStatus === 'OK' && p.generatedImageUrl).length,
+        skippedFlagged: book.pages.filter(p => p.moderationStatus === 'FLAGGED').length,
+      }, 'Smart retry - filtering to failed/missing pages only');
+    } else {
+      // For first-time illustration, filter to pages that need processing
+      pagesToProcess = book.pages.filter((p) => {
+        const isTitle = p.isTitlePage;
+        const hasText = !!(p.text && p.text.trim());
+        return isTitle || hasText;
+      });
+    }
   }
 
   if (pagesToProcess.length === 0) {

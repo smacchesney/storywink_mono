@@ -153,6 +153,7 @@ export interface CharacterExtractionJob {
   bookId: string;
   userId: string;
   artStyle: string;
+  pageIds?: string[];
 }
 
 /**
