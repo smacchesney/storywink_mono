@@ -178,6 +178,10 @@ export default function BookResolvePage() {
     setShowUploader(false);
     if (!assets.length || !selectedPage) return;
 
+    // Immediately show the "Writing your story..." state
+    setStep('reviewing-text');
+    setIsGeneratingText(true);
+
     try {
       const token = await getToken();
       // Create asset record
@@ -198,12 +202,8 @@ export default function BookResolvePage() {
       });
       if (!replaceResponse.ok) throw new Error('Failed to replace photo');
 
-      // Refresh book data
-      await fetchBook();
-
-      // Move to text generation step
-      setStep('reviewing-text');
-      setIsGeneratingText(true);
+      // Refresh book data in background
+      fetchBook();
 
       // Queue text generation (runs in worker)
       const textResponse = await fetch('/api/generate/story/page', {
