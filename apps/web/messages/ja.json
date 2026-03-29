@@ -205,7 +205,7 @@
     "bookNotFound": "絵本が見つかりません。",
     "pageNeedsAttention": "{page}ページ目の確認が必要です",
     "tapToSwitch": "{total}件中{current}件目を修正中 — 上のハイライトされたページをタップで切替",
-    "photoCouldntBeIllustrated": "この写真はイラスト化できませんでした。別の写真をお試しください！",
+    "photoCouldntBeIllustrated": "この写真はイラスト化できませんでした（コンテンツポリシー）。別の写真をお試しください！",
     "removePage": "ページを削除",
     "replacePhoto": "写真を変更",
     "reviewStory": "ストーリーを確認",

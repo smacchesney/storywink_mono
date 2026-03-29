@@ -205,7 +205,7 @@
     "bookNotFound": "Book not found.",
     "pageNeedsAttention": "Page {page} needs attention",
     "tapToSwitch": "Fixing {current} of {total} — tap a highlighted page above to switch",
-    "photoCouldntBeIllustrated": "This photo couldn't be illustrated. Try a different one!",
+    "photoCouldntBeIllustrated": "This photo couldn't be illustrated (content policy). Try a different one!",
     "removePage": "Remove Page",
     "replacePhoto": "Replace Photo",
     "reviewStory": "Review your story",
