@@ -123,15 +123,20 @@ export function CloudinaryUploaderAuto({
     
     // Case 1: We have queue info and all uploads are complete
     if (hasUploads && allUploadsComplete) {
-      logger.info({ 
+      logger.info({
         assetCount: uploadedAssets.current.length,
         currentFileIndex: currentFileIndex.current,
-        totalFiles: totalFiles.current 
+        totalFiles: totalFiles.current
       }, "All uploads complete - calling onUploadComplete");
-      
+
       hasCalledComplete.current = true;
+
+      // Close the widget BEFORE notifying parent — prevents orphaned overlay
+      // when parent unmounts this component in response to onUploadComplete
+      try { widgetRef.current?.close(); } catch {}
+
       onUploadComplete(uploadedAssets.current);
-      
+
       // Reset state for next upload
       uploadedAssets.current = [];
       currentFileIndex.current = 0;
