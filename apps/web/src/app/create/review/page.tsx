@@ -352,8 +352,10 @@ function ReviewPageContent() {
       return;
     }
     
-    // --- Save and Confirm --- 
+    // --- Save and Confirm ---
     setIsSavingPage(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
       let response: Response;
       if (currentIndex === 0) { // Saving Title Page
@@ -361,14 +363,16 @@ function ReviewPageContent() {
         response = await fetch(`/api/book/${bookIdToUse}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: pendingTitleReview }), // Send updated title
+          body: JSON.stringify({ title: pendingTitleReview }),
+          signal: controller.signal,
         });
       } else { // Saving Story Page
         if (!currentPage.id) throw new Error("Page ID is missing, cannot save.");
         response = await fetch(`/api/book/${bookIdToUse}/page/${currentPage.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: currentPage.text || '', textConfirmed: true }), 
+          body: JSON.stringify({ text: currentPage.text || '', textConfirmed: true }),
+          signal: controller.signal,
         });
       }
 
@@ -376,20 +380,18 @@ function ReviewPageContent() {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `Failed to save (Status: ${response.status})`);
       }
-      
+
       // Update main state *after* successful save
       if (currentIndex === 0) {
           // Update book details (removed unused state variable)
       }
-      
+
       // Mark as confirmed locally
       setConfirmed(arr => {
         const copy = [...arr];
-        copy[currentIndex] = true; 
+        copy[currentIndex] = true;
         return copy;
       });
-      // Removed toast notification when page is confirmed
-      // toast.success(currentIndex === 0 ? "Title page saved and confirmed!" : `Page ${currentIndex} saved and confirmed!`);
 
       // Auto-advance to next page after confirmation if not on last page
       if (currentIndex < pages.length - 1) {
@@ -398,9 +400,13 @@ function ReviewPageContent() {
 
     } catch (error) {
       console.error("Error saving page/title:", error);
-      toast.error(`${error instanceof Error ? error.message : String(error)}`);
+      const message = error instanceof DOMException && error.name === 'AbortError'
+        ? t('saveTimeout')
+        : error instanceof Error ? error.message : String(error);
+      toast.error(message);
     } finally {
-       if (isMountedRef.current) { 
+       clearTimeout(timeoutId);
+       if (isMountedRef.current) {
            setIsSavingPage(false);
        }
     }
@@ -448,6 +454,8 @@ function ReviewPageContent() {
   // Keyboard arrow navigation
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       if (e.key === 'ArrowLeft') goPrev();
       if (e.key === 'ArrowRight') goNext();
     };
@@ -457,7 +465,6 @@ function ReviewPageContent() {
   }, [/* Add goPrev, goNext if needed */]); 
 
   const allConfirmed = pages.length > 0 && confirmed.every(c => c);
-  const confirmedCount = confirmed.filter(Boolean).length;
   const isWorking = isLoadingText || isSavingPage || isStartingIllustration || isAwaitingFinalStatus || isFetchingInitialData;
 
   // Handle loading/redirect state before rendering main UI
@@ -479,7 +486,7 @@ function ReviewPageContent() {
       <PageTracker 
         totalPages={pages.length} 
         currentPage={currentIndex} 
-        confirmedPages={confirmedCount} 
+        confirmed={confirmed}
         onPageSelect={setCurrentIndex} 
         allPagesConfirmed={allConfirmed}
         isProcessing={isWorking && !isAwaitingFinalStatus} // Modify isProcessing if needed
@@ -488,7 +495,8 @@ function ReviewPageContent() {
       
       {/* Main Content Area - Shows One Page at a Time */}
       <div className="flex-1 overflow-y-auto p-4">
-        <PageCard 
+        <PageCard
+          key={currentIndex}
           id={currentPageData?.id}
           imageUrl={currentPageData?.generatedImageUrl || currentPageData?.originalImageUrl}
           text={isTitlePageSelected ? pendingTitleReview : currentPageData?.text}

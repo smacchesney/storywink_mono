@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 interface PageTrackerProps {
   totalPages: number;
   currentPage: number;
-  confirmedPages: number;
+  confirmed: boolean[];
   onPageSelect: (index: number) => void;
   allPagesConfirmed: boolean;
   isProcessing: boolean;
@@ -18,10 +18,10 @@ interface PageTrackerProps {
  * PageTracker provides a visual indicator for page navigation and completion status
  * Shows dots for all pages, with color-coding for confirmation status
  */
-const PageTracker = ({ 
-  totalPages, 
-  currentPage, 
-  confirmedPages, 
+const PageTracker = ({
+  totalPages,
+  currentPage,
+  confirmed,
   onPageSelect,
   allPagesConfirmed,
   isProcessing,
@@ -34,7 +34,7 @@ const PageTracker = ({
         {/* Dots container moved to the left side of the header */}
         <div className="dots-container flex gap-1 overflow-x-auto py-1 no-scrollbar">
           {Array.from({ length: totalPages }).map((_, idx) => {
-            const isConfirmed = idx < confirmedPages;
+            const isConfirmed = confirmed[idx] ?? false;
             const isCurrent = idx === currentPage;
             const isTitle = idx === 0;
             

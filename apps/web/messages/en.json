@@ -162,6 +162,7 @@
     "enterPageText": "Enter text for page {n}...",
     "noTextYet": "No text yet.",
     "saveChanges": "Save Changes",
+    "saveTimeout": "Save timed out. Please check your connection and try again.",
     "contentFlagged": "Content flagged",
     "noPreview": "No Preview"
   },

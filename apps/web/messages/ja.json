@@ -162,6 +162,7 @@
     "enterPageText": "{n}ページのテキストを入力...",
     "noTextYet": "テキストはまだありません。",
     "saveChanges": "変更を保存",
+    "saveTimeout": "保存がタイムアウトしました。接続を確認して再度お試しください。",
     "contentFlagged": "コンテンツにフラグがあります",
     "noPreview": "プレビューなし"
   },
