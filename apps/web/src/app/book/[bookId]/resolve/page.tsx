@@ -133,7 +133,13 @@ export default function BookResolvePage() {
     fetchBook();
   }, [fetchBook]);
 
-  const flaggedPages = book?.pages.filter((p) => p.moderationStatus === 'FLAGGED') || [];
+  // Pages needing work: FLAGGED or replaced (PENDING with no illustration)
+  const flaggedPages = book?.pages.filter(
+    (p) => !p.isTitlePage && (
+      p.moderationStatus === 'FLAGGED' ||
+      (p.moderationStatus === 'PENDING' && !p.generatedImageUrl)
+    )
+  ) || [];
 
   // --- Remove Page ---
   const handleRemovePage = async () => {
@@ -199,19 +205,42 @@ export default function BookResolvePage() {
       setStep('reviewing-text');
       setIsGeneratingText(true);
 
-      // Generate text for the page
+      // Queue text generation (runs in worker)
       const textResponse = await fetch('/api/generate/story/page', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ bookId, pageId: selectedPage.id }),
       });
-      if (!textResponse.ok) throw new Error('Failed to generate story text');
-      const textData = await textResponse.json();
-      setGeneratedText(textData.text);
+      if (!textResponse.ok) throw new Error('Failed to start text generation');
+
+      // Poll for text to appear on the page
+      const pageIdToWatch = selectedPage.id;
+      pollIntervalRef.current = setInterval(async () => {
+        try {
+          const bookRes = await fetch(`/api/book/${bookId}`);
+          const bookData = await bookRes.json();
+          const page = bookData.pages.find((p: PageData) => p.id === pageIdToWatch);
+          if (page?.text) {
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+            setGeneratedText(page.text);
+            setIsGeneratingText(false);
+          }
+        } catch {
+          // Keep polling
+        }
+      }, 3000);
+
+      // Timeout after 60 seconds
+      pollTimeoutRef.current = setTimeout(() => {
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        setIsGeneratingText(false);
+        toast.error(t('textGenerationTimeout'));
+        setStep('overview');
+      }, 60000);
     } catch (err: any) {
       toast.error(err.message);
       setStep('overview');
-    } finally {
       setIsGeneratingText(false);
     }
   };

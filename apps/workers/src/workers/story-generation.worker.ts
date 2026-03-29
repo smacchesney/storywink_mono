@@ -14,7 +14,7 @@ import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/sh
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
-export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
+export async function processStoryGeneration(job: Job<StoryGenerationJob & { singlePageId?: string }>) {
   // Wrap everything in try-catch to catch early errors
   try {
     // Early validation
@@ -39,6 +39,12 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
     // Safe access to job data
     const bookId = job.data.bookId;
     const userId = job.data.userId;
+    const singlePageId = job.data.singlePageId;
+
+    // Route to single-page handler if singlePageId is present
+    if (singlePageId) {
+      return await processSinglePageTextGeneration(job, openai, bookId, singlePageId);
+    }
 
     if (!bookId || !userId) {
       throw new Error(`Missing required job data: bookId=${bookId}, userId=${userId}`);
@@ -386,4 +392,131 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob>) {
 
     throw error;
   }
+}
+
+/**
+ * Generate text for a single page using surrounding narrative context.
+ * Used when a user replaces a flagged photo on a PARTIAL book.
+ * Does NOT change book status — the book stays PARTIAL.
+ */
+async function processSinglePageTextGeneration(
+  job: Job,
+  openai: OpenAI,
+  bookId: string,
+  pageId: string,
+) {
+  logger.info({ bookId, pageId, jobId: job.id }, 'Starting single-page text generation');
+
+  const book = await prisma.book.findUnique({
+    where: { id: bookId },
+    include: {
+      pages: {
+        orderBy: { index: 'asc' },
+        include: { asset: true },
+      },
+    },
+  });
+
+  if (!book) throw new Error('Book not found');
+
+  const targetPage = book.pages.find(p => p.id === pageId);
+  if (!targetPage) throw new Error('Target page not found');
+
+  const photoUrl = targetPage.asset?.url || targetPage.asset?.thumbnailUrl || targetPage.originalImageUrl;
+  if (!photoUrl) throw new Error('Target page has no photo');
+
+  // Get story pages (excluding title page) for context
+  const storyPages = book.pages.filter(p => !p.isTitlePage);
+  const targetIndex = storyPages.findIndex(p => p.id === pageId);
+
+  const prevPages = storyPages.slice(Math.max(0, targetIndex - 2), targetIndex);
+  const nextPages = storyPages.slice(targetIndex + 1, targetIndex + 3);
+
+  const prevContext = prevPages.filter(p => p.text).map(p => `Page ${p.pageNumber}: "${p.text}"`).join('\n');
+  const nextContext = nextPages.filter(p => p.text).map(p => `Page ${p.pageNumber}: "${p.text}"`).join('\n');
+
+  // Parse additional characters
+  let characterInfo = '';
+  if (book.childName) {
+    characterInfo = `The main character is named "${book.childName}".`;
+    if (book.additionalCharacters) {
+      try {
+        const chars = JSON.parse(book.additionalCharacters) as Array<{ name: string; relationship: string }>;
+        if (chars.length > 0) {
+          characterInfo += ` Other characters: ${chars.map(c => `"${c.name}" (${c.relationship})`).join(', ')}.`;
+        }
+      } catch { /* ignore parse errors */ }
+    }
+  }
+
+  const language = book.language || 'en';
+  const languageInstruction = language === 'ja'
+    ? 'Write the story text in Japanese (hiragana preferred for young children). Use simple, warm language.'
+    : 'Write the story text in English.';
+
+  const promptText = [
+    `You are writing page ${targetPage.pageNumber} of a children's picture book titled "${book.title || 'My Special Story'}".`,
+    characterInfo,
+    languageInstruction,
+    '',
+    prevContext ? `## Story so far (previous pages):\n${prevContext}` : '## This is near the beginning of the story.',
+    '',
+    `## Your task:`,
+    `Write story text for page ${targetPage.pageNumber} based on the photo provided. Write 2-4 sentences (max 50 words). The text should feel warm, playful, and natural when read aloud to a toddler.`,
+    '',
+    nextContext ? `## What comes after (for continuity):\n${nextContext}` : '## This is near the end of the story.',
+    '',
+    `Also provide brief illustrationNotes describing any visual effects or mood for the illustrator, or null if the photo speaks for itself.`,
+  ].join('\n');
+
+  const imageUrl = optimizeCloudinaryUrlForVision(convertHeicToJpeg(photoUrl));
+
+  const SINGLE_PAGE_SCHEMA = {
+    type: 'object',
+    properties: {
+      text: { type: 'string', description: 'Story text (2-4 sentences, max 50 words)' },
+      illustrationNotes: { type: ['string', 'null'], description: 'Visual notes for illustrator, or null' },
+    },
+    required: ['text', 'illustrationNotes'],
+    additionalProperties: false,
+  } as const;
+
+  const result = await openai.responses.create({
+    model: 'gpt-5-mini',
+    instructions: STORY_GENERATION_SYSTEM_PROMPT,
+    input: [
+      {
+        role: 'user',
+        content: [
+          { type: 'input_image', image_url: imageUrl, detail: 'high' as const },
+          { type: 'input_text', text: promptText },
+        ],
+      },
+    ],
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'single_page_story',
+        strict: true,
+        schema: SINGLE_PAGE_SCHEMA as Record<string, unknown>,
+      },
+    },
+  });
+
+  const responseText = result.output_text;
+  if (!responseText) throw new Error('OpenAI returned empty response for single page');
+
+  const parsed = JSON.parse(responseText) as { text: string; illustrationNotes: string | null };
+
+  await prisma.page.update({
+    where: { id: pageId },
+    data: {
+      text: parsed.text,
+      illustrationNotes: parsed.illustrationNotes,
+      textConfirmed: false,
+    },
+  });
+
+  logger.info({ bookId, pageId, textLength: parsed.text.length }, 'Single-page text generation completed');
+  return { success: true, pageId, text: parsed.text };
 }
