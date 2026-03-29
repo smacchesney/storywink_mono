@@ -398,14 +398,14 @@ export default function BookResolvePage() {
 
       {/* Selected Page Actions */}
       {selectedPage && step === 'overview' && (
-        <Card className="border-amber-200 bg-amber-50/50">
-          <CardContent className="pt-6">
+        <Card className="border-amber-200 bg-amber-50/50 overflow-hidden">
+          <CardContent className="pt-6 px-4 sm:px-6">
             {flaggedPages.length > 1 && (
               <p className="text-xs text-amber-700 mb-3 font-medium">
                 {t('tapToSwitch', { current: flaggedPages.findIndex(p => p.id === selectedPage.id) + 1, total: flaggedPages.length })}
               </p>
             )}
-            <div className="flex items-start gap-4">
+            <div className="flex items-start gap-3 sm:gap-4">
               <div className="relative w-20 h-20 rounded-lg overflow-hidden shrink-0 border">
                 {selectedPhotoUrl ? (
                   <Image src={selectedPhotoUrl} alt={`Page ${selectedPage.pageNumber}`} fill className="object-cover" sizes="80px" />
@@ -420,10 +420,10 @@ export default function BookResolvePage() {
                 <p className="text-sm text-muted-foreground mt-1">
                   {t('photoCouldntBeIllustrated')}
                 </p>
-                <div className="flex gap-3 mt-4">
+                <div className="flex flex-col sm:flex-row gap-2 mt-4">
                   <Button
                     onClick={handleReplaceClick}
-                    className="flex-1 bg-[#F76C5E] hover:bg-[#E55A4C] text-white rounded-full font-playful"
+                    className="w-full sm:flex-1 bg-[#F76C5E] hover:bg-[#E55A4C] text-white rounded-full font-playful"
                   >
                     <ImagePlus className="h-4 w-4 mr-1.5" />
                     {t('replacePhoto')}
@@ -431,7 +431,7 @@ export default function BookResolvePage() {
                   <Button
                     variant="outline"
                     onClick={() => setShowDeleteDialog(true)}
-                    className="flex-1 rounded-full font-playful border-slate-300 text-slate-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+                    className="w-full sm:flex-1 rounded-full font-playful border-slate-300 text-slate-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
                   >
                     <Trash2 className="h-4 w-4 mr-1.5" />
                     {t('removePage')}
