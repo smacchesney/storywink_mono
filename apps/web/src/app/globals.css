@@ -177,6 +177,23 @@
   scrollbar-width: none;
 }
 
+/* Visible scrollbar for mobile storyboard panel */
+.storyboard-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.storyboard-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 8px 0;
+}
+.storyboard-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(247, 108, 94, 0.6);
+  border-radius: 3px;
+}
+.storyboard-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(247, 108, 94, 0.6) transparent;
+}
+
 /* Mobile adjustments for review page */
 @media (max-width: 768px) {
   .h-screen {

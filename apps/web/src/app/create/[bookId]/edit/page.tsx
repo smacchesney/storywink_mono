@@ -983,7 +983,7 @@ export default function EditBookPage() {
   // ---- Helper to render Storyboard content + footer (reused by Sheet & Drawer) ----
   const StoryboardPanelContent = (
     <>
-      <div className="flex-grow overflow-auto py-4 px-2" data-vaul-no-drag>
+      <div className="flex-grow overflow-auto py-4 px-2 storyboard-scroll" data-vaul-no-drag>
         {bookData && (
           <StoryboardGrid 
             pages={storyboardPagesForGrid} // <-- Pass the state variable

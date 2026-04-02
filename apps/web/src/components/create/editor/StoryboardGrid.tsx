@@ -10,17 +10,20 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
 } from '@dnd-kit/core';
 import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
-  rectSortingStrategy, // Or verticalListSortingStrategy if simpler layout needed first
+  rectSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
+import { GripVertical } from 'lucide-react';
 import { StoryboardPage, optimizeCloudinaryUrl } from '@storywink/shared';
 import { cn } from '@/lib/utils';
 
@@ -36,6 +39,7 @@ function SortablePageItem({ id, page, visualIndex }: { id: string; page: Storybo
     attributes,
     listeners,
     setNodeRef,
+    setActivatorNodeRef,
     transform,
     transition,
     isDragging
@@ -45,7 +49,6 @@ function SortablePageItem({ id, page, visualIndex }: { id: string; page: Storybo
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 10 : undefined,
-    opacity: isDragging ? 0.8 : 1,
   };
 
   return (
@@ -53,21 +56,31 @@ function SortablePageItem({ id, page, visualIndex }: { id: string; page: Storybo
       ref={setNodeRef}
       style={style}
       className={cn(
-        "relative aspect-square bg-gray-200 rounded overflow-hidden shadow",
-        "hover:shadow-lg",
-        "transition-shadow",
-        "duration-200",
-        "ease-in-out",
-        "touch-none", // Prevent scroll interference during drag
-        "select-none", // Prevent text selection
-        "[-webkit-touch-callout:none]", // Prevent iOS callout menu
-        "cursor-grab active:cursor-grabbing",
-        isDragging && "ring-2 ring-[#F76C5E]"
+        "group relative aspect-square bg-gray-200 rounded overflow-hidden shadow",
+        "hover:shadow-lg transition-shadow duration-200 ease-in-out",
+        "select-none [-webkit-touch-callout:none]",
+        isDragging && "opacity-30"
       )}
       {...attributes}
-      {...listeners}
     >
-      {/* Use thumbnail, fallback to full url with optimization */}
+      {/* Drag handle — only this element activates drag */}
+      <button
+        ref={setActivatorNodeRef}
+        {...listeners}
+        className={cn(
+          "absolute top-1 left-1 z-10",
+          "w-7 h-7 rounded-md",
+          "bg-black/30 backdrop-blur-sm",
+          "flex items-center justify-center",
+          "touch-none cursor-grab active:cursor-grabbing",
+          "md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+        )}
+        aria-label={t('dragHandle')}
+      >
+        <GripVertical className="size-4 text-white/80" />
+      </button>
+
+      {/* Thumbnail image */}
       {page.asset?.thumbnailUrl || page.asset?.url ? (
         <Image
           src={page.asset.thumbnailUrl || optimizeCloudinaryUrl(page.asset.url)}
@@ -80,12 +93,42 @@ function SortablePageItem({ id, page, visualIndex }: { id: string; page: Storybo
       ) : (
         <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">{t('noThumb')}</div>
       )}
-      {/* Page Number Overlay - Updated Style */}
+      {/* Page Number Overlay */}
       <div
         className={cn(
-          "absolute bottom-1 right-1 rounded-sm px-1.5 py-0.5", // Base positioning and padding
-          "bg-[#F76C5E] text-white", // Coral background, white text
-          "text-[10px] font-medium leading-none" // Font styling
+          "absolute bottom-1 right-1 rounded-sm px-1.5 py-0.5",
+          "bg-[#F76C5E] text-white",
+          "text-[10px] font-medium leading-none"
+        )}
+      >
+        {t('pageLabel', { n: visualIndex + 1 })}
+      </div>
+    </div>
+  );
+}
+
+// Thumbnail clone rendered inside DragOverlay
+function DragOverlayItem({ page, visualIndex }: { page: StoryboardPage; visualIndex: number }) {
+  const t = useTranslations('editor');
+  return (
+    <div className="relative aspect-square bg-gray-200 rounded overflow-hidden shadow-xl ring-2 ring-[#F76C5E] rotate-[2deg]">
+      {page.asset?.thumbnailUrl || page.asset?.url ? (
+        <Image
+          src={page.asset.thumbnailUrl || optimizeCloudinaryUrl(page.asset.url)}
+          alt={t('pageAlt', { n: visualIndex + 1 })}
+          fill
+          sizes="120px"
+          style={{ objectFit: "cover" }}
+          className="pointer-events-none"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">{t('noThumb')}</div>
+      )}
+      <div
+        className={cn(
+          "absolute bottom-1 right-1 rounded-sm px-1.5 py-0.5",
+          "bg-[#F76C5E] text-white",
+          "text-[10px] font-medium leading-none"
         )}
       >
         {t('pageLabel', { n: visualIndex + 1 })}
@@ -97,16 +140,7 @@ function SortablePageItem({ id, page, visualIndex }: { id: string; page: Storybo
 // Main Storyboard Component
 export function StoryboardGrid({ pages, onOrderChange }: StoryboardGridProps) {
   const [items, setItems] = useState<StoryboardPage[]>(pages);
-
-  // Debug logging
-  useEffect(() => {
-    console.log('StoryboardGrid received pages:', pages);
-    console.log('Pages length:', pages.length);
-    if (pages.length > 0) {
-      console.log('First page asset:', pages[0].asset);
-      console.log('All pages have assets:', pages.every(p => p.asset));
-    }
-  }, [pages]);
+  const [activeItem, setActiveItem] = useState<{ page: StoryboardPage; index: number } | null>(null);
 
   // Update internal state if external pages prop changes
   useEffect(() => {
@@ -115,63 +149,54 @@ export function StoryboardGrid({ pages, onOrderChange }: StoryboardGridProps) {
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
-      // Require mouse to move 10px before activating drag
-      activationConstraint: {
-        distance: 10,
-      },
+      activationConstraint: { distance: 5 },
     }),
     useSensor(TouchSensor, {
-      // Distance-based activation - start drag after moving 10px
-      // This avoids conflicts with iOS long-press gestures (zoom, text selection)
-      activationConstraint: {
-        distance: 10,
-      },
+      // Press-and-hold on the grip handle before drag starts
+      activationConstraint: { delay: 150, tolerance: 8 },
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
 
+  function handleDragStart(event: DragStartEvent) {
+    const index = items.findIndex(p => p.id === event.active.id);
+    if (index !== -1) {
+      setActiveItem({ page: items[index], index });
+    }
+    if (window.navigator.vibrate) {
+      window.navigator.vibrate(50);
+    }
+  }
+
   function handleDragEnd(event: DragEndEvent) {
+    setActiveItem(null);
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
       setItems((currentItems) => {
         const oldIndex = currentItems.findIndex((item) => item.id === active.id);
         const newIndex = currentItems.findIndex((item) => item.id === over.id);
-        
+
         const newOrderedItems = arrayMove(currentItems, oldIndex, newIndex);
-        
-        // Update pageNumber and index based on new order
+
         const finalItems = newOrderedItems.map((item, index) => ({
             ...item,
             index: index,
             pageNumber: index + 1,
-            // Potentially update isTitlePage here if needed, though cover logic might be separate
-            isTitlePage: index === 0 
+            isTitlePage: index === 0
         }));
 
-        onOrderChange(finalItems); // Notify parent of the final order
-        return finalItems; // Update local state
+        onOrderChange(finalItems);
+        return finalItems;
       });
     }
   }
 
-  // Separate the cover page (assuming index 0 is cover initially - adjust if needed)
-  // This filtering should ideally happen in the PARENT component based on coverAssetId
-  // but we handle it here temporarily for layout demonstration.
-  // const coverPage = items.find(p => p.isTitlePage); 
-  // const storyPages = items.filter(p => !p.isTitlePage);
-  
-  // For now, assume items are already filtered non-cover pages from parent
-  // const items = pages; 
-
-  // Haptic feedback on drag start
-  const handleDragStart = () => {
-    if (window.navigator.vibrate) {
-      window.navigator.vibrate(50); // Brief 50ms haptic feedback
-    }
-  };
+  function handleDragCancel() {
+    setActiveItem(null);
+  }
 
   return (
     <DndContext
@@ -179,25 +204,30 @@ export function StoryboardGrid({ pages, onOrderChange }: StoryboardGridProps) {
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
-      {/* We need one SortableContext containing ALL draggable items */}
-      <SortableContext 
-        items={items.map(item => item.id)} 
-        strategy={rectSortingStrategy} 
+      <SortableContext
+        items={items.map(item => item.id)}
+        strategy={rectSortingStrategy}
       >
         <div className="p-2">
-           <div className="grid grid-cols-3 gap-2">
+           <div className="grid grid-cols-3 gap-3">
             {items.map((page, index) => (
-              <SortablePageItem 
-                key={page.id} 
-                id={page.id} 
-                page={page} 
+              <SortablePageItem
+                key={page.id}
+                id={page.id}
+                page={page}
                 visualIndex={index}
               />
             ))}
           </div>
         </div>
       </SortableContext>
+      <DragOverlay adjustScale={false}>
+        {activeItem ? (
+          <DragOverlayItem page={activeItem.page} visualIndex={activeItem.index} />
+        ) : null}
+      </DragOverlay>
     </DndContext>
   );
 }
