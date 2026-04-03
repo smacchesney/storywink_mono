@@ -123,7 +123,7 @@ function ReviewPageContent() {
               originalImageUrl: p.originalImageUrl, 
               assetId: p.assetId,
               generatedImageUrl: p.generatedImageUrl,
-              isTitlePage: p.isTitlePage || (p.index === 0),
+              isTitlePage: p.isTitlePage || false,
               pageNumber: p.pageNumber,
               moderationStatus: p.moderationStatus,
               moderationReason: p.moderationReason
@@ -138,7 +138,7 @@ function ReviewPageContent() {
             
             setCurrentIndex(0);
 
-            const hasMissingText = mappedPages.some(p => !p.isTitlePage && p.text === null);
+            const hasMissingText = mappedPages.some(p => p.text === null);
 
             if (hasMissingText && fetchedBook.status === BookStatus.GENERATING) {
               // This case should be less common now, but handle if pages exist but text is null
@@ -221,7 +221,7 @@ function ReviewPageContent() {
                       }));
                       console.log("Review Page: Updating pages state with fetched text:", updatedPageData);
                       setPages(updatedPageData);
-                      setConfirmed(fetchedBook.pages.map((p: Page) => p.textConfirmed || p.isTitlePage)); 
+                      setConfirmed(fetchedBook.pages.map((p: Page) => p.textConfirmed || false));
                       setIsLoadingText(false);
                       console.log("Review Page: Story text generated successfully");
                   } else {
@@ -314,7 +314,7 @@ function ReviewPageContent() {
 
   // Handle text updates
   const handleTextChange = (newText: string) => {
-    if (currentIndex === 0) {
+    if (pages[currentIndex]?.isTitlePage) {
       // Handle title page text change
       setPendingTitleReview(newText);
     } else {
@@ -358,7 +358,7 @@ function ReviewPageContent() {
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
       let response: Response;
-      if (currentIndex === 0) { // Saving Title Page
+      if (currentPage?.isTitlePage) { // Saving Title Page
         if (!pendingTitleReview.trim()) throw new Error("Book title cannot be empty.");
         response = await fetch(`/api/book/${bookIdToUse}`, {
           method: 'PATCH',
@@ -379,11 +379,6 @@ function ReviewPageContent() {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `Failed to save (Status: ${response.status})`);
-      }
-
-      // Update main state *after* successful save
-      if (currentIndex === 0) {
-          // Update book details (removed unused state variable)
       }
 
       // Mark as confirmed locally
@@ -477,7 +472,7 @@ function ReviewPageContent() {
   }
 
   const currentPageData = pages[currentIndex];
-  const isTitlePageSelected = currentIndex === 0 && pages.length > 0; // Simpler check
+  const isTitlePageSelected = currentPageData?.isTitlePage || false;
 
   // Main Render - New Mobile-Optimized Layout
   return (

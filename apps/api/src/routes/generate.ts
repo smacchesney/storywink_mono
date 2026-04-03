@@ -190,15 +190,14 @@ generateRouter.post(
           });
         }
       } else {
-        // Process all pages that need illustrations
-        // Include title pages (they don't need text) and story pages with text
+        // Process all pages that have text and need illustrations
         pagesToIllustrate = book.pages.filter((p) => {
-          const isTitle = p.isTitlePage; // Use the isTitlePage field directly for reliability
+          const isTitle = p.isTitlePage;
           const hasText = !!(p.text && p.text.trim());
           const hasExistingImage = !!p.generatedImageUrl;
 
-          // Include if: (title page OR has text) AND no existing image
-          const shouldInclude = (isTitle || hasText) && !hasExistingImage;
+          // Include if: has text AND no existing image
+          const shouldInclude = hasText && !hasExistingImage;
 
           console.log(`[Express API] Page ${p.pageNumber} analysis:`);
           console.log(`    - Is Title Page: ${isTitle}`);

@@ -31,7 +31,8 @@ export async function getUserBooks(): Promise<UserBooksResult> {
         status: true,
         createdAt: true,
         updatedAt: true,
-        coverAssetId: true, // Ensure coverAssetId is fetched
+        coverAssetId: true,
+        coverImageUrl: true,
         pages: {
           orderBy: { index: Prisma.SortOrder.asc }, // Order pages by index
           select: {
@@ -51,25 +52,23 @@ export async function getUserBooks(): Promise<UserBooksResult> {
       let determinedCoverImageUrl: string | null = null;
       
       // Find the designated cover page using coverAssetId or fallback to title page/first page
-      const coverPageDetails = book.coverAssetId 
+      const coverPageDetails = book.coverAssetId
         ? book.pages.find(p => p.assetId === book.coverAssetId)
-        : book.pages.find(p => p.isTitlePage || p.index === 0);
+        : book.pages.find(p => p.isTitlePage);
 
       if (book.status === BookStatus.COMPLETED) {
-        // For COMPLETED books, prioritize the generated image of the cover page
-        if (coverPageDetails) {
-          determinedCoverImageUrl = coverPageDetails.generatedImageUrl || coverPageDetails.originalImageUrl; // Fallback to original if generated not there
-        } else if (book.pages.length > 0) { // Fallback to first page if no specific cover found
-          determinedCoverImageUrl = book.pages[0].generatedImageUrl || book.pages[0].originalImageUrl;
-        }
+        // For COMPLETED books, prefer dedicated cover illustration, then cover page generated image
+        determinedCoverImageUrl = book.coverImageUrl
+          || coverPageDetails?.generatedImageUrl
+          || coverPageDetails?.originalImageUrl
+          || book.pages[0]?.generatedImageUrl
+          || book.pages[0]?.originalImageUrl
+          || null;
       } else {
-        // For DRAFT, GENERATING, ILLUSTRATING, FAILED, PARTIAL statuses,
-        // use the original image of the cover page
-        if (coverPageDetails) {
-          determinedCoverImageUrl = coverPageDetails.originalImageUrl;
-        } else if (book.pages.length > 0) { // Fallback to first page if no specific cover found
-          determinedCoverImageUrl = book.pages[0].originalImageUrl;
-        }
+        // For non-completed statuses, use the original image of the cover page
+        determinedCoverImageUrl = coverPageDetails?.originalImageUrl
+          || book.pages[0]?.originalImageUrl
+          || null;
       }
 
       return {

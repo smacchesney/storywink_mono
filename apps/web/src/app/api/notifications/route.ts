@@ -17,6 +17,7 @@ export async function GET() {
           select: {
             id: true,
             title: true,
+            coverImageUrl: true,
             pages: {
               take: 1,
               orderBy: { pageNumber: 'asc' },
@@ -42,7 +43,7 @@ export async function GET() {
       createdAt: n.createdAt,
       bookId: n.bookId,
       bookTitle: n.book?.title,
-      coverImageUrl: n.book?.pages[0]?.generatedImageUrl || n.book?.pages[0]?.originalImageUrl || null,
+      coverImageUrl: n.book?.coverImageUrl || n.book?.pages[0]?.generatedImageUrl || n.book?.pages[0]?.originalImageUrl || null,
     }));
 
     return NextResponse.json({

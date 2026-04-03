@@ -11,18 +11,17 @@ export function isTitlePage(pageAssetId: string | null, bookCoverAssetId: string
 }
 
 /**
- * Filters pages into story pages and cover pages using consistent logic.
- * Note: storyPages now includes ALL pages (including the cover page),
- * since the cover photo participates in the story as well.
+ * Categorizes pages into story pages and cover pages.
+ * storyPages includes ALL pages (cover photo participates in the story).
  * coverPages identifies which page(s) provide the cover illustration.
  */
 export function categorizePages<T extends { assetId: string | null }>(
   pages: T[],
   bookCoverAssetId: string | null
-): { storyPages: T[]; titlePages: T[]; coverPages: T[] } {
+): { storyPages: T[]; coverPages: T[] } {
   const coverPages = pages.filter(page => isTitlePage(page.assetId, bookCoverAssetId));
 
-  return { storyPages: pages, titlePages: coverPages, coverPages };
+  return { storyPages: pages, coverPages };
 }
 
 /**

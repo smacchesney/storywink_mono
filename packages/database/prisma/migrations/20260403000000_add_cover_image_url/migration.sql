@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "Book" ADD COLUMN "coverImageUrl" TEXT;
+ALTER TABLE "Book" ADD COLUMN IF NOT EXISTS "coverImageUrl" TEXT;

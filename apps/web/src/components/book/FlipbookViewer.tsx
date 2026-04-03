@@ -65,24 +65,28 @@ export interface FlipbookActions {
 export function buildDisplayPages(pages: Page[], options?: BuildDisplayPagesOptions): DisplayPage[] {
   const displayPages: DisplayPage[] = [];
   const language = options?.language || 'en';
+  // Find the cover page and render it first
+  const coverPage = pages.find(p => p.isTitlePage);
+  if (coverPage) {
+    // Cover page (solo right with showCover)
+    displayPages.push({ type: 'illustration', page: coverPage });
+    // Blank inside front cover (left side of first spread)
+    displayPages.push({ type: 'blank' });
+    // Dedication (right side of first spread)
+    displayPages.push({
+      type: 'dedication',
+      childName: options?.childName ?? null,
+      bookTitle: options?.bookTitle ?? 'You',
+      language,
+    });
+  }
+  // All pages get text+illustration pairs in story order
+  // Only include text page if the page actually has story text
   for (const page of pages) {
-    if (page.isTitlePage) {
-      // Cover page (index 0, solo right with showCover)
-      displayPages.push({ type: 'illustration', page });
-      // Blank inside front cover (index 1, left side of first spread)
-      displayPages.push({ type: 'blank' });
-      // Dedication (index 2, right side of first spread)
-      displayPages.push({
-        type: 'dedication',
-        childName: options?.childName ?? null,
-        bookTitle: options?.bookTitle ?? 'You',
-        language,
-      });
-    } else {
-      // Text on left (verso), illustration on right (recto) — same spread
+    if (page.text && page.text.trim()) {
       displayPages.push({ type: 'text', page, language });
-      displayPages.push({ type: 'illustration', page });
     }
+    displayPages.push({ type: 'illustration', page });
   }
   // Ending page (left side of last story spread)
   displayPages.push({

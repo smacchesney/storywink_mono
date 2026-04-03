@@ -87,8 +87,8 @@ export async function POST(request: NextRequest) {
     const printedPageCount = calculatePrintedPageCount(book._count.pages);
     const printCostCents = PRINT_PRICING.RETAIL_PRICE_CENTS;
 
-    // Get cover image URL
-    const coverImageUrl = book.pages[0]?.generatedImageUrl;
+    // Get cover image URL (prefer dedicated cover illustration)
+    const coverImageUrl = book.coverImageUrl || book.pages[0]?.generatedImageUrl;
     const optimizedCoverUrl = coverImageUrl ? coolifyImageUrl(coverImageUrl) : undefined;
 
     // Build base URL for success/cancel

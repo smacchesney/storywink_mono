@@ -227,6 +227,13 @@ export default function BookResolvePage() {
     }
   }, [actionablePages.length, currentFixIndex]);
 
+  // --- Scroll to top when switching review pages ---
+  useEffect(() => {
+    if (phase === 'review-text') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [currentReviewIndex, phase]);
+
   // --- Navigation between actionable pages ---
   const goToFixPage = (index: number) => {
     setCurrentFixIndex(index);

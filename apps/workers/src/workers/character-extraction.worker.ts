@@ -197,11 +197,10 @@ async function createIllustrationFlow(
         skippedFlagged: book.pages.filter(p => p.moderationStatus === 'FLAGGED').length,
       }, 'Smart retry - filtering to failed/missing pages only');
     } else {
-      // For first-time illustration, filter to pages that need processing
+      // For first-time illustration, filter to pages that have text ready
       pagesToProcess = book.pages.filter((p) => {
-        const isTitle = p.isTitlePage;
         const hasText = !!(p.text && p.text.trim());
-        return isTitle || hasText;
+        return hasText;
       });
     }
   }

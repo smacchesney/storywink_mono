@@ -82,10 +82,10 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
   const bookTitle = printOrder?.book?.title || session?.metadata?.bookTitle || 'Your Book';
   const quantity = printOrder?.quantity || parseInt(session?.metadata?.quantity || '1', 10);
 
-  // Get cover image from the included book data
+  // Get cover image from the included book data (prefer dedicated cover illustration)
   let coverImageUrl: string | null = null;
   if (printOrder?.book) {
-    coverImageUrl = printOrder.book.pages[0]?.generatedImageUrl || null;
+    coverImageUrl = printOrder.book.coverImageUrl || printOrder.book.pages[0]?.generatedImageUrl || null;
   } else if (bookId) {
     // Fallback: fetch book separately if not in printOrder
     const book = await prisma.book.findFirst({
@@ -98,7 +98,7 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
         },
       },
     });
-    coverImageUrl = book?.pages[0]?.generatedImageUrl || null;
+    coverImageUrl = book?.coverImageUrl || book?.pages[0]?.generatedImageUrl || null;
   }
 
   // Format price - prefer Stripe session, fallback to database
