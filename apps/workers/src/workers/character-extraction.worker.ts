@@ -35,8 +35,8 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
 
     if (!book) throw new Error('Book not found');
 
-    // 2. Get all story pages (exclude title page)
-    const storyPages = book.pages.filter(p => !p.isTitlePage);
+    // 2. Get all pages (including cover page)
+    const storyPages = book.pages;
 
     // 3. Parse additional characters
     let additionalCharacters: { name: string; relationship: string }[] | null = null;

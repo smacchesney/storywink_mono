@@ -11,16 +11,18 @@ export function isTitlePage(pageAssetId: string | null, bookCoverAssetId: string
 }
 
 /**
- * Filters pages into story pages and title pages using consistent logic
+ * Filters pages into story pages and cover pages using consistent logic.
+ * Note: storyPages now includes ALL pages (including the cover page),
+ * since the cover photo participates in the story as well.
+ * coverPages identifies which page(s) provide the cover illustration.
  */
 export function categorizePages<T extends { assetId: string | null }>(
-  pages: T[], 
+  pages: T[],
   bookCoverAssetId: string | null
-): { storyPages: T[]; titlePages: T[] } {
-  const storyPages = pages.filter(page => !isTitlePage(page.assetId, bookCoverAssetId));
-  const titlePages = pages.filter(page => isTitlePage(page.assetId, bookCoverAssetId));
-  
-  return { storyPages, titlePages };
+): { storyPages: T[]; titlePages: T[]; coverPages: T[] } {
+  const coverPages = pages.filter(page => isTitlePage(page.assetId, bookCoverAssetId));
+
+  return { storyPages: pages, titlePages: coverPages, coverPages };
 }
 
 /**
@@ -119,12 +121,12 @@ export const coolifyImageUrl = optimizeCloudinaryUrl;
  *
  * Interior layout (saddle stitch):
  *   Page 1: Dedication
- *   Pages 2..2N+1: [Text page + Illustration page] × N story photos
+ *   Pages 2..2N+1: [Text page + Illustration page] × N photos
  *   Page 2N+2: Ending ("The End")
  *
- * Title page is NOT in the interior — it's on the cover spread.
+ * All photos (including the cover photo) appear in the interior.
  *
- * @param totalDbPages - Total page rows in the database (includes title page)
+ * @param totalDbPages - Total page rows in the database
  * @param options.padToMultipleOf4 - Pad to multiple of 4 for Lulu saddle stitch (default false)
  * @returns The number of printed interior pages
  */
@@ -132,7 +134,7 @@ export function calculatePrintedPageCount(
   totalDbPages: number,
   options?: { padToMultipleOf4?: boolean }
 ): number {
-  const storyPhotos = Math.max(0, totalDbPages - 1); // exclude title page
+  const storyPhotos = Math.max(0, totalDbPages); // all photos are story pages
   const rawCount = 2 + storyPhotos * 2; // dedication + ending + (text + illustration) per photo
 
   if (options?.padToMultipleOf4) {

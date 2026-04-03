@@ -71,12 +71,11 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       throw new Error('Book not found');
     }
 
-    // Filter out cover/title page to get story pages with their assets
-    // Use isTitlePage field which is always set correctly, instead of coverAssetId which may be null
-    const storyPages = book.pages.filter(page => !page.isTitlePage);
+    // All pages participate in story generation (including cover page)
+    const storyPages = book.pages;
 
     if (!storyPages || storyPages.length === 0) {
-      throw new Error('Book has no story pages (excluding cover)');
+      throw new Error('Book has no pages');
     }
 
     // Diagnostic logging for debugging text assignment issues
@@ -97,11 +96,11 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
     }, 'Story generation page analysis');
 
     // Validate page count
-    if (storyPages.length !== book.pageLength - 1) {
+    if (storyPages.length !== book.pageLength) {
       logger.warn({
         bookId,
         storyPagesCount: storyPages.length,
-        expectedStoryPages: book.pageLength - 1,
+        expectedStoryPages: book.pageLength,
         bookPageLength: book.pageLength,
         totalPagesInBook: book.pages.length
       }, 'Page count mismatch - story pages vs expected');
@@ -299,11 +298,10 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       throw error;
     }
 
-    // Verify all story pages actually received text in the database
+    // Verify all pages actually received text in the database
     const pagesAfterUpdate = await prisma.page.findMany({
       where: {
         bookId,
-        isTitlePage: false
       },
       select: {
         id: true,
@@ -425,8 +423,8 @@ async function processSinglePageTextGeneration(
   const photoUrl = targetPage.asset?.url || targetPage.asset?.thumbnailUrl || targetPage.originalImageUrl;
   if (!photoUrl) throw new Error('Target page has no photo');
 
-  // Get story pages (excluding title page) for context
-  const storyPages = book.pages.filter(p => !p.isTitlePage);
+  // Get all story pages for context
+  const storyPages = book.pages;
   const targetIndex = storyPages.findIndex(p => p.id === pageId);
 
   const prevPages = storyPages.slice(Math.max(0, targetIndex - 2), targetIndex);

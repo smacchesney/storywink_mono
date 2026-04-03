@@ -1,8 +1,11 @@
-import { Router } from 'express';
-import { requireAuth } from '@clerk/express';
-import prisma from '../database/index.js';
-import { ensureDbUser, AuthenticatedRequest } from '../middleware/ensureDbUser.js';
-import { LULU_ORDER_LIMITS } from '@storywink/shared/lulu';
+import { Router } from "express";
+import { requireAuth } from "@clerk/express";
+import prisma from "../database/index.js";
+import {
+  ensureDbUser,
+  AuthenticatedRequest,
+} from "../middleware/ensureDbUser.js";
+import { LULU_ORDER_LIMITS } from "@storywink/shared/lulu";
 
 export const cartRouter = Router();
 
@@ -13,7 +16,7 @@ cartRouter.use(ensureDbUser);
 /**
  * GET /api/cart - Get all cart items for the authenticated user
  */
-cartRouter.get('/', async (req: AuthenticatedRequest, res, next) => {
+cartRouter.get("/", async (req: AuthenticatedRequest, res, next) => {
   try {
     const userId = req.dbUser!.id;
 
@@ -32,11 +35,11 @@ cartRouter.get('/', async (req: AuthenticatedRequest, res, next) => {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
 
     // Transform to include cover image and total
-    const items = cartItems.map(item => ({
+    const items = cartItems.map((item) => ({
       id: item.id,
       bookId: item.bookId,
       quantity: item.quantity,
@@ -71,7 +74,7 @@ cartRouter.get('/', async (req: AuthenticatedRequest, res, next) => {
  * POST /api/cart - Add a book to the cart
  * If the book is already in the cart, updates the quantity instead.
  */
-cartRouter.post('/', async (req: AuthenticatedRequest, res, next) => {
+cartRouter.post("/", async (req: AuthenticatedRequest, res, next) => {
   try {
     const userId = req.dbUser!.id;
     const { bookId, quantity = 1 } = req.body;
@@ -79,7 +82,7 @@ cartRouter.post('/', async (req: AuthenticatedRequest, res, next) => {
     if (!bookId) {
       res.status(400).json({
         success: false,
-        error: 'bookId is required',
+        error: "bookId is required",
       });
       return;
     }
@@ -92,14 +95,14 @@ cartRouter.post('/', async (req: AuthenticatedRequest, res, next) => {
       where: {
         id: bookId,
         userId,
-        status: { in: ['COMPLETED', 'PARTIAL'] },
+        status: { in: ["COMPLETED", "PARTIAL"] },
       },
     });
 
     if (!book) {
       res.status(404).json({
         success: false,
-        error: 'Book not found or not ready for printing',
+        error: "Book not found or not ready for printing",
       });
       return;
     }
@@ -141,100 +144,109 @@ cartRouter.post('/', async (req: AuthenticatedRequest, res, next) => {
 /**
  * PATCH /api/cart/:cartItemId - Update cart item quantity
  */
-cartRouter.patch('/:cartItemId', async (req: AuthenticatedRequest, res, next) => {
-  try {
-    const userId = req.dbUser!.id;
-    const { cartItemId } = req.params;
-    const { quantity } = req.body;
+cartRouter.patch(
+  "/:cartItemId",
+  async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const userId = req.dbUser!.id;
+      const { cartItemId } = req.params;
+      const { quantity } = req.body;
 
-    if (quantity === undefined) {
-      res.status(400).json({
-        success: false,
-        error: 'quantity is required',
+      if (quantity === undefined) {
+        res.status(400).json({
+          success: false,
+          error: "quantity is required",
+        });
+        return;
+      }
+
+      // Validate quantity range
+      const qty = Math.min(
+        Math.max(LULU_ORDER_LIMITS.MIN_QUANTITY, quantity),
+        LULU_ORDER_LIMITS.MAX_QUANTITY,
+      );
+
+      // Verify ownership
+      const existingItem = await prisma.cartItem.findFirst({
+        where: { id: cartItemId, userId },
       });
-      return;
-    }
 
-    // Validate quantity range
-    const qty = Math.min(Math.max(LULU_ORDER_LIMITS.MIN_QUANTITY, quantity), LULU_ORDER_LIMITS.MAX_QUANTITY);
+      if (!existingItem) {
+        res.status(404).json({
+          success: false,
+          error: "Cart item not found",
+        });
+        return;
+      }
 
-    // Verify ownership
-    const existingItem = await prisma.cartItem.findFirst({
-      where: { id: cartItemId, userId },
-    });
-
-    if (!existingItem) {
-      res.status(404).json({
-        success: false,
-        error: 'Cart item not found',
-      });
-      return;
-    }
-
-    // Update quantity
-    const cartItem = await prisma.cartItem.update({
-      where: { id: cartItemId },
-      data: { quantity: qty },
-      include: {
-        book: {
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            pageLength: true,
+      // Update quantity
+      const cartItem = await prisma.cartItem.update({
+        where: { id: cartItemId },
+        data: { quantity: qty },
+        include: {
+          book: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              pageLength: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    res.json({
-      success: true,
-      data: cartItem,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+      res.json({
+        success: true,
+        data: cartItem,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 /**
  * DELETE /api/cart/:cartItemId - Remove item from cart
  */
-cartRouter.delete('/:cartItemId', async (req: AuthenticatedRequest, res, next) => {
-  try {
-    const userId = req.dbUser!.id;
-    const { cartItemId } = req.params;
+cartRouter.delete(
+  "/:cartItemId",
+  async (req: AuthenticatedRequest, res, next) => {
+    try {
+      const userId = req.dbUser!.id;
+      const { cartItemId } = req.params;
 
-    // Verify ownership
-    const existingItem = await prisma.cartItem.findFirst({
-      where: { id: cartItemId, userId },
-    });
-
-    if (!existingItem) {
-      res.status(404).json({
-        success: false,
-        error: 'Cart item not found',
+      // Verify ownership
+      const existingItem = await prisma.cartItem.findFirst({
+        where: { id: cartItemId, userId },
       });
-      return;
+
+      if (!existingItem) {
+        res.status(404).json({
+          success: false,
+          error: "Cart item not found",
+        });
+        return;
+      }
+
+      // Delete item
+      await prisma.cartItem.delete({
+        where: { id: cartItemId },
+      });
+
+      res.json({
+        success: true,
+        message: "Item removed from cart",
+      });
+    } catch (error) {
+      next(error);
     }
-
-    // Delete item
-    await prisma.cartItem.delete({
-      where: { id: cartItemId },
-    });
-
-    res.json({
-      success: true,
-      message: 'Item removed from cart',
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+  },
+);
 
 /**
  * DELETE /api/cart - Clear entire cart
  */
-cartRouter.delete('/', async (req: AuthenticatedRequest, res, next) => {
+cartRouter.delete("/", async (req: AuthenticatedRequest, res, next) => {
   try {
     const userId = req.dbUser!.id;
 

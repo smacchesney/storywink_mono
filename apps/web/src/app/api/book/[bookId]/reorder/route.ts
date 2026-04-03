@@ -49,7 +49,7 @@ export async function POST(
     // Verify user owns the book before proceeding
     const bookOwnerCheck = await prisma.book.findUnique({
       where: { id: bookId, userId: dbUser.id },
-      select: { id: true }, // Select minimal field
+      select: { id: true, coverAssetId: true },
     });
 
     if (!bookOwnerCheck) {
@@ -82,22 +82,25 @@ export async function POST(
       }))
     }, 'API: Page state before reorder');
 
+    // Build a map of pageId → assetId for isTitlePage derivation
+    const pageAssetMap = new Map(currentPages.map(p => [p.id, p.assetId]));
+    const coverAssetId = bookOwnerCheck.coverAssetId;
+
     // Use a transaction to update all page indices atomically
     await prisma.$transaction(async (tx) => {
       logger.info({ clerkId, dbUserId: dbUser.id, bookId }, 'API: Starting page reorder transaction.');
-      
-      
-      const updatePromises = pages.map(page => 
-        tx.page.updateMany({ // Use updateMany to ensure page belongs to the correct book
+
+      const updatePromises = pages.map(page =>
+        tx.page.updateMany({
           where: {
             id: page.pageId,
-            bookId: bookId, // Ensure the page belongs to this book
+            bookId: bookId,
           },
           data: {
             index: page.index,
             pageNumber: page.index + 1,
-            // Update isTitlePage based on whether this page is at index 0
-            isTitlePage: page.index === 0,
+            // isTitlePage is based on coverAssetId, not index position
+            isTitlePage: pageAssetMap.get(page.pageId) === coverAssetId && coverAssetId !== null,
           },
         })
       );

@@ -60,19 +60,21 @@ export async function GET(
       return NextResponse.json({ error: 'Book not found or access denied' }, { status: 404 });
     }
 
-    // Separate title page from story pages
-    const titlePageData = bookData.pages.find(
+    // Find cover page for the title page illustration
+    const coverPage = bookData.pages.find(
       page => isTitlePage(page.assetId, bookData.coverAssetId)
     );
-    const storyPages = bookData.pages.filter(
-      page => !isTitlePage(page.assetId, bookData.coverAssetId)
-    );
+    // Use coverImageUrl (dedicated cover illustration) if available, otherwise fall back to page illustration
+    const titlePageForPdf = coverPage ? {
+      ...coverPage,
+      generatedImageUrl: bookData.coverImageUrl || coverPage.generatedImageUrl,
+    } : undefined;
 
-    // 2. Generate the PDF buffer (user mode: title → dedication → stories → back cover)
+    // 2. Generate the PDF buffer (user mode: title → dedication → ALL stories → back cover)
     const pdfBuffer = await generateBookPdf(
-      { ...bookData, pages: storyPages } as BookWithPages,
+      bookData as BookWithPages,
       {
-        titlePage: titlePageData as Page | undefined,
+        titlePage: titlePageForPdf as Page | undefined,
         includeBackCover: true,
         padToFour: false,
       }

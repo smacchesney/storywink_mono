@@ -48,74 +48,13 @@ import { BookStatus } from '@/shared';
 
 Available exports: main, `/constants`, `/schemas`, `/utils`, `/types`, `/redis`, `/prompts`, `/prompts/story`, `/prompts/illustration`, `/prompts/styles`
 
-## Book Status Flow
-
-```
-DRAFT → GENERATING → STORY_READY → ILLUSTRATING → COMPLETED
-                                                 ↘ PARTIAL (some pages failed)
-                                                 ↘ FAILED (critical error)
-```
-
-## Hybrid API Pattern
-
-The app uses both Express and Next.js API routes:
-
-- **Express (port 4000)**: Queue operations, worker coordination
-  - `/api/generate/story`, `/api/generate/illustrations`, `/api/books`
-
-- **Next.js (port 3000)**: User-facing operations, webhooks
-  - `/api/book/create`, `/api/cloudinary/notify`, `/api/webhooks/clerk`
-
-## Key Patterns
-
-- Queue-based processing: All AI operations async via BullMQ
-- Direct Cloudinary uploads: Browser-to-Cloudinary (no server involvement)
-- Title page detection: `isTitlePage()` in `packages/shared/src/utils.ts`
-- AI prompts: Centralized in `packages/shared/src/prompts/`
-- Redis connections: Use `createBullMQConnection()` from `@storywink/shared/redis`
-
-## Print-on-Demand (Lulu Saddle Stitch)
-
-Pod package: `0850X0850FCPRESS080CW444MXX` (8.5x8.5 Full Color Saddle Stitch)
-
-**Two separate PDFs sent to Lulu:**
-
-1. **Cover PDF** — Single-page spread: Back Cover (left, 8.625") + Front Cover (right, 8.625") = 17.25" x 8.75"
-   - Front cover = title page illustration (full bleed)
-   - Back cover = white bg, Excalifont "Storywink.ai" branding, mascot below
-   - Files: `apps/web/src/lib/pdf/generateLuluCover.ts`, `apps/workers/src/utils/pdf/generateLuluCover.ts`
-
-2. **Interior PDF** — Sequential single pages, 8.75" x 8.75" (8.5" + 0.125" bleed)
-   - Page 1 (recto): Dedication — "This book was made especially for [childName]"
-   - Pages 2+: Text (verso/left) + Illustration (recto/right) pairs per story page
-   - Ending page: "The End / Until next time, [childName]!"
-   - Padded to multiple of 4 with blank pages (saddle stitch requirement, 4-48 pages)
-   - Title page EXCLUDED (it's on the cover spread)
-   - Files: `apps/web/src/lib/pdf/generateBookPdf.ts`, `apps/workers/src/utils/pdf/generateBookPdf.ts`
-
-**Key Lulu rules:**
-- Inside front/back covers are NOT printable (saddle stitch only)
-- Page 1 of interior prints on recto (right-hand side)
-- Lulu handles imposition — supply reader-spread order, NOT printer spreads
-- Page count formula: `2 (dedication + ending) + 2N` where N = story photos (always even)
-
-**User PDF export** (different from Lulu): Title page → Dedication → Stories → Ending → Back cover. No blank padding. Controlled via `generateBookPdf(bookData, { titlePage, includeBackCover: true, padToFour: false })`.
-
-**Dual code paths:** Web (`apps/web/src/lib/pdf/`) and Workers (`apps/workers/src/utils/pdf/`) have mirrored PDF generators. Changes must be applied to BOTH.
-
 ## Ways of Working
 
 - Provide brutally honest assessments. No sugar-coating.
 - Always question my assumptions - I may be incorrect or misunderstanding.
 - Keep solutions simple. Only make changes directly requested.
-
-## Brand
-
-- **Primary**: Coral `#F76C5E`
-- **Font**: Excalifont (hand-drawn style), class `font-playful` in Tailwind
-- **Text**: Near-black `#1a1a1a`
-- **Logo**: "Storywin" in black + "k.ai" in coral
-- **Mascots** (Cloudinary): dedication (sleeping cats), ending (sitting cats), back cover (waving cats)
+- When making UI / UX changes, use playwright MCP to verify the quality of the UI changes, and ensure consistency with brand guidelines. Save screenshots in .screenshots folder.
+- The USP of this app is simplicity and intuitive UX for users. We need to hyper-focus on this in EVERYTHING we do. 
 
 ## Additional Documentation
 

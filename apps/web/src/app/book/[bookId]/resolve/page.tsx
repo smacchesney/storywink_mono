@@ -59,7 +59,6 @@ const MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v177229137
 
 /** Determine if a page needs work based on its DB state */
 function pageNeedsWork(p: PageData): boolean {
-  if (p.isTitlePage) return false;
   if (p.moderationStatus === 'FLAGGED') return true;
   if (!p.generatedImageUrl && p.moderationStatus !== 'OK') return true;
   return false;
@@ -227,13 +226,6 @@ export default function BookResolvePage() {
       setCurrentFixIndex(0);
     }
   }, [actionablePages.length, currentFixIndex]);
-
-  // --- Scroll to top when switching review pages ---
-  useEffect(() => {
-    if (phase === 'review-text') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, [currentReviewIndex, phase]);
 
   // --- Navigation between actionable pages ---
   const goToFixPage = (index: number) => {
@@ -515,7 +507,7 @@ export default function BookResolvePage() {
         <>
           {/* Page Grid */}
           <div className="grid grid-cols-6 sm:grid-cols-8 gap-2 mb-6">
-            {book.pages.filter(p => !p.isTitlePage).map((page) => {
+            {book.pages.map((page) => {
               const isReplaced = replacedPageIds.includes(page.id);
               const needsWork = pageNeedsWork(page) && !isReplaced;
               const isSelected = selectedFixPage?.id === page.id;

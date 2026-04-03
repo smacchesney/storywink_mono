@@ -84,13 +84,9 @@ export async function processPrintFulfillment(job: Job<PrintFulfillmentJob>): Pr
     // Report progress: Starting PDF generation
     await job.updateProgress({ stage: 'generating_pdfs', percent: 10 });
 
-    // 3. Generate interior PDF (exclude title page - it appears on the cover)
-    const interiorPages = book.pages.filter(page => !page.isTitlePage);
-    console.log(`[PrintFulfillment] Generating interior PDF (${interiorPages.length} story pages, title page excluded)...`);
-    const interiorPdfBuffer = await generateBookPdf({
-      ...book,
-      pages: interiorPages,
-    });
+    // 3. Generate interior PDF (all pages including cover photo)
+    console.log(`[PrintFulfillment] Generating interior PDF (${book.pages.length} pages)...`);
+    const interiorPdfBuffer = await generateBookPdf(book);
     console.log(`[PrintFulfillment] Interior PDF generated: ${interiorPdfBuffer.length} bytes`);
 
     await job.updateProgress({ stage: 'interior_pdf_complete', percent: 30 });

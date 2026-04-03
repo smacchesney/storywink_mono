@@ -23,24 +23,12 @@ export function Canvas({ bookData, options, onTitlePlaceholderClick }: CanvasPro
   const [nextBtnDisabled, setNextBtnDisabled] = useState(true);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  // --- Calculate Display Order --- 
+  // --- Calculate Display Order ---
   const orderedPagesForDisplay = useMemo(() => {
     if (!bookData?.pages) return [];
-
-    const coverPage = bookData.coverAssetId 
-        ? bookData.pages.find(p => p.assetId === bookData.coverAssetId)
-        : bookData.pages.find(p => p.isTitlePage); // Fallback to isTitlePage if coverAssetId is null
-        
-    const otherPages = bookData.pages.filter(p => p.id !== coverPage?.id);
-
-    // Sort the other pages by their database index
-    otherPages.sort((a, b) => a.index - b.index);
-
-    // Combine: cover first (if found), then the rest sorted by index
-    // If coverPage wasn't found (e.g., initial state, error), just return pages sorted by index
-    return coverPage ? [coverPage, ...otherPages] : [...bookData.pages].sort((a, b) => a.index - b.index);
-
-  }, [bookData?.pages, bookData?.coverAssetId]);
+    // Display all pages in their index order (cover page sits at its storyboard position)
+    return [...bookData.pages].sort((a, b) => a.index - b.index);
+  }, [bookData?.pages]);
   // -----------------------------
 
   // --- Carousel Navigation --- 
@@ -85,8 +73,8 @@ export function Canvas({ bookData, options, onTitlePlaceholderClick }: CanvasPro
                 </div>
               )}
               
-              {/* Title Overlay - Cover is always first */}
-              {displayIndex === 0 && (
+              {/* Title Overlay - shown on the cover page */}
+              {page.assetId === bookData.coverAssetId && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/30 p-4">
                   {bookData.title && bookData.title.trim() !== '' ? (
                     <h2 className="text-white text-2xl md:text-3xl font-bold text-center shadow-text">

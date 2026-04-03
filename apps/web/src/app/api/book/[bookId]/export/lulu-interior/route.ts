@@ -5,7 +5,7 @@ import logger from '@/lib/logger';
 import { generateBookPdf } from '@/lib/pdf/generateBookPdf';
 import { uploadPdfToDropbox } from '@/lib/dropbox';
 import { Book, Page } from '@prisma/client';
-import { isTitlePage, calculatePrintedPageCount } from '@storywink/shared/utils';
+import { calculatePrintedPageCount } from '@storywink/shared/utils';
 
 // Define the expected Book type with Pages for the PDF generator
 type BookWithPages = Book & { pages: Page[] };
@@ -75,24 +75,20 @@ export async function POST(
       );
     }
 
-    // Filter out title page - Lulu interior should only contain story pages
-    // The title page is used for the cover (separate PDF), not the interior
-    const storyPages = bookData.pages.filter(
-      page => !isTitlePage(page.assetId, bookData.coverAssetId)
-    );
+    // All pages (including cover photo) appear in the interior
+    const storyPages = bookData.pages;
 
     logger.info({
       bookId,
       totalPages: bookData.pages.length,
       storyPages: storyPages.length,
       coverAssetId: bookData.coverAssetId,
-    }, 'Filtered pages for Lulu interior (excluding title page)');
+    }, 'Preparing pages for Lulu interior (all pages included)');
 
-    // Validate we have story pages to print
     if (storyPages.length === 0) {
-      logger.warn({ bookId }, 'No story pages found for interior PDF');
+      logger.warn({ bookId }, 'No pages found for interior PDF');
       return NextResponse.json(
-        { error: 'No story pages found. Book must have at least one story page for interior PDF.' },
+        { error: 'No pages found. Book must have at least one page for interior PDF.' },
         { status: 400 }
       );
     }

@@ -40,6 +40,7 @@ export interface Book {
   specialObjects?: string | null;
   excitementElement?: string | null;
   coverAssetId?: string | null;
+  coverImageUrl?: string | null;
   characterIdentity?: CharacterIdentity | null;
   promptTokens?: number | null;
   completionTokens?: number | null;

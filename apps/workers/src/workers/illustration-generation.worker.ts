@@ -152,9 +152,8 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       throw new Error('Page not found');
     }
     
-    // Use isTitlePage from job data (already determined by API)
-    // Title pages don't need text (they use book title), but story pages do
-    if (!isTitlePage && (!text || text.trim().length === 0)) {
+    // All pages (including cover) must have story text
+    if (!text || text.trim().length === 0) {
       console.error(`[IllustrationWorker] ERROR: Page ${pageNumber} has no text!`);
       throw new Error('Page has no text - cannot generate illustration without story content');
     }
@@ -251,14 +250,10 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       throw new Error(`Invalid style key: ${styleKey}. Available styles: ${Object.keys(STYLE_LIBRARY).join(', ')}`);
     }
 
-    // Get style reference URLs - title pages use cover refs, story pages use standard refs
+    // All pages (including cover) use standard style references for the story illustration.
+    // Cover pages get a separate cover-style illustration generated afterwards.
     let styleReferenceUrls: string[];
-    if (isTitlePage && styleData.coverReferenceImageUrls?.length) {
-      styleReferenceUrls = [...styleData.coverReferenceImageUrls];
-    } else {
-      // Spread to convert readonly array to mutable array
-      styleReferenceUrls = [...styleData.referenceImageUrls];
-    }
+    styleReferenceUrls = [...styleData.referenceImageUrls];
 
     // ============================================================================
     // DIAGNOSTIC: Database-persisted logging to survive process crashes
@@ -355,11 +350,13 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
 
     console.log(`[IllustrationWorker] Fetched ${styleReferenceBuffers.length} style reference image(s) for page ${pageNumber}`);
 
+    // For the primary illustration, always use story-style prompt (isTitlePage: false).
+    // Cover pages get a separate cover-style illustration generated afterwards.
     const promptInput: IllustrationPromptOptions = {
         style: styleKey,
         pageText: text,
         bookTitle: bookTitle,
-        isTitlePage: isTitlePage,
+        isTitlePage: false,
         illustrationNotes: illustrationNotes,
         language: language || 'en',
         referenceImageCount: styleReferenceBuffers.length,
@@ -554,30 +551,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
               throw new Error(errorMessage);
           }
 
-          // Add Storywink.ai logo to title pages
-          if (isTitlePage) {
-              try {
-                  logger.info({ jobId: job.id, pageId, pageNumber }, 'Adding logo overlay to title page...');
-                  console.log(`[IllustrationWorker] Adding Storywink.ai logo to title page ${pageNumber}`);
-                  generatedImageBuffer = await addLogoToTitlePage(generatedImageBuffer);
-                  logger.info({ jobId: job.id, pageId, pageNumber }, 'Logo overlay added successfully.');
-                  console.log(`[IllustrationWorker] Logo overlay complete for page ${pageNumber}`);
-              } catch (logoOverlayError: any) {
-                  // Logo overlay failure should be retried, not silently skipped
-                  const errorMessage = `Logo overlay failed: ${logoOverlayError.message}`;
-                  logger.error({
-                      jobId: job.id,
-                      pageId,
-                      pageNumber,
-                      error: logoOverlayError.message,
-                      stack: logoOverlayError.stack,
-                  }, errorMessage);
-                  console.error(`[IllustrationWorker] Logo overlay failed for page ${pageNumber}: ${logoOverlayError.message}`);
-                  console.error(`[IllustrationWorker] Stack: ${logoOverlayError.stack}`);
-                  // Throw to trigger retry logic - will be marked FAILED after exhausting retries
-                  throw new Error(errorMessage);
-              }
-          }
+          // Logo overlay is now only applied to the separate cover illustration (generated below)
 
           const uploadResult = await new Promise<any>((resolve, reject) => {
                cloudinary.uploader.upload_stream(
@@ -636,13 +610,106 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
          throw dbError; 
     }
 
+    // Generate separate COVER illustration for the cover page (with cover prompt + logo)
+    if (isTitlePage && !moderationBlocked && finalImageUrl) {
+      console.log(`[IllustrationWorker] Generating separate cover illustration for title page ${pageNumber}...`);
+      try {
+        // Use cover-specific style references if available
+        const coverStyleRefs = styleData.coverReferenceImageUrls?.length
+          ? [...styleData.coverReferenceImageUrls]
+          : [...styleData.referenceImageUrls];
+
+        // Fetch cover style reference images
+        const coverRefBuffers: { buffer: Buffer; mimeType: string }[] = [];
+        for (const refUrl of coverStyleRefs) {
+          const refRes = await fetch(refUrl);
+          const refArrayBuffer = await refRes.arrayBuffer();
+          const mimeType = refRes.headers.get('content-type') || 'image/png';
+          coverRefBuffers.push({ buffer: Buffer.from(refArrayBuffer), mimeType });
+        }
+
+        // Build cover-style prompt (isTitlePage: true uses buildCoverPrompt)
+        const coverPromptInput: IllustrationPromptOptions = {
+          style: styleKey,
+          pageText: text,
+          bookTitle: bookTitle,
+          isTitlePage: true,
+          illustrationNotes: illustrationNotes,
+          language: language || 'en',
+          referenceImageCount: coverRefBuffers.length,
+          characterIdentity: characterIdentity || null,
+          pageNumber: pageNumber,
+          qcFeedback: qcFeedback || null,
+        };
+        const coverTextPrompt = createIllustrationPrompt(coverPromptInput);
+
+        const coverPrompt = [
+          { inlineData: { mimeType: contentImageMimeType, data: contentImageBase64 } },
+          ...coverRefBuffers.map(ref => ({
+            inlineData: { mimeType: ref.mimeType, data: ref.buffer.toString('base64') },
+          })),
+          { text: coverTextPrompt },
+        ];
+
+        const coverResult = await ai.models.generateContent({
+          model: "gemini-3.1-flash-image-preview",
+          contents: coverPrompt,
+          config: {
+            responseModalities: ['TEXT', 'IMAGE'],
+            imageConfig: { aspectRatio: '1:1', imageSize: '2K' },
+          },
+        });
+
+        const coverImagePart = coverResult?.candidates?.[0]?.content?.parts?.find((part: any) => part.inlineData);
+        if (coverImagePart?.inlineData?.data) {
+          let coverBuffer = Buffer.from(coverImagePart.inlineData.data, 'base64');
+
+          // Upscale for print
+          coverBuffer = await upscaleForPrint(coverBuffer);
+
+          // Apply logo overlay to cover illustration
+          coverBuffer = await addLogoToTitlePage(coverBuffer);
+
+          // Upload cover illustration to Cloudinary
+          const coverUpload = await new Promise<any>((resolve, reject) => {
+            cloudinary.uploader.upload_stream(
+              {
+                folder: `storywink/${bookId}/generated`,
+                public_id: `cover_illustration`,
+                overwrite: true,
+                tags: [`book:${bookId}`, `cover`, `style:${styleKey}`],
+                resource_type: "image",
+              },
+              (error, result) => {
+                if (error) reject(error); else resolve(result);
+              }
+            ).end(coverBuffer);
+          });
+
+          if (coverUpload?.secure_url) {
+            // Store cover illustration URL on the Book model
+            await prisma.book.update({
+              where: { id: bookId },
+              data: { coverImageUrl: coverUpload.secure_url },
+            });
+            console.log(`[IllustrationWorker] Cover illustration generated and stored: ${coverUpload.secure_url}`);
+            logger.info({ jobId: job.id, bookId, coverUrl: coverUpload.secure_url }, 'Cover illustration stored in Book.coverImageUrl');
+          }
+        } else {
+          logger.warn({ jobId: job.id, bookId, pageNumber }, 'Cover illustration generation returned no image data');
+        }
+      } catch (coverError: any) {
+        // Cover illustration failure is non-fatal -- the story illustration is already saved
+        logger.error({ jobId: job.id, bookId, pageNumber, error: coverError.message }, 'Cover illustration generation failed (non-fatal)');
+        console.error(`[IllustrationWorker] Cover illustration failed for page ${pageNumber}: ${coverError.message}`);
+      }
+    }
+
     // The book-finalize worker will handle status updates
-    // We don't need to check completion here anymore
-    
     console.log(`[IllustrationWorker] Job ${job.id} completed successfully for page ${pageNumber}`);
-    
-    return { 
-      success: true, 
+
+    return {
+      success: true,
       imageUrl: finalImageUrl,
       pageNumber,
       moderationStatus: moderationBlocked ? "FLAGGED" : "OK"

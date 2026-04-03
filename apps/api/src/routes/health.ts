@@ -28,7 +28,7 @@ healthRouter.get("/", async (_req, res) => {
       DATABASE_URL: !!process.env.DATABASE_URL,
       REDIS_URL: !!process.env.REDIS_URL,
       CLERK_SECRET_KEY: !!process.env.CLERK_SECRET_KEY,
-    }
+    },
   };
 
   try {
@@ -40,7 +40,10 @@ healthRouter.get("/", async (_req, res) => {
       health.database = "not configured";
     }
   } catch (error) {
-    console.warn("Database connection check failed (healthcheck still passes):", error);
+    console.warn(
+      "Database connection check failed (healthcheck still passes):",
+      error,
+    );
     health.database = "error";
   }
 

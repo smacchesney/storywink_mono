@@ -185,7 +185,6 @@ export function StoryboardGrid({ pages, onOrderChange }: StoryboardGridProps) {
             ...item,
             index: index,
             pageNumber: index + 1,
-            isTitlePage: index === 0
         }));
 
         onOrderChange(finalItems);

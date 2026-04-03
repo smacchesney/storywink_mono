@@ -170,7 +170,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
     }
 
     // Check completion status
-    const { storyPages, titlePages } = categorizePages(book.pages, book.coverAssetId);
+    const { storyPages, coverPages } = categorizePages(book.pages, book.coverAssetId);
 
     const pagesWithText = book.pages.filter((p: any) => p.text && p.text.trim().length > 0);
     const storyPagesWithText = storyPages.filter((p: any) => p.text && p.text.trim().length > 0);
@@ -184,7 +184,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
     logger.info({
       bookId,
       totalPages,
-      titlePages: titlePages.length,
+      coverPages: coverPages.length,
       storyPages: storyPages.length,
       pagesWithText: pagesWithText.length,
       storyPagesWithText: storyPagesWithText.length,
@@ -196,7 +196,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
     }, 'Book completion status analysis');
 
     console.log(`[BookFinalize] Book ${bookId} analysis:`)
-    console.log(`  - Total Pages: ${totalPages} (${titlePages.length} title, ${storyPages.length} story)`)
+    console.log(`  - Total Pages: ${totalPages} (${coverPages.length} cover, ${storyPages.length} story)`)
     console.log(`  - Story Pages with Text: ${storyPagesWithText.length}/${storyPages.length}`)
     console.log(`  - Pages with Illustrations: ${pagesWithIllustrations.length}/${totalPages}`)
     console.log(`  - Text Complete: ${textComplete}`)

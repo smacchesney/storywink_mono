@@ -74,14 +74,14 @@ app.use(errorHandler);
 // Add a simple test endpoint
 app.get("/api/test", (_req, res) => {
   console.log("Test endpoint hit");
-  res.json({ 
-    message: "API is running", 
+  res.json({
+    message: "API is running",
     timestamp: new Date().toISOString(),
     env: {
       NODE_ENV: process.env.NODE_ENV,
       DATABASE_URL_SET: !!process.env.DATABASE_URL,
-      DATABASE_URL_LENGTH: process.env.DATABASE_URL?.length || 0
-    }
+      DATABASE_URL_LENGTH: process.env.DATABASE_URL?.length || 0,
+    },
   });
 });
 
@@ -93,4 +93,3 @@ app.listen(PORT, () => {
   console.log(`Environment: ${process.env.NODE_ENV}`);
   console.log(`🔄 Deployment: ${new Date().toISOString()}`);
 });
-

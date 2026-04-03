@@ -61,6 +61,7 @@ model Book {
   specialObjects       String?
   excitementElement String?
   coverAssetId      String?
+  coverImageUrl     String?   // AI-generated cover illustration (separate from page's story illustration)
   characterIdentity Json?     // Canonical character description for illustration consistency
   qcRound           Int            @default(0) // Current QC iteration (0 = first pass, 1+ = re-illustration)
   promptTokens      Int?

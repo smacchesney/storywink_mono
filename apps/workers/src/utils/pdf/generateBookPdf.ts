@@ -84,8 +84,33 @@ function loadJapaneseFontBase64(): string {
   }
 }
 
+/**
+ * Load Andika TTF as base64 for story text in PDFs.
+ * Andika is designed for beginning/early readers with clear, unambiguous letterforms.
+ */
+function loadAndikaFontBase64(): string {
+  try {
+    const currentDir = typeof __dirname !== 'undefined'
+      ? __dirname
+      : dirname(fileURLToPath(import.meta.url));
+    const fontPath = join(currentDir, '../../assets/fonts/Andika-Regular.ttf');
+    const fontBuffer = readFileSync(fontPath);
+    return fontBuffer.toString('base64');
+  } catch {
+    console.warn('[PDF] Could not load Andika for PDF embedding');
+    return '';
+  }
+}
+
 /** Returns the CSS font-family for story text based on language. */
 function storyFontFamily(language: string): string {
+  return language === 'ja'
+    ? "'Zen Maru Gothic', 'Hiragino Maru Gothic Pro', sans-serif"
+    : "'Andika', sans-serif";
+}
+
+/** Returns the CSS font-family for branding/decorative text (dedication, ending). */
+function brandingFontFamily(language: string): string {
   return language === 'ja'
     ? "'Zen Maru Gothic', 'Hiragino Maru Gothic Pro', sans-serif"
     : "'Excalifont', cursive, sans-serif";
@@ -162,7 +187,7 @@ function generateTextPageHtml(page: Page, language: string): string {
 function generateDedicationPageHtml(childName: string | null, bookTitle: string, language: string): string {
   const displayName = childName || bookTitle || 'You';
   const texts = PAGE_TEXT[language as keyof typeof PAGE_TEXT] || PAGE_TEXT.en;
-  const fontFamily = storyFontFamily(language);
+  const fontFamily = brandingFontFamily(language);
 
   const pageStyle = `
     width: ${PAGE_WIDTH_WITH_BLEED_IN}in;
@@ -224,7 +249,7 @@ function generateDedicationPageHtml(childName: string | null, bookTitle: string,
 function generateEndingPageHtml(childName: string | null, bookTitle: string, language: string): string {
   const displayName = childName || bookTitle || 'You';
   const texts = PAGE_TEXT[language as keyof typeof PAGE_TEXT] || PAGE_TEXT.en;
-  const fontFamily = storyFontFamily(language);
+  const fontFamily = brandingFontFamily(language);
 
   const pageStyle = `
     width: ${PAGE_WIDTH_WITH_BLEED_IN}in;
@@ -311,9 +336,9 @@ function padToMultipleOfFour(pageHtmlArray: string[]): string[] {
 /**
  * Generates a PDF buffer for the given book data.
  *
- * Expects title pages to be pre-filtered out by callers.
+ * All pages (including cover photo) are included as interior pages.
  * Inserts a dedication page as page 1 (right-hand side), then
- * interleaves text (left) + illustration (right) for each story page.
+ * interleaves text (left) + illustration (right) for each page.
  * Pads to multiple of 4 for Lulu saddle stitch.
  */
 export async function generateBookPdf(bookData: BookWithPages): Promise<Buffer> {
@@ -329,6 +354,17 @@ export async function generateBookPdf(bookData: BookWithPages): Promise<Buffer> 
       ? `@font-face {
           font-family: 'Excalifont';
           src: url(data:font/truetype;base64,${fontBase64}) format('truetype');
+          font-weight: normal;
+          font-style: normal;
+        }`
+      : '';
+
+    // Load Andika font for story text (English)
+    const andikaBase64 = language !== 'ja' ? loadAndikaFontBase64() : '';
+    const andikaFontFace = andikaBase64
+      ? `@font-face {
+          font-family: 'Andika';
+          src: url(data:font/truetype;base64,${andikaBase64}) format('truetype');
           font-weight: normal;
           font-style: normal;
         }`
@@ -377,6 +413,7 @@ export async function generateBookPdf(bookData: BookWithPages): Promise<Buffer> 
         <title>${bookData.title || 'My Storybook'}</title>
         <style>
           ${fontFace}
+          ${andikaFontFace}
           ${jaFontFace}
           body { margin: 0; padding: 0; }
         </style>

@@ -109,7 +109,7 @@ booksRouter.post("/", async (req: AuthenticatedRequest, res, next) => {
     const book = await prisma.book.create({
       data: {
         userId,
-        title: '', // Empty title - will be set in editor
+        title: "", // Empty title - will be set in editor
         pageLength: body.pageLength,
         artStyle: body.artStyle,
         tone: body.tone,

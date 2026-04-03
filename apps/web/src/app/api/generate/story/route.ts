@@ -106,24 +106,18 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Book generation cannot be started from current status: ${book.status}` }, { status: 409 }); // Conflict
     }
 
-    // 3. Filter out cover page and prepare storyPages for the job
-    const coverAssetId = book.coverAssetId;
+    // 3. Prepare all pages for story generation (including cover page)
     const pagesForStory = book.pages
-      .filter(p => {
-        // Exclude cover page more robustly
-        if (!coverAssetId) return true; // If no cover set, include all pages
-        return p.assetId !== coverAssetId;
-      })
-      .map((page) => ({ // Map to the structure worker needs - preserve original page numbers
+      .map((page) => ({
         pageId: page.id,
-        pageNumber: page.pageNumber, // Keep original pageNumber from database
+        pageNumber: page.pageNumber,
         assetId: page.assetId,
-        originalImageUrl: page.asset?.thumbnailUrl || page.asset?.url || page.originalImageUrl // Ensure URL is passed
+        originalImageUrl: page.asset?.thumbnailUrl || page.asset?.url || page.originalImageUrl
       }));
-      
+
     if (pagesForStory.length === 0) {
-        logger.error({ clerkId, dbUserId: dbUser.id, bookId }, 'API: /generate/story - No pages available for story generation after filtering cover.');
-        return NextResponse.json({ error: 'No pages found to generate story for (after excluding cover).' }, { status: 400 });
+        logger.error({ clerkId, dbUserId: dbUser.id, bookId }, 'API: /generate/story - No pages available for story generation.');
+        return NextResponse.json({ error: 'No pages found to generate story for.' }, { status: 400 });
     }
 
     logger.info({ clerkId, dbUserId: dbUser.id, bookId, pageCount: pagesForStory.length }, 'API: /generate/story - Prepared pages for job queue.');

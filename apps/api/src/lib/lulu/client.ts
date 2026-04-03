@@ -5,7 +5,7 @@
  * Documentation: https://developers.lulu.com/
  */
 
-import { LULU_CONFIG } from '@storywink/shared/lulu';
+import { LULU_CONFIG } from "@storywink/shared/lulu";
 
 // Types for Lulu API responses
 export interface LuluToken {
@@ -90,13 +90,13 @@ export interface LuluPrintJobCostResponse {
   total_discount_amount?: string;
   currency: string;
   line_item_costs: Array<{
-    cost_excl_discounts: string;           // Per-unit cost (doesn't scale with qty)
-    total_cost_excl_discounts?: string;    // cost_excl_discounts × quantity
-    total_cost_excl_tax: string;           // Total print cost for quantity (after discounts, before tax)
-    total_cost_incl_tax?: string;          // Total print cost including tax
-    total_tax?: string;                    // Tax for this line item
-    tax_rate?: string;                     // Tax rate as decimal
-    unit_tier_cost?: string | null;        // Per-unit with volume discount
+    cost_excl_discounts: string; // Per-unit cost (doesn't scale with qty)
+    total_cost_excl_discounts?: string; // cost_excl_discounts × quantity
+    total_cost_excl_tax: string; // Total print cost for quantity (after discounts, before tax)
+    total_cost_incl_tax?: string; // Total print cost including tax
+    total_tax?: string; // Tax for this line item
+    tax_rate?: string; // Tax rate as decimal
+    unit_tier_cost?: string | null; // Per-unit with volume discount
     quantity: number;
     currency: string;
     discounts?: Array<{
@@ -165,15 +165,19 @@ export class LuluApiClient {
     const clientSecret = process.env.LULU_CLIENT_SECRET;
 
     if (!clientId || !clientSecret) {
-      throw new Error('LULU_CLIENT_ID and LULU_CLIENT_SECRET environment variables are required');
+      throw new Error(
+        "LULU_CLIENT_ID and LULU_CLIENT_SECRET environment variables are required",
+      );
     }
 
     this.clientId = clientId;
     this.clientSecret = clientSecret;
 
     // Use sandbox for development, production for live orders
-    const useSandbox = process.env.LULU_USE_SANDBOX === 'true';
-    this.baseUrl = useSandbox ? LULU_CONFIG.SANDBOX_API : LULU_CONFIG.PRODUCTION_API;
+    const useSandbox = process.env.LULU_USE_SANDBOX === "true";
+    this.baseUrl = useSandbox
+      ? LULU_CONFIG.SANDBOX_API
+      : LULU_CONFIG.PRODUCTION_API;
   }
 
   /**
@@ -188,12 +192,12 @@ export class LuluApiClient {
     const tokenUrl = `${this.baseUrl}${LULU_CONFIG.TOKEN_ENDPOINT}`;
 
     const response = await fetch(tokenUrl, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({
-        grant_type: 'client_credentials',
+        grant_type: "client_credentials",
         client_id: this.clientId,
         client_secret: this.clientSecret,
       }),
@@ -201,13 +205,15 @@ export class LuluApiClient {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Failed to get Lulu access token: ${response.status} ${errorText}`);
+      throw new Error(
+        `Failed to get Lulu access token: ${response.status} ${errorText}`,
+      );
     }
 
-    const data = await response.json() as LuluToken;
+    const data = (await response.json()) as LuluToken;
 
     this.accessToken = data.access_token;
-    this.tokenExpiresAt = Date.now() + (data.expires_in * 1000);
+    this.tokenExpiresAt = Date.now() + data.expires_in * 1000;
 
     return this.accessToken;
   }
@@ -217,15 +223,15 @@ export class LuluApiClient {
    */
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
   ): Promise<T> {
     const token = await this.getAccessToken();
 
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       ...options,
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
         ...options.headers,
       },
     });
@@ -236,7 +242,10 @@ export class LuluApiClient {
       // Try to parse as JSON for more detailed error info
       try {
         const errorJson = JSON.parse(errorText);
-        console.error('Lulu API error details:', JSON.stringify(errorJson, null, 2));
+        console.error(
+          "Lulu API error details:",
+          JSON.stringify(errorJson, null, 2),
+        );
       } catch {
         // HTML error response, already logged above
       }
@@ -257,11 +266,14 @@ export class LuluApiClient {
     podPackageId?: string;
   }): Promise<LuluPrintJobCostResponse> {
     const requestBody = {
-      line_items: [{
-        page_count: params.pageCount,
-        pod_package_id: params.podPackageId || LULU_CONFIG.DEFAULT_POD_PACKAGE,
-        quantity: params.quantity,
-      }],
+      line_items: [
+        {
+          page_count: params.pageCount,
+          pod_package_id:
+            params.podPackageId || LULU_CONFIG.DEFAULT_POD_PACKAGE,
+          quantity: params.quantity,
+        },
+      ],
       // /print-job-cost-calculations/ uses country_code (unlike /shipping-options/ which uses country)
       shipping_address: {
         city: params.shippingAddress.city,
@@ -269,17 +281,17 @@ export class LuluApiClient {
         postcode: params.shippingAddress.postcode,
         state_code: params.shippingAddress.state_code,
         street1: params.shippingAddress.street1,
-        phone_number: params.shippingAddress.phone_number || '+1 000 000 0000',
+        phone_number: params.shippingAddress.phone_number || "+1 000 000 0000",
       },
       shipping_option: params.shippingOption,
     };
 
     return this.request<LuluPrintJobCostResponse>(
-      '/print-job-cost-calculations/',
+      "/print-job-cost-calculations/",
       {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify(requestBody),
-      }
+      },
     );
   }
 
@@ -296,11 +308,14 @@ export class LuluApiClient {
     podPackageId?: string;
   }): Promise<LuluShippingOptionsResponse> {
     const requestBody = {
-      line_items: [{
-        page_count: params.pageCount,
-        pod_package_id: params.podPackageId || LULU_CONFIG.DEFAULT_POD_PACKAGE,
-        quantity: params.quantity,
-      }],
+      line_items: [
+        {
+          page_count: params.pageCount,
+          pod_package_id:
+            params.podPackageId || LULU_CONFIG.DEFAULT_POD_PACKAGE,
+          quantity: params.quantity,
+        },
+      ],
       // Lulu API uses "country" not "country_code" in shipping_address
       shipping_address: {
         city: params.shippingAddress.city,
@@ -308,17 +323,14 @@ export class LuluApiClient {
         postcode: params.shippingAddress.postcode,
         state_code: params.shippingAddress.state_code,
         street1: params.shippingAddress.street1,
-        phone_number: params.shippingAddress.phone_number || '+1 000 000 0000',
+        phone_number: params.shippingAddress.phone_number || "+1 000 000 0000",
       },
     };
 
-    return this.request<LuluShippingOptionsResponse>(
-      '/shipping-options/',
-      {
-        method: 'POST',
-        body: JSON.stringify(requestBody),
-      }
-    );
+    return this.request<LuluShippingOptionsResponse>("/shipping-options/", {
+      method: "POST",
+      body: JSON.stringify(requestBody),
+    });
   }
 
   /**
@@ -338,37 +350,40 @@ export class LuluApiClient {
     const requestBody: LuluCreatePrintJobRequest = {
       contact_email: params.contactEmail,
       external_id: params.externalId,
-      line_items: [{
-        printable_normalization: {
-          cover: { source_url: params.coverPdfUrl },
-          interior: { source_url: params.interiorPdfUrl },
-          pod_package_id: params.podPackageId || LULU_CONFIG.DEFAULT_POD_PACKAGE,
+      line_items: [
+        {
+          printable_normalization: {
+            cover: { source_url: params.coverPdfUrl },
+            interior: { source_url: params.interiorPdfUrl },
+            pod_package_id:
+              params.podPackageId || LULU_CONFIG.DEFAULT_POD_PACKAGE,
+          },
+          quantity: params.quantity,
+          title: params.bookTitle,
         },
-        quantity: params.quantity,
-        title: params.bookTitle,
-      }],
+      ],
       shipping_address: {
         name: params.shippingAddress.name,
         street1: params.shippingAddress.street1,
         street2: params.shippingAddress.street2,
         city: params.shippingAddress.city,
-        state_code: params.shippingAddress.state_code || '',
+        state_code: params.shippingAddress.state_code || "",
         country_code: params.shippingAddress.country_code,
         postcode: params.shippingAddress.postcode,
-        phone_number: params.shippingAddress.phone_number || '+1 000 000 0000',
+        phone_number: params.shippingAddress.phone_number || "+1 000 000 0000",
       },
       shipping_level: params.shippingLevel,
     };
 
-    console.log('Lulu createPrintJob request:', JSON.stringify(requestBody, null, 2));
-
-    return this.request<LuluPrintJob>(
-      '/print-jobs/',
-      {
-        method: 'POST',
-        body: JSON.stringify(requestBody),
-      }
+    console.log(
+      "Lulu createPrintJob request:",
+      JSON.stringify(requestBody, null, 2),
     );
+
+    return this.request<LuluPrintJob>("/print-jobs/", {
+      method: "POST",
+      body: JSON.stringify(requestBody),
+    });
   }
 
   /**
@@ -383,7 +398,7 @@ export class LuluApiClient {
    */
   async cancelPrintJob(printJobId: number | string): Promise<void> {
     await this.request(`/print-jobs/${printJobId}/`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 
@@ -391,20 +406,29 @@ export class LuluApiClient {
    * Validate that a PDF meets Lulu's specifications.
    * Note: This is a simple dimension check, not a full validation.
    */
-  static validateInteriorSpecs(pageCount: number): { valid: boolean; errors: string[] } {
+  static validateInteriorSpecs(pageCount: number): {
+    valid: boolean;
+    errors: string[];
+  } {
     const errors: string[] = [];
 
     if (pageCount < LULU_CONFIG.SADDLE_STITCH.MIN_PAGES) {
-      errors.push(`Page count ${pageCount} is below minimum of ${LULU_CONFIG.SADDLE_STITCH.MIN_PAGES}`);
+      errors.push(
+        `Page count ${pageCount} is below minimum of ${LULU_CONFIG.SADDLE_STITCH.MIN_PAGES}`,
+      );
     }
 
     if (pageCount > LULU_CONFIG.SADDLE_STITCH.MAX_PAGES) {
-      errors.push(`Page count ${pageCount} exceeds maximum of ${LULU_CONFIG.SADDLE_STITCH.MAX_PAGES}`);
+      errors.push(
+        `Page count ${pageCount} exceeds maximum of ${LULU_CONFIG.SADDLE_STITCH.MAX_PAGES}`,
+      );
     }
 
     // Saddle stitch requires page count divisible by 4
     if (pageCount % 4 !== 0) {
-      errors.push(`Saddle stitch binding requires page count divisible by 4 (got ${pageCount})`);
+      errors.push(
+        `Saddle stitch binding requires page count divisible by 4 (got ${pageCount})`,
+      );
     }
 
     return {

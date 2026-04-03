@@ -187,22 +187,18 @@ export default function EditBookPage() {
   // Update storyboardOrder state when the underlying bookData changes OR cover changes
   useEffect(() => {
     if (bookData?.pages) {
-        const filteredPages = bookData.pages
-            .filter(page => page.assetId !== bookData.coverAssetId)
-            // Sort stably first (e.g., by original pageNumber or createdAt if index isn't reliable yet)
-            .sort((a, b) => a.pageNumber - b.pageNumber); // Or sort by a.createdAt.getTime() - b.createdAt.getTime()
-            
+        // All pages (including cover) appear in the storyboard
+        const sortedPages = [...bookData.pages]
+            .sort((a, b) => a.pageNumber - b.pageNumber);
+
         // Re-assign sequential indices FOR DISPLAY in the storyboard context
-        const reIndexedFilteredPages = filteredPages.map((page, idx) => ({
+        const reIndexedPages = sortedPages.map((page, idx) => ({
             ...page,
-            // NOTE: We are modifying the index/pageNumber in the local state copy 
-            // for immediate visual consistency in the grid. 
-            // The final correct indices are assigned during save.
-            index: idx,       // Temporary visual index (0-based)
-            pageNumber: idx + 1 // Temporary visual page number (1-based)
+            index: idx,
+            pageNumber: idx + 1
         }));
 
-        setStoryboardOrder(reIndexedFilteredPages);
+        setStoryboardOrder(reIndexedPages);
     }
   }, [bookData?.pages, bookData?.coverAssetId]);
 
@@ -339,18 +335,14 @@ export default function EditBookPage() {
     setIsSavingOrder(true);
     logger.info({ bookId }, "Saving storyboard order...");
 
-    // 1. Find the actual cover page from the main bookData
-    const coverPage = bookData.pages.find(p => p.assetId === bookData.coverAssetId);
-    
-    // 2. Create the final, full ordered list for the API
-    const finalOrderedPages = [
-        // Ensure cover page (if found) is first with index 0
-        ...(coverPage ? [{ ...coverPage, index: 0 }] : []),
-        // Map the locally reordered storyboard pages to indices 1, 2, 3...
-        ...storyboardOrder.map((page, idx) => ({ ...page, index: idx + 1 }))
-    ];
+    // All pages (including cover) are in the storyboard with their user-chosen order
+    const finalOrderedPages = storyboardOrder.map((page, idx) => ({
+        ...page,
+        index: idx,
+        pageNumber: idx + 1,
+    }));
 
-    // 3. Prepare API payload with pageId and NEW index for ALL pages
+    // Prepare API payload with pageId and NEW index for ALL pages
     const pagesToSave = finalOrderedPages.map(page => ({
       pageId: page.id,
       index: page.index, 
@@ -725,7 +717,6 @@ export default function EditBookPage() {
             ...page,
             index: idx,
             pageNumber: idx + 1,
-            isTitlePage: idx === 0
           }));
 
         return {

@@ -211,14 +211,15 @@ export async function generateLuluCover(bookData: BookWithPages): Promise<Buffer
   let browser = null;
 
   try {
-    // Find the title page (cover page) - it's the page where assetId matches book.coverAssetId
+    // Use the dedicated cover illustration (Book.coverImageUrl) if available,
+    // otherwise fall back to the cover page's generated illustration
     const titlePage = bookData.pages.find(page => page.assetId === bookData.coverAssetId);
 
     if (!titlePage) {
       console.warn(`[PDF] No title page found for book ${bookData.id}, using first page as cover`);
     }
 
-    const coverImageUrl = titlePage?.generatedImageUrl || bookData.pages[0]?.generatedImageUrl;
+    const coverImageUrl = bookData.coverImageUrl || titlePage?.generatedImageUrl || bookData.pages[0]?.generatedImageUrl;
 
     // Load font for branding text
     const fontBase64 = loadFontBase64();
