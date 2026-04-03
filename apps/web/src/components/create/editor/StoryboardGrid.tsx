@@ -73,7 +73,7 @@ function SortablePageItem({ id, page, visualIndex }: { id: string; page: Storybo
           "bg-black/30 backdrop-blur-sm",
           "flex items-center justify-center",
           "touch-none cursor-grab active:cursor-grabbing",
-          "md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+          "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 transition-opacity"
         )}
         aria-label={t('dragHandle')}
       >
