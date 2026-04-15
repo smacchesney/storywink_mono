@@ -13,13 +13,26 @@ export interface AdditionalCharacter {
   relationship: string;
 }
 
+const MOOD_OPTIONS = [
+  { value: 'adventurous', labelKey: 'moodAdventurous' },
+  { value: 'silly', labelKey: 'moodSilly' },
+  { value: 'sweet', labelKey: 'moodSweet' },
+  { value: 'brave', labelKey: 'moodBrave' },
+  { value: 'dreamy', labelKey: 'moodDreamy' },
+  { value: 'curious', labelKey: 'moodCurious' },
+] as const;
+
 interface DetailsEditorPanelProps {
   currentTitle: string;
   currentChildName: string;
   currentAdditionalCharacters: AdditionalCharacter[];
+  currentTone: string | null;
+  currentTheme: string;
   onTitleChange: (title: string) => void;
   onChildNameChange: (name: string) => void;
   onAdditionalCharactersChange: (characters: AdditionalCharacter[]) => void;
+  onToneChange: (tone: string | null) => void;
+  onThemeChange: (theme: string) => void;
   onSave: () => void;
   onCancel: () => void;
   isSaving: boolean;
@@ -66,9 +79,13 @@ export function DetailsEditorPanel({
   currentTitle,
   currentChildName,
   currentAdditionalCharacters,
+  currentTone,
+  currentTheme,
   onTitleChange,
   onChildNameChange,
   onAdditionalCharactersChange,
+  onToneChange,
+  onThemeChange,
   onSave,
   onCancel,
   isSaving,
@@ -175,6 +192,49 @@ export function DetailsEditorPanel({
               {t('characterCount', { count: currentAdditionalCharacters.length })}
             </p>
           )}
+        </div>
+
+        {/* Story Mood */}
+        <div className="space-y-1.5">
+          <Label className="text-sm font-semibold">{t('storyMood')}</Label>
+          <p className="text-xs text-muted-foreground">
+            {t('storyMoodHint')}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {MOOD_OPTIONS.map((mood) => (
+              <button
+                key={mood.value}
+                type="button"
+                onClick={() => onToneChange(currentTone === mood.value ? null : mood.value)}
+                className={`
+                  font-playful text-sm px-3 py-1.5 rounded-full transition-all duration-200
+                  ${currentTone === mood.value
+                    ? 'bg-[#F76C5E] text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }
+                `}
+              >
+                {t(mood.labelKey)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Story Theme */}
+        <div className="space-y-1.5">
+          <Label htmlFor="story-theme" className="text-sm font-semibold">
+            {t('storyTheme')}
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            {t('storyThemeHint')}
+          </p>
+          <Input
+            id="story-theme"
+            placeholder={t('storyThemePlaceholder')}
+            value={currentTheme}
+            onChange={(e) => onThemeChange(e.target.value)}
+            maxLength={100}
+          />
         </div>
       </div>
 

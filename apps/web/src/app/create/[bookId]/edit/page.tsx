@@ -80,6 +80,8 @@ export default function EditBookPage() {
   const [pendingTitle, setPendingTitle] = useState('');
   const [pendingChildName, setPendingChildName] = useState('');
   const [pendingAdditionalCharacters, setPendingAdditionalCharacters] = useState<AdditionalCharacter[]>([]);
+  const [pendingTone, setPendingTone] = useState<string | null>(null);
+  const [pendingTheme, setPendingTheme] = useState('');
   const [pendingCoverAssetId, setPendingCoverAssetId] = useState<string | null | undefined>(undefined);
   const [isSavingCover, setIsSavingCover] = useState(false); // <-- Loading state for saving cover
   const [isGeneratingStory, setIsGeneratingStory] = useState(false); // <-- State for generation loading
@@ -308,6 +310,8 @@ export default function EditBookPage() {
     } else if (tab === 'details') { // Initialize pending details
       setPendingTitle(bookData?.title || '');
       setPendingChildName(bookData?.childName || '');
+      setPendingTone(bookData?.tone || null);
+      setPendingTheme(bookData?.theme || '');
       // Parse JSON string to array
       try {
         const parsed = bookData?.additionalCharacters
@@ -514,6 +518,8 @@ export default function EditBookPage() {
       title?: string;
       childName?: string | null;
       additionalCharacters?: AdditionalCharacter[];
+      tone?: string | null;
+      theme?: string | null;
     } = {};
 
     if (pendingTitle !== bookData.title) updatePayload.title = pendingTitle;
@@ -527,6 +533,14 @@ export default function EditBookPage() {
       : [];
     if (JSON.stringify(validCharacters) !== JSON.stringify(currentCharacters)) {
       updatePayload.additionalCharacters = validCharacters;
+    }
+
+    // Compare tone and theme
+    if (pendingTone !== (bookData.tone || null)) {
+      updatePayload.tone = pendingTone;
+    }
+    if (pendingTheme !== (bookData.theme || '')) {
+      updatePayload.theme = pendingTheme || null;
     }
 
     if (Object.keys(updatePayload).length === 0) {
@@ -554,6 +568,8 @@ export default function EditBookPage() {
             ...(updatePayload.additionalCharacters !== undefined && {
               additionalCharacters: JSON.stringify(updatePayload.additionalCharacters)
             }),
+            ...(updatePayload.tone !== undefined && { tone: updatePayload.tone }),
+            ...(updatePayload.theme !== undefined && { theme: updatePayload.theme }),
         };
       });
 
@@ -1173,9 +1189,13 @@ export default function EditBookPage() {
                     currentTitle={pendingTitle}
                     currentChildName={pendingChildName}
                     currentAdditionalCharacters={pendingAdditionalCharacters}
+                    currentTone={pendingTone}
+                    currentTheme={pendingTheme}
                     onTitleChange={handlePendingTitleChange}
                     onChildNameChange={setPendingChildName}
                     onAdditionalCharactersChange={setPendingAdditionalCharacters}
+                    onToneChange={setPendingTone}
+                    onThemeChange={setPendingTheme}
                     onSave={handleSaveDetails}
                     onCancel={() => setIsDetailsPanelOpen(false)}
                     isSaving={isSavingDetails}
@@ -1190,9 +1210,13 @@ export default function EditBookPage() {
                     currentTitle={pendingTitle}
                     currentChildName={pendingChildName}
                     currentAdditionalCharacters={pendingAdditionalCharacters}
+                    currentTone={pendingTone}
+                    currentTheme={pendingTheme}
                     onTitleChange={handlePendingTitleChange}
                     onChildNameChange={setPendingChildName}
                     onAdditionalCharactersChange={setPendingAdditionalCharacters}
+                    onToneChange={setPendingTone}
+                    onThemeChange={setPendingTheme}
                     onSave={handleSaveDetails}
                     onCancel={() => setIsDetailsPanelOpen(false)}
                     isSaving={isSavingDetails}

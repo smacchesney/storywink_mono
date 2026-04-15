@@ -22,6 +22,30 @@ export type GeminiImagePlaceholder = ImagePlaceholder;
 export const STORY_RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
+    storyArc: {
+      type: 'object',
+      description: 'Plan the story arc BEFORE writing pages — this shapes the narrative',
+      properties: {
+        desire: {
+          type: 'string',
+          description: 'What does the child want, discover, or set out to do? (1 sentence)',
+        },
+        refrain: {
+          type: 'string',
+          description: 'A 4-8 word phrase that will recur 3+ times with variation throughout the story',
+        },
+        emotionalPeak: {
+          type: 'string',
+          description: 'The moment of biggest feeling — wonder, triumph, laughter, or warmth (1 sentence)',
+        },
+        resolution: {
+          type: 'string',
+          description: 'How does the story land? What feeling does the child carry into sleep? (1 sentence)',
+        },
+      },
+      required: ['desire', 'refrain', 'emotionalPeak', 'resolution'],
+      additionalProperties: false,
+    },
     pages: {
       type: 'array',
       description: 'Story text and illustration notes for each page',
@@ -46,7 +70,7 @@ export const STORY_RESPONSE_SCHEMA = {
       }
     }
   },
-  required: ['pages'],
+  required: ['storyArc', 'pages'],
   additionalProperties: false,
 } as const;
 
@@ -57,6 +81,8 @@ export interface StoryGenerationInput {
   artStyle?: string;
   childName?: string;
   additionalCharacters?: { name: string; relationship: string }[];
+  tone?: string; // Story mood e.g. "adventurous", "silly", "sweet"
+  theme?: string; // Story context e.g. "Our trip to the beach"
   language?: string; // "en" | "ja", defaults to "en"
   storyPages: {
     pageId: string;
@@ -70,8 +96,14 @@ export interface StoryGenerationInput {
 // SYSTEM PROMPT (StoryGen)
 // ----------------------------------
 
-export const STORY_GENERATION_SYSTEM_PROMPT =
-  "You are an expert children's picture\u2011book author for toddlers (ages 2-4). Parents will read this story aloud to their children. Your task is to write engaging, age-appropriate story text for a personalised picture book based on the user's photos and inputs.";
+export const STORY_GENERATION_SYSTEM_PROMPT = `You are an expert children's picture-book author for toddlers (ages 2-4). Parents read your stories aloud at bedtime.
+
+CRITICAL MINDSET — You are a STORYTELLER, not a photo captioner:
+- Photos are INSPIRATION, not subjects. A photo of a child at the park should spark a narrative moment (wonder, mischief, discovery) — NOT a description of "a child standing in the park."
+- Every page must advance the STORY — an emotional journey with desire, tension, and resolution.
+- If you find yourself describing what's visible in a photo, STOP and rewrite from the child's inner experience.
+
+Your north star: Would a parent want to re-read this 100 times? That requires emotional truth, rhythm, and a refrain worth repeating.`;
 
 // ----------------------------------
 // STORY GENERATION PROMPT
@@ -127,15 +159,35 @@ export function createStoryGenerationPrompt(
   const baseInstructions = [
     `# Instructions & Guiding Principles:`,
     `- Imagine a parent curled up with their toddler at bedtime, reading aloud. Every sentence should feel warm, playful, and alive in a parent's voice.`,
-    `- Craft a **cohesive story** matching the provided sequence of user-uploaded images, with a **clear beginning, middle, and end**.`,
     `- Write from the **toddler's perspective** — what they see, feel, touch, hear, and wonder about. Ground every moment in their sensory experience.`,
+    ``,
+    `## ANTI-CAPTION RULE (critical):`,
+    `- NEVER describe what's literally visible in the photo like a caption. Instead, narrate what the child FEELS, IMAGINES, or DISCOVERS in that moment.`,
+    `- BAD: "Kai is at the beach. He sees the waves." (this is a caption)`,
+    `- GOOD: "The waves whisper a secret — come closer, come closer! Kai wiggles his toes in the sand." (this is a story)`,
+    `- Each page must contain at least one element that goes BEYOND the photo: an internal feeling, a question, a sensory detail, or an imaginative leap.`,
+    ``,
+    `## Narrative Architecture (OPENING → BUILDING → LANDING):`,
+    `- **OPENING** (first ~20% of pages): Establish the child's world AND a small desire or question. What do they want, wonder about, or set out to do? Hook the listener.`,
+    `- **BUILDING** (middle ~60%): The desire meets the world. Each page should ESCALATE — new discoveries, small obstacles, mounting excitement or tenderness. This is where the refrain repeats and evolves.`,
+    `- **LANDING** (final ~20%): The emotional peak resolves into warmth and safety. The last page should feel like a soft exhale — a sentence a parent lingers on before closing the book.`,
+    `- NEVER end with "What a wonderful day" or similar summary statements. Let the accumulated feeling speak for itself.`,
+    ``,
+    `## Recurring Refrain (REQUIRED):`,
+    `- Create a short phrase (4-8 words) that echoes through the story at least 3 times.`,
+    `- Vary it slightly each time — change one word, add emphasis, or whisper it the last time.`,
+    `- Great refrains feel like a heartbeat: "Splish, splash, one more splash!" → "Splish, splash, the biggest splash!" → "Splish... splash... goodnight, little splash."`,
+    `- Report this phrase in the "storyArc.refrain" field.`,
     ``,
     `## Voice & Rhythm (critical for read-aloud quality):`,
     `- **Vary sentence structure**: mix short punchy fragments ("Splish!") with slightly longer flowing sentences. Avoid monotonous Subject-Verb-Object patterns.`,
-    `- **Use questions and exclamations** to pull the listener in: "What's that sound?", "Look!", "Can you guess what happens next?"`,
     `- **Onomatopoeia and sound words** should feel organic to the scene — rumble, swoosh, crunch, pitter-pat — not forced.`,
-    `- **Repetition with variation** builds anticipation: repeat a phrase across pages but change one element each time.`,
     `- Sentences should have a **musical quality** when read aloud — rhythm matters more than vocabulary.`,
+    `- Use concrete nouns and action verbs. No abstractions. One idea per sentence.`,
+    ``,
+    `## Dialogic Moments:`,
+    `- Include 2-3 questions across the whole book that invite the listening child to participate: "Can you see...?", "What do you think happens next?", "How many splashes was that?"`,
+    `- Place these naturally — never more than one per page, and never on the final page.`,
     ``,
     `## Emotional Texture:`,
     `- Capture the **small moments** that make a toddler's day magical — the wonder of a new texture, the thrill of a puddle, the safety of a parent's hand.`,
@@ -146,6 +198,16 @@ export function createStoryGenerationPrompt(
     characterInstruction,
     `  - Book Title: \"${input.bookTitle || '(Not Provided)'}\"`,
     ``,
+    ...(input.tone ? [
+      `## Story Mood:`,
+      `- Write this story with a **"${input.tone}"** feel throughout. Let this mood guide word choice, pacing, and energy level.`,
+      ``,
+    ] : []),
+    ...(input.theme ? [
+      `## Story Context:`,
+      `- The parent described this story as: **"${input.theme}"**. Weave this context into the narrative — it should inform the story arc, not just be mentioned once.`,
+      ``,
+    ] : []),
     `## Length:`,
     `- **2-4 sentences per page, maximum 50 words** (for the ${input.storyPages.length} pages provided).`,
     `  - This 50 word limit is STRICT — text is displayed on its own page but must stay concise for toddler attention spans.`,
@@ -182,8 +244,9 @@ export function createStoryGenerationPrompt(
     `  - If no dynamic effect fits, set "illustrationNotes" to null or empty.`,
     `\n- Effects must feel playful but natural, blending into the scene without overwhelming it.`,
     `\n- Final Output:`,
-    `\nReturn ONLY a valid JSON object with a "pages" array. Each element must have "pageNumber" (number), "text" (string), and "illustrationNotes" (string or null).`,
-    `Example format: {"pages":[{"pageNumber":1,"text":"Sample text...","illustrationNotes":"Suggestion..."},{"pageNumber":2,"text":"More text...","illustrationNotes":null}]}`
+    `\nReturn ONLY a valid JSON object with a "storyArc" object AND a "pages" array. Plan the storyArc FIRST (desire, refrain, emotionalPeak, resolution), then write pages that follow that arc.`,
+    `Each page element must have "pageNumber" (number), "text" (string), and "illustrationNotes" (string or null).`,
+    `Example format: {"storyArc":{"desire":"...","refrain":"...","emotionalPeak":"...","resolution":"..."},"pages":[{"pageNumber":1,"text":"Sample text...","illustrationNotes":"Suggestion..."}]}`
   ].join('');
 
   parts.push({
@@ -204,7 +267,15 @@ export interface StoryPageResponse {
   illustrationNotes?: string | null;
 }
 
+export interface StoryArc {
+  desire: string;
+  refrain: string;
+  emotionalPeak: string;
+  resolution: string;
+}
+
 export interface StoryResponse {
+  storyArc: StoryArc;
   pages: StoryPageResponse[];
 }
 

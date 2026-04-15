@@ -123,6 +123,8 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       artStyle: book.artStyle || undefined,
       childName: book.childName || undefined,
       additionalCharacters: additionalCharacters.length > 0 ? additionalCharacters : undefined,
+      tone: book.tone || undefined,
+      theme: book.theme || undefined,
       language: book.language || 'en',
       storyPages: storyPages.map((page, index) => ({
         pageId: page.id,

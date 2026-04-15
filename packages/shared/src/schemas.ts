@@ -27,6 +27,8 @@ export const updateBookSchema = z.object({
   coverAssetId: z.string().optional(),
   childName: z.string().max(50, 'Name too long').nullable().optional(),
   additionalCharacters: z.array(additionalCharacterSchema).max(5, 'Maximum 5 characters').optional(),
+  tone: z.string().max(50).nullable().optional(),
+  theme: z.string().max(100).nullable().optional(),
 });
 
 export const updatePageSchema = z.object({
