@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from '@/lib/db';
 import { z } from 'zod'; // Import Zod
+import { STORY_MOODS } from '@storywink/shared/constants';
 import logger from '@/lib/logger'; // Import logger
 
 // Zod schema for additional characters in the story
@@ -18,7 +19,7 @@ const updateBookSchema = z.object({
   coverAssetId: z.string().cuid().nullable().optional(), // For cover changes
   childName: z.string().max(50, 'Name too long').nullable().optional(),
   additionalCharacters: z.array(additionalCharacterSchema).max(5, 'Maximum 5 characters').optional(),
-  tone: z.string().max(50).nullable().optional(),
+  tone: z.enum(STORY_MOODS).nullable().optional(),
   theme: z.string().max(100).nullable().optional(),
 }).strict(); // Ensure no extra fields are passed
 

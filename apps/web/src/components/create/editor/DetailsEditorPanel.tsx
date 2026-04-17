@@ -7,20 +7,21 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader2, Plus, X } from 'lucide-react';
 import { DrawerFooter } from "@/components/ui/drawer";
+import { STORY_MOODS } from '@storywink/shared/constants';
 
 export interface AdditionalCharacter {
   name: string;
   relationship: string;
 }
 
-const MOOD_OPTIONS = [
-  { value: 'adventurous', labelKey: 'moodAdventurous' },
-  { value: 'silly', labelKey: 'moodSilly' },
-  { value: 'sweet', labelKey: 'moodSweet' },
-  { value: 'brave', labelKey: 'moodBrave' },
-  { value: 'dreamy', labelKey: 'moodDreamy' },
-  { value: 'curious', labelKey: 'moodCurious' },
-] as const;
+const MOOD_LABEL_KEYS: Record<string, string> = {
+  adventurous: 'moodAdventurous',
+  silly: 'moodSilly',
+  sweet: 'moodSweet',
+  brave: 'moodBrave',
+  dreamy: 'moodDreamy',
+  curious: 'moodCurious',
+};
 
 interface DetailsEditorPanelProps {
   currentTitle: string;
@@ -201,20 +202,21 @@ export function DetailsEditorPanel({
             {t('storyMoodHint')}
           </p>
           <div className="flex flex-wrap gap-2">
-            {MOOD_OPTIONS.map((mood) => (
+            {STORY_MOODS.map((mood) => (
               <button
-                key={mood.value}
+                key={mood}
                 type="button"
-                onClick={() => onToneChange(currentTone === mood.value ? null : mood.value)}
+                aria-pressed={currentTone === mood}
+                onClick={() => onToneChange(currentTone === mood ? null : mood)}
                 className={`
                   font-playful text-sm px-3 py-1.5 rounded-full transition-all duration-200
-                  ${currentTone === mood.value
+                  ${currentTone === mood
                     ? 'bg-[#F76C5E] text-white shadow-sm'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }
                 `}
               >
-                {t(mood.labelKey)}
+                {t(MOOD_LABEL_KEYS[mood])}
               </button>
             ))}
           </div>

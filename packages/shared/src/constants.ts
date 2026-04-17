@@ -70,6 +70,26 @@ export const PAGE_TEXT = {
   },
 } as const;
 
+// Story mood options (canonical source — used by UI, schemas, and prompt)
+export const STORY_MOODS = [
+  'adventurous',
+  'silly',
+  'sweet',
+  'brave',
+  'dreamy',
+  'curious',
+] as const;
+export type StoryMood = typeof STORY_MOODS[number];
+
+export const STORY_MOOD_LABELS: Record<StoryMood, { en: string; ja: string }> = {
+  adventurous: { en: 'Adventurous', ja: 'ぼうけん' },
+  silly: { en: 'Silly & Funny', ja: 'おもしろい' },
+  sweet: { en: 'Sweet & Cozy', ja: 'やさしい' },
+  brave: { en: 'Brave & Bold', ja: 'ゆうかん' },
+  dreamy: { en: 'Dreamy & Magical', ja: 'ゆめいっぱい' },
+  curious: { en: 'Curious Explorer', ja: 'たんけん' },
+} as const;
+
 // Book status messages
 export const STATUS_MESSAGES = {
   DRAFT: 'Setting up your storybook',

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { STORY_MOODS } from './constants.js';
 
 // Supported book languages
 export const SUPPORTED_LANGUAGES = ['en', 'ja'] as const;
@@ -10,8 +11,8 @@ export const createBookSchema = z.object({
   pageLength: z.number().int().min(6).max(23).default(10),
   language: z.enum(SUPPORTED_LANGUAGES).default('en'),
   artStyle: z.string().optional(),
-  tone: z.string().optional(),
-  theme: z.string().optional(),
+  tone: z.enum(STORY_MOODS).optional(),
+  theme: z.string().max(100).optional(),
 });
 
 // Schema for additional characters in the story
@@ -27,7 +28,7 @@ export const updateBookSchema = z.object({
   coverAssetId: z.string().optional(),
   childName: z.string().max(50, 'Name too long').nullable().optional(),
   additionalCharacters: z.array(additionalCharacterSchema).max(5, 'Maximum 5 characters').optional(),
-  tone: z.string().max(50).nullable().optional(),
+  tone: z.enum(STORY_MOODS).nullable().optional(),
   theme: z.string().max(100).nullable().optional(),
 });
 
