@@ -64,11 +64,17 @@ const PageCard = ({
     <div className="page-card flex flex-col p-4 bg-white rounded-md shadow-sm">
       {/* Page Label - Centered above image */}
       <div className="text-center mb-3 flex items-center justify-center gap-2">
-        <h3 className="text-sm font-medium text-[#F76C5E]">
+        <h3
+          className="text-sm font-medium text-[#F76C5E]"
+          aria-label={isTitlePage ? `${t('page', { n: pageNumber })}, ${t('coverBadge')}` : undefined}
+        >
           {t('page', { n: pageNumber })}
         </h3>
         {isTitlePage && (
-          <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#F76C5E]/10 text-[#F76C5E] border border-[#F76C5E]/30">
+          <span
+            aria-hidden="true"
+            className="text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#F76C5E]/10 text-[#B8483E] border border-[#F76C5E]/40"
+          >
             {t('coverBadge')}
           </span>
         )}
