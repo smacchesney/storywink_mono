@@ -3,7 +3,6 @@ import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Loader2, Pencil, Check, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { coolifyImageUrl } from '@storywink/shared';
@@ -64,10 +63,15 @@ const PageCard = ({
   return (
     <div className="page-card flex flex-col p-4 bg-white rounded-md shadow-sm">
       {/* Page Label - Centered above image */}
-      <div className="text-center mb-3">
+      <div className="text-center mb-3 flex items-center justify-center gap-2">
         <h3 className="text-sm font-medium text-[#F76C5E]">
-          {isTitlePage ? t('titlePage') : t('page', { n: pageNumber })}
+          {t('page', { n: pageNumber })}
         </h3>
+        {isTitlePage && (
+          <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#F76C5E]/10 text-[#F76C5E] border border-[#F76C5E]/30">
+            {t('coverBadge')}
+          </span>
+        )}
       </div>
 
       {/* Image Container */}
@@ -75,7 +79,7 @@ const PageCard = ({
         {imageUrl ? (
           <Image
             src={coolifyImageUrl(imageUrl)}
-            alt={isTitlePage ? t('titlePage') : t('page', { n: pageNumber })}
+            alt={t('page', { n: pageNumber })}
             fill
             sizes="(max-width: 768px) 100vw, 50vh"
             className="object-contain"
@@ -84,7 +88,7 @@ const PageCard = ({
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <span className="text-2xl font-semibold text-muted-foreground">
-              {isTitlePage ? t('titlePage') : t('page', { n: pageNumber })}
+              {t('page', { n: pageNumber })}
             </span>
           </div>
         )}
@@ -139,28 +143,16 @@ const PageCard = ({
       <div className="text-editor flex-1">
         {isEditing ? (
           <>
-            {isTitlePage ? (
-              // Title page input (shorter, larger text)
-              <Input
-                value={editedText}
-                onChange={(e) => setEditedText(e.target.value)}
-                className="w-full text-center font-semibold text-lg p-3"
-                placeholder={t('enterTitle')}
-              />
-            ) : (
-              // Regular page textarea
-              <Textarea
-                value={editedText}
-                onChange={(e) => setEditedText(e.target.value)}
-                className="w-full min-h-[100px] p-3"
-                placeholder={t('enterPageText', { n: pageNumber })}
-              />
-            )}
-            
+            <Textarea
+              value={editedText}
+              onChange={(e) => setEditedText(e.target.value)}
+              className="w-full min-h-[100px] p-3"
+              placeholder={t('enterPageText', { n: pageNumber })}
+            />
             {/* Edit mode buttons */}
             <div className="flex gap-2 mt-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   setIsEditing(false);
                   setEditedText(text || "");
@@ -169,7 +161,7 @@ const PageCard = ({
               >
                 {tc('cancel')}
               </Button>
-              <Button 
+              <Button
                 onClick={handleSaveText}
                 className="flex-1 bg-[#F76C5E] hover:bg-[#F76C5E]/90 text-white"
               >
@@ -177,12 +169,6 @@ const PageCard = ({
               </Button>
             </div>
           </>
-        ) : isTitlePage ? (
-          <div className={`text-content p-3 min-h-[40px] border rounded-md text-center font-semibold text-lg ${
-            isConfirmed ? 'bg-green-50 border-green-200' : 'bg-white'
-          }`}>
-            {text || t('enterTitleFallback')}
-          </div>
         ) : (
           <div className={`text-content p-3 max-h-[35vh] overflow-y-auto border rounded-md ${
             isConfirmed ? 'bg-green-50 border-green-200' : 'bg-white'
