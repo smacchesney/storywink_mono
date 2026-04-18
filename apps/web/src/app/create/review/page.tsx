@@ -327,7 +327,7 @@ function ReviewPageContent() {
     });
   };
 
-  // Toggle confirmation per page / title
+  // Toggle confirmation per page
   const toggleConfirm = async () => {
     const currentPage = pages[currentIndex];
     const bookIdToUse = bookIdFromUrl;
@@ -374,7 +374,7 @@ function ReviewPageContent() {
       }
 
     } catch (error) {
-      console.error("Error saving page/title:", error);
+      console.error("Error saving page:", error);
       const message = error instanceof DOMException && error.name === 'AbortError'
         ? t('saveTimeout')
         : error instanceof Error ? error.message : String(error);
