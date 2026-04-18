@@ -58,8 +58,6 @@ function ReviewPageContent() {
 
   const isMountedRef = useRef(true);
 
-  const [pendingTitleReview, setPendingTitleReview] = useState(''); // <-- State for pending title edits
-
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -131,8 +129,7 @@ function ReviewPageContent() {
             console.log("Review Page: Successfully mapped pages:", mappedPages); // Log after successful map
             setPages(mappedPages);
             // Store fetched book data (removed unused state variable)
-            setPendingTitleReview(fetchedBook.title || ''); // <-- Initialize pending title
-            
+
             // Initialize confirmed: ALL false initially
             setConfirmed(sortedPages.map(() => false)); 
             
@@ -314,20 +311,14 @@ function ReviewPageContent() {
 
   // Handle text updates
   const handleTextChange = (newText: string) => {
-    if (pages[currentIndex]?.isTitlePage) {
-      // Handle title page text change
-      setPendingTitleReview(newText);
-    } else {
-      // Handle regular page text change
-      setPages(prev => {
-        const copy = [...prev];
-        if (copy[currentIndex]) {
-          copy[currentIndex] = { ...copy[currentIndex], text: newText };
-        }
-        return copy;
-      });
-    }
-    
+    setPages(prev => {
+      const copy = [...prev];
+      if (copy[currentIndex]) {
+        copy[currentIndex] = { ...copy[currentIndex], text: newText };
+      }
+      return copy;
+    });
+
     // Mark as unconfirmed when text changes
     setConfirmed(prev => {
       const copy = [...prev];
@@ -357,24 +348,13 @@ function ReviewPageContent() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
-      let response: Response;
-      if (currentPage?.isTitlePage) { // Saving Title Page
-        if (!pendingTitleReview.trim()) throw new Error("Book title cannot be empty.");
-        response = await fetch(`/api/book/${bookIdToUse}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: pendingTitleReview }),
-          signal: controller.signal,
-        });
-      } else { // Saving Story Page
-        if (!currentPage.id) throw new Error("Page ID is missing, cannot save.");
-        response = await fetch(`/api/book/${bookIdToUse}/page/${currentPage.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: currentPage.text || '', textConfirmed: true }),
-          signal: controller.signal,
-        });
-      }
+      if (!currentPage.id) throw new Error("Page ID is missing, cannot save.");
+      const response = await fetch(`/api/book/${bookIdToUse}/page/${currentPage.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: currentPage.text || '', textConfirmed: true }),
+        signal: controller.signal,
+      });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -494,8 +474,8 @@ function ReviewPageContent() {
           key={currentIndex}
           id={currentPageData?.id}
           imageUrl={currentPageData?.generatedImageUrl || currentPageData?.originalImageUrl}
-          text={isTitlePageSelected ? pendingTitleReview : currentPageData?.text}
-          pageNumber={isTitlePageSelected ? 0 : currentIndex}
+          text={currentPageData?.text}
+          pageNumber={currentIndex + 1}
           isTitlePage={isTitlePageSelected}
           isConfirmed={confirmed[currentIndex]}
           moderationStatus={currentPageData?.moderationStatus}
