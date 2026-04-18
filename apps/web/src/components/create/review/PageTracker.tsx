@@ -36,25 +36,24 @@ const PageTracker = ({
           {Array.from({ length: totalPages }).map((_, idx) => {
             const isConfirmed = confirmed[idx] ?? false;
             const isCurrent = idx === currentPage;
-            const isTitle = idx === 0;
-            
+
             return (
               <div key={idx} className="group relative">
-                <button 
+                <button
                   onClick={() => onPageSelect(idx)}
                   className={`
                     h-2 transition-all duration-200
-                    ${isCurrent ? 'w-6' : 'w-2'} 
+                    ${isCurrent ? 'w-6' : 'w-2'}
                     rounded-full
                     ${isCurrent ? 'scale-y-150' : ''}
                     ${isConfirmed ? 'bg-green-500' : 'bg-gray-300'}
                   `}
                   aria-label={t('goToPage', { n: idx + 1 })}
                 />
-                
+
                 {/* Hoverable tooltip */}
                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap">
-                  {isTitle ? t('titlePage') : t('page', { n: idx })}
+                  {t('page', { n: idx + 1 })}
                   {isConfirmed && ' ✓'}
                 </div>
               </div>
