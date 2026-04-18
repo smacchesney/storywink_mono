@@ -65,6 +65,9 @@ railway.json
 assets/
 .playwright-mcp/
 
+# Local-only scratch folder (large PDFs, personal notes)
+.docs/
+
 # Documentation (except README.md and project docs)
 *.md
 !README.md

@@ -48,7 +48,10 @@ cartRouter.get("/", async (req: AuthenticatedRequest, res, next) => {
         title: item.book.title,
         status: item.book.status,
         pageCount: item.book.pageLength,
-        coverImageUrl: item.book.coverImageUrl || item.book.pages[0]?.generatedImageUrl || null,
+        coverImageUrl:
+          item.book.coverImageUrl ||
+          item.book.pages[0]?.generatedImageUrl ||
+          null,
       },
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
