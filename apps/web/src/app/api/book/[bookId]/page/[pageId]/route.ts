@@ -174,12 +174,14 @@ export async function DELETE(
         .sort((a, b) => a.index - b.index);
 
       for (let i = 0; i < remainingPages.length; i++) {
+        const page = remainingPages[i];
         await tx.page.update({
-          where: { id: remainingPages[i].id },
+          where: { id: page.id },
           data: {
             index: i,
             pageNumber: i + 1,
-            isTitlePage: i === 0,
+            isTitlePage:
+              book.coverAssetId !== null && page.assetId === book.coverAssetId,
           },
         });
       }
