@@ -169,8 +169,6 @@
     "edit": "Edit",
     "confirmText": "Confirm Text",
     "confirmed": "Confirmed",
-    "enterTitle": "Enter a title for your book...",
-    "enterTitleFallback": "Enter a title for your book",
     "enterPageText": "Enter text for page {n}...",
     "noTextYet": "No text yet.",
     "saveChanges": "Save Changes",

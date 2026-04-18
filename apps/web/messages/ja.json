@@ -169,8 +169,6 @@
     "edit": "編集",
     "confirmText": "テキストを確定",
     "confirmed": "確定済み",
-    "enterTitle": "絵本のタイトルを入力...",
-    "enterTitleFallback": "絵本のタイトルを入力",
     "enterPageText": "{n}ページのテキストを入力...",
     "noTextYet": "テキストはまだありません。",
     "saveChanges": "変更を保存",
