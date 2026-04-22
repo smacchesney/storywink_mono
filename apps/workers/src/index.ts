@@ -279,7 +279,8 @@ illustrationWorker.on('completed', (job) => {
 });
 
 illustrationWorker.on('failed', (job, err) => {
-  const failureStage = err.message.includes('Gemini') || err.message.includes('Google') ? 'ai_generation' :
+  const failureStage = (err.message.includes('Gemini') || err.message.includes('Google') ||
+                        err.message.includes('OpenAI') || err.message.includes('gpt-image')) ? 'ai_generation' :
                       err.message.includes('Cloudinary') ? 'image_upload' :
                       err.message.includes('fetch') ? 'image_fetch' :
                       err.message.includes('database') ? 'database_update' :
