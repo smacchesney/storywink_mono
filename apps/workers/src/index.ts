@@ -73,6 +73,7 @@ import { processIllustrationGeneration } from './workers/illustration-generation
 import { processBookFinalize } from './workers/book-finalize.worker.js';
 import { processPrintFulfillment } from './workers/print-fulfillment.worker.js';
 import { processCharacterExtraction } from './workers/character-extraction.worker.js';
+import { getIllustrator } from './lib/illustrators/index.js';
 
 // CRITICAL: Pre-load and validate STYLE_LIBRARY before processing any jobs
 // This prevents race conditions where workers access STYLE_LIBRARY before it's fully loaded
@@ -125,6 +126,10 @@ function deepFreeze(obj: any): void {
 
 // Apply deep freeze to prevent any mutations
 deepFreeze(STYLE_LIBRARY);
+
+// Validate illustration provider config at startup — throws on misconfiguration
+// so a misdeployed worker fails immediately rather than on first job.
+getIllustrator();
 
 // Generate unique instance ID to track which worker processes which job
 const INSTANCE_ID = crypto.randomUUID();
