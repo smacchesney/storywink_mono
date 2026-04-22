@@ -1,7 +1,8 @@
 import { Job } from 'bullmq';
 import prisma from '../database/index.js';
 import { IllustrationGenerationJobV2 } from '@storywink/shared/types';
-import { GoogleGenAI } from '@google/genai';
+import { getIllustrator } from '../lib/illustrators/index.js';
+import type { IllustrationInput } from '../lib/illustrators/index.js';
 import { v2 as cloudinary } from 'cloudinary';
 import pino from 'pino';
 import util from 'util';
@@ -106,10 +107,6 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
 
   try {
     // Validate prerequisites
-    if (!process.env.GOOGLE_API_KEY) {
-      throw new Error('Google API key not configured');
-    }
-
     if (!process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET || !process.env.CLOUDINARY_CLOUD_NAME) {
       throw new Error('Cloudinary API credentials not configured');
     }
@@ -125,11 +122,8 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       throw new Error('Missing required job data: bookId, pageId, or userId');
     }
 
-    // Initialize Google AI
-    const ai = new GoogleGenAI({
-      apiKey: process.env.GOOGLE_API_KEY,
-    });
-    
+    const illustrator = getIllustrator();
+
     logger.info({ 
       jobId: job.id, 
       userId, 
@@ -373,10 +367,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     console.log(`  - Prompt length: ${textPrompt.length} chars`);
     console.log(`  - First 100 chars: ${textPrompt.substring(0, 100)}...`);
 
-    // Convert content image to base64 for Gemini API
-    const contentImageBase64 = contentImageBuffer.toString('base64');
-
-    logger.info({ jobId: job.id, pageId, pageNumber, refCount: styleReferenceBuffers.length }, 'Prepared images as base64 for Gemini API.');
+    logger.info({ jobId: job.id, pageId, pageNumber, refCount: styleReferenceBuffers.length }, 'Prepared images for illustration provider.');
 
     let generatedImageBase64: string | null = null;
     let moderationBlocked = false;
@@ -397,65 +388,33 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     }
 
     try {
-       logger.info({ jobId: job.id, pageId, pageNumber }, 'Calling Gemini 3.1 Flash Image API...');
-       console.log(`[IllustrationWorker] Calling Gemini 3.1 Flash API for page ${pageNumber} with ${styleReferenceBuffers.length} style ref(s)...`);
+       logger.info({ jobId: job.id, pageId, pageNumber, provider: illustrator.name }, 'Calling illustration provider...');
+       console.log(`[IllustrationWorker] Calling ${illustrator.name} for page ${pageNumber} with ${styleReferenceBuffers.length} style ref(s)...`);
 
-       // Build multi-image prompt for Gemini
-       // Order: Content image, Style references, Text prompt
-       const prompt = [
-           // 1. Content image (user's photo)
-           {
-               inlineData: {
-                   mimeType: contentImageMimeType,
-                   data: contentImageBase64,
-               },
-           },
-           // 2. Style reference image(s) - 1 for title pages, 2 for story pages
-           ...styleReferenceBuffers.map(ref => ({
-               inlineData: {
-                   mimeType: ref.mimeType,
-                   data: ref.buffer.toString('base64'),
-               },
-           })),
-           // 3. Text prompt
-           {
-               text: textPrompt
-           }
-       ];
+       const illustrationInput: IllustrationInput = {
+         contentImage: { buffer: contentImageBuffer, mimeType: contentImageMimeType },
+         styleRefs: styleReferenceBuffers,
+         prompt: textPrompt,
+       };
 
-       logger.info({
-           jobId: job.id,
-           pageNumber,
-           imageCount: 1 + styleReferenceBuffers.length,
-           contentImage: 1,
-           styleRefs: styleReferenceBuffers.length,
-       }, 'Prepared Gemini prompt with images');
+       const result = await illustrator.generate(illustrationInput);
 
-       const result = await ai.models.generateContent({
-           model: "gemini-3.1-flash-image-preview",
-           contents: prompt,
-           config: {
-               responseModalities: ['TEXT', 'IMAGE'],
-               imageConfig: {
-                   aspectRatio: '1:1',
-                   imageSize: '2K',
-               },
-           },
-       });
+       logger.info({ jobId: job.id, pageId, pageNumber, provider: illustrator.name }, 'Received response from illustration provider.');
+       console.log(`[IllustrationWorker] ${illustrator.name} response received for page ${pageNumber}`);
 
-       logger.info({ jobId: job.id, pageId, pageNumber }, 'Received response from Gemini.');
-       console.log(`[IllustrationWorker] Gemini 3.1 Flash response received for page ${pageNumber}`);
-
-        // Extract image data from Gemini response
-        const imagePart = result?.candidates?.[0]?.content?.parts?.find((part: any) => part.inlineData);
-        if (imagePart?.inlineData?.data) {
-            generatedImageBase64 = imagePart.inlineData.data;
-            logger.info({ jobId: job.id, pageId, pageNumber }, 'Extracted generated image data from Gemini response.');
-        } else {
-            moderationBlocked = true;
-            moderationReasonText = "Image generation failed or blocked by content policy (no image data in response).";
-            logger.warn({ jobId: job.id, pageId, pageNumber, attempt: contentPolicyAttempt + 1, maxAttempts: MAX_CONTENT_POLICY_RETRIES + 1 }, 'Gemini response did not contain image data.');
-        }
+       if (result.imageBase64) {
+         generatedImageBase64 = result.imageBase64;
+         logger.info({ jobId: job.id, pageId, pageNumber }, 'Extracted generated image data.');
+       } else {
+         moderationBlocked = true;
+         moderationReasonText = result.blockedReason ?? 'Image generation returned no data.';
+         logger.warn({
+           jobId: job.id, pageId, pageNumber,
+           attempt: contentPolicyAttempt + 1,
+           maxAttempts: MAX_CONTENT_POLICY_RETRIES + 1,
+           reason: moderationReasonText,
+         }, 'Illustration provider reported content block or no image data.');
+       }
 
     } catch (apiError: any) {
         // Extract detailed error information from Google API response
@@ -643,26 +602,16 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         };
         const coverTextPrompt = createIllustrationPrompt(coverPromptInput);
 
-        const coverPrompt = [
-          { inlineData: { mimeType: contentImageMimeType, data: contentImageBase64 } },
-          ...coverRefBuffers.map(ref => ({
-            inlineData: { mimeType: ref.mimeType, data: ref.buffer.toString('base64') },
-          })),
-          { text: coverTextPrompt },
-        ];
+        const coverInput: IllustrationInput = {
+          contentImage: { buffer: contentImageBuffer, mimeType: contentImageMimeType },
+          styleRefs: coverRefBuffers,
+          prompt: coverTextPrompt,
+        };
 
-        const coverResult = await ai.models.generateContent({
-          model: "gemini-3.1-flash-image-preview",
-          contents: coverPrompt,
-          config: {
-            responseModalities: ['TEXT', 'IMAGE'],
-            imageConfig: { aspectRatio: '1:1', imageSize: '2K' },
-          },
-        });
+        const coverResult = await illustrator.generate(coverInput);
 
-        const coverImagePart = coverResult?.candidates?.[0]?.content?.parts?.find((part: any) => part.inlineData);
-        if (coverImagePart?.inlineData?.data) {
-          let coverBuffer = Buffer.from(coverImagePart.inlineData.data, 'base64');
+        if (coverResult.imageBase64) {
+          let coverBuffer = Buffer.from(coverResult.imageBase64, 'base64');
 
           // Upscale for print
           coverBuffer = await upscaleForPrint(coverBuffer);
@@ -678,16 +627,15 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
                 public_id: `cover_illustration`,
                 overwrite: true,
                 tags: [`book:${bookId}`, `cover`, `style:${styleKey}`],
-                resource_type: "image",
+                resource_type: 'image',
               },
               (error, result) => {
                 if (error) reject(error); else resolve(result);
-              }
+              },
             ).end(coverBuffer);
           });
 
           if (coverUpload?.secure_url) {
-            // Store cover illustration URL on the Book model
             await prisma.book.update({
               where: { id: bookId },
               data: { coverImageUrl: coverUpload.secure_url },
@@ -696,7 +644,10 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
             logger.info({ jobId: job.id, bookId, coverUrl: coverUpload.secure_url }, 'Cover illustration stored in Book.coverImageUrl');
           }
         } else {
-          logger.warn({ jobId: job.id, bookId, pageNumber }, 'Cover illustration generation returned no image data');
+          logger.warn(
+            { jobId: job.id, bookId, pageNumber, reason: coverResult.blockedReason },
+            'Cover illustration generation returned no image data',
+          );
         }
       } catch (coverError: any) {
         // Cover illustration failure is non-fatal -- the story illustration is already saved
