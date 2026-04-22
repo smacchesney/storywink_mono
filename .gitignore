@@ -70,6 +70,7 @@ assets/
 
 # Documentation (except README.md and project docs)
 *.md
+!docs/superpowers/**/*.md
 !README.md
 !CLAUDE.md
 !ARCHITECTURE_ANALYSIS.md
