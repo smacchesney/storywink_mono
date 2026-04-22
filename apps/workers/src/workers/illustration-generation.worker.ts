@@ -431,7 +431,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
        }
 
     } catch (apiError: any) {
-        // Extract detailed error information from Google API response
+        // Extract detailed error information from illustration provider response
         const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
         const errorCode = apiError?.code || apiError?.response?.status;
         const errorDetails = apiError?.response?.data || apiError?.details;
@@ -456,9 +456,9 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
             isCopyrightIssue,
             isContentPolicyBlock,
             fullError: JSON.stringify(apiError, null, 2)
-        }, 'Error calling Gemini 3.1 Flash Image API.');
+        }, 'Error calling illustration provider API.');
 
-        console.error(`[IllustrationWorker] Gemini API error for page ${pageNumber}:`);
+        console.error(`[IllustrationWorker] ${illustrator.name} API error for page ${pageNumber}:`);
         console.error(`  - Error: ${errorMessage}`);
         console.error(`  - Error Code: ${errorCode || 'N/A'}`);
         console.error(`  - Is Content Policy Block: ${isContentPolicyBlock}`);
@@ -504,7 +504,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
           logger.info({ jobId: job.id, pageId, pageNumber }, 'Decoding and uploading generated image to Cloudinary...');
           let generatedImageBuffer = Buffer.from(generatedImageBase64, 'base64');
 
-          // Upscale from Gemini 2K (2048×2048) to Lulu print size (2625×2625)
+          // Upscale from 2048×2048 to Lulu print size (2625×2625) for 300 DPI at 8.75"
           // This ensures 300 DPI quality for 8.75" × 8.75" print with bleed
           try {
               logger.info({ jobId: job.id, pageId, pageNumber }, 'Upscaling image for print quality (2048 → 2625px)...');
@@ -706,7 +706,8 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       hasText: !!text,
       textLength: text?.length || 0,
       failureStage: errorMessage.includes('text overlay') || errorMessage.includes('Text overlay') ? 'text_overlay' :
-                   errorMessage.includes('Gemini') || errorMessage.includes('Google') ? 'ai_generation' :
+                   (errorMessage.includes('Gemini') || errorMessage.includes('Google') ||
+                    errorMessage.includes('OpenAI') || errorMessage.includes('gpt-image')) ? 'ai_generation' :
                    errorMessage.includes('Cloudinary') ? 'image_upload' :
                    errorMessage.includes('fetch') ? 'image_fetch' :
                    errorMessage.includes('database') ? 'database_update' : 'unknown'
