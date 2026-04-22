@@ -40,8 +40,22 @@ function isTransientError(error: Error): boolean {
     'resource exhausted',
     // Image processing errors (retry-able)
     'sharp',
+    // OpenAI transient markers (gpt-image-2)
+    'rate_limit_exceeded',
+    'server_error',
+    '500',
+    '502',
+    '504',
+    'engine overloaded',
   ];
-  return transientPatterns.some(pattern => message.includes(pattern));
+  // Non-transient OpenAI errors: billing / account issues should fail fast.
+  const nonTransientPatterns = [
+    'insufficient_quota',
+    'invalid_api_key',
+    'account_deactivated',
+  ];
+  if (nonTransientPatterns.some((p) => message.includes(p))) return false;
+  return transientPatterns.some((pattern) => message.includes(pattern));
 }
 
 /**
