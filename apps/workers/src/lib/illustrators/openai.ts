@@ -37,12 +37,16 @@ function isContentPolicyBlock(err: any): boolean {
 export class OpenAIProvider implements IllustrationProvider {
   readonly name = 'openai' as const;
   private readonly client: OpenAI;
+  private readonly quality: QualityLevel;
+  private readonly thinking: boolean;
 
   constructor() {
     if (!process.env.OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY is required when ILLUSTRATION_PROVIDER=openai');
     }
     this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    this.quality = readQuality();
+    this.thinking = readThinking();
   }
 
   async generate(input: IllustrationInput): Promise<IllustrationOutput> {
@@ -61,8 +65,7 @@ export class OpenAIProvider implements IllustrationProvider {
       ),
     ]);
 
-    const quality = readQuality();
-    const thinking = readThinking();
+    const { quality, thinking } = this;
 
     try {
       const response = await this.client.images.edit({
