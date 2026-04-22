@@ -1,6 +1,6 @@
 # Storywink.ai
 
-AI-powered platform transforming photos into personalized children's picture books. Uses GPT-5.1 for story generation and Gemini 3 Pro Image for illustrations.
+AI-powered platform transforming photos into personalized children's picture books. Uses GPT-5.1 for story generation. Illustrations use Gemini 3.1 Flash Image or OpenAI gpt-image-2, selectable via the `ILLUSTRATION_PROVIDER` env var on the workers service.
 
 ## Commands
 
