@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Lint, type-check, build
+    runs-on: ubuntu-latest
+
+    env:
+      # Turbo remote caching is not used; keep the local cache deterministic.
+      TURBO_TELEMETRY_DISABLED: '1'
+      # --- Build-time env placeholders ---
+      # Next.js evaluates middleware and pages during `next build`. Clerk reads
+      # these at init and validates the key format, so a well-formed dummy pair
+      # is required for the web build to succeed in CI. They are NOT real keys.
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsuZXhhbXBsZS5jb20k
+      CLERK_SECRET_KEY: sk_test_ci_dummy_secret_key_not_real
+      NEXT_PUBLIC_CLERK_SIGN_IN_URL: /sign-in
+      NEXT_PUBLIC_CLERK_SIGN_UP_URL: /sign-up
+      NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: /library
+      NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: /library
+      NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: storywink
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      # Prisma reads the schema's datasource url from this at generate time. A
+      # dummy connection string is enough — `prisma generate` does not connect.
+      DATABASE_URL: postgresql://user:pass@localhost:5432/ci?schema=public
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Cache turbo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ hashFiles('package-lock.json') }}-
+            ${{ runner.os }}-turbo-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run check-types
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test --if-present
