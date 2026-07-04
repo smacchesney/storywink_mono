@@ -30,6 +30,11 @@ export default tseslint.config(
       '**/*.config.mjs',
       '**/*.config.cjs',
       '**/*.config.ts',
+      // apps/web lints through Next's toolchain (eslint-config-next provides
+      // the react/react-hooks/next plugins this config doesn't). Without this
+      // ignore, `next build`'s lint step resolves THIS config for web files
+      // and fails on rules the Next plugins are supposed to own.
+      'apps/web/**',
     ],
   },
 

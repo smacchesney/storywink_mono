@@ -7,6 +7,7 @@ import { createBullMQConnection } from '@storywink/shared/redis';
 import OpenAI from 'openai';
 import { optimizeCloudinaryUrlForVision } from '@storywink/shared/utils';
 import { createQCPrompt, QC_SYSTEM_PROMPT, QC_RESPONSE_SCHEMA } from '@storywink/shared/prompts/quality-check';
+import { computeBookStatus } from '../lib/computeBookStatus.js';
 import { ANALYSIS_MODEL } from '../config/models.js';
 import pino from 'pino';
 
@@ -219,17 +220,10 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
       console.log(`    - Moderation Status: ${page.moderationStatus || 'N/A'}`)
     });
 
-    let finalStatus: 'COMPLETED' | 'PARTIAL' | 'FAILED';
+    const finalStatus = computeBookStatus(book.pages, book.coverAssetId);
 
-    if (textComplete && illustrationsComplete) {
-      finalStatus = 'COMPLETED';
-    } else if (illustrationsComplete) {
+    if (finalStatus === 'COMPLETED' && !textComplete && illustrationsComplete) {
       console.log(`[BookFinalize] All illustrations complete, treating as COMPLETED despite missing text on some pages`);
-      finalStatus = 'COMPLETED';
-    } else if (pagesWithText.length > 0 || pagesWithIllustrations.length > 0) {
-      finalStatus = 'PARTIAL';
-    } else {
-      finalStatus = 'FAILED';
     }
 
     // ========================================================================
