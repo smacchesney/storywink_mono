@@ -5,14 +5,6 @@ import logger from '@/lib/logger';
 import { PageType } from '@prisma/client'; // Import PageType
 import { getAuthenticatedUser } from '@/lib/db/ensureUser'; // Import the new helper
 
-// --- DEBUG: Log environment variables before configuration ---
-console.log("--- Cloudinary Env Vars Check ---");
-console.log("CLOUDINARY_CLOUD_NAME:", process.env.CLOUDINARY_CLOUD_NAME);
-console.log("CLOUDINARY_API_KEY:", process.env.CLOUDINARY_API_KEY ? 'SET' : 'NOT SET'); // Log SET/NOT SET for secrets
-console.log("CLOUDINARY_API_SECRET:", process.env.CLOUDINARY_API_SECRET ? 'SET' : 'NOT SET');
-console.log("-----------------------------------");
-// --- End Debug Log ---
-
 // Configure Cloudinary
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -47,11 +39,6 @@ async function uploadToCloudinary(buffer: Buffer, options: object): Promise<any>
 }
 
 export async function POST(request: Request) {
-    // Add this log to check the environment variable
-    console.log('DATABASE_URL in /api/upload:', process.env.DATABASE_URL ? 'Loaded' : 'MISSING!');
-    // Log the full URL - REMEMBER TO REDACT PASSWORD IF SHARING LOGS
-    console.log('>>> DEBUG: Actual DATABASE_URL:', process.env.DATABASE_URL); 
-    
     try {
         // Use the new helper to get authenticated user data
         const { clerkId, dbUser, primaryEmail } = await getAuthenticatedUser();
