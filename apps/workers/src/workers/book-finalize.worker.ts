@@ -22,6 +22,7 @@ async function runQualityCheck(
   bookId: string,
   pages: Array<{ pageNumber: number; pageId: string; generatedImageUrl: string | null }>,
   characterIdentity: CharacterIdentity | null,
+  language: string = 'en',
 ): Promise<BookQCResult | null> {
   if (!process.env.OPENAI_API_KEY) {
     logger.warn({ bookId }, 'Skipping QC: OPENAI_API_KEY not configured');
@@ -56,7 +57,7 @@ async function runQualityCheck(
   }
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const promptText = createQCPrompt(characterIdentity, contentParts.length);
+  const promptText = createQCPrompt(characterIdentity, contentParts.length, language);
 
   // Add the text prompt after all images
   contentParts.push({ type: 'input_text', text: promptText });
@@ -246,7 +247,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
           generatedImageUrl: p.generatedImageUrl,
         }));
 
-        const qcResult = await runQualityCheck(bookId, qcPages, characterIdentity);
+        const qcResult = await runQualityCheck(bookId, qcPages, characterIdentity, book.language);
 
         if (qcResult && !qcResult.passed && qcResult.failedPageIds.length > 0) {
           const nextRound = qcRound + 1;

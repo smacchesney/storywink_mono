@@ -12,7 +12,8 @@ export const QC_SYSTEM_PROMPT =
 
 export function createQCPrompt(
   characterIdentity: CharacterIdentity | null,
-  pageCount: number
+  pageCount: number,
+  language: string = 'en'
 ): string {
   const characterSection = characterIdentity
     ? `Expected characters (canonical reference):\n${characterIdentity.characters.map(c => {
@@ -33,7 +34,9 @@ ${characterSection}
 For each illustration, evaluate:
 1. CHARACTER CONSISTENCY (0-10): Do characters match the descriptions above? Are they recognizable as the same person across pages? Check hair color, skin tone, face shape, proportions.
 2. STYLE CONSISTENCY (0-10): Does the illustration match the established art style? Is the construction method, lighting, and material rendering consistent with other pages?
-3. OVERALL QUALITY (0-10): General illustration quality, composition, absence of artifacts or distortions.
+3. OVERALL QUALITY (0-10): General illustration quality, composition, absence of artifacts or distortions. Apply these hard caps:
+   - STRAY TEXT: Any unintended text, garbled or half-formed letters, captions, or watermark-like marks caps OVERALL QUALITY at 4. (Intentional onomatopoeia sound effects are allowed — but they must be correctly spelled and in the right script: ${language === 'ja' ? 'Japanese kana (e.g. ざぶーん, わーい) — Latin-alphabet sound effects are a FAILURE' : 'the Latin alphabet (e.g. SPLASH!, WHEE!) — non-Latin scripts are a FAILURE'}.)
+   - ANATOMY: Clearly visible anatomical errors — wrong number of fingers, extra or missing limbs, fused or melted facial features, impossible joints — cap OVERALL QUALITY at 5.
 
 A page PASSES if overall score >= 6.
 A page FAILS if overall score < 6 OR character consistency < 5.
@@ -52,7 +55,8 @@ Focus on these critical attributes (in priority order):
 3. Facial features (eye style, expression approach)
 4. Body proportions (head-to-body ratio)
 5. Clothing accuracy vs reference photo
-6. Art style consistency (construction method, texture, lighting)`;
+6. Art style consistency (construction method, texture, lighting)
+7. Stray/garbled text and anatomical errors (see hard caps above) — when present, name them explicitly in "issues" and in "suggestedPromptAdditions" (e.g. "REMOVE STRAY TEXT: garbled lettering in top-right corner", "HANDS: left hand rendered with six fingers, must be five").`;
 }
 
 export const QC_RESPONSE_SCHEMA = {
