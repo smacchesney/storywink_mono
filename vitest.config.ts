@@ -25,6 +25,7 @@ export default defineConfig({
   test: {
     include: [
       'packages/shared/src/**/*.test.ts',
+      'packages/pdf/src/**/*.test.ts',
       'apps/workers/src/**/*.test.ts',
     ],
     environment: 'node',

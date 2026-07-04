@@ -17,6 +17,7 @@
     "@sentry/node": "^10.63.0",
     "@sparticuz/chromium": "^131.0.1",
     "@storywink/database": "*",
+    "@storywink/pdf": "*",
     "@storywink/shared": "*",
     "bullmq": "^5.48.1",
     "cloudinary": "^2.6.0",

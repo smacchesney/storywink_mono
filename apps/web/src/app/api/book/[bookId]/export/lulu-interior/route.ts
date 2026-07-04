@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
-import { generateBookPdf } from '@/lib/pdf/generateBookPdf';
+import { generateBookPdf } from '@storywink/pdf';
 import { uploadPdfToDropbox } from '@/lib/dropbox';
 import { Book, Page } from '@prisma/client';
 import { calculatePrintedPageCount } from '@storywink/shared/utils';
+import { loadWebPdfFonts } from '../pdfFonts';
 
 // Define the expected Book type with Pages for the PDF generator
 type BookWithPages = Book & { pages: Page[] };
@@ -113,11 +114,15 @@ export async function POST(
       );
     }
 
-    // Generate the interior PDF buffer (interleaved text + illustration pages)
-    const pdfBuffer = await generateBookPdf({
-      ...bookData,
-      pages: storyPages,
-    } as BookWithPages);
+    // Generate the interior PDF buffer (interleaved text + illustration pages).
+    // Lulu path uses generator defaults: no title page, no back cover, padded to 4.
+    const pdfBuffer = await generateBookPdf(
+      {
+        ...bookData,
+        pages: storyPages,
+      } as BookWithPages,
+      { fonts: loadWebPdfFonts(), logger }
+    );
 
     // Upload to Dropbox with public shared link (avoids Cloudinary 10MB limit)
     logger.info({ bookId }, 'Uploading interior PDF to Dropbox...');
