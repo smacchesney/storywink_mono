@@ -20,9 +20,8 @@ All endpoints live under `src/app/api/`. Examples (non-exhaustive):
 ## Key Directories
 - `src/app/` — App Router pages and layouts
 - `src/components/` — React components
-- `src/lib/pdf/` — Client-side PDF generation (mirrored in workers)
 - `src/i18n/` — Internationalization config and messages
 - `src/hooks/` — Custom React hooks
 
 ## PDF Generation
-This app has PDF generators that mirror `apps/workers/src/utils/pdf/`. Changes to PDF logic must be applied to BOTH locations.
+All PDF generation lives in the shared `packages/pdf` workspace (`@storywink/pdf`). This app supplies its fonts via `src/app/api/book/[bookId]/export/pdfFonts.ts` and calls the package from the export routes.

@@ -11,11 +11,10 @@ Background job processors for AI operations.
 
 ## Key Directories
 - `src/workers/` — Job processor implementations
-- `src/utils/pdf/` — Server-side PDF generation (mirrored in web app)
 - `src/lib/` — AI client wrappers and utilities
 
 ## PDF Generation
-This app has PDF generators that mirror `apps/web/src/lib/pdf/`. Changes to PDF logic must be applied to BOTH locations.
+All PDF generation lives in the shared `packages/pdf` workspace (`@storywink/pdf`). This app supplies fonts via `src/utils/pdf-fonts.ts`; the print-fulfillment worker calls the package. The Lulu output path is production-verified — behavior changes there require a new proof print.
 
 ## Patterns
 - All AI operations are async — enqueued by Next.js API routes in `apps/web`, processed here
