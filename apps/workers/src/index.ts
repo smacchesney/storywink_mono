@@ -20,6 +20,7 @@ process.env.PINO_NO_BUFFER = 'true';
 import { Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { config } from 'dotenv';
+import * as Sentry from '@sentry/node';
 import { QUEUE_NAMES } from '@storywink/shared/constants';
 import { createBullMQConnection } from '@storywink/shared/redis';
 import pino from 'pino';
@@ -49,6 +50,20 @@ if (missingVars.length > 0) {
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
 });
+
+// Initialize Sentry error monitoring.
+// Silent no-op when SENTRY_DSN is unset (local dev, CI): we skip init entirely,
+// so every Sentry.captureException call downstream becomes a harmless no-op.
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+    tracesSampleRate: process.env.SENTRY_TRACES_SAMPLE_RATE
+      ? Number(process.env.SENTRY_TRACES_SAMPLE_RATE)
+      : 0,
+  });
+  logger.info('Sentry initialized for workers');
+}
 
 // Create Redis connection with BullMQ-specific options
 // Uses family: 0 for IPv6 support on Railway private networking
@@ -236,6 +251,10 @@ storyWorker.on('completed', (job) => {
 
 storyWorker.on('failed', (job, err) => {
   logger.error({ jobId: job?.id, error: err.message }, 'Story generation failed');
+  Sentry.captureException(err, {
+    tags: { worker: 'story-generation', jobId: job?.id },
+    extra: { bookId: job?.data?.bookId, attempts: job?.attemptsMade },
+  });
   console.error('='.repeat(80));
   console.error(`[StoryWorker] FAILED JOB ${job?.id}`);
   console.error('='.repeat(80));
@@ -300,6 +319,16 @@ illustrationWorker.on('failed', (job, err) => {
     willRetry: (job?.attemptsMade || 0) < (job?.opts?.attempts || 1)
   }, 'Illustration generation failed');
 
+  Sentry.captureException(err, {
+    tags: { worker: 'illustration-generation', jobId: job?.id, failureStage },
+    extra: {
+      bookId: job?.data?.bookId,
+      pageId: job?.data?.pageId,
+      pageNumber: job?.data?.pageNumber,
+      attempts: job?.attemptsMade,
+    },
+  });
+
   console.error('='.repeat(80));
   console.error(`[IllustrationWorker] FAILED JOB ${job?.id}`);
   console.error('='.repeat(80));
@@ -352,6 +381,10 @@ finalizeWorker.on('failed', (job, err) => {
     bookId: job?.data?.bookId,
     attempts: job?.attemptsMade
   }, 'Book finalization failed');
+  Sentry.captureException(err, {
+    tags: { worker: 'book-finalize', jobId: job?.id },
+    extra: { bookId: job?.data?.bookId, attempts: job?.attemptsMade },
+  });
   console.error('='.repeat(80));
   console.error(`[FinalizeWorker] FAILED JOB ${job?.id}`);
   console.error('='.repeat(80));
@@ -396,6 +429,14 @@ printFulfillmentWorker.on('failed', (job, err) => {
     bookId: job?.data?.bookId,
     attempts: job?.attemptsMade
   }, 'Print fulfillment failed');
+  Sentry.captureException(err, {
+    tags: { worker: 'print-fulfillment', jobId: job?.id },
+    extra: {
+      printOrderId: job?.data?.printOrderId,
+      bookId: job?.data?.bookId,
+      attempts: job?.attemptsMade,
+    },
+  });
   console.error('='.repeat(80));
   console.error(`[PrintFulfillmentWorker] FAILED JOB ${job?.id}`);
   console.error('='.repeat(80));
@@ -435,6 +476,10 @@ characterExtractionWorker.on('failed', (job, err) => {
     bookId: job?.data?.bookId,
     attempts: job?.attemptsMade,
   }, 'Character extraction failed');
+  Sentry.captureException(err, {
+    tags: { worker: 'character-extraction', jobId: job?.id },
+    extra: { bookId: job?.data?.bookId, attempts: job?.attemptsMade },
+  });
   console.error('='.repeat(80));
   console.error(`[CharacterExtractionWorker] FAILED JOB ${job?.id}`);
   console.error('='.repeat(80));
