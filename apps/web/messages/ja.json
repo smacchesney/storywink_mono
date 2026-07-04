@@ -42,7 +42,28 @@
     "canLeavePage": "できあがるまで数分かかります。このページを離れても大丈夫 — 絵本はライブラリに届きます。",
     "mascotAlt": "ストーリーを書いているカイ（恐竜）",
     "uploadingPhotos": "写真をアップロード中...",
-    "photoLimit": "1冊あたり最大{max}枚まで"
+    "photoLimit": "1冊あたり最大{max}枚まで",
+    "continue": "つぎへ",
+    "stillUploading": "あと{count}枚アップロード中…",
+    "creating": "じゅんび中…",
+    "createFailed": "絵本をはじめられませんでした",
+    "noPhotos": "写真を1枚いじょう えらんでください。",
+    "notReady": "少しお待ちください。じゅんび中です。"
+  },
+  "upload": {
+    "addPhotos": "写真をついか",
+    "optimizeHint": "大きな写真は自動で最適化されます。事前に縮小する必要はありません。",
+    "counter": "{used} / {max}",
+    "retry": "やりなおす",
+    "remove": "写真をけす",
+    "replacing": "こうかん中…",
+    "errorTooBig": "この写真は大きすぎます。10MB以下のものをえらんでください。",
+    "errorWrongType": "これは写真ではありません。JPG・PNG・WebP・HEIC をつかってください。",
+    "errorWrongTypeSome": "写真ではない{count}件をスキップしました。",
+    "errorCapReached": "1冊あたり最大{max}枚まで ついかできます。",
+    "errorSomeFailed": "{count}枚アップロードできませんでした。タップしてやりなおしてください。",
+    "errorNetwork": "アップロードできませんでした。せつぞくをかくにんして やりなおしてください。",
+    "errorGeneric": "この写真でもんだいがおきました。もういちど おためしください。"
   },
   "setup": {
     "photosLabel": "しゃしん",

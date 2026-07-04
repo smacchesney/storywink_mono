@@ -42,7 +42,28 @@
     "canLeavePage": "This takes a few minutes — feel free to leave. Your book will be waiting in your library.",
     "mascotAlt": "Kai the Dino writing a story",
     "uploadingPhotos": "Uploading your photos...",
-    "photoLimit": "Up to {max} photos per book"
+    "photoLimit": "Up to {max} photos per book",
+    "continue": "Continue",
+    "stillUploading": "Still uploading {count}…",
+    "creating": "Getting things ready…",
+    "createFailed": "Couldn't start your book",
+    "noPhotos": "Add at least one photo to continue.",
+    "notReady": "Just a moment — getting things ready."
+  },
+  "upload": {
+    "addPhotos": "Add photos",
+    "optimizeHint": "Big photos are optimized automatically — no need to shrink them first.",
+    "counter": "{used} / {max}",
+    "retry": "Retry",
+    "remove": "Remove photo",
+    "replacing": "Replacing…",
+    "errorTooBig": "That photo is too large. Please pick one under 10MB.",
+    "errorWrongType": "That file isn't a photo. Use JPG, PNG, WebP, or HEIC.",
+    "errorWrongTypeSome": "Skipped {count, plural, one {# file that wasn't a photo} other {# files that weren't photos}}.",
+    "errorCapReached": "You can add up to {max} photos per book.",
+    "errorSomeFailed": "{count, plural, one {# photo didn't upload} other {# photos didn't upload}} — tap to retry.",
+    "errorNetwork": "Upload didn't go through. Check your connection and retry.",
+    "errorGeneric": "Something went wrong with that photo. Please try again."
   },
   "setup": {
     "photosLabel": "Your photos",
