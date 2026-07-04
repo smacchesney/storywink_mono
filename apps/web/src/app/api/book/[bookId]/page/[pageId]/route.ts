@@ -4,6 +4,7 @@ import { db as prisma } from '@/lib/db';
 import { BookStatus } from '@prisma/client';
 import { z } from 'zod';
 import logger from '@/lib/logger';
+import { QueueName, getQueue } from '@/lib/queue/index';
 
 // Zod schema for request body validation
 const updatePageSchema = z.object({
@@ -197,6 +198,25 @@ export async function DELETE(
         'API: Page deletion transaction committed'
       );
     });
+
+    // Removing a photo from a DRAFT book invalidates the perception pass's
+    // view of the set — refresh the brief/questions/identity. Non-fatal.
+    if (book.status === BookStatus.DRAFT) {
+      try {
+        await getQueue(QueueName.PhotoAnalysis).add(
+          `analyze-photos-${bookId}`,
+          { bookId, userId: dbUser.id, refresh: true },
+          {
+            attempts: 2,
+            backoff: { type: 'exponential', delay: 5000 },
+            removeOnComplete: { count: 100 },
+            removeOnFail: { count: 500 },
+          }
+        );
+      } catch (queueError) {
+        logger.error({ bookId, error: queueError }, 'Failed to enqueue perception refresh (non-fatal)');
+      }
+    }
 
     // Auto-complete: if book is PARTIAL and all remaining pages are now OK, mark as COMPLETED
     if (book.status === BookStatus.PARTIAL) {

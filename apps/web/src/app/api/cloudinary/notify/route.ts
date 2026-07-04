@@ -4,6 +4,7 @@ import logger from '@/lib/logger';
 import { PageType } from '@prisma/client';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { convertHeicToJpeg } from '@storywink/shared/utils';
+import { QueueName, getQueue } from '@/lib/queue/index';
 
 // This endpoint is called after successful Cloudinary uploads to create database records
 export async function POST(request: NextRequest) {
@@ -24,15 +25,17 @@ export async function POST(request: NextRequest) {
     let bookPageCount = 0;
 
     // If bookId provided, verify user owns the book and get page count
+    let bookStatus: string | null = null;
     if (bookId) {
       const book = await prisma.book.findUnique({
         where: { id: bookId, userId: dbUser.id },
-        select: { _count: { select: { pages: true } } }
+        select: { status: true, _count: { select: { pages: true } } }
       });
       if (!book) {
         return NextResponse.json({ error: 'Book not found or permission denied' }, { status: 404 });
       }
       bookPageCount = book._count.pages;
+      bookStatus = book.status;
     }
 
     // Create database records for each uploaded asset
@@ -103,6 +106,25 @@ export async function POST(request: NextRequest) {
     }
 
     logger.info({ count: createdAssets.length }, "Assets created successfully");
+
+    // Photos added to a DRAFT book change what the perception pass saw —
+    // refresh the story brief/questions/identity for the new set. Non-fatal.
+    if (bookId && bookStatus === 'DRAFT' && createdAssets.length > 0) {
+      try {
+        await getQueue(QueueName.PhotoAnalysis).add(
+          `analyze-photos-${bookId}`,
+          { bookId, userId: dbUser.id, refresh: true },
+          {
+            attempts: 2,
+            backoff: { type: 'exponential', delay: 5000 },
+            removeOnComplete: { count: 100 },
+            removeOnFail: { count: 500 },
+          }
+        );
+      } catch (queueError) {
+        logger.error({ bookId, error: queueError }, 'Failed to enqueue perception refresh (non-fatal)');
+      }
+    }
 
     return NextResponse.json({
       success: true,

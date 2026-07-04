@@ -17,6 +17,13 @@ const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 export interface PhotoAnalysisJob {
   bookId: string;
   userId: string;
+  /**
+   * Set when the photo set changed after the first pass (add/remove on the
+   * setup sheet). A refresh may OVERWRITE the machine-written eventSummary
+   * and unanswered captureQuestions so the brief matches the new photo set —
+   * but only while the book is still DRAFT, and never over parent answers.
+   */
+  refresh?: boolean;
 }
 
 /**
@@ -30,8 +37,8 @@ export interface PhotoAnalysisJob {
  * pipeline behaves exactly as it did before this pass existed.
  */
 export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
-  const { bookId, userId } = job.data;
-  logger.info({ bookId, userId, jobId: job.id }, 'Starting photo perception pass');
+  const { bookId, userId, refresh } = job.data;
+  logger.info({ bookId, userId, jobId: job.id, refresh: !!refresh }, 'Starting photo perception pass');
 
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OpenAI API key not configured');
@@ -129,10 +136,17 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
 
     // Never clobber a parent's edits: eventSummary only fills when empty,
     // captureQuestions only when none exist yet, title only when blank.
+    // A refresh (photo set changed while still DRAFT) may additionally
+    // overwrite the machine-written eventSummary and REPLACE captureQuestions
+    // as long as the parent hasn't answered any of them.
     const current = await tx.book.findUnique({
       where: { id: bookId },
-      select: { eventSummary: true, captureQuestions: true, title: true },
+      select: { eventSummary: true, captureQuestions: true, title: true, status: true },
     });
+
+    const isDraftRefresh = refresh && current?.status === 'DRAFT';
+    const existingQuestions = (current?.captureQuestions as { answer?: string | null }[] | null) ?? [];
+    const hasAnswers = existingQuestions.some(q => q.answer && q.answer.trim());
 
     await tx.book.update({
       where: { id: bookId },
@@ -142,10 +156,12 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
           sceneContext: analysis.sceneContext,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any, // Prisma Json column (same cast the extraction worker uses)
-        ...(current?.eventSummary ? {} : { eventSummary: analysis.eventSummary }),
-        ...(current?.captureQuestions
-          ? {}
-          : { captureQuestions: analysis.captureQuestions.map(q => ({ ...q, answer: null })) }),
+        ...(!current?.eventSummary || isDraftRefresh
+          ? { eventSummary: analysis.eventSummary }
+          : {}),
+        ...(!current?.captureQuestions || (isDraftRefresh && !hasAnswers)
+          ? { captureQuestions: analysis.captureQuestions.map(q => ({ ...q, answer: null })) }
+          : {}),
         ...(current?.title?.trim()
           ? {}
           : { title: analysis.suggestedTitle.trim().slice(0, 100) }),
