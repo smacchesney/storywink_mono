@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React from 'react';
 import { useTranslations } from 'next-intl';
@@ -9,7 +9,9 @@ import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import PhotoStrip, { StripPhoto } from '@/components/create/setup/PhotoStrip';
 import ArtStyleStrip from '@/components/create/setup/ArtStyleStrip';
-import CaptureChips, { CaptureQuestion } from '@/components/create/setup/CaptureChips';
+import CaptureChips, {
+  CaptureQuestion,
+} from '@/components/create/setup/CaptureChips';
 
 export interface SetupFormState {
   childName: string;
@@ -29,8 +31,15 @@ interface SetupSheetProps {
   hasEventSummary: boolean;
   isSubmitting: boolean;
   showNameError: boolean;
+  /** Book id — enables the inline add/remove affordances in the photo strip. */
+  bookId?: string;
   onReorder: (photos: StripPhoto[]) => void;
-  onChange: <K extends keyof SetupFormState>(key: K, value: SetupFormState[K]) => void;
+  /** Refetch trigger after photos are added/removed inline. */
+  onPhotosChanged?: () => void | Promise<void>;
+  onChange: <K extends keyof SetupFormState>(
+    key: K,
+    value: SetupFormState[K],
+  ) => void;
   onSubmit: () => void;
 }
 
@@ -47,7 +56,9 @@ export function SetupSheet({
   hasEventSummary,
   isSubmitting,
   showNameError,
+  bookId,
   onReorder,
+  onPhotosChanged,
   onChange,
   onSubmit,
 }: SetupSheetProps) {
@@ -57,13 +68,23 @@ export function SetupSheet({
     <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 pb-28 pt-4">
       {/* Photos */}
       <section className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-gray-600">{t('photosLabel')}</label>
-        <PhotoStrip photos={photos} onReorder={onReorder} />
+        <label className="text-sm font-medium text-gray-600">
+          {t('photosLabel')}
+        </label>
+        <PhotoStrip
+          photos={photos}
+          onReorder={onReorder}
+          bookId={bookId}
+          onPhotosChanged={onPhotosChanged}
+        />
       </section>
 
       {/* Child name — the one required field */}
       <section className="flex flex-col gap-1.5">
-        <label htmlFor="childName" className="text-sm font-medium text-gray-600">
+        <label
+          htmlFor="childName"
+          className="text-sm font-medium text-gray-600"
+        >
           {t('childNameLabel')}
         </label>
         <Input
@@ -74,7 +95,7 @@ export function SetupSheet({
           maxLength={50}
           className={cn(
             'font-playful text-base',
-            showNameError && 'border-[#F76C5E] focus-visible:ring-[#F76C5E]'
+            showNameError && 'border-[#F76C5E] focus-visible:ring-[#F76C5E]',
           )}
         />
         {showNameError && (
@@ -99,7 +120,9 @@ export function SetupSheet({
           {titlePending && !form.title && (
             <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center gap-2 text-gray-400">
               <Sparkles className="h-3.5 w-3.5 animate-pulse text-[#F76C5E]" />
-              <span className="animate-pulse font-playful text-sm">{t('titleThinking')}</span>
+              <span className="animate-pulse font-playful text-sm">
+                {t('titleThinking')}
+              </span>
             </div>
           )}
         </div>
@@ -108,7 +131,10 @@ export function SetupSheet({
       {/* Story brief — the experience-capture centerpiece */}
       {hasEventSummary && (
         <section className="flex flex-col gap-1.5">
-          <label htmlFor="eventSummary" className="text-sm font-medium text-gray-600">
+          <label
+            htmlFor="eventSummary"
+            className="text-sm font-medium text-gray-600"
+          >
             {t('whatWeSee')}
           </label>
           <textarea
@@ -134,8 +160,13 @@ export function SetupSheet({
 
       {/* Art style */}
       <section className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-gray-600">{t('artStyleLabel')}</label>
-        <ArtStyleStrip value={form.artStyle} onChange={(s) => onChange('artStyle', s)} />
+        <label className="text-sm font-medium text-gray-600">
+          {t('artStyleLabel')}
+        </label>
+        <ArtStyleStrip
+          value={form.artStyle}
+          onChange={(s) => onChange('artStyle', s)}
+        />
       </section>
 
       {/* Review-first toggle — quiet / tertiary */}

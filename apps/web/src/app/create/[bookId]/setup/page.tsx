@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -9,7 +9,9 @@ import { Loader2 } from 'lucide-react';
 import { BookStatus } from '@prisma/client';
 import { isValidStyle, StyleKey } from '@storywink/shared/prompts/styles';
 import { apiClient } from '@/lib/api-client';
-import SetupSheet, { SetupFormState } from '@/components/create/setup/SetupSheet';
+import SetupSheet, {
+  SetupFormState,
+} from '@/components/create/setup/SetupSheet';
 import type { StripPhoto } from '@/components/create/setup/PhotoStrip';
 import type { CaptureQuestion } from '@/components/create/setup/CaptureChips';
 import GenerationProgress from '@/components/create/GenerationProgress';
@@ -23,7 +25,11 @@ interface BookPage {
   index: number;
   pageNumber: number;
   assetId: string | null;
-  asset?: { id: string; url: string | null; thumbnailUrl: string | null } | null;
+  asset?: {
+    id: string;
+    url: string | null;
+    thumbnailUrl: string | null;
+  } | null;
 }
 
 interface BookData {
@@ -62,15 +68,22 @@ export default function SetupPage() {
   });
 
   // Track which fields the parent has edited so perception never clobbers them.
-  const touched = useRef({ childName: false, title: false, eventSummary: false, captureQuestions: false });
+  const touched = useRef({
+    childName: false,
+    title: false,
+    eventSummary: false,
+    captureQuestions: false,
+  });
   const isMountedRef = useRef(true);
 
   // Perception is non-fatal by design — when the poll gives up without a
   // title, the shimmer must settle into a normal placeholder, not spin forever.
   const [perceptionSettled, setPerceptionSettled] = useState(false);
 
-  const titlePending = !form.title && !touched.current.title && !perceptionSettled;
-  const hasEventSummary = form.eventSummary.trim().length > 0 || touched.current.eventSummary;
+  const titlePending =
+    !form.title && !touched.current.title && !perceptionSettled;
+  const hasEventSummary =
+    form.eventSummary.trim().length > 0 || touched.current.eventSummary;
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -88,14 +101,16 @@ export default function SetupPage() {
           id: p.id,
           thumbnailUrl: p.asset?.thumbnailUrl ?? null,
           url: p.asset?.url ?? null,
-        }))
+        })),
     );
 
     setForm((prev) => {
       const next = { ...prev };
       if (!touched.current.title && book.title?.trim()) next.title = book.title;
-      if (!touched.current.childName && book.childName) next.childName = book.childName;
-      if (!touched.current.eventSummary && book.eventSummary) next.eventSummary = book.eventSummary;
+      if (!touched.current.childName && book.childName)
+        next.childName = book.childName;
+      if (!touched.current.eventSummary && book.eventSummary)
+        next.eventSummary = book.eventSummary;
       if (!touched.current.captureQuestions && book.captureQuestions?.length) {
         next.captureQuestions = book.captureQuestions;
       }
@@ -117,7 +132,10 @@ export default function SetupPage() {
         if (cancelled || !isMountedRef.current) return;
 
         // In-flight or finished books shouldn't sit on setup.
-        if (book.status === BookStatus.GENERATING || book.status === BookStatus.ILLUSTRATING) {
+        if (
+          book.status === BookStatus.GENERATING ||
+          book.status === BookStatus.ILLUSTRATING
+        ) {
           setGenerating(true);
           setIsLoading(false);
           return;
@@ -141,10 +159,16 @@ export default function SetupPage() {
           const token = await getToken();
           if (token && !cancelled && isMountedRef.current) {
             const booksRes = await apiClient.getBooks(token);
-            const list = (booksRes?.data as Array<{ id: string; childName: string | null }> | undefined) ?? [];
+            const list =
+              (booksRes?.data as
+                | Array<{ id: string; childName: string | null }>
+                | undefined) ?? [];
             const recent = list.find((b) => b.id !== bookId && b.childName);
             if (recent?.childName && !touched.current.childName) {
-              setForm((prev) => ({ ...prev, childName: recent.childName as string }));
+              setForm((prev) => ({
+                ...prev,
+                childName: recent.childName as string,
+              }));
             }
           }
         }
@@ -168,7 +192,8 @@ export default function SetupPage() {
     if (isLoading || generating) return;
     const needsTitle = !touched.current.title && !form.title;
     const needsSummary = !touched.current.eventSummary && !form.eventSummary;
-    const needsQuestions = !touched.current.captureQuestions && form.captureQuestions.length === 0;
+    const needsQuestions =
+      !touched.current.captureQuestions && form.captureQuestions.length === 0;
     if (!needsTitle && !needsSummary && !needsQuestions) return;
 
     let polls = 0;
@@ -210,8 +235,23 @@ export default function SetupPage() {
       if (key === 'childName') setShowNameError(false);
       setForm((prev) => ({ ...prev, [key]: value }));
     },
-    []
+    [],
   );
+
+  // Refetch the book after photos are added/removed inline in the strip. Reuses
+  // mergeBook, which respects parent edits (touched fields) and re-derives the
+  // photo strip from the fresh page set.
+  const refetchBook = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/book/${bookId}`);
+      if (!res.ok || !isMountedRef.current) return;
+      const book: BookData = await res.json();
+      if (!isMountedRef.current) return;
+      mergeBook(book);
+    } catch {
+      // Non-fatal — the strip keeps its optimistic state until the next fetch.
+    }
+  }, [bookId, mergeBook]);
 
   const handleReorder = useCallback(
     async (next: StripPhoto[]) => {
@@ -229,7 +269,7 @@ export default function SetupPage() {
         toast.error(t('reorderError'));
       }
     },
-    [bookId, t]
+    [bookId, t],
   );
 
   const handleSubmit = useCallback(async () => {
@@ -246,8 +286,10 @@ export default function SetupPage() {
         autoIllustrate: !form.reviewFirst,
       };
       if (form.title.trim()) patchBody.title = form.title.trim();
-      if (form.eventSummary.trim()) patchBody.eventSummary = form.eventSummary.trim();
-      if (form.captureQuestions.length > 0) patchBody.captureQuestions = form.captureQuestions;
+      if (form.eventSummary.trim())
+        patchBody.eventSummary = form.eventSummary.trim();
+      if (form.captureQuestions.length > 0)
+        patchBody.captureQuestions = form.captureQuestions;
 
       const patchRes = await fetch(`/api/book/${bookId}`, {
         method: 'PATCH',
@@ -279,7 +321,9 @@ export default function SetupPage() {
   }, [bookId, form, isSubmitting, t]);
 
   if (generating) {
-    return <GenerationProgress bookId={bookId} reviewFirst={form.reviewFirst} />;
+    return (
+      <GenerationProgress bookId={bookId} reviewFirst={form.reviewFirst} />
+    );
   }
 
   if (isLoading) {
@@ -312,7 +356,9 @@ export default function SetupPage() {
       hasEventSummary={hasEventSummary}
       isSubmitting={isSubmitting}
       showNameError={showNameError}
+      bookId={bookId}
       onReorder={handleReorder}
+      onPhotosChanged={refetchBook}
       onChange={handleChange}
       onSubmit={handleSubmit}
     />

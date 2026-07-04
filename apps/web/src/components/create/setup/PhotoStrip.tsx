@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import {
   DndContext,
@@ -21,7 +21,14 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useTranslations } from 'next-intl';
-import { optimizeCloudinaryUrl } from '@storywink/shared';
+import { useAuth } from '@clerk/nextjs';
+import { toast } from 'sonner';
+import { ImagePlus, Loader2, X } from 'lucide-react';
+import { optimizeCloudinaryUrl, BOOK_CONSTRAINTS } from '@storywink/shared';
+import { makeFileKey, uploadPhotos, validateFile } from '@/lib/uploadPhotos';
+import logger from '@/lib/logger';
+
+const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif';
 
 export interface StripPhoto {
   id: string;
@@ -33,19 +40,43 @@ interface PhotoStripProps {
   photos: StripPhoto[];
   /** Fires with the reordered array (in new page order) after a drag. */
   onReorder: (photos: StripPhoto[]) => void;
+  /**
+   * When present, enables the inline "+" tile (uploads append pages to this
+   * book) and the ✕ remove button (calls the page DELETE endpoint).
+   */
+  bookId?: string;
+  /**
+   * Called after photos have been uploaded+appended, or after a page has been
+   * removed, so the parent can refetch the book (which re-derives the strip).
+   */
+  onPhotosChanged?: () => void | Promise<void>;
 }
 
 function SortableThumb({
   photo,
   isCover,
   coverLabel,
+  removable,
+  removing,
+  onRemove,
+  removeLabel,
 }: {
   photo: StripPhoto;
   isCover: boolean;
   coverLabel: string;
+  removable: boolean;
+  removing: boolean;
+  onRemove: () => void;
+  removeLabel: string;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: photo.id });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: photo.id });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -60,36 +91,98 @@ function SortableThumb({
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      className="relative shrink-0 h-16 w-16 rounded-xl overflow-hidden border border-black/5 shadow-sm cursor-grab active:cursor-grabbing bg-gray-100"
+      className="relative shrink-0 h-16 w-16 rounded-xl overflow-hidden border border-black/5 shadow-sm bg-gray-100"
     >
-      {src ? (
-        <Image
-          src={optimizeCloudinaryUrl(src)}
-          alt=""
-          fill
-          sizes="64px"
-          className="object-cover pointer-events-none"
-        />
-      ) : null}
+      {/* Drag surface — separated from the ✕ so removing doesn't start a drag. */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="absolute inset-0 cursor-grab active:cursor-grabbing"
+      >
+        {src ? (
+          <Image
+            src={optimizeCloudinaryUrl(src)}
+            alt=""
+            fill
+            sizes="64px"
+            className="object-cover pointer-events-none"
+          />
+        ) : null}
+      </div>
+
       {isCover && (
-        <span className="absolute bottom-0 inset-x-0 bg-[#F76C5E] text-white text-[9px] leading-tight font-playful text-center py-0.5">
+        <span className="absolute bottom-0 inset-x-0 bg-[#F76C5E] text-white text-[9px] leading-tight font-playful text-center py-0.5 pointer-events-none">
           {coverLabel}
         </span>
+      )}
+
+      {/* Remove (✕) — hidden on the cover (cover can't be deleted). */}
+      {removable && !isCover && (
+        <button
+          type="button"
+          onClick={onRemove}
+          disabled={removing}
+          aria-label={removeLabel}
+          className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/75 disabled:opacity-60"
+        >
+          {removing ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <X className="h-3 w-3" strokeWidth={2.5} />
+          )}
+        </button>
       )}
     </div>
   );
 }
 
+/** The always-present "+" tile that opens the OS picker inline. */
+function AddTile({
+  onClick,
+  busy,
+  label,
+}: {
+  onClick: () => void;
+  busy: boolean;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      aria-label={label}
+      className="group flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-[#F76C5E]/40 bg-[#F76C5E]/[0.04] transition-colors hover:border-[#F76C5E] hover:bg-[#F76C5E]/[0.08] disabled:opacity-60"
+    >
+      {busy ? (
+        <Loader2 className="h-5 w-5 animate-spin text-[#F76C5E]" />
+      ) : (
+        <ImagePlus className="h-5 w-5 text-[#F76C5E] transition-transform group-hover:scale-110" />
+      )}
+    </button>
+  );
+}
+
 /**
  * A compact, drag-to-reorder horizontal strip of page thumbnails. The first
- * photo is the cover. Reordering commits immediately via onReorder (which the
- * setup page maps to POST /reorder).
+ * photo is the cover. Reordering commits immediately via onReorder. When a
+ * bookId is supplied, a "+" tile appends photos (uploaded straight to the book,
+ * which auto-refreshes perception) and each non-cover thumbnail gets an ✕ that
+ * calls the page DELETE endpoint (respecting the cover + min-2 guards).
  */
-export function PhotoStrip({ photos, onReorder }: PhotoStripProps) {
+export function PhotoStrip({
+  photos,
+  onReorder,
+  bookId,
+  onPhotosChanged,
+}: PhotoStripProps) {
   const t = useTranslations('setup');
+  const tUpload = useTranslations('upload');
+  const { getToken } = useAuth();
   const [items, setItems] = useState<StripPhoto[]>(photos);
+  const [uploading, setUploading] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setItems(photos);
@@ -97,8 +190,12 @@ export function PhotoStrip({ photos, onReorder }: PhotoStripProps) {
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 150, tolerance: 8 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -112,9 +209,95 @@ export function PhotoStrip({ photos, onReorder }: PhotoStripProps) {
     onReorder(next);
   };
 
+  const remaining = Math.max(0, BOOK_CONSTRAINTS.MAX_PHOTOS - items.length);
+  const canAdd = !!bookId && remaining > 0;
+
+  const openPicker = useCallback(() => inputRef.current?.click(), []);
+
+  const onInputChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const fileList = e.target.files;
+      e.target.value = ''; // Allow re-picking the same file.
+      if (!bookId || !fileList || fileList.length === 0) return;
+
+      // Respect the cap and pre-validate. One bad file never sinks the batch.
+      const picked = Array.from(fileList).slice(0, remaining);
+      const valid = picked.filter((f) => {
+        try {
+          validateFile(f);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+      const rejected = picked.length - valid.length;
+      if (rejected > 0)
+        toast.error(tUpload('errorWrongTypeSome', { count: rejected }));
+      if (fileList.length > remaining)
+        toast.error(
+          tUpload('errorCapReached', { max: BOOK_CONSTRAINTS.MAX_PHOTOS }),
+        );
+      if (valid.length === 0) return;
+
+      setUploading(true);
+      try {
+        const assets = await uploadPhotos(
+          valid.map((file) => ({ key: makeFileKey(), file })),
+          { bookId, getToken },
+        );
+        if (assets.length < valid.length) {
+          toast.error(
+            tUpload('errorSomeFailed', { count: valid.length - assets.length }),
+          );
+        }
+        await onPhotosChanged?.();
+      } catch (err) {
+        logger.error({ err }, 'PhotoStrip inline upload failed');
+        toast.error(tUpload('errorGeneric'));
+      } finally {
+        setUploading(false);
+      }
+    },
+    [bookId, remaining, getToken, onPhotosChanged, tUpload],
+  );
+
+  const handleRemove = useCallback(
+    async (photo: StripPhoto) => {
+      if (!bookId) return;
+      setRemovingId(photo.id);
+      try {
+        const token = await getToken();
+        const res = await fetch(`/api/book/${bookId}/page/${photo.id}`, {
+          method: 'DELETE',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          // Surface the server's guard message (cover / min-2) as a toast.
+          throw new Error(body.error || tUpload('errorGeneric'));
+        }
+        await onPhotosChanged?.();
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : tUpload('errorGeneric'),
+        );
+      } finally {
+        setRemovingId(null);
+      }
+    },
+    [bookId, getToken, onPhotosChanged, tUpload],
+  );
+
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <SortableContext items={items.map((p) => p.id)} strategy={horizontalListSortingStrategy}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <SortableContext
+        items={items.map((p) => p.id)}
+        strategy={horizontalListSortingStrategy}
+      >
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
           {items.map((photo, idx) => (
             <SortableThumb
@@ -122,10 +305,35 @@ export function PhotoStrip({ photos, onReorder }: PhotoStripProps) {
               photo={photo}
               isCover={idx === 0}
               coverLabel={t('coverBadge')}
+              removable={!!bookId}
+              removing={removingId === photo.id}
+              onRemove={() => void handleRemove(photo)}
+              removeLabel={tUpload('remove')}
             />
           ))}
+
+          {canAdd && (
+            <AddTile
+              onClick={openPicker}
+              busy={uploading}
+              label={tUpload('addPhotos')}
+            />
+          )}
         </div>
       </SortableContext>
+
+      {bookId && (
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          accept={ACCEPT}
+          onChange={onInputChange}
+          className="sr-only"
+          aria-hidden="true"
+          tabIndex={-1}
+        />
+      )}
     </DndContext>
   );
 }
