@@ -73,6 +73,7 @@ import { processIllustrationGeneration } from './workers/illustration-generation
 import { processBookFinalize } from './workers/book-finalize.worker.js';
 import { processPrintFulfillment } from './workers/print-fulfillment.worker.js';
 import { processCharacterExtraction } from './workers/character-extraction.worker.js';
+import { processPhotoAnalysis } from './workers/photo-analysis.worker.js';
 import { getIllustrator } from './lib/illustrators/index.js';
 
 // CRITICAL: Pre-load and validate STYLE_LIBRARY before processing any jobs
@@ -218,6 +219,16 @@ const characterExtractionWorker = new Worker(
   {
     connection: redis,
     concurrency: CHARACTER_EXTRACTION_CONCURRENCY,
+    lockDuration: 300000, // 5 minutes for multi-image vision analysis
+  }
+);
+
+const photoAnalysisWorker = new Worker(
+  QUEUE_NAMES.PHOTO_ANALYSIS,
+  processPhotoAnalysis,
+  {
+    connection: redis,
+    concurrency: parseInt(process.env.PHOTO_ANALYSIS_CONCURRENCY || '2', 10),
     lockDuration: 300000, // 5 minutes for multi-image vision analysis
   }
 );
@@ -448,17 +459,33 @@ characterExtractionWorker.on('failed', (job, err) => {
   console.error('='.repeat(80));
 });
 
+// Photo Analysis Worker event handlers
+photoAnalysisWorker.on('completed', (job) => {
+  logger.info({ jobId: job.id, bookId: job.data.bookId }, 'Photo perception pass completed');
+});
+
+photoAnalysisWorker.on('failed', (job, err) => {
+  // Non-fatal for the book: story generation degrades gracefully without analysis.
+  logger.error({
+    jobId: job?.id,
+    bookId: job?.data?.bookId,
+    error: err.message,
+    attempts: job?.attemptsMade,
+  }, 'Photo perception pass failed');
+});
+
 // Graceful shutdown
 const shutdown = async () => {
   logger.info('Shutting down workers...');
-  
+
   await storyWorker.close();
   await illustrationWorker.close();
   await finalizeWorker.close();
   await printFulfillmentWorker.close();
   await characterExtractionWorker.close();
+  await photoAnalysisWorker.close();
   await redis.quit();
-  
+
   process.exit(0);
 };
 

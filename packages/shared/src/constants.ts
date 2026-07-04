@@ -19,6 +19,7 @@ export const QUEUE_NAMES = {
   BOOK_FINALIZE: 'book-finalize',
   PRINT_FULFILLMENT: 'print-fulfillment',
   CHARACTER_EXTRACTION: 'character-extraction',
+  PHOTO_ANALYSIS: 'photo-analysis',
 } as const;
 
 // Book constraints

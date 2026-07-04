@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
 import { BookStatus, PageType } from '@prisma/client';
+import { QueueName, getQueue } from '@/lib/queue/index';
 
 // Zod schema for request body validation
 const createBookSchema = z.object({
@@ -105,7 +106,26 @@ export async function POST(req: NextRequest) {
     });
 
     console.log(`>>> DEBUG: Book creation successful! Book ID: ${newBook.id}`);
-    return NextResponse.json({ 
+
+    // Kick off the photo perception pass immediately so the story brief,
+    // capture questions, and character identity are ready by the time the
+    // parent reaches the setup sheet. Failure here never blocks creation.
+    try {
+      await getQueue(QueueName.PhotoAnalysis).add(
+        `analyze-photos-${newBook.id}`,
+        { bookId: newBook.id, userId: dbUser.id },
+        {
+          attempts: 2,
+          backoff: { type: 'exponential', delay: 5000 },
+          removeOnComplete: { count: 100 },
+          removeOnFail: { count: 500 },
+        }
+      );
+    } catch (queueError) {
+      logger.error({ bookId: newBook.id, error: queueError }, 'API: Failed to enqueue photo analysis (non-fatal).');
+    }
+
+    return NextResponse.json({
       success: true,
       data: { id: newBook.id, bookId: newBook.id }
     }, { status: 201 }); // 201 Created

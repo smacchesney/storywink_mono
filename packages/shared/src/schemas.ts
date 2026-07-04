@@ -30,6 +30,19 @@ export const updateBookSchema = z.object({
   additionalCharacters: z.array(additionalCharacterSchema).max(5, 'Maximum 5 characters').optional(),
   tone: z.enum(STORY_MOODS).nullable().optional(),
   theme: z.string().max(100).nullable().optional(),
+  eventSummary: z.string().max(500).nullable().optional(),
+  captureQuestions: z
+    .array(
+      z.object({
+        id: z.string(),
+        question: z.string(),
+        options: z.array(z.string()),
+        answer: z.string().nullable().optional(),
+      }),
+    )
+    .max(5)
+    .optional(),
+  autoIllustrate: z.boolean().optional(),
 });
 
 export const updatePageSchema = z.object({

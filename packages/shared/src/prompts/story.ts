@@ -84,11 +84,25 @@ export interface StoryGenerationInput {
   language?: string; // "en" | "ja", defaults to "en"
   suggestTitle?: boolean; // True when the current title is a placeholder — the model's suggestedTitle will be used
   qcFeedback?: string; // Editorial corrections from a failed story-QC round, injected on regeneration
+  eventSummary?: string; // Parent-confirmed "what actually happened" brief. When present it REPLACES theme in the prompt.
+  confirmedFacts?: string[]; // Parent's tapped answers to photo-derived questions ("This was Emma's first beach trip")
+  charactersInPhotos?: {
+    name: string;
+    role: string;
+    appearsOnPages: number[];
+  }[]; // From the perception pass — who actually appears where
   storyPages: {
     pageId: string;
     pageNumber: number;
     assetId: string | null;
     originalImageUrl: string | null;
+    analysis?: {
+      setting: string;
+      action: string;
+      emotion: string;
+      eventSignals: string[];
+      narrativeRole: string;
+    } | null; // Perception-pass output for this photo, when fresh
   }[];
 }
 
@@ -137,6 +151,14 @@ export function createStoryGenerationPrompt(
         text: `[No Image Provided for Page ${page.pageNumber}]`,
       });
     }
+    if (page.analysis) {
+      const signals = page.analysis.eventSignals?.length
+        ? ` Signals: ${page.analysis.eventSignals.join(', ')}.`
+        : '';
+      parts.push({
+        text: `WHAT'S HERE (raw notes, NOT the story): ${page.analysis.setting}; ${page.analysis.action}; ${page.analysis.emotion}.${signals} ARC ROLE: ${page.analysis.narrativeRole}.`,
+      });
+    }
   });
   parts.push({ text: '--- End Storyboard ---' });
 
@@ -156,6 +178,19 @@ export function createStoryGenerationPrompt(
     characterInstruction = `  - Use descriptive terms like "the child", "the little one", etc.`;
   }
 
+  // Supporting-cast weaving: the perception pass knows who appears on which
+  // pages, so recurring family members get real roles instead of cameos.
+  if (input.charactersInPhotos?.length) {
+    const supporting = input.charactersInPhotos.filter(c => c.role !== 'main_child' && c.appearsOnPages.length > 0);
+    if (supporting.length > 0) {
+      characterInstruction += `\n  - SUPPORTING CAST (from the actual photos — weave them in, don't just mention them):`;
+      for (const c of supporting) {
+        characterInstruction += `\n    - ${c.name} (${c.role.replace(/_/g, ' ')}) appears on page(s) ${c.appearsOnPages.join(', ')}. Give them a real supporting role in the story: introduce them naturally when they first appear, involve them in at least one emotional beat (a shared laugh, a steadying hand, a discovery together), and if they are present near the end, include them in the landing.`;
+      }
+      characterInstruction += `\n    - Never invent appearances: a character speaks or acts on a page ONLY if they are actually on that page (or plausibly just off-frame on an adjacent one).`;
+    }
+  }
+
   const baseInstructions = [
     `# Instructions & Guiding Principles:`,
     `- Imagine a parent curled up with their toddler at bedtime, reading aloud. Every sentence should feel warm, playful, and alive in a parent's voice.`,
@@ -172,6 +207,12 @@ export function createStoryGenerationPrompt(
     `- **BUILDING** (middle ~60%): The desire meets the world. Each page should ESCALATE — new discoveries, small obstacles, mounting excitement or tenderness. This is where the refrain repeats and evolves.`,
     `- **LANDING** (final ~20%): The emotional peak resolves into warmth and safety. The last page should feel like a soft exhale — a sentence a parent lingers on before closing the book.`,
     `- NEVER end with "What a wonderful day" or similar summary statements. Let the accumulated feeling speak for itself.`,
+    `- Where pages carry an ARC ROLE note, use it: "opening" pages plant the desire, "rising" pages escalate, a "peak" page carries the emotional high point, "quiet" pages are a breath of tenderness, "closing" pages land the story. The roles are suggestions from the photos — honor their shape even while you interpret freely.`,
+    ``,
+    `## PAGE-TO-PAGE FLOW (critical — photos alone rarely tell a story):`,
+    `- **Connective device**: If the photos read as a montage of separate moments rather than one continuous event, choose ONE thread and pull every page through it: a wondering question the child carries ("will the waves say hello back?"), a tiny quest, something the child is collecting or counting, or the refrain itself acting as a heartbeat. Never let pages sit side by side unconnected.`,
+    `- **Hand-off rule**: Every page except the last must END with something that leans into the next page — a sound getting closer, a glance toward something new, a question, a "and then...?" energy. The listener should NEED the page turn.`,
+    `- **Callbacks**: In the LANDING, echo one concrete detail from the OPENING (an object, a sound, the refrain in its softest form). This is what makes a story feel whole instead of a list of moments.`,
     ``,
     `## Recurring Refrain (REQUIRED):`,
     `- Create a short phrase (4-8 words) that echoes through the story at least 3 times.`,
@@ -214,7 +255,17 @@ export function createStoryGenerationPrompt(
       `- Write this story with a **"${input.tone}"** feel throughout. Let this mood guide word choice, pacing, and energy level.`,
       ``,
     ] : []),
-    ...(input.theme ? [
+    // Exactly ONE experience-context block reaches the prompt: the confirmed
+    // eventSummary supersedes the legacy free-text theme when present.
+    ...(input.eventSummary ? [
+      `## What actually happened (confirmed by the parent — this is the heart of the story):`,
+      `- "${input.eventSummary}"`,
+      ...(input.confirmedFacts?.length
+        ? input.confirmedFacts.map(f => `- Parent confirmed: ${f}`)
+        : []),
+      `- The story must feel TRUE to this. It should inform the desire, the peak, and the landing — not appear as a one-line mention.`,
+      ``,
+    ] : input.theme ? [
       `## Story Context:`,
       `- The parent described this story as: **"${input.theme}"**. Weave this context into the narrative — it should inform the story arc, not just be mentioned once.`,
       ``,

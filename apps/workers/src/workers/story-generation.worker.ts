@@ -231,6 +231,35 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       }
     }
 
+    // Perception-pass context (all optional — the pipeline degrades to
+    // photos-only behavior when the analysis job failed or is stale).
+    interface StoredPageAnalysis {
+      assetId?: string | null;
+      setting: string;
+      action: string;
+      emotion: string;
+      eventSignals: string[];
+      narrativeRole: string;
+    }
+
+    const captureQuestions = (book.captureQuestions as
+      | { question: string; answer?: string | null }[]
+      | null) ?? [];
+    const confirmedFacts = captureQuestions
+      .filter(q => q.answer && q.answer.trim())
+      .map(q => `${q.question} → ${q.answer}`);
+
+    const identity = book.characterIdentity as
+      | { characters?: { characterId: string; role: string; name: string | null; appearsOnPages: number[] }[] }
+      | null;
+    const charactersInPhotos = identity?.characters
+      ?.map(c => ({
+        name: c.name || c.role.replace(/_/g, ' '),
+        role: c.role,
+        appearsOnPages: c.appearsOnPages || [],
+      }))
+      .filter(c => c.appearsOnPages.length > 0);
+
     // Prepare story generation input using advanced prompt structure
     const storyInput: StoryGenerationInput = {
       bookTitle: book.title || 'My Special Story',
@@ -240,13 +269,31 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       additionalCharacters: additionalCharacters.length > 0 ? additionalCharacters : undefined,
       tone: book.tone || undefined,
       theme: book.theme || undefined,
+      eventSummary: book.eventSummary || undefined,
+      confirmedFacts: confirmedFacts.length > 0 ? confirmedFacts : undefined,
+      charactersInPhotos: charactersInPhotos?.length ? charactersInPhotos : undefined,
       language: book.language || 'en',
-      storyPages: storyPages.map((page, index) => ({
-        pageId: page.id,
-        pageNumber: index + 1, // 1-based numbering for story pages
-        assetId: page.assetId,
-        originalImageUrl: page.asset?.url || page.asset?.thumbnailUrl || null
-      })),
+      suggestTitle: job.data.titleWasGenerated === true,
+      storyPages: storyPages.map((page, index) => {
+        const analysis = page.analysis as StoredPageAnalysis | null;
+        // Stale analysis (photo was swapped since the perception pass) is dropped.
+        const fresh = analysis && analysis.assetId === page.assetId ? analysis : null;
+        return {
+          pageId: page.id,
+          pageNumber: index + 1, // 1-based numbering for story pages
+          assetId: page.assetId,
+          originalImageUrl: page.asset?.url || page.asset?.thumbnailUrl || null,
+          analysis: fresh
+            ? {
+                setting: fresh.setting,
+                action: fresh.action,
+                emotion: fresh.emotion,
+                eventSignals: fresh.eventSignals || [],
+                narrativeRole: fresh.narrativeRole,
+              }
+            : null,
+        };
+      }),
     };
 
     const jobStartedAt = Date.now();

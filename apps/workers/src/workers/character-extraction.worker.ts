@@ -39,6 +39,28 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
     // 2. Get all pages (including cover page)
     const storyPages = book.pages;
 
+    // Skip the vision call when the perception pass already produced a fresh
+    // identity: characterIdentity exists AND every page's stored analysis was
+    // stamped with its current assetId (i.e. no photo has been swapped since).
+    const existingIdentity = book.characterIdentity as CharacterIdentity | null;
+    const identityIsFresh =
+      !!existingIdentity?.characters?.length &&
+      storyPages.length > 0 &&
+      storyPages.every(p => {
+        const analysis = p.analysis as { assetId?: string | null } | null;
+        return analysis && analysis.assetId === p.assetId;
+      });
+
+    if (identityIsFresh) {
+      logger.info(
+        { bookId, characterCount: existingIdentity!.characters.length },
+        'Reusing fresh character identity from perception pass — skipping extraction vision call',
+      );
+      characterIdentity = existingIdentity;
+      await createIllustrationFlow(bookId, userId, characterIdentity, pageIds);
+      return { success: true, characterCount: characterIdentity!.characters.length, reused: true };
+    }
+
     // 3. Parse additional characters
     let additionalCharacters: { name: string; relationship: string }[] | null = null;
     if (book.additionalCharacters) {
