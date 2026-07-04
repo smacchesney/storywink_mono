@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isTitlePage, categorizePages, calculatePrintedPageCount } from './utils.js';
+import { isTitlePage, categorizePages, calculatePrintedPageCount, convertHeicToJpeg } from './utils.js';
 
 describe('isTitlePage', () => {
   it('is true when the page asset matches the cover asset', () => {
@@ -71,5 +71,34 @@ describe('calculatePrintedPageCount', () => {
     expect(calculatePrintedPageCount(1, { padToMultipleOf4: true })).toBe(4);
     // N=3 -> raw 8 -> already a multiple of 4
     expect(calculatePrintedPageCount(3, { padToMultipleOf4: true })).toBe(8);
+  });
+});
+
+describe('convertHeicToJpeg', () => {
+  const base = 'https://res.cloudinary.com/storywink/image/upload/v1/user_x/photo';
+
+  it('rewrites .heic URLs with an f_jpg transform', () => {
+    expect(convertHeicToJpeg(`${base}.heic`)).toBe(
+      'https://res.cloudinary.com/storywink/image/upload/f_jpg,fl_force_strip/v1/user_x/photo.heic'
+    );
+  });
+
+  it('rewrites .heif URLs with an f_jpg transform', () => {
+    expect(convertHeicToJpeg(`${base}.heif`)).toBe(
+      'https://res.cloudinary.com/storywink/image/upload/f_jpg,fl_force_strip/v1/user_x/photo.heif'
+    );
+  });
+
+  it('is case-insensitive on the extension', () => {
+    expect(convertHeicToJpeg(`${base}.HEIC`)).toContain('f_jpg,fl_force_strip');
+  });
+
+  it('passes non-HEIC URLs through unchanged', () => {
+    expect(convertHeicToJpeg(`${base}.jpg`)).toBe(`${base}.jpg`);
+  });
+
+  it('returns an empty string for null/undefined', () => {
+    expect(convertHeicToJpeg(null)).toBe('');
+    expect(convertHeicToJpeg(undefined)).toBe('');
   });
 });

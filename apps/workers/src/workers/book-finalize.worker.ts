@@ -1,4 +1,5 @@
 import { Job, FlowProducer } from 'bullmq';
+import * as Sentry from '@sentry/node';
 import prisma from '../database/index.js';
 import { BookFinalizeJob, CharacterIdentity, BookQCResult } from '@storywink/shared/types';
 import { QUEUE_NAMES } from '@storywink/shared/constants';
@@ -428,6 +429,10 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
 
   } catch (error: any) {
     logger.error({ bookId, error: error.message, qcRound }, 'Book finalization failed');
+    Sentry.captureException(error, {
+      tags: { worker: 'book-finalize', jobId: job.id },
+      extra: { bookId, qcRound },
+    });
 
     // Update book status to failed
     await prisma.book.update({

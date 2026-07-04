@@ -3,6 +3,7 @@ import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
 import { PageType } from '@prisma/client';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
+import { convertHeicToJpeg } from '@storywink/shared/utils';
 
 // This endpoint is called after successful Cloudinary uploads to create database records
 export async function POST(request: NextRequest) {
@@ -37,15 +38,28 @@ export async function POST(request: NextRequest) {
     // Create database records for each uploaded asset
     for (const asset of assets) {
       try {
+        // iPhones shoot HEIC by default. Cloudinary stores the original but can
+        // transcode on delivery, so we persist JPEG-deliverable URLs. Vision
+        // APIs and <img> tags can't render HEIC directly; convertHeicToJpeg
+        // rewrites .heic URLs with an f_jpg transform and passes others through.
+        const isHeic =
+          asset.format?.toLowerCase() === 'heic' ||
+          asset.format?.toLowerCase() === 'heif' ||
+          asset.url?.toLowerCase().includes('.heic') ||
+          asset.url?.toLowerCase().includes('.heif');
+        const storedUrl = isHeic ? convertHeicToJpeg(asset.url) : asset.url;
+        const storedThumbnailUrl = isHeic ? convertHeicToJpeg(asset.thumbnailUrl) : asset.thumbnailUrl;
+        const storedFileType = isHeic ? 'image/jpeg' : `image/${asset.format}`;
+
         const createdData = await prisma.$transaction(async (tx) => {
           // Create Asset record
           const newAsset = await tx.asset.create({
             data: {
               userId: dbUser.id,
               publicId: asset.publicId,
-              url: asset.url,
-              thumbnailUrl: asset.thumbnailUrl,
-              fileType: `image/${asset.format}`, // Convert format to MIME type
+              url: storedUrl,
+              thumbnailUrl: storedThumbnailUrl,
+              fileType: storedFileType, // JPEG for HEIC uploads (delivered as JPEG)
               size: asset.bytes,
             },
           });

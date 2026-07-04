@@ -80,7 +80,7 @@ const getUploadErrorMessage = (error: any): { title: string; description: string
   if (combined.includes('format') || combined.includes('type') || combined.includes('unsupported') || combined.includes('invalid')) {
     return {
       title: 'Unsupported format',
-      description: 'Please use JPG, PNG, or WebP photos.'
+      description: 'Please use JPG, PNG, WebP, or HEIC photos (iPhone photos work too).'
     };
   }
 
@@ -298,8 +298,10 @@ export function CloudinaryUploaderAuto({
     sources: ['local', 'camera'] as ('local' | 'camera')[],
     multiple: true,
     maxFiles: BOOK_CONSTRAINTS.MAX_PHOTOS,
-    // Only allow common web-safe image formats
-    clientAllowedFormats: ['jpg', 'jpeg', 'png', 'webp'],
+    // Allow common web-safe image formats plus HEIC/HEIF (iPhone default).
+    // Cloudinary transcodes HEIC on delivery, so we store the original and
+    // serve a JPEG-transformed URL (see /api/cloudinary/notify).
+    clientAllowedFormats: ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'],
     maxFileSize: 10485760, // 10MB
     showAdvancedOptions: false,
     showCompletedButton: true,

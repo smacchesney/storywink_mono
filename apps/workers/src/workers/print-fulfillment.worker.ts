@@ -10,6 +10,7 @@
  */
 
 import { Job } from 'bullmq';
+import * as Sentry from '@sentry/node';
 import prisma from '../database/client.js';
 import { PrintFulfillmentJob, getLuluLevelByTierKey } from '@storywink/shared';
 import { generateBookPdf } from '../utils/pdf/generateBookPdf.js';
@@ -169,6 +170,10 @@ export async function processPrintFulfillment(job: Job<PrintFulfillmentJob>): Pr
 
   } catch (error: unknown) {
     const err = error as Error;
+    Sentry.captureException(err, {
+      tags: { worker: 'print-fulfillment', jobId: job.id },
+      extra: { printOrderId, bookId, userId },
+    });
     console.error('='.repeat(80));
     console.error(`[PrintFulfillment] FAILED - Order ${printOrderId}`);
     console.error(`  Error: ${err.message}`);

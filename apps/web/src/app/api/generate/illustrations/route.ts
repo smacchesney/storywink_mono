@@ -5,6 +5,7 @@ import { QueueName, getQueue } from '@/lib/queue/index';
 import { db as prisma } from '@/lib/db';
 import { BookStatus } from '@prisma/client';
 import logger from '@/lib/logger';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // Define the expected input schema using Zod
 const illustrationRequestSchema = z.object({
@@ -17,6 +18,14 @@ const illustrationRequestSchema = z.object({
 export async function POST(request: Request) {
   try {
     const { dbUser, clerkId } = await getAuthenticatedUser();
+
+    const rl = await checkRateLimit(`generate-illustrations:${dbUser.id}`, 20, 3600);
+    if (!rl.allowed) {
+      logger.warn({ dbUserId: dbUser.id, key: `generate-illustrations:${dbUser.id}`, remaining: rl.remaining }, 'Rate limit exceeded: generate illustrations');
+      if (process.env.RATE_LIMIT_ENFORCE === 'true') {
+        return NextResponse.json({ error: "You're generating illustrations very quickly. Please wait a little while and try again." }, { status: 429 });
+      }
+    }
 
     let requestData;
     try {

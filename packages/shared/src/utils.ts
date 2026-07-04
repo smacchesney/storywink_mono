@@ -57,11 +57,13 @@ export function optimizeCloudinaryUrlForVision(url: string): string {
 export function convertHeicToJpeg(url: string | null | undefined): string {
   if (!url) return '';
 
-  // Check if URL contains .heic extension (case insensitive)
-  const isHeic = url.toLowerCase().includes('.heic');
+  // Check for HEIC/HEIF extension (case insensitive). iPhones shoot both
+  // container types; both are unrenderable by browsers and vision APIs.
+  const lower = url.toLowerCase();
+  const isHeic = lower.includes('.heic') || lower.includes('.heif');
 
   if (isHeic) {
-    // Cloudinary transformation: f_jpg,fl_force_strip converts HEIC to JPEG
+    // Cloudinary transformation: f_jpg,fl_force_strip converts HEIC/HEIF to JPEG
     // fl_force_strip removes all metadata to speed up conversion
     return url.replace('/upload/', '/upload/f_jpg,fl_force_strip/');
   }
