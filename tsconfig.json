@@ -24,7 +24,8 @@
     "baseUrl": ".",
     "paths": {
       "@storywink/shared": ["./packages/shared/src"],
-      "@storywink/database": ["./packages/database/src"]
+      "@storywink/database": ["./packages/database/src"],
+      "@storywink/pdf": ["./packages/pdf/src"]
     }
   },
   "exclude": ["node_modules", "**/dist"]
