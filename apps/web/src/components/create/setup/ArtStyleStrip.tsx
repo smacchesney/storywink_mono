@@ -1,0 +1,72 @@
+"use client";
+
+import React from 'react';
+import Image from 'next/image';
+import { useTranslations } from 'next-intl';
+import { Check } from 'lucide-react';
+import { optimizeCloudinaryUrl } from '@storywink/shared';
+import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
+import { cn } from '@/lib/utils';
+
+interface ArtStyleStripProps {
+  value: StyleKey;
+  onChange: (style: StyleKey) => void;
+}
+
+// Maps a style key to its setup-namespace label key.
+const LABEL_KEYS: Record<StyleKey, string> = {
+  vignette: 'styleVignette',
+  origami: 'styleOrigami',
+  kawaii: 'styleKawaii',
+};
+
+/**
+ * The horizontal 3-thumbnail art-style picker. Reuses STYLE_LIBRARY's first
+ * reference image per style so there's a single source of truth for the art.
+ */
+export function ArtStyleStrip({ value, onChange }: ArtStyleStripProps) {
+  const t = useTranslations('setup');
+  const styles = Object.entries(STYLE_LIBRARY) as [StyleKey, (typeof STYLE_LIBRARY)[StyleKey]][];
+
+  return (
+    <div className="grid grid-cols-3 gap-2.5">
+      {styles.map(([key, def]) => {
+        const selected = value === key;
+        const labelKey = LABEL_KEYS[key];
+        const label = labelKey ? t(labelKey) : def.label;
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onChange(key)}
+            className={cn(
+              'relative aspect-square overflow-hidden rounded-xl border transition-all',
+              selected
+                ? 'border-[#F76C5E] ring-2 ring-[#F76C5E] ring-offset-1'
+                : 'border-black/10 hover:border-[#F76C5E]/50'
+            )}
+            aria-pressed={selected}
+          >
+            <Image
+              src={optimizeCloudinaryUrl(def.referenceImageUrls[0])}
+              alt={label}
+              fill
+              sizes="(max-width: 768px) 33vw, 120px"
+              className="object-cover"
+            />
+            {selected && (
+              <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#F76C5E] text-white shadow">
+                <Check className="h-3 w-3" />
+              </span>
+            )}
+            <span className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent px-1 pb-1 pt-3 text-[11px] font-playful text-white text-center">
+              {label}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export default ArtStyleStrip;

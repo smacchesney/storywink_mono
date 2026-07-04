@@ -11,6 +11,15 @@ const additionalCharacterSchema = z.object({
   relationship: z.string().min(1, 'Relationship is required').max(50, 'Relationship too long'),
 });
 
+// Zod schema for the AI-generated capture questions the setup surface edits.
+// The parent only ever sets `answer`; the rest round-trips unchanged.
+const captureQuestionSchema = z.object({
+  id: z.string(),
+  question: z.string(),
+  options: z.array(z.string()),
+  answer: z.string().nullable().optional(),
+});
+
 // Zod schema for validating PATCH request body
 const updateBookSchema = z.object({
   artStyle: z.string().nullable().optional(), // Allow null or undefined
@@ -21,6 +30,10 @@ const updateBookSchema = z.object({
   additionalCharacters: z.array(additionalCharacterSchema).max(5, 'Maximum 5 characters').optional(),
   tone: z.enum(STORY_MOODS).nullable().optional(),
   theme: z.string().max(100).nullable().optional(),
+  // The experience-capture fields the setup surface fills before generation.
+  eventSummary: z.string().max(500).nullable().optional(),
+  captureQuestions: z.array(captureQuestionSchema).max(10).nullable().optional(),
+  autoIllustrate: z.boolean().optional(),
 }).strict(); // Ensure no extra fields are passed
 
 type RouteContext = { params: Promise<{ bookId: string }> };

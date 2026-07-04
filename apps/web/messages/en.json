@@ -44,6 +44,62 @@
     "uploadingPhotos": "Uploading your photos...",
     "photoLimit": "Up to {max} photos per book"
   },
+  "setup": {
+    "photosLabel": "Your photos",
+    "coverBadge": "Cover",
+    "childNameLabel": "Who is this book for?",
+    "childNamePlaceholder": "Your child's name",
+    "childNameRequired": "Add a name so the story can star them.",
+    "titleLabel": "Book title",
+    "titlePlaceholder": "Give your book a title",
+    "titleThinking": "Thinking of a title...",
+    "whatWeSee": "What we see",
+    "eventSummaryPlaceholder": "Tell us what happened",
+    "skip": "Skip",
+    "artStyleLabel": "Pick a style",
+    "reviewFirstLabel": "Review the story before illustrating",
+    "makeMyBook": "Make my book",
+    "saving": "Getting things ready...",
+    "loadError": "We couldn't load this book.",
+    "goBack": "Go back",
+    "reorderError": "Couldn't save the new order. Try again.",
+    "saveError": "Something went wrong. Please try again.",
+    "styleVignette": "Pen & Pencil",
+    "styleOrigami": "Paper Origami",
+    "styleKawaii": "Kawaii"
+  },
+  "progress": {
+    "readingPhotos": "Reading your photos...",
+    "writingStory": "Writing the story...",
+    "gettingCharacters": "Getting the characters just right...",
+    "illustratingPage": "Illustrating page {current} of {total}",
+    "canLeave": "You can leave — we'll save it to your library.",
+    "stillWorking": "Still working — check your library in a bit.",
+    "goToLibrary": "Go to my library",
+    "mascotAlt": "Kai the Dino at work"
+  },
+  "issue": {
+    "pagesNeedAttention": "{count, plural, one {# page needs attention} other {# pages need attention}}",
+    "fixPages": "Fix pages",
+    "somethingWentWrong": "Something didn't go to plan.",
+    "failedMessage": "We hit a snag making your book. Let's try that again.",
+    "retry": "Try again",
+    "retrying": "Trying again...",
+    "flaggedNeedPhoto": "{count, plural, one {# page needs a different photo} other {# pages need a different photo}}"
+  },
+  "pageMenu": {
+    "openMenu": "Page options",
+    "editText": "Edit text",
+    "newIllustration": "New illustration",
+    "changePhoto": "Change photo",
+    "save": "Save",
+    "cancel": "Cancel",
+    "regenerating": "Making a new illustration...",
+    "textSaved": "Text saved.",
+    "textSaveError": "Couldn't save the text.",
+    "reillustrateStarted": "Making a new illustration for this page.",
+    "reillustrateError": "Couldn't start a new illustration."
+  },
   "editor": {
     "bookIdMissing": "Book ID is missing.",
     "bookNotFound": "Book not found or failed to load.",
@@ -236,7 +292,7 @@
     "retry": "Try Again"
   },
   "footer": {
-    "copyright": "Storywink.ai \u00a9 {year} All rights reserved.",
+    "copyright": "Storywink.ai © {year} All rights reserved.",
     "terms": "Terms",
     "privacy": "Privacy"
   }
