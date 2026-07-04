@@ -66,11 +66,19 @@ export async function POST(
     const pagesWithText = book.pages.filter(p => p.text && p.text.trim().length > 0);
 
     if (pagesWithText.length === 0) {
-      // Story never landed — re-run story generation from scratch.
-      await prisma.book.update({
-        where: { id: bookId },
+      // Story never landed — re-run story generation from scratch. The
+      // conditional transition is the concurrency mutex for double-taps.
+      const transition = await prisma.book.updateMany({
+        where: {
+          id: bookId,
+          userId: dbUser.id,
+          status: { in: [BookStatus.FAILED, BookStatus.PARTIAL, BookStatus.DRAFT] },
+        },
         data: { status: BookStatus.GENERATING },
       });
+      if (transition.count === 0) {
+        return NextResponse.json({ error: 'This book is already being worked on.' }, { status: 409 });
+      }
 
       const fullPages = await prisma.page.findMany({
         where: { bookId },
@@ -126,13 +134,21 @@ export async function POST(
       );
     }
 
+    // Conditional transition = concurrency mutex for double-taps.
+    const transition = await prisma.book.updateMany({
+      where: {
+        id: bookId,
+        userId: dbUser.id,
+        status: { in: [BookStatus.FAILED, BookStatus.PARTIAL, BookStatus.STORY_READY] },
+      },
+      data: { status: BookStatus.ILLUSTRATING },
+    });
+    if (transition.count === 0) {
+      return NextResponse.json({ error: 'This book is already being worked on.' }, { status: 409 });
+    }
     await prisma.page.updateMany({
       where: { id: { in: retryablePages.map(p => p.id) } },
       data: { moderationStatus: 'PENDING' },
-    });
-    await prisma.book.update({
-      where: { id: bookId },
-      data: { status: BookStatus.ILLUSTRATING },
     });
 
     await getQueue(QueueName.CharacterExtraction).add(

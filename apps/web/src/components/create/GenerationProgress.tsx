@@ -84,12 +84,21 @@ export function GenerationProgress({ bookId, reviewFirst }: GenerationProgressPr
     if (status === BookStatus.COMPLETED || status === BookStatus.PARTIAL) {
       router.push(`/book/${bookId}/preview`);
     } else if (status === BookStatus.STORY_READY && reviewFirst) {
-      // Review-first path: the book intentionally stops here for manual review.
       router.push(`/create/review?bookId=${bookId}`);
     }
-    // When reviewFirst is off, STORY_READY is a transient step — the book
-    // auto-chains into ILLUSTRATING, so we keep showing progress. The 8-minute
-    // timeout is the only escape hatch if it never advances.
+  }, [status, reviewFirst, bookId, router]);
+
+  // On the auto-chain path STORY_READY is transient (seconds). If it PERSISTS,
+  // the book is genuinely parked there — reviewFirst was chosen in a previous
+  // session (the local prop is lost on reload) or the auto-chain failed and
+  // the worker reverted. Either way review is the right home; a grace timer
+  // avoids hijacking the momentary STORY_READY blip mid-chain.
+  useEffect(() => {
+    if (status !== BookStatus.STORY_READY || reviewFirst) return;
+    const timer = setTimeout(() => {
+      router.push(`/create/review?bookId=${bookId}`);
+    }, 15000);
+    return () => clearTimeout(timer);
   }, [status, reviewFirst, bookId, router]);
 
   // Failure surface: swap the shimmer for the retry banner in place.

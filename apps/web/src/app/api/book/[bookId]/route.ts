@@ -13,11 +13,13 @@ const additionalCharacterSchema = z.object({
 
 // Zod schema for the AI-generated capture questions the setup surface edits.
 // The parent only ever sets `answer`; the rest round-trips unchanged.
+// Length caps bound both DB bloat and the story-prompt surface these
+// strings eventually land in.
 const captureQuestionSchema = z.object({
-  id: z.string(),
-  question: z.string(),
-  options: z.array(z.string()),
-  answer: z.string().nullable().optional(),
+  id: z.string().max(100),
+  question: z.string().max(300),
+  options: z.array(z.string().max(200)).max(8),
+  answer: z.string().max(500).nullable().optional(),
 });
 
 // Zod schema for validating PATCH request body

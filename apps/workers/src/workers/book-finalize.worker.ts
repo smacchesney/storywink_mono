@@ -229,9 +229,15 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
 
     // ========================================================================
     // QC CHECK: Run quality check on completed illustrations
-    // Only runs if: status would be COMPLETED, and we haven't exceeded max QC rounds
+    // Only runs if: status would be COMPLETED, we haven't exceeded max QC
+    // rounds, AND this wasn't a scoped run (single-page reillustrate must
+    // never cascade regenerations onto pages the user didn't touch).
     // ========================================================================
-    if (finalStatus === 'COMPLETED' && qcRound < MAX_QC_ROUNDS) {
+    const isScopedRun = Boolean(job.data.scopedPageIds?.length);
+    if (isScopedRun) {
+      logger.info({ bookId, scopedPageIds: job.data.scopedPageIds }, 'Scoped illustration run — skipping book-wide QC');
+    }
+    if (finalStatus === 'COMPLETED' && qcRound < MAX_QC_ROUNDS && !isScopedRun) {
       try {
         // Get character identity from book record
         const characterIdentity = book.characterIdentity as CharacterIdentity | null;

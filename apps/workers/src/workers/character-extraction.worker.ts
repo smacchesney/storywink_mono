@@ -10,7 +10,7 @@ import {
   CHARACTER_IDENTITY_RESPONSE_SCHEMA,
   CharacterExtractionInput,
 } from '@storywink/shared/prompts/character-identity';
-import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
+import { optimizeCloudinaryUrlForVision, convertHeicToJpeg, remapCharacterPages } from '@storywink/shared/utils';
 import { ANALYSIS_MODEL } from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -39,26 +39,25 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
     // 2. Get all pages (including cover page)
     const storyPages = book.pages;
 
-    // Skip the vision call when the perception pass already produced a fresh
-    // identity: characterIdentity exists AND every page's stored analysis was
-    // stamped with its current assetId (i.e. no photo has been swapped since).
+    // Skip the vision call when the perception pass's identity can be
+    // remapped onto the CURRENT page order (appearsOnAssetIds stamps present
+    // and every referenced asset still on the book). Remapping — not raw
+    // reuse — is what makes the skip safe after the parent reorders photos;
+    // a swapped/removed photo makes remap return null and we re-extract.
     const existingIdentity = book.characterIdentity as CharacterIdentity | null;
-    const identityIsFresh =
-      !!existingIdentity?.characters?.length &&
-      storyPages.length > 0 &&
-      storyPages.every(p => {
-        const analysis = p.analysis as { assetId?: string | null } | null;
-        return analysis && analysis.assetId === p.assetId;
-      });
+    const remappedIdentity =
+      existingIdentity?.characters?.length && storyPages.length > 0
+        ? remapCharacterPages(existingIdentity, storyPages.map(p => p.assetId))
+        : null;
 
-    if (identityIsFresh) {
+    if (remappedIdentity) {
       logger.info(
-        { bookId, characterCount: existingIdentity!.characters.length },
-        'Reusing fresh character identity from perception pass — skipping extraction vision call',
+        { bookId, characterCount: remappedIdentity.characters.length },
+        'Reusing perception-pass character identity (remapped to current page order) — skipping extraction vision call',
       );
-      characterIdentity = existingIdentity;
+      characterIdentity = remappedIdentity;
       await createIllustrationFlow(bookId, userId, characterIdentity, pageIds);
-      return { success: true, characterCount: characterIdentity!.characters.length, reused: true };
+      return { success: true, characterCount: remappedIdentity.characters.length, reused: true };
     }
 
     // 3. Parse additional characters
@@ -268,7 +267,10 @@ async function createIllustrationFlow(
     const flow = await flowProducer.add({
       name: `finalize-book-${bookId}`,
       queueName: QUEUE_NAMES.BOOK_FINALIZE,
-      data: { bookId, userId },
+      // scopedPageIds tells finalize this run was a targeted re-render (e.g.
+      // single-page reillustrate) — QC must not cascade regenerations onto
+      // pages the user never asked to touch.
+      data: { bookId, userId, ...(pageIds?.length ? { scopedPageIds: pageIds } : {}) },
       opts: {
         removeOnComplete: { count: 100 },
         removeOnFail: { count: 500 },

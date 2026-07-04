@@ -116,12 +116,18 @@ export function LibraryClientView() {
     });
   }, [visibleBooks, sortBy]);
 
-  // Check if any books are currently illustrating
+  // Keep polling through every non-terminal state — a story-stage retry
+  // moves a book to GENERATING, and stopping the poll there would leave the
+  // card looking stuck until a manual refresh.
   const hasIllustratingBooks = useMemo(() => {
-    return books.some(book => book.status === 'ILLUSTRATING');
+    return books.some(book =>
+      book.status === 'ILLUSTRATING' ||
+      book.status === 'GENERATING' ||
+      book.status === 'STORY_READY'
+    );
   }, [books]);
 
-  // Poll for updates when there are illustrating books
+  // Poll for updates while any book is being worked on
   useEffect(() => {
     if (!hasIllustratingBooks || !isLoaded) return;
 

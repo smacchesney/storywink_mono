@@ -144,3 +144,51 @@ export function calculatePrintedPageCount(
 
   return rawCount;
 }
+/**
+ * Remaps a perception-pass CharacterIdentity's appearsOnPages from
+ * creation-order photo numbers to the CURRENT page order.
+ *
+ * appearsOnPages is positional: the perception pass numbers photos 1..N in
+ * the order they existed at analysis time. When the parent reorders photos,
+ * those numbers silently point at the wrong pages. The perception pass also
+ * stamps appearsOnAssetIds (the assetId behind each number), which lets us
+ * recover the correct current positions here.
+ *
+ * Returns null when remapping is impossible (no appearsOnAssetIds stamps, or
+ * an asset no longer exists on the book) — callers must treat null as
+ * "identity page-mapping is unusable" and degrade (re-extract, or omit
+ * page-targeted character instructions) rather than trust stale numbers.
+ */
+export function remapCharacterPages<
+  T extends {
+    characters: {
+      appearsOnPages: number[];
+      appearsOnAssetIds?: (string | null)[];
+    }[];
+  },
+>(identity: T, currentOrderedAssetIds: (string | null)[]): T | null {
+  const positionByAsset = new Map<string, number>();
+  currentOrderedAssetIds.forEach((assetId, index) => {
+    if (assetId) positionByAsset.set(assetId, index + 1);
+  });
+
+  const remappedCharacters = [];
+  for (const character of identity.characters) {
+    const assetIds = character.appearsOnAssetIds;
+    if (!assetIds) return null; // legacy identity without stamps — cannot remap
+
+    const pages: number[] = [];
+    for (const assetId of assetIds) {
+      if (!assetId) continue;
+      const position = positionByAsset.get(assetId);
+      if (position === undefined) return null; // photo removed/replaced — stale
+      pages.push(position);
+    }
+    remappedCharacters.push({
+      ...character,
+      appearsOnPages: [...new Set(pages)].sort((a, b) => a - b),
+    });
+  }
+
+  return { ...identity, characters: remappedCharacters };
+}

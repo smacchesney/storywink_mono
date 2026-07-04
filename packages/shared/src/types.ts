@@ -134,6 +134,8 @@ export interface BookFinalizeJob {
   bookId: string;
   userId: string;
   qcRound?: number;
+  /** Set when the illustration run was scoped (single-page reillustrate / targeted retry): finalize skips the book-wide QC cascade. */
+  scopedPageIds?: string[];
 }
 
 /**
@@ -197,6 +199,14 @@ export interface CharacterDescription {
   styleTranslation: string;
   /** Which page numbers this character appears in */
   appearsOnPages: number[];
+  /**
+   * The assetIds behind appearsOnPages, stamped by the perception pass.
+   * appearsOnPages is positional (creation order) and goes stale when the
+   * parent reorders photos; remapping through these assetIds recovers the
+   * correct current page numbers. Absent on identities produced by the
+   * extraction worker (which always runs against the current order).
+   */
+  appearsOnAssetIds?: (string | null)[];
 }
 
 /**

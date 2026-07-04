@@ -20,7 +20,7 @@ import {
   StoryQCResponse,
   countRefrainEchoes,
 } from '@storywink/shared/prompts/story-check';
-import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
+import { optimizeCloudinaryUrlForVision, convertHeicToJpeg, remapCharacterPages } from '@storywink/shared/utils';
 import { STORY_MODEL, ANALYSIS_MODEL } from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -249,14 +249,24 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       .filter(q => q.answer && q.answer.trim())
       .map(q => `${q.question} → ${q.answer}`);
 
-    const identity = book.characterIdentity as
-      | { characters?: { characterId: string; role: string; name: string | null; appearsOnPages: number[] }[] }
+    // appearsOnPages is creation-order-positional; remap to the CURRENT page
+    // order via the perception pass's assetId stamps. When remapping fails
+    // (legacy identity, swapped photo) we omit page-targeted character
+    // instructions entirely rather than assert wrong page numbers.
+    const rawIdentity = book.characterIdentity as
+      | { characters?: { characterId: string; role: string; name: string | null; appearsOnPages: number[]; appearsOnAssetIds?: (string | null)[] }[] }
       | null;
-    const charactersInPhotos = identity?.characters
-      ?.map(c => ({
+    const remappedIdentity = rawIdentity?.characters?.length
+      ? remapCharacterPages(
+          { characters: rawIdentity.characters },
+          storyPages.map(p => p.assetId),
+        )
+      : null;
+    const charactersInPhotos = remappedIdentity?.characters
+      .map(c => ({
         name: c.name || c.role.replace(/_/g, ' '),
         role: c.role,
-        appearsOnPages: c.appearsOnPages || [],
+        appearsOnPages: c.appearsOnPages,
       }))
       .filter(c => c.appearsOnPages.length > 0);
 

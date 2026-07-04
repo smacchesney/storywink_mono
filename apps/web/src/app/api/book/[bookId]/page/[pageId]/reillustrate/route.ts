@@ -59,7 +59,15 @@ export async function POST(
     }
 
     const allowedStatuses: BookStatus[] = [BookStatus.COMPLETED, BookStatus.PARTIAL];
-    if (!allowedStatuses.includes(book.status)) {
+
+    // Conditional transition doubles as the concurrency mutex: of N
+    // simultaneous taps, exactly one request moves the book to ILLUSTRATING;
+    // the rest see count 0 and get a 409.
+    const transition = await prisma.book.updateMany({
+      where: { id: bookId, userId: dbUser.id, status: { in: allowedStatuses } },
+      data: { status: BookStatus.ILLUSTRATING },
+    });
+    if (transition.count === 0) {
       return NextResponse.json(
         { error: `A single page can only be re-illustrated on a finished book (current status: ${book.status}).` },
         { status: 409 }
@@ -70,11 +78,6 @@ export async function POST(
     await prisma.page.update({
       where: { id: pageId },
       data: { moderationStatus: 'PENDING', generatedImageUrl: null },
-    });
-
-    await prisma.book.update({
-      where: { id: bookId },
-      data: { status: BookStatus.ILLUSTRATING },
     });
 
     const extractionQueue = getQueue(QueueName.CharacterExtraction);

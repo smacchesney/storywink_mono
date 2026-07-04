@@ -102,6 +102,18 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
   if (!result.output_text) throw new Error('Photo analysis returned empty response');
   const analysis = JSON.parse(result.output_text) as PhotoAnalysisResponse;
 
+  // Stamp each character's appearsOnPages with the assetIds behind those
+  // positions. appearsOnPages is creation-order-positional and goes stale if
+  // the parent reorders photos; the stamps let consumers remap to the
+  // current order (remapCharacterPages in @storywink/shared).
+  const assetIdByPosition = new Map<number, string | null>(
+    input.storyPages.map(p => [p.pageNumber, p.assetId]),
+  );
+  const stampedCharacters = analysis.characters.map(c => ({
+    ...c,
+    appearsOnAssetIds: c.appearsOnPages.map(n => assetIdByPosition.get(n) ?? null),
+  }));
+
   // Persist per-page analysis, stamped with the page's current assetId so
   // consumers can detect staleness after a photo swap.
   await prisma.$transaction(async (tx) => {
@@ -126,7 +138,7 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
       where: { id: bookId },
       data: {
         characterIdentity: {
-          characters: analysis.characters,
+          characters: stampedCharacters,
           sceneContext: analysis.sceneContext,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any, // Prisma Json column (same cast the extraction worker uses)

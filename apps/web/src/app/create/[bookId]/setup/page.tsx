@@ -65,7 +65,11 @@ export default function SetupPage() {
   const touched = useRef({ childName: false, title: false, eventSummary: false, captureQuestions: false });
   const isMountedRef = useRef(true);
 
-  const titlePending = !form.title && !touched.current.title;
+  // Perception is non-fatal by design — when the poll gives up without a
+  // title, the shimmer must settle into a normal placeholder, not spin forever.
+  const [perceptionSettled, setPerceptionSettled] = useState(false);
+
+  const titlePending = !form.title && !touched.current.title && !perceptionSettled;
   const hasEventSummary = form.eventSummary.trim().length > 0 || touched.current.eventSummary;
 
   useEffect(() => {
@@ -173,6 +177,7 @@ export default function SetupPage() {
       polls += 1;
       if (polls > MAX_POLLS) {
         clearInterval(intervalId);
+        if (isMountedRef.current) setPerceptionSettled(true);
         return;
       }
       try {
