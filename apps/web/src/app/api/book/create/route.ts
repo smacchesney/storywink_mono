@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
           pageLength: assetIds.length, // Set page length based on provided assets
           language,
           coverAssetId: assetIds[0], // First photo becomes the cover
+          autoIllustrate: true, // Product default: chain straight into illustration after story success
           // Other fields like artStyle will be set later in the editor
         },
       });

@@ -50,6 +50,10 @@
       "types": "./dist/prompts/quality-check.d.ts",
       "import": "./dist/prompts/quality-check.js"
     },
+    "./prompts/story-check": {
+      "types": "./dist/prompts/story-check.d.ts",
+      "import": "./dist/prompts/story-check.js"
+    },
     "./redis": {
       "types": "./dist/redis.d.ts",
       "import": "./dist/redis.js"
@@ -63,6 +67,8 @@
     "build": "tsc --outDir dist --declaration --declarationMap --sourceMap",
     "dev": "tsc --outDir dist --declaration --watch",
     "check-types": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "clean": "rm -rf dist node_modules .turbo"
   },
   "dependencies": {

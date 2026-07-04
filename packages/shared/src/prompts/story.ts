@@ -11,12 +11,6 @@ export interface ImagePlaceholder {
 }
 export type StoryPromptPart = TextPart | ImagePlaceholder;
 
-// Backwards compatibility aliases
-/** @deprecated Use TextPart instead */
-export type GeminiTextPart = TextPart;
-/** @deprecated Use ImagePlaceholder instead */
-export type GeminiImagePlaceholder = ImagePlaceholder;
-
 // JSON Schema for OpenAI structured output (strict mode)
 // Array-based format: { pages: [{ pageNumber, text, illustrationNotes }, ...] }
 export const STORY_RESPONSE_SCHEMA = {
@@ -46,6 +40,10 @@ export const STORY_RESPONSE_SCHEMA = {
       required: ['desire', 'refrain', 'emotionalPeak', 'resolution'],
       additionalProperties: false,
     },
+    suggestedTitle: {
+      type: 'string',
+      description: 'A short, evocative book title (2-6 words) in the story language. Suggest one even if a title was provided.',
+    },
     pages: {
       type: 'array',
       description: 'Story text and illustration notes for each page',
@@ -70,7 +68,7 @@ export const STORY_RESPONSE_SCHEMA = {
       }
     }
   },
-  required: ['storyArc', 'pages'],
+  required: ['storyArc', 'suggestedTitle', 'pages'],
   additionalProperties: false,
 } as const;
 
@@ -84,6 +82,8 @@ export interface StoryGenerationInput {
   tone?: string; // Story mood e.g. "adventurous", "silly", "sweet"
   theme?: string; // Story context e.g. "Our trip to the beach"
   language?: string; // "en" | "ja", defaults to "en"
+  suggestTitle?: boolean; // True when the current title is a placeholder — the model's suggestedTitle will be used
+  qcFeedback?: string; // Editorial corrections from a failed story-QC round, injected on regeneration
   storyPages: {
     pageId: string;
     pageNumber: number;
@@ -196,8 +196,19 @@ export function createStoryGenerationPrompt(
     ``,
     `## Characters:`,
     characterInstruction,
-    `  - Book Title: \"${input.bookTitle || '(Not Provided)'}\"`,
+    `  - Book Title: "${input.bookTitle || '(Not Provided)'}"`,
     ``,
+    `## Title:`,
+    input.suggestTitle
+      ? `- The parent has NOT chosen a title yet — your "suggestedTitle" WILL become the book's title. Make it short (2-6 words), warm, and specific to this story${input.language === 'ja' ? ', written in Japanese (hiragana/katakana, no kanji)' : ''}. Avoid generic titles like "A Special Day".`
+      : `- The parent chose the title above. Still provide a "suggestedTitle" as an alternative, but the story should honor the existing title.`,
+    ``,
+    ...(input.qcFeedback ? [
+      `## CRITICAL CORRECTIONS (from editorial review of your previous draft):`,
+      `- A previous draft of this story failed editorial review. You MUST address every point below in this rewrite:`,
+      input.qcFeedback.split('\n').map(line => `  ${line}`).join('\n'),
+      ``,
+    ] : []),
     ...(input.tone ? [
       `## Story Mood:`,
       `- Write this story with a **"${input.tone}"** feel throughout. Let this mood guide word choice, pacing, and energy level.`,
@@ -244,9 +255,9 @@ export function createStoryGenerationPrompt(
     `  - If no dynamic effect fits, set "illustrationNotes" to null or empty.`,
     `\n- Effects must feel playful but natural, blending into the scene without overwhelming it.`,
     `\n- Final Output:`,
-    `\nReturn ONLY a valid JSON object with a "storyArc" object AND a "pages" array. Plan the storyArc FIRST (desire, refrain, emotionalPeak, resolution), then write pages that follow that arc.`,
+    `\nReturn ONLY a valid JSON object with a "storyArc" object, a "suggestedTitle" string, AND a "pages" array. Plan the storyArc FIRST (desire, refrain, emotionalPeak, resolution), then write pages that follow that arc.`,
     `Each page element must have "pageNumber" (number), "text" (string), and "illustrationNotes" (string or null).`,
-    `Example format: {"storyArc":{"desire":"...","refrain":"...","emotionalPeak":"...","resolution":"..."},"pages":[{"pageNumber":1,"text":"Sample text...","illustrationNotes":"Suggestion..."}]}`
+    `Example format: {"storyArc":{"desire":"...","refrain":"...","emotionalPeak":"...","resolution":"..."},"suggestedTitle":"...","pages":[{"pageNumber":1,"text":"Sample text...","illustrationNotes":"Suggestion..."}]}`
   ].join('');
 
   parts.push({
@@ -255,10 +266,6 @@ export function createStoryGenerationPrompt(
 
   return parts;
 }
-
-// Backwards compatibility alias
-/** @deprecated Use createStoryGenerationPrompt instead */
-export const createVisionStoryGenerationPrompt = createStoryGenerationPrompt;
 
 // Export types for response parsing
 export interface StoryPageResponse {
@@ -276,8 +283,6 @@ export interface StoryArc {
 
 export interface StoryResponse {
   storyArc: StoryArc;
+  suggestedTitle: string;
   pages: StoryPageResponse[];
 }
-
-// Backwards compatibility alias (deprecated)
-export type WinkifyStoryResponse = StoryResponse;

@@ -64,6 +64,7 @@ model Book {
   coverImageUrl     String?   // AI-generated cover illustration (separate from page's story illustration)
   characterIdentity Json?     // Canonical character description for illustration consistency
   qcRound           Int            @default(0) // Current QC iteration (0 = first pass, 1+ = re-illustration)
+  autoIllustrate    Boolean        @default(false) // Chain straight into illustration after story success (DB default false keeps pre-existing books on the manual flow; create route sets true for new books)
   promptTokens      Int?
   completionTokens  Int?
   totalTokens       Int?

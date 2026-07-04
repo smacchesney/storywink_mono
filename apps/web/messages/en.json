@@ -39,7 +39,7 @@
   "create": {
     "startCreating": "Start Creating",
     "brewingStory": "Brewing a Bedtime adventure...",
-    "dontClosePage": "Please don't close this page while your story is being written.",
+    "canLeavePage": "This takes a few minutes — feel free to leave. Your book will be waiting in your library.",
     "mascotAlt": "Kai the Dino writing a story",
     "uploadingPhotos": "Uploading your photos...",
     "photoLimit": "Up to {max} photos per book"

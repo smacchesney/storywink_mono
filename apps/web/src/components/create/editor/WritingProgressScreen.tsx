@@ -8,7 +8,7 @@ import { BookStatus } from '@prisma/client';
 
 interface WritingProgressScreenProps {
   bookId: string;
-  onComplete: (bookId: string) => void;
+  onComplete: (bookId: string, status: BookStatus) => void;
   onError: (bookId: string, errorMsg?: string) => void;
 }
 
@@ -68,7 +68,9 @@ export function WritingProgressScreen({
 }: WritingProgressScreenProps) {
   const t = useTranslations('create');
   const pollCountRef = useRef(0);
-  const MAX_POLLS = 24; // Timeout after 2 minutes (24 * 5 seconds)
+  // Story generation now includes an editorial QC pass with up to one
+  // regeneration, so allow 6 minutes before declaring a timeout.
+  const MAX_POLLS = 72;
 
   // Poll for book status
   useEffect(() => {
@@ -92,7 +94,7 @@ export function WritingProgressScreen({
 
         if (status === BookStatus.STORY_READY || status === BookStatus.ILLUSTRATING || status === BookStatus.COMPLETED) {
           clearInterval(intervalId);
-          onComplete(bookId);
+          onComplete(bookId, status);
         } else if (status === BookStatus.FAILED) {
           clearInterval(intervalId);
           onError(bookId, "Generation process failed.");
@@ -206,9 +208,8 @@ export function WritingProgressScreen({
       {/* Progress dots */}
       <ProgressDots />
 
-      {/* Keep page open notice */}
       <p className="text-xs text-[#F76C5E] font-playful mt-8 text-center max-w-xs">
-        {t('dontClosePage')}
+        {t('canLeavePage')}
       </p>
     </div>
   );

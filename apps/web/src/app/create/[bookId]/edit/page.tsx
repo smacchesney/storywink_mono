@@ -873,11 +873,18 @@ export default function EditBookPage() {
       // Loading state (isGeneratingStory) will remain true until progress screen calls back
   };
   
-  // Callback from WritingProgressScreen on completion
-  const handleGenerationComplete = (completedBookId: string) => {
+  // Callback from WritingProgressScreen on completion.
+  // STORY_READY means the review gate is on (reviewFirst) or the auto-chain
+  // could not start — go to review. Once the book is ILLUSTRATING (auto-chain)
+  // the review step is moot — the library shows live illustration progress.
+  const handleGenerationComplete = (completedBookId: string, status: BookStatus) => {
       setShowGenerationProgress(false);
-      setIsGeneratingStory(false); 
-      router.push(`/create/review?bookId=${completedBookId}`); // Navigate to review page
+      setIsGeneratingStory(false);
+      if (status === BookStatus.STORY_READY) {
+        router.push(`/create/review?bookId=${completedBookId}`);
+      } else {
+        router.push('/library');
+      }
   };
 
   // Callback from WritingProgressScreen on error/timeout

@@ -39,7 +39,7 @@
   "create": {
     "startCreating": "さあ、つくろう",
     "brewingStory": "おやすみ前のぼうけんを準備中...",
-    "dontClosePage": "ストーリーを書いている間、このページを閉じないでください。",
+    "canLeavePage": "できあがるまで数分かかります。このページを離れても大丈夫 — 絵本はライブラリに届きます。",
     "mascotAlt": "ストーリーを書いているカイ（恐竜）",
     "uploadingPhotos": "写真をアップロード中...",
     "photoLimit": "1冊あたり最大{max}枚まで"

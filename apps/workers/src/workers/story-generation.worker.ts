@@ -1,6 +1,8 @@
-import { Job } from 'bullmq';
+import { Job, Queue } from 'bullmq';
 import prisma from '../database/index.js';
 import { StoryGenerationJob } from '@storywink/shared/types';
+import { QUEUE_NAMES } from '@storywink/shared/constants';
+import { createBullMQConnection } from '@storywink/shared/redis';
 import OpenAI from 'openai';
 import pino from 'pino';
 import {
@@ -10,12 +12,124 @@ import {
   StoryResponse,
   STORY_RESPONSE_SCHEMA,
 } from '@storywink/shared/prompts/story';
+import {
+  createStoryQCPrompt,
+  STORY_QC_SYSTEM_PROMPT,
+  STORY_QC_RESPONSE_SCHEMA,
+  STORY_QC_THRESHOLDS,
+  StoryQCResponse,
+  countRefrainEchoes,
+} from '@storywink/shared/prompts/story-check';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
-import { STORY_MODEL } from '../config/models.js';
+import { STORY_MODEL, ANALYSIS_MODEL } from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
-export async function processStoryGeneration(job: Job<StoryGenerationJob & { singlePageId?: string }>) {
+// Regen only happens while the total job stays inside this budget, so QC can
+// never turn a working story job into a hung one.
+const STORY_QC_TIME_BUDGET_MS = Number(process.env.STORY_QC_TIME_BUDGET_MS || 180_000);
+
+let characterExtractionQueue: Queue | null = null;
+function getCharacterExtractionQueue(): Queue {
+  if (!characterExtractionQueue) {
+    characterExtractionQueue = new Queue(QUEUE_NAMES.CHARACTER_EXTRACTION, {
+      connection: createBullMQConnection(),
+    });
+  }
+  return characterExtractionQueue;
+}
+
+/**
+ * Editorial review of a generated story. Refrain recurrence is checked
+ * deterministically in code; the model scores arc, rhythm, caption risk,
+ * and the landing. Returns numbered corrections for the regen prompt.
+ */
+async function evaluateStoryQuality(
+  openai: OpenAI,
+  storyResponse: StoryResponse,
+  input: StoryGenerationInput,
+  bookId: string,
+): Promise<{ passed: boolean; feedback: string }> {
+  const problems: string[] = [];
+  const pageTexts = storyResponse.pages.map(p => p.text || '');
+
+  const refrain = storyResponse.storyArc?.refrain || '';
+  const echoes = countRefrainEchoes(refrain, pageTexts, input.language);
+  if (echoes < STORY_QC_THRESHOLDS.minRefrainEchoes) {
+    problems.push(
+      `The refrain "${refrain}" is only recognizable on ${echoes} page(s). It must echo (with variation) on at least ${STORY_QC_THRESHOLDS.minRefrainEchoes} pages.`,
+    );
+  }
+
+  const result = await openai.responses.create({
+    model: ANALYSIS_MODEL,
+    instructions: STORY_QC_SYSTEM_PROMPT,
+    input: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'input_text',
+            text: createStoryQCPrompt({
+              storyArc: storyResponse.storyArc,
+              pages: storyResponse.pages.map(p => ({ pageNumber: p.pageNumber, text: p.text })),
+              language: input.language,
+              theme: input.theme,
+            }),
+          },
+        ],
+      },
+    ],
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'story_qc',
+        strict: true,
+        schema: STORY_QC_RESPONSE_SCHEMA as Record<string, unknown>,
+      },
+    },
+  });
+
+  if (!result.output_text) throw new Error('Story QC returned empty response');
+  const qc = JSON.parse(result.output_text) as StoryQCResponse;
+
+  logger.info(
+    {
+      bookId,
+      refrainEchoes: echoes,
+      arcCoherence: qc.arcCoherence,
+      readAloudRhythm: qc.readAloudRhythm,
+      lastPageLanding: qc.lastPageLanding,
+      maxCaptionRisk: Math.max(0, ...qc.pages.map(p => p.captionRisk)),
+    },
+    'Story QC scores',
+  );
+
+  if (qc.arcCoherence < STORY_QC_THRESHOLDS.minArcCoherence) {
+    problems.push(`Arc coherence scored ${qc.arcCoherence}/10 — the pages must actually deliver the declared desire → escalation → peak → soft landing.`);
+  }
+  if (qc.readAloudRhythm < STORY_QC_THRESHOLDS.minReadAloudRhythm) {
+    problems.push(`Read-aloud rhythm scored ${qc.readAloudRhythm}/10 — vary sentence lengths and make it musical when spoken.`);
+  }
+  if (!qc.lastPageLanding) {
+    problems.push('The final page must land as a soft, warm exhale — no summary statements.');
+  }
+  for (const page of qc.pages) {
+    if (page.captionRisk > STORY_QC_THRESHOLDS.maxCaptionRisk) {
+      problems.push(`Page ${page.pageNumber} reads like a photo caption (risk ${page.captionRisk}/10). ${page.issue || 'Rewrite from the child\'s inner experience.'}`);
+    }
+  }
+  if (problems.length > 0 && qc.feedback) {
+    problems.push(qc.feedback);
+  }
+
+  return {
+    passed: problems.length === 0,
+    feedback: problems.map((p, i) => `${i + 1}. ${p}`).join('\n'),
+  };
+}
+
+export async function processStoryGeneration(job: Job<StoryGenerationJob & { singlePageId?: string; titleWasGenerated?: boolean }>) {
   // Wrap everything in try-catch to catch early errors
   try {
     // Early validation
@@ -135,52 +249,87 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       })),
     };
 
-    // Create the prompt parts and map to OpenAI content parts
-    const promptParts = createStoryGenerationPrompt(storyInput);
-    const contentParts: Array<
-      | { type: 'input_text'; text: string }
-      | { type: 'input_image'; image_url: string; detail: 'high' }
-    > = [];
+    const jobStartedAt = Date.now();
 
-    for (const part of promptParts) {
-      if ('type' in part && part.type === 'image_placeholder') {
-        const url = optimizeCloudinaryUrlForVision(convertHeicToJpeg(part.imageUrl));
-        contentParts.push({ type: 'input_image', image_url: url, detail: 'high' });
-      } else if ('text' in part) {
-        contentParts.push({ type: 'input_text', text: part.text });
+    // Generate the story (optionally with editorial corrections from a failed QC round)
+    const generateStory = async (qcFeedback?: string): Promise<StoryResponse> => {
+      const promptParts = createStoryGenerationPrompt({ ...storyInput, qcFeedback });
+      const contentParts: Array<
+        | { type: 'input_text'; text: string }
+        | { type: 'input_image'; image_url: string; detail: 'high' }
+      > = [];
+
+      for (const part of promptParts) {
+        if ('type' in part && part.type === 'image_placeholder') {
+          const url = optimizeCloudinaryUrlForVision(convertHeicToJpeg(part.imageUrl));
+          contentParts.push({ type: 'input_image', image_url: url, detail: 'high' });
+        } else if ('text' in part) {
+          contentParts.push({ type: 'input_text', text: part.text });
+        }
       }
-    }
 
-    // Call OpenAI with vision for story generation
-    const result = await openai.responses.create({
-      model: STORY_MODEL,
-      instructions: STORY_GENERATION_SYSTEM_PROMPT,
-      input: [{ role: 'user', content: contentParts }],
-      text: {
-        format: {
-          type: 'json_schema',
-          name: 'story_response',
-          strict: true,
-          schema: STORY_RESPONSE_SCHEMA as Record<string, unknown>,
+      const result = await openai.responses.create({
+        model: STORY_MODEL,
+        instructions: STORY_GENERATION_SYSTEM_PROMPT,
+        input: [{ role: 'user', content: contentParts }],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'story_response',
+            strict: true,
+            schema: STORY_RESPONSE_SCHEMA as Record<string, unknown>,
+          },
         },
-      },
-    });
+      });
 
-    const rawResult = result.output_text;
-    if (!rawResult) {
-      throw new Error('OpenAI returned empty response');
+      const rawResult = result.output_text;
+      if (!rawResult) {
+        throw new Error('OpenAI returned empty response');
+      }
+
+      logger.info({ bookId, isRegen: !!qcFeedback, rawResponse: rawResult.substring(0, 500) }, 'Raw OpenAI response received');
+
+      // Defensive: strip markdown code block wrapping if present
+      let cleanedResult = rawResult.trim();
+      if (cleanedResult.startsWith('```')) {
+        cleanedResult = cleanedResult.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+      }
+
+      try {
+        return JSON.parse(cleanedResult) as StoryResponse;
+      } catch (parseError) {
+        logger.error({
+          bookId,
+          parseError: parseError instanceof Error ? parseError.message : 'Unknown parse error',
+          rawResponseLength: rawResult.length,
+          rawResponseFirst500: rawResult.substring(0, 500),
+        }, 'Failed to parse OpenAI response');
+        throw new Error(`Invalid JSON response from OpenAI: ${parseError instanceof Error ? parseError.message : 'unknown error'}`);
+      }
+    };
+
+    let storyResponse = await generateStory();
+
+    // Story QC: verify the draft before any illustration money is spent on it.
+    // One regen max; QC errors and blown time budgets accept the draft as-is.
+    try {
+      const verdict = await evaluateStoryQuality(openai, storyResponse, storyInput, bookId);
+      if (!verdict.passed) {
+        if (Date.now() - jobStartedAt < STORY_QC_TIME_BUDGET_MS) {
+          logger.warn({ bookId, feedback: verdict.feedback }, 'Story QC failed — regenerating once with corrections');
+          storyResponse = await generateStory(verdict.feedback);
+        } else {
+          logger.warn({ bookId, feedback: verdict.feedback }, 'Story QC failed but time budget exhausted — accepting draft');
+        }
+      }
+    } catch (qcError) {
+      logger.warn({
+        bookId,
+        error: qcError instanceof Error ? qcError.message : 'Unknown QC error',
+      }, 'Story QC errored — accepting draft without review');
     }
 
-    // Log raw response for debugging
-    logger.info({ bookId, rawResponse: rawResult.substring(0, 500) }, 'Raw OpenAI response received');
-
-    // Defensive: strip markdown code block wrapping if present
-    let cleanedResult = rawResult.trim();
-    if (cleanedResult.startsWith('```')) {
-      cleanedResult = cleanedResult.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
-    }
-
-    // Parse the response and prepare update data (not promises yet)
+    // Prepare update data (not promises yet)
     interface PageUpdateData {
       pageId: string;
       text: string;
@@ -190,9 +339,6 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
     let pageUpdates: PageUpdateData[] = [];
 
     try {
-      // Response format: { pages: [{ pageNumber, text, illustrationNotes }, ...] }
-      const storyResponse: StoryResponse = JSON.parse(cleanedResult);
-
       logger.info({ bookId, pageCount: storyResponse.pages?.length }, 'Parsing story response');
 
       // Validate that all expected pages are present in response
@@ -250,16 +396,13 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
           textConfirmed: trimmedText.length > 0,
         };
       });
-    } catch (parseError) {
+    } catch (mappingError) {
       logger.error({
         bookId,
-        parseError: parseError instanceof Error ? parseError.message : 'Unknown parse error',
-        rawResponseLength: rawResult.length,
-        rawResponseFirst500: rawResult.substring(0, 500),
-        rawResponseLast200: rawResult.substring(rawResult.length - 200),
-        cleanedResultFirst500: cleanedResult.substring(0, 500),
-      }, 'Failed to parse OpenAI response');
-      throw new Error(`Invalid JSON response from OpenAI: ${parseError instanceof Error ? parseError.message : 'unknown error'}`);
+        error: mappingError instanceof Error ? mappingError.message : 'Unknown error',
+        responsePageCount: storyResponse.pages?.length,
+      }, 'Failed to map story response onto pages');
+      throw mappingError;
     }
 
     logger.info({
@@ -360,19 +503,66 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       }, 'Verification passed: All story pages have text');
     }
 
+    // Persist the model's title when the book only had a placeholder
+    const suggestedTitle = storyResponse.suggestedTitle?.trim();
+    const shouldAdoptTitle = Boolean(job.data.titleWasGenerated && suggestedTitle);
+
     // Update book status to story ready (not yet illustrating)
     await prisma.book.update({
       where: { id: bookId },
       data: {
         status: 'STORY_READY',
+        ...(shouldAdoptTitle ? { title: suggestedTitle!.slice(0, 100) } : {}),
         updatedAt: new Date(),
       },
     });
+
+    if (shouldAdoptTitle) {
+      logger.info({ bookId, title: suggestedTitle }, 'Adopted model-suggested book title');
+    }
+
+    // Auto-chain: hand the book straight to illustration. The chain re-enters
+    // via character extraction, which owns the illustration FlowProducer flow.
+    // A chain failure must NOT fail the story job — the book stays STORY_READY
+    // and the user can start illustration manually.
+    if (book.autoIllustrate) {
+      try {
+        await prisma.book.update({
+          where: { id: bookId },
+          data: { status: 'ILLUSTRATING' },
+        });
+        await getCharacterExtractionQueue().add(
+          `extract-characters-${bookId}`,
+          {
+            bookId,
+            userId,
+            artStyle: book.artStyle || 'vignette',
+          },
+          {
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 10000 },
+            removeOnComplete: { count: 100 },
+            removeOnFail: { count: 500 },
+          },
+        );
+        logger.info({ bookId }, 'Auto-chained into illustration via character extraction');
+      } catch (chainError) {
+        logger.error({
+          bookId,
+          error: chainError instanceof Error ? chainError.message : 'Unknown error',
+        }, 'Auto-chain enqueue failed — reverting to STORY_READY for manual illustration');
+        await prisma.book.update({
+          where: { id: bookId, status: 'ILLUSTRATING' },
+          data: { status: 'STORY_READY' },
+        }).catch(() => {});
+      }
+    }
 
     logger.info({
       bookId,
       pagesUpdated: pageUpdates.length,
       totalStoryPages: storyPages.length,
+      autoChained: book.autoIllustrate,
       allPagesHaveText: pageUpdates.length === storyPages.length
     }, 'Story generation completed');
     return { success: true, pagesUpdated: pageUpdates.length };

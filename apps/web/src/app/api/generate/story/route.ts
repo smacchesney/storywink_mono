@@ -50,12 +50,25 @@ export interface StoryGenerationJobData {
     assetId: string | null;
     originalImageUrl: string | null;
   }[];
+  // True when the title was a server-filled placeholder — the worker adopts
+  // the model's suggestedTitle in that case.
+  titleWasGenerated?: boolean;
 }
 
 // Zod schema for the NEW request body
 const triggerStoryRequestSchema = z.object({
   bookId: z.string().cuid(),
+  // Opt-in review gate: when true the book stops at STORY_READY for manual
+  // review instead of auto-chaining into illustration.
+  reviewFirst: z.boolean().optional(),
 });
+
+function placeholderTitle(childName: string | null, language: string): string {
+  if (language === 'ja') {
+    return childName ? `${childName}のだいぼうけん` : 'ぼくらのだいぼうけん';
+  }
+  return childName ? `${childName}'s Big Adventure` : 'Our Big Adventure';
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -74,7 +87,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    const { bookId } = validatedData;
+    const { bookId, reviewFirst } = validatedData;
 
     // 1. Fetch Book, Pages, and Assets (ensure user owns the book)
     const book = await prisma.book.findUnique({
@@ -94,12 +107,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Book not found or permission denied' }, { status: 404 });
     }
 
-    // 2. Validate required fields for generation
-    if (!book.title?.trim() || !book.artStyle) {
-        logger.warn({ clerkId, dbUserId: dbUser.id, bookId }, 'API: /generate/story - Missing required book details (title, artStyle).');
-        return NextResponse.json({ error: 'Missing required book details: Title and Art Style must be set.' }, { status: 400 });
-    }
-    
+    // 2. Fill generation defaults instead of gating. A missing art style falls
+    // back to the product default; a missing title gets a placeholder and the
+    // story model's suggestedTitle replaces it on completion.
+    const artStyle = book.artStyle || 'vignette';
+    const titleWasGenerated = !book.title?.trim();
+    const title = book.title?.trim() || placeholderTitle(book.childName, book.language || 'en');
+
     // Ensure book is in a state where generation can be started (e.g., DRAFT or maybe FAILED)
     if (book.status !== BookStatus.DRAFT && book.status !== BookStatus.FAILED && book.status !== BookStatus.COMPLETED) { // Allow re-gen from COMPLETED? Maybe not.
         logger.warn({ clerkId, dbUserId: dbUser.id, bookId, status: book.status }, 'API: /generate/story - Book not in DRAFT or FAILED state.');
@@ -122,24 +136,31 @@ export async function POST(req: NextRequest) {
 
     logger.info({ clerkId, dbUserId: dbUser.id, bookId, pageCount: pagesForStory.length }, 'API: /generate/story - Prepared pages for job queue.');
 
-    // 4. Update Book status to GENERATING
+    // 4. Update Book status to GENERATING (persisting any filled defaults so
+    // the worker and prompts read consistent values from the DB)
     await prisma.book.update({
       where: { id: bookId },
-      data: { status: BookStatus.GENERATING },
+      data: {
+        status: BookStatus.GENERATING,
+        ...(titleWasGenerated ? { title } : {}),
+        ...(!book.artStyle ? { artStyle } : {}),
+        ...(reviewFirst !== undefined ? { autoIllustrate: !reviewFirst } : {}),
+      },
     });
-    logger.info({ clerkId, dbUserId: dbUser.id, bookId }, 'API: /generate/story - Set book status to GENERATING.');
+    logger.info({ clerkId, dbUserId: dbUser.id, bookId, titleWasGenerated, artStyle }, 'API: /generate/story - Set book status to GENERATING.');
 
     // 5. Prepare Job Data
     const jobData: StoryGenerationJobData = {
       userId: dbUser.id, // Use database user ID
       bookId,
       promptContext: { // Simplified prompt context
-        bookTitle: book.title,
-        artStyle: book.artStyle,
+        bookTitle: title,
+        artStyle,
         isDoubleSpread: false,
         language: book.language || 'en',
       },
       storyPages: pagesForStory,
+      titleWasGenerated,
     };
 
     // 6. Add job to queue using getQueue
