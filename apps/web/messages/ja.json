@@ -44,6 +44,62 @@
     "uploadingPhotos": "写真をアップロード中...",
     "photoLimit": "1冊あたり最大{max}枚まで"
   },
+  "setup": {
+    "photosLabel": "しゃしん",
+    "coverBadge": "ひょうし",
+    "childNameLabel": "だれのための えほんですか？",
+    "childNamePlaceholder": "おこさまの なまえ",
+    "childNameRequired": "なまえを いれると、そのこが しゅやくの おはなしに なります。",
+    "titleLabel": "えほんの タイトル",
+    "titlePlaceholder": "タイトルを つけましょう",
+    "titleThinking": "タイトルを かんがえています...",
+    "whatWeSee": "みえたこと",
+    "eventSummaryPlaceholder": "なにが あったか おしえてください",
+    "skip": "スキップ",
+    "artStyleLabel": "スタイルを えらぶ",
+    "reviewFirstLabel": "えを つくるまえに おはなしを かくにんする",
+    "makeMyBook": "えほんを つくる",
+    "saving": "じゅんびを しています...",
+    "loadError": "この えほんを よみこめませんでした。",
+    "goBack": "もどる",
+    "reorderError": "ならびかえを ほぞんできませんでした。もういちど おためしください。",
+    "saveError": "エラーが おきました。もういちど おためしください。",
+    "styleVignette": "ペンと えんぴつ",
+    "styleOrigami": "おりがみ",
+    "styleKawaii": "かわいい"
+  },
+  "progress": {
+    "readingPhotos": "しゃしんを みています...",
+    "writingStory": "おはなしを かいています...",
+    "gettingCharacters": "キャラクターを ととのえています...",
+    "illustratingPage": "{total}まいちゅう {current}まいめを えがいています",
+    "canLeave": "はなれても だいじょうぶ。ライブラリーに ほぞんします。",
+    "stillWorking": "まだ さぎょうちゅうです。すこししてから ライブラリーを みてください。",
+    "goToLibrary": "ライブラリーへ",
+    "mascotAlt": "おしごとちゅうの カイ"
+  },
+  "issue": {
+    "pagesNeedAttention": "{count, plural, other {#ページの かくにんが ひつようです}}",
+    "fixPages": "ページを なおす",
+    "somethingWentWrong": "うまく いきませんでした。",
+    "failedMessage": "えほんづくりで もんだいが おきました。もういちど ためしましょう。",
+    "retry": "もういちど",
+    "retrying": "もういちど ためしています...",
+    "flaggedNeedPhoto": "{count, plural, other {#ページは べつの しゃしんが ひつようです}}"
+  },
+  "pageMenu": {
+    "openMenu": "ページの オプション",
+    "editText": "ぶんしょうを へんしゅう",
+    "newIllustration": "あたらしい イラスト",
+    "changePhoto": "しゃしんを かえる",
+    "save": "ほぞん",
+    "cancel": "キャンセル",
+    "regenerating": "あたらしい イラストを つくっています...",
+    "textSaved": "ぶんしょうを ほぞんしました。",
+    "textSaveError": "ぶんしょうを ほぞんできませんでした。",
+    "reillustrateStarted": "このページの あたらしい イラストを つくっています。",
+    "reillustrateError": "あたらしい イラストを はじめられませんでした。"
+  },
   "editor": {
     "bookIdMissing": "ブックIDがありません。",
     "bookNotFound": "絵本が見つからないか、読み込みに失敗しました。",
@@ -236,7 +292,7 @@
     "retry": "もう一度試す"
   },
   "footer": {
-    "copyright": "Storywink.ai \u00a9 {year} All rights reserved.",
+    "copyright": "Storywink.ai © {year} All rights reserved.",
     "terms": "利用規約",
     "privacy": "プライバシー"
   }

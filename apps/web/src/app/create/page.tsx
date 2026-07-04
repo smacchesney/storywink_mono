@@ -123,8 +123,8 @@ export default function CreateBookPage() {
         const creationResult = await handleCreateBook(assetIds);
 
         if (creationResult?.bookId) {
-          // Navigate to edit page
-          router.push(`/create/${creationResult.bookId}/edit`);
+          // Navigate to the express setup surface
+          router.push(`/create/${creationResult.bookId}/setup`);
         } else {
           // Error occurred during handleCreateBook
           setIsUploading(false);

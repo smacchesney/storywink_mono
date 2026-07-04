@@ -437,7 +437,11 @@ function ReviewPageContent() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [/* Add goPrev, goNext if needed */]); 
 
-  const allConfirmed = pages.length > 0 && confirmed.every(c => c);
+  // "Illustrate Book" is enabled whenever every page has non-empty text. The
+  // old per-page Confirm gate is gone; editing a page still saves its text,
+  // but a parent never has to tap Confirm on every page to proceed.
+  const allPagesHaveText = pages.length > 0 && pages.every(p => (p.text || '').trim().length > 0);
+  const allConfirmed = allPagesHaveText;
   const isWorking = isLoadingText || isSavingPage || isStartingIllustration || isAwaitingFinalStatus || isFetchingInitialData;
 
   // Handle loading/redirect state before rendering main UI
