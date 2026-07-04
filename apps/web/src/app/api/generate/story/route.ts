@@ -5,8 +5,9 @@ import { getQueue, QueueName } from '@/lib/queue'; // Correct queue import
 // Import types from the default client path
 import { BookStatus } from '@prisma/client';
 // Import shared prisma instance
-import { db as prisma } from '@/lib/db'; 
+import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
+import { checkRateLimit } from '@/lib/rateLimit';
 import type { StoryGenerationInput } from '@storywink/shared';
 
 // REMOVED local BookStatus enum workaround (Task 7.8)
@@ -73,6 +74,14 @@ function placeholderTitle(childName: string | null, language: string): string {
 export async function POST(req: NextRequest) {
   try {
     const { dbUser, clerkId } = await getAuthenticatedUser();
+
+    const rl = await checkRateLimit(`generate-story:${dbUser.id}`, 10, 3600);
+    if (!rl.allowed) {
+      logger.warn({ dbUserId: dbUser.id, key: `generate-story:${dbUser.id}`, remaining: rl.remaining }, 'Rate limit exceeded: generate story');
+      if (process.env.RATE_LIMIT_ENFORCE === 'true') {
+        return NextResponse.json({ error: "You're generating stories very quickly. Please wait a little while and try again." }, { status: 429 });
+      }
+    }
 
     let validatedData;
     try {

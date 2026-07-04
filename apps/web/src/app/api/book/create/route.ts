@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { z } from 'zod';
 import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { BookStatus, PageType } from '@prisma/client';
 
 // Zod schema for request body validation
@@ -14,6 +15,14 @@ const createBookSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     const { dbUser, clerkId } = await getAuthenticatedUser();
+
+    const rl = await checkRateLimit(`book-create:${dbUser.id}`, 20, 3600);
+    if (!rl.allowed) {
+      logger.warn({ dbUserId: dbUser.id, key: `book-create:${dbUser.id}`, remaining: rl.remaining }, 'Rate limit exceeded: book create');
+      if (process.env.RATE_LIMIT_ENFORCE === 'true') {
+        return NextResponse.json({ error: "You're creating books very quickly. Please wait a little while and try again." }, { status: 429 });
+      }
+    }
 
     let validatedData;
     try {

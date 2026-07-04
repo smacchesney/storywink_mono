@@ -4,6 +4,7 @@ import { db as prisma } from '@/lib/db';
 import { BookStatus } from '@prisma/client';
 import { QueueName, getQueue } from '@/lib/queue/index';
 import logger from '@/lib/logger';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 /**
  * POST /api/book/[bookId]/page/[pageId]/reillustrate
@@ -22,6 +23,14 @@ export async function POST(
 
   try {
     const { dbUser, clerkId } = await getAuthenticatedUser();
+
+    const rl = await checkRateLimit(`reillustrate:${dbUser.id}`, 30, 3600);
+    if (!rl.allowed) {
+      logger.warn({ dbUserId: dbUser.id, key: `reillustrate:${dbUser.id}`, remaining: rl.remaining }, 'Rate limit exceeded: reillustrate page');
+      if (process.env.RATE_LIMIT_ENFORCE === 'true') {
+        return NextResponse.json({ error: "You're re-illustrating pages very quickly. Please wait a little while and try again." }, { status: 429 });
+      }
+    }
 
     if (!bookId || !pageId) {
       return NextResponse.json({ error: 'Missing bookId or pageId parameter' }, { status: 400 });
