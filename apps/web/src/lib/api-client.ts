@@ -1,25 +1,15 @@
 import { ApiResponse } from '@storywink/shared';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
-
 interface RequestOptions extends RequestInit {
   token?: string;
-  baseUrl?: string; // Allow overriding baseUrl for Next.js API routes
 }
 
 class ApiClient {
-  private baseUrl: string;
-
-  constructor(baseUrl: string = API_URL) {
-    this.baseUrl = baseUrl;
-  }
-
   private async request<T>(
     endpoint: string,
     options: RequestOptions = {}
   ): Promise<ApiResponse<T>> {
-    const { token, baseUrl, ...fetchOptions } = options;
-    const finalBaseUrl = baseUrl !== undefined ? baseUrl : this.baseUrl;
+    const { token, ...fetchOptions } = options;
 
     const config: RequestInit = {
       ...fetchOptions,
@@ -45,7 +35,7 @@ class ApiClient {
     }
 
     try {
-      const response = await fetch(`${finalBaseUrl}${endpoint}`, config);
+      const response = await fetch(endpoint, config);
       const data = await response.json();
 
       if (!response.ok) {
@@ -68,77 +58,19 @@ class ApiClient {
     return this.request('/api/books', { token });
   }
 
-  async getBook(bookId: string, token: string) {
-    return this.request(`/api/books/${bookId}`, { token });
-  }
-
   async createBook(data: any, token: string) {
-    // This is a Next.js API route, call it directly without the Express API baseUrl
     return this.request('/api/book/create', {
       method: 'POST',
-      body: JSON.stringify(data),
-      token,
-      baseUrl: '', // Override to use relative path for Next.js API routes
-    });
-  }
-
-  async updateBook(bookId: string, data: any, token: string) {
-    return this.request(`/api/books/${bookId}`, {
-      method: 'PATCH',
       body: JSON.stringify(data),
       token,
     });
   }
 
   async deleteBook(bookId: string, token: string) {
-    return this.request(`/api/books/${bookId}`, {
+    return this.request(`/api/book/${bookId}`, {
       method: 'DELETE',
       token,
     });
-  }
-
-  // Pages
-  async updatePage(bookId: string, pageId: string, data: any, token: string) {
-    return this.request(`/api/pages/${bookId}/${pageId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-      token,
-    });
-  }
-
-  // Generation
-  async generateStory(bookId: string, token: string) {
-    return this.request('/api/generate/story', {
-      method: 'POST',
-      body: JSON.stringify({ bookId }),
-      token,
-    });
-  }
-
-  async generateIllustrations(bookId: string, pageIds: string[], token: string) {
-    return this.request('/api/generate/illustrations', {
-      method: 'POST',
-      body: JSON.stringify({ bookId, pageIds }),
-      token,
-    });
-  }
-
-  // Upload
-  async uploadFile(file: File, token: string) {
-    const formData = new FormData();
-    formData.append('files', file);
-
-    return this.request('/api/upload', {
-      method: 'POST',
-      body: formData,
-      headers: {}, // Let browser set content-type for FormData
-      token,
-    });
-  }
-
-  // Health check
-  async health() {
-    return this.request('/api/health');
   }
 }
 

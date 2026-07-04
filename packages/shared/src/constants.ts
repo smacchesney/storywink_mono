@@ -39,15 +39,6 @@ export const UPLOAD_CONSTRAINTS = {
   ALLOWED_EXTENSIONS: ['.jpg', '.jpeg', '.png', '.webp'],
 } as const;
 
-// Art styles
-export const ART_STYLES = [
-  { id: 'watercolor', name: 'Watercolor', description: 'Soft, flowing watercolor paintings' },
-  { id: 'cartoon', name: 'Cartoon', description: 'Bold, colorful cartoon illustrations' },
-  { id: 'sketch', name: 'Sketch', description: 'Hand-drawn pencil sketches' },
-  { id: 'digital', name: 'Digital', description: 'Modern digital art style' },
-  { id: 'anime', name: 'Anime', description: 'Japanese anime-inspired artwork' },
-] as const;
-
 // Language configuration
 export const LANGUAGE_LABELS: Record<string, string> = {
   en: 'English',

@@ -12,9 +12,8 @@
     "build": "turbo run build",
     "build:clean": "turbo run build --force",
     "build:verify": "node -e \"const fs=require('fs'); const crypto=require('crypto'); const content=fs.readFileSync('packages/shared/dist/prompts/styles.js','utf8'); console.log('SHA256 of styles.js:', crypto.createHash('sha256').update(content).digest('hex'));\"",
-    "start": "echo 'Please specify a service: npm run start:web, start:api, or start:workers'",
+    "start": "echo 'Please specify a service: npm run start:web or start:workers'",
     "start:web": "cd apps/web && npm run start",
-    "start:api": "cd apps/api && npm run start",
     "start:workers": "cd apps/workers && npm run start",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
@@ -27,10 +26,13 @@
     "i18n:check": "npx tsx scripts/check-translations.ts"
   },
   "devDependencies": {
+    "@eslint/js": "^9.27.0",
     "@types/node": "^20.0.0",
+    "eslint": "^9.27.0",
     "prettier": "^3.5.3",
     "turbo": "^2.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.32.0"
   },
   "engines": {
     "node": ">=18.0.0",

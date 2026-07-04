@@ -14,9 +14,6 @@ echo -e "${YELLOW}Setting up environment variables...${NC}"
 
 # Web service environment variables
 cat > apps/web/.env.local << EOF
-# API URL
-NEXT_PUBLIC_API_URL=http://localhost:3001
-
 # Clerk Authentication
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 CLERK_SECRET_KEY=$CLERK_SECRET_KEY
@@ -35,37 +32,6 @@ NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 EOF
 
 echo -e "${GREEN}✓ Web environment variables set${NC}"
-
-# API service environment variables
-cat > apps/api/.env.local << EOF
-# Database
-DATABASE_URL=$DATABASE_URL
-REDIS_URL=$REDIS_URL
-
-# Server
-PORT=3001
-NODE_ENV=development
-
-# Clerk Authentication
-CLERK_SECRET_KEY=$CLERK_SECRET_KEY
-CLERK_WEBHOOK_SECRET=${CLERK_WEBHOOK_SECRET:-whsec_your_webhook_secret}
-
-# OpenAI
-OPENAI_API_KEY=$OPENAI_API_KEY
-
-# Cloudinary
-CLOUDINARY_CLOUD_NAME=$CLOUDINARY_CLOUD_NAME
-CLOUDINARY_API_KEY=$CLOUDINARY_API_KEY
-CLOUDINARY_API_SECRET=$CLOUDINARY_API_SECRET
-
-# Frontend URL (for CORS)
-NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
-
-# Log Level
-LOG_LEVEL=$LOG_LEVEL
-EOF
-
-echo -e "${GREEN}✓ API environment variables set${NC}"
 
 # Workers service environment variables
 cat > apps/workers/.env.local << EOF

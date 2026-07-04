@@ -34,8 +34,6 @@ function ReviewPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams(); // <-- Get search params
   const t = useTranslations('review');
-  // Keep context for now, but don't rely on it for bookId
-  // const { bookData: contextBookData, setBookData } = useBookCreation(); // Unused 
 
   // Get bookId from URL query parameter
   const bookIdFromUrl = searchParams.get('bookId'); 

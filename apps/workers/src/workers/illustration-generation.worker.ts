@@ -5,7 +5,6 @@ import { getIllustrator } from '../lib/illustrators/index.js';
 import type { IllustrationInput } from '../lib/illustrators/index.js';
 import { v2 as cloudinary } from 'cloudinary';
 import pino from 'pino';
-import util from 'util';
 import { createIllustrationPrompt, IllustrationPromptOptions } from '@storywink/shared/prompts/illustration';
 // Import STYLE_LIBRARY directly from styles module to avoid barrel export race condition
 import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
@@ -65,13 +64,6 @@ function isLastAttempt(job: Job): boolean {
   const maxAttempts = job.opts?.attempts || 1;
   return (job.attemptsMade + 1) >= maxAttempts;
 }
-
-// ============================================================================
-// DIAGNOSTIC: Track first job execution for detailed logging
-// ============================================================================
-// This flag ensures we only log detailed diagnostics once per worker process,
-// avoiding log spam while still capturing critical runtime information.
-let firstJobExecuted = false;
 
 export async function processIllustrationGeneration(job: Job<IllustrationGenerationJobV2>) {
 
@@ -210,42 +202,6 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
 
     const styleKey = artStyle as StyleKey;
 
-    // ============================================================================
-    // DIAGNOSTIC: First-job property descriptor logging
-    // ============================================================================
-    // On the very first job, log the complete internal structure of the
-    // STYLE_LIBRARY object. This will show us:
-    // - What properties actually exist
-    // - Whether they're getters/setters or plain values
-    // - The prototype chain
-    // - Hidden or enumerable properties
-    if (!firstJobExecuted) {
-      firstJobExecuted = true;
-
-      console.log('='.repeat(80));
-      console.log('[DIAGNOSTIC] First Job Execution - STYLE_LIBRARY Inspection');
-      console.log('='.repeat(80));
-
-      console.log('[FirstJob] styles module URL:', import.meta.url);
-      console.log('[FirstJob] referenceImageUrls snapshot:', STYLE_LIBRARY.vignette?.referenceImageUrls);
-
-      console.log('[FirstJob] Full STYLE_LIBRARY object:');
-      console.log(util.inspect(STYLE_LIBRARY, { depth: 5, showHidden: true, colors: false }));
-
-      console.log('\n[FirstJob] Property descriptors for vignette style:');
-      console.log(util.inspect(
-        Object.getOwnPropertyDescriptors(STYLE_LIBRARY.vignette),
-        { depth: null, colors: false }
-      ));
-
-      console.log('\n[FirstJob] Container Information:');
-      console.log(`  - Process PID: ${process.pid}`);
-      console.log(`  - Hostname: ${process.env.HOSTNAME || 'unknown'}`);
-      console.log(`  - Railway Commit: ${process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown'}`);
-      console.log(`  - Git Commit: ${process.env.GIT_COMMIT_SHA || 'unknown'}`);
-      console.log('='.repeat(80));
-    }
-
     // Defensive check: Ensure STYLE_LIBRARY is loaded (prevent race condition on module import)
     if (!STYLE_LIBRARY || Object.keys(STYLE_LIBRARY).length === 0) {
       logger.error({ jobId: job.id, pageId, pageNumber }, 'STYLE_LIBRARY not loaded - module import race condition detected');
@@ -260,8 +216,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
 
     // All pages (including cover) use standard style references for the story illustration.
     // Cover pages get a separate cover-style illustration generated afterwards.
-    let styleReferenceUrls: string[];
-    styleReferenceUrls = [...styleData.referenceImageUrls];
+    const styleReferenceUrls: string[] = [...styleData.referenceImageUrls];
 
     // ============================================================================
     // DIAGNOSTIC: Database-persisted logging to survive process crashes

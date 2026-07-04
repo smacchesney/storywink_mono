@@ -194,4 +194,54 @@ export async function PATCH(
     // Handle potential Prisma errors, e.g., unique constraint violations if applicable
     return NextResponse.json({ error: 'Failed to update book' }, { status: 500 });
   }
-} 
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: RouteContext
+) {
+  const { bookId } = await params;
+
+  try {
+    const { dbUser, clerkId } = await getAuthenticatedUser();
+
+    if (!bookId) {
+      logger.warn({ clerkId, dbUserId: dbUser.id }, 'API: Book delete attempt missing bookId.');
+      return NextResponse.json({ error: 'Missing bookId parameter' }, { status: 400 });
+    }
+
+    // Delete only if the authenticated user owns the book.
+    // Relies on onDelete: Cascade to remove pages/related records.
+    const deleteResult = await prisma.book.deleteMany({
+      where: {
+        id: bookId,
+        userId: dbUser.id, // Use database user ID for ownership check
+      },
+    });
+
+    if (deleteResult.count === 0) {
+      logger.warn({ clerkId, dbUserId: dbUser.id, bookId }, 'API: Book delete failed - Book not found or user does not own it.');
+      const bookExists = await prisma.book.findUnique({ where: { id: bookId }, select: { id: true } });
+      const status = bookExists ? 403 : 404;
+      const message = bookExists ? 'Permission denied' : 'Book not found';
+      return NextResponse.json({ error: message }, { status });
+    }
+
+    logger.info({ clerkId, dbUserId: dbUser.id, bookId }, 'API: Book deleted successfully.');
+    return NextResponse.json({ success: true, message: 'Book deleted successfully' }, { status: 200 });
+
+  } catch (error) {
+    // Handle authentication errors
+    if (error instanceof Error && (
+      error.message.includes('not authenticated') ||
+      error.message.includes('ID mismatch') ||
+      error.message.includes('primary email not found')
+    )) {
+      logger.warn('API: Book delete attempt without authentication.');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    logger.error({ bookId, error }, 'API: Error deleting book.');
+    return NextResponse.json({ error: 'Failed to delete book' }, { status: 500 });
+  }
+}

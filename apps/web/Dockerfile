@@ -29,12 +29,10 @@ WORKDIR /app
 
 # Accept build arguments for Next.js public environment variables
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-ARG NEXT_PUBLIC_API_URL
 ARG RAILWAY_GIT_COMMIT_SHA
 
 # Set environment variables for build time
 ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # Copy node_modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
