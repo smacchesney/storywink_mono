@@ -1,261 +1,169 @@
-"use client";
+'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Plus, Loader2, Camera } from 'lucide-react';
 import { toast } from 'sonner';
-import PhotoSourceSheet from '@/components/create/PhotoSourceSheet';
-import { CloudinaryUploaderAuto } from '@/components/cloudinary-uploader-auto';
-import { apiClient } from '@/lib/api-client';
+import { Camera, Loader2 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
-import logger from '@/lib/logger';
 import { useTranslations, useLocale } from 'next-intl';
-import type { BookLanguage } from '@storywink/shared/schemas';
+import { apiClient } from '@/lib/api-client';
+import logger from '@/lib/logger';
 import { BOOK_CONSTRAINTS } from '@storywink/shared';
-
-// Type for Cloudinary asset from uploader
-interface CloudinaryAsset {
-  publicId: string;
-  url: string;
-  thumbnailUrl: string;
-  format: string;
-  bytes: number;
-  width: number;
-  height: number;
-}
-
-// Type for database asset
-interface Asset {
-  id: string;
-  thumbnailUrl: string;
-  url: string;
-}
+import type { BookLanguage } from '@storywink/shared/schemas';
+import PhotoTray, { type PhotoTrayHandle } from '@/components/upload/PhotoTray';
+import type { UploadedAsset } from '@/lib/uploadPhotos';
 
 export default function CreateBookPage() {
   const router = useRouter();
   const t = useTranslations('create');
   const locale = useLocale();
   const { getToken, isLoaded } = useAuth();
-  const [language, setLanguage] = useState<BookLanguage>((locale === 'ja' ? 'ja' : 'en') as BookLanguage);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [showCloudinaryUploader, setShowCloudinaryUploader] = useState(false);
-  const [isLoadingUploader, setIsLoadingUploader] = useState(false);
 
-  // Track when loading started for minimum spinner display time
-  const loadingStartTimeRef = useRef<number | null>(null);
+  const [language, setLanguage] = useState<BookLanguage>(
+    (locale === 'ja' ? 'ja' : 'en') as BookLanguage,
+  );
+  // Uploaded assets in tile order, mirrored from the tray for reactive UI.
+  const [assets, setAssets] = useState<UploadedAsset[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [isCreating, setIsCreating] = useState(false);
 
-  // Handle creation of database records for uploaded assets
-  const createAssetRecords = async (cloudinaryAssets: CloudinaryAsset[]): Promise<Asset[]> => {
-    const token = await getToken();
-    if (!token) {
-      throw new Error('Not authenticated');
+  const trayRef = useRef<PhotoTrayHandle>(null);
+
+  const handleAssetsChange = useCallback((next: UploadedAsset[]) => {
+    setAssets(next);
+    setPendingCount(trayRef.current?.pendingCount() ?? 0);
+  }, []);
+
+  const handleBatchSettled = useCallback(() => {
+    setPendingCount(trayRef.current?.pendingCount() ?? 0);
+  }, []);
+
+  // Wait (poll) until no tile is still uploading, so Continue never drops
+  // in-flight photos. Caps at ~60s to avoid hanging on a wedged upload.
+  const waitForUploads = useCallback(async () => {
+    const start = Date.now();
+    while (trayRef.current?.hasPending()) {
+      if (Date.now() - start > 60_000) break;
+      await new Promise((r) => setTimeout(r, 300));
     }
+  }, []);
 
+  const handleContinue = useCallback(async () => {
+    if (isCreating) return;
+    if (!isLoaded) {
+      toast.error(t('notReady'));
+      return;
+    }
+    setIsCreating(true);
     try {
-      const response = await fetch('/api/cloudinary/notify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ assets: cloudinaryAssets }),
-      });
+      await waitForUploads();
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create asset records');
+      const finalAssets = trayRef.current?.getUploadedAssets() ?? assets;
+      const assetIds = finalAssets.map((a) => a.id);
+      if (assetIds.length === 0) {
+        toast.error(t('noPhotos'));
+        setIsCreating(false);
+        return;
       }
 
-      const result = await response.json();
-      return result.data.assets;
-    } catch (error) {
-      logger.error({ error }, "Failed to create asset records");
-      throw error;
-    }
-  };
+      const token = await getToken();
+      if (!token) throw new Error('not authenticated');
 
-  // Create book with assets
-  const handleCreateBook = async (assetIds: string[]) => {
-    if (!isLoaded) {
-      throw new Error('Authentication not loaded');
-    }
-
-    const token = await getToken();
-    if (!token) {
-      throw new Error('Not authenticated');
-    }
-    
-    try {
-      const response = await apiClient.createBook({
-        assetIds,
-        language,
-      }, token);
-
+      const response = await apiClient.createBook(
+        { assetIds, language },
+        token,
+      );
       if (!response.success || !response.data) {
         throw new Error(response.error || 'Book creation failed');
       }
 
-      return { bookId: (response.data as any).id };
-      
-    } catch (error) { 
-      logger.error({ error }, 'Book Creation API Call Failed');
-      toast.error(`Failed to start book creation: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      return null;
+      const bookId = (response.data as { id: string }).id;
+      router.push(`/create/${bookId}/setup`);
+    } catch (err) {
+      logger.error({ err }, 'Book creation failed');
+      toast.error(
+        `${t('createFailed')}: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      );
+      setIsCreating(false);
     }
-  };
+  }, [
+    isCreating,
+    isLoaded,
+    assets,
+    language,
+    getToken,
+    router,
+    t,
+    waitForUploads,
+  ]);
 
-  // Handle upload completion from Cloudinary
-  const handleUploadComplete = async (cloudinaryAssets: CloudinaryAsset[]) => {
-    logger.info({ count: cloudinaryAssets.length }, "Cloudinary uploads completed");
-
-    // Hide the Cloudinary component now that uploads are done
-    setShowCloudinaryUploader(false);
-
-    try {
-      // Create database records for the uploaded assets
-      const dbAssets = await createAssetRecords(cloudinaryAssets);
-      logger.info({ count: dbAssets.length }, "Database assets created");
-
-      if (dbAssets.length > 0) {
-        const assetIds = dbAssets.map(asset => asset.id);
-        const creationResult = await handleCreateBook(assetIds);
-
-        if (creationResult?.bookId) {
-          // Navigate to the express setup surface
-          router.push(`/create/${creationResult.bookId}/setup`);
-        } else {
-          // Error occurred during handleCreateBook
-          setIsUploading(false);
-        }
-      } else {
-        setIsUploading(false);
-      }
-    } catch (error) {
-      logger.error({ error }, "Failed to process uploads");
-      toast.error(`Failed to process uploads: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setIsUploading(false);
-    }
-  };
-
-  const handleUploadStart = (totalFiles: number) => {
-    logger.info({ totalFiles }, "Upload started");
-    setIsUploading(true);
-    setIsSheetOpen(false);
-  };
-
-  const handleUploadProgress = (_progress: number, _currentFile: number, _totalFiles: number) => {
-    // Progress is handled by Cloudinary's built-in widget UI
-  };
-
-  const handleStartCreatingClick = () => {
-    logger.info("Start Creating clicked - Directly opening Cloudinary uploader");
-    // Track when loading started for minimum spinner display
-    loadingStartTimeRef.current = Date.now();
-    // Show loading spinner while Cloudinary widget loads
-    setIsLoadingUploader(true);
-    // Skip the PhotoSourceSheet and directly trigger Cloudinary uploader
-    setShowCloudinaryUploader(true);
-  };
-
-  const handleChooseFromPhone = () => {
-    setIsSheetOpen(false);
-    // Show the auto-opening Cloudinary uploader
-    setShowCloudinaryUploader(true);
-  };
-
-  const handleUploadCancel = () => {
-    logger.info("Upload cancelled");
-    setShowCloudinaryUploader(false);
-    setIsUploading(false);
-    setIsLoadingUploader(false);
-  };
-
-  const handleImportFromGooglePhotos = () => {
-    // TODO: Implement Google Photos import
-  };
+  const hasReady = assets.length > 0;
+  const continueLabel =
+    pendingCount > 0
+      ? t('stillUploading', { count: pendingCount })
+      : t('continue');
 
   return (
-    <>
-      {(!showCloudinaryUploader || isLoadingUploader) && (
-        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-150px)] px-4 py-8">
-          <Button
-            onClick={handleStartCreatingClick}
-            disabled={isUploading || isLoadingUploader}
-            variant="outline"
-            className="relative bg-white rounded-full w-24 h-24 md:w-40 md:h-40 shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out flex items-center justify-center group"
-          >
-            {isLoadingUploader ? (
-              <Loader2 className="text-[#F76C5E] w-10 h-10 md:w-16 md:h-16 animate-spin" />
-            ) : (
-              <Plus className="text-[#F76C5E] w-10 h-10 md:w-16 md:h-16 transition-transform duration-300 ease-in-out group-hover:scale-110" />
-            )}
-          </Button>
-
-          <p className="mt-4 md:mt-6 text-lg md:text-xl text-gray-600 font-medium">
-            {t('startCreating')}
+    <div className="mx-auto flex min-h-[calc(100vh-150px)] w-full max-w-2xl flex-col px-4 py-8">
+      <div className="mb-6 text-center">
+        <h1 className="font-playful text-2xl font-bold text-[#1a1a1a] md:text-3xl">
+          {t('startCreating')}
+        </h1>
+        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-gray-100/80 px-4 py-2">
+          <Camera className="h-4 w-4 shrink-0 text-[#F76C5E]" />
+          <p className="text-sm text-gray-500">
+            {t('photoLimit', { max: BOOK_CONSTRAINTS.MAX_PHOTOS })}
           </p>
+        </div>
+      </div>
 
-          <div className="mt-4 md:mt-5 flex items-center gap-2 rounded-full bg-gray-100/80 px-4 py-2">
-            <Camera className="w-4 h-4 text-[#F76C5E] shrink-0" />
-            <p className="text-sm text-gray-500">
-              {t('photoLimit', { max: BOOK_CONSTRAINTS.MAX_PHOTOS })}
-            </p>
-          </div>
+      {/* Language selector */}
+      <div className="mb-6 flex items-center justify-center">
+        <div className="flex items-center gap-1.5 rounded-full bg-gray-100/80 p-1">
+          {[
+            { value: 'en' as const, label: 'English' },
+            { value: 'ja' as const, label: '日本語' },
+          ].map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setLanguage(value)}
+              className={`rounded-full px-4 py-1.5 font-playful text-sm transition-all duration-200 ${
+                language === value
+                  ? 'bg-[#F76C5E] text-white shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-          {/* Language selector */}
-          <div className="mt-5 flex items-center gap-1.5 rounded-full bg-gray-100/80 p-1">
-            {([
-              { value: 'en' as const, label: 'English' },
-              { value: 'ja' as const, label: '日本語' },
-            ]).map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => setLanguage(value)}
-                className={`
-                  font-playful text-sm px-4 py-1.5 rounded-full transition-all duration-200
-                  ${language === value
-                    ? 'bg-[#F76C5E] text-white shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                  }
-                `}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+      <PhotoTray
+        trayRef={trayRef}
+        onAssetsChange={handleAssetsChange}
+        onBatchSettled={handleBatchSettled}
+      />
 
-          <PhotoSourceSheet
-            isOpen={isSheetOpen}
-            onOpenChange={setIsSheetOpen}
-            onChooseFromPhone={handleChooseFromPhone}
-            onImportFromGooglePhotos={handleImportFromGooglePhotos}
-          />
+      {/* Continue — primary coral, enabled once at least one upload has finished */}
+      {(hasReady || pendingCount > 0) && (
+        <div className="sticky inset-x-0 bottom-0 z-10 mt-6 pb-2">
+          <button
+            onClick={handleContinue}
+            disabled={!hasReady || isCreating}
+            className="mx-auto flex w-full max-w-md items-center justify-center gap-2 rounded-full bg-[#F76C5E] px-6 py-3.5 font-playful text-lg text-white shadow-md transition-colors hover:bg-[#F76C5E]/90 disabled:opacity-60"
+          >
+            {isCreating ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                {t('creating')}
+              </>
+            ) : (
+              continueLabel
+            )}
+          </button>
         </div>
       )}
-
-      {/* Cloudinary uploader that auto-opens */}
-      {showCloudinaryUploader && (
-        <CloudinaryUploaderAuto
-          onUploadComplete={handleUploadComplete}
-          onUploadStart={handleUploadStart}
-          onUploadProgress={handleUploadProgress}
-          onCancel={handleUploadCancel}
-          onOpen={() => {
-            // Ensure spinner shows for at least 2 seconds (typical widget load time)
-            const MIN_LOADING_TIME = 2000;
-            const elapsed = Date.now() - (loadingStartTimeRef.current || Date.now());
-            const remaining = Math.max(0, MIN_LOADING_TIME - elapsed);
-
-            if (remaining > 0) {
-              setTimeout(() => setIsLoadingUploader(false), remaining);
-            } else {
-              setIsLoadingUploader(false);
-            }
-          }}
-        />
-      )}
-    </>
+    </div>
   );
 }
