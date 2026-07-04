@@ -4,7 +4,8 @@ Background job processors for AI operations.
 
 ## Stack
 - BullMQ workers with TypeScript
-- GPT-5.1 for story generation
+- `gpt-5.5` (OpenAI Responses API, override via `STORY_MODEL`) for story generation
+- `gpt-5-mini` for character extraction and QC (illustration QC + story QC)
 - Gemini 3.1 Flash Image or OpenAI gpt-image-2 for illustrations (selected via `ILLUSTRATION_PROVIDER` env)
 - Redis via `createBullMQConnection()` from `@storywink/shared/redis`
 
@@ -17,9 +18,10 @@ Background job processors for AI operations.
 This app has PDF generators that mirror `apps/web/src/lib/pdf/`. Changes to PDF logic must be applied to BOTH locations.
 
 ## Patterns
-- All AI operations are async — enqueued via the Express API, processed here
+- All AI operations are async — enqueued by Next.js API routes in `apps/web`, processed here
 - Workers should be idempotent — a job may be retried on failure
 - Use `@storywink/shared` for all shared types, schemas, and prompts
+- Auto-illustrate re-enters via the character-extraction worker, which builds the illustration FlowProducer flow (parent finalize + child illustration jobs). See `createIllustrationFlow` in `src/workers/character-extraction.worker.ts`.
 
 ## Illustration Providers
 

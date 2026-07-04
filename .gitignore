@@ -68,17 +68,10 @@ assets/
 # Local-only scratch folder (large PDFs, personal notes)
 .docs/
 
-# Documentation (except README.md and project docs)
+# Documentation: ignore stray markdown, but keep README, CLAUDE.md files, and versioned docs/
 *.md
 !docs/superpowers/**/*.md
 !README.md
-!CLAUDE.md
-!ARCHITECTURE_ANALYSIS.md
-!ARCHITECTURE_IMPROVEMENTS.md
-!CLOUDINARY_DIRECT_UPLOAD_PLAN.md
-!MONOREPO_IMPORT_CLEANUP_PLAN.md
-!OPTIMIZATION_PLAN.md
-!OPTIMIZATION_PROGRESS.md
-!OPTIMIZATIONS_June8.md
-!PAGE_ORDERING_ARCHITECTURE.md
-!REORDER_TEXT_FIX_PLAN.md
+!**/CLAUDE.md
+!docs/
+!docs/**/*.md

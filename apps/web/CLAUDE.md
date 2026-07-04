@@ -1,6 +1,6 @@
 # Web App (Next.js 15)
 
-Port 3000. Frontend + user-facing API routes.
+Port 3000. Frontend + all API routes. There is no separate Express service — this app owns every HTTP endpoint (book ops, webhooks, queue enqueue, PDF/print export).
 
 ## Stack
 - Next.js 15 App Router, React, TypeScript
@@ -10,9 +10,12 @@ Port 3000. Frontend + user-facing API routes.
 - Cloudinary for image hosting (direct browser uploads)
 
 ## API Routes (Next.js)
+All endpoints live under `src/app/api/`. Examples (non-exhaustive):
 - `/api/book/create` — Book creation
+- `/api/generate/story`, `/api/generate/illustrations` — Queue enqueue
 - `/api/cloudinary/notify` — Upload webhooks
-- `/api/webhooks/clerk` — Auth webhooks
+- `/api/webhooks/clerk`, `/api/webhooks/stripe` — Auth + payment webhooks
+- `/api/book/[bookId]/export/...` — PDF and Lulu print export
 
 ## Key Directories
 - `src/app/` — App Router pages and layouts

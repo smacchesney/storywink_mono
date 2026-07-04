@@ -1,6 +1,6 @@
 # Storywink.ai
 
-AI-powered platform transforming photos into personalized children's picture books. Uses GPT-5.1 for story generation. Illustrations use Gemini 3.1 Flash Image or OpenAI gpt-image-2, selectable via the `ILLUSTRATION_PROVIDER` env var on the workers service.
+AI-powered platform transforming photos into personalized children's picture books. Story generation runs on the OpenAI Responses API (`gpt-5.5`, override via `STORY_MODEL`); character extraction and QC use `gpt-5-mini`. Illustrations use Gemini 3.1 Flash Image or OpenAI gpt-image-2, selectable via the `ILLUSTRATION_PROVIDER` env var on the workers service.
 
 ## Commands
 
@@ -21,14 +21,15 @@ npm run db:migrate             # Run migrations
 
 ```
 apps/
-  web/          Next.js 15 frontend (port 3000)
-  api/          Express REST API (port 4000)
-  workers/      BullMQ job processors
+  web/          Next.js 15 — UI + all API routes (port 3000)
+  workers/      BullMQ job processors (all AI work)
 
 packages/
   database/     Prisma schema and client
   shared/       Shared types, schemas, prompts (builds to dist/)
 ```
+
+The web app owns every HTTP endpoint. Deploy target is Railway (services: web, workers, migrate).
 
 ## Critical: Import Pattern
 
