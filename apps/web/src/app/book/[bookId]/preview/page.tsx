@@ -11,6 +11,8 @@ import { Progress } from '@/components/ui/progress';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import BookPageGallery from '@/components/book/BookPageGallery'; // Import the new component
 import FlipbookViewer, { FlipbookActions, buildDisplayPages } from '@/components/book/FlipbookViewer'; // Import FlipbookViewer, FlipbookActions type, and buildDisplayPages
+import BookIssueBanner from '@/components/create/BookIssueBanner';
+import PageControlsMenu from '@/components/book/PageControlsMenu';
 import { showError } from '@/lib/toast-utils';
 import { cn } from '@/lib/utils';
 
@@ -98,9 +100,10 @@ export default function BookPreviewPage() {
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
-    if (book?.status === BookStatus.ILLUSTRATING) {
+    // Poll while the book is actively being made — covers the ILLUSTRATING
+    // render loop, a single-page re-illustration, and a story-stage retry.
+    if (book?.status === BookStatus.ILLUSTRATING || book?.status === BookStatus.GENERATING) {
       intervalId = setInterval(() => {
-        console.log('Polling for book status...');
         loadBook();
       }, 5000);
     }
@@ -276,27 +279,38 @@ export default function BookPreviewPage() {
 
   if (book.status === BookStatus.FAILED) {
      return (
-      <div className="flex flex-col justify-center items-center min-h-screen text-destructive p-4">
-        <Card className="w-full max-w-md text-center border-destructive">
-          <CardHeader>
-             <CardTitle className="text-destructive">Illustration Failed</CardTitle>
-           </CardHeader>
-           <CardContent>
-              <AlertTriangle className="h-8 w-8 mb-2 mx-auto" />
-              <p className="mb-4">
-                Something went wrong during illustration generation. Please try again later or contact support.
-              </p>
-           </CardContent>
-         </Card>
+      <div className="flex flex-col justify-center items-center min-h-screen p-4">
+        <div className="w-full max-w-md">
+          <BookIssueBanner
+            bookId={bookId}
+            status={BookStatus.FAILED}
+            onRetryStarted={() => {
+              // Retry flips the book back into a working state on the server;
+              // reload so the ILLUSTRATING/GENERATING poll picks up from here.
+              loadBook();
+            }}
+          />
+        </div>
       </div>
     );
   }
 
   if (book.status === BookStatus.COMPLETED) {
-    const totalDisplayPages = buildDisplayPages(book.pages, { childName: book.childName, bookTitle: book.title, language: book.language }).length;
+    const displayPages = buildDisplayPages(book.pages, { childName: book.childName, bookTitle: book.title, language: book.language });
+    const totalDisplayPages = displayPages.length;
     // Disable prev/next based on current display index
     const canFlipPrev = currentDisplayIndex > 1;
     const canFlipNext = currentDisplayIndex < totalDisplayPages;
+
+    // Resolve the current display page back to its source Page so the per-page
+    // menu can act on it. Cover/dedication/ending/blank pages have no source
+    // page and get no menu. The cover (title page) is left alone by design.
+    const currentDisplay = displayPages[currentDisplayIndex - 1];
+    const currentSourcePage =
+      currentDisplay && (currentDisplay.type === 'illustration' || currentDisplay.type === 'text')
+        ? currentDisplay.page
+        : null;
+    const menuPage = currentSourcePage && !currentSourcePage.isTitlePage ? currentSourcePage : null;
 
     return (
       <div className="flex flex-col h-[100dvh] bg-background">
@@ -429,10 +443,10 @@ export default function BookPreviewPage() {
           </div>
         </div>
 
-        {/* Footer with Page Number - Hide in fullscreen */}
+        {/* Footer with Page Number + per-page menu - Hide in fullscreen */}
         {!isFullscreen && (
           <div className={cn(
-            "flex justify-center items-center bg-white border-t shrink-0 transition-all",
+            "flex justify-center items-center gap-2 bg-white border-t shrink-0 transition-all relative",
             isLandscape ? "py-1" : "py-2"
           )}>
             <div className="flex items-center bg-muted/20 rounded-full px-4 py-1">
@@ -440,6 +454,15 @@ export default function BookPreviewPage() {
                 Page {currentDisplayIndex} of {totalDisplayPages}
               </span>
             </div>
+            {menuPage && (
+              <div className="absolute right-3">
+                <PageControlsMenu
+                  bookId={bookId}
+                  page={menuPage}
+                  onMutated={loadBook}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

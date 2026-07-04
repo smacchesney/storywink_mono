@@ -168,32 +168,31 @@ export function LibraryClientView() {
     return pageWithImage?.generatedImageUrl || pageWithImage?.originalImageUrl || null;
   };
 
-  // Handle retry for failed/partial books
+  // Handle retry for failed books. The status-aware /retry endpoint decides
+  // whether to re-run story generation or re-enter illustration itself.
   const handleRetryIllustrations = async (bookId: string) => {
     setIsRetrying(bookId);
     try {
-      const token = await getToken();
-      if (!token) return;
-
-      const response = await fetch('/api/generate/illustrations', {
+      const response = await fetch(`/api/book/${bookId}/retry`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ bookId }),
       });
 
-      if (response.ok) {
-        // Refresh books to get updated status
+      const data = await response.json().catch(() => ({}));
+
+      if (response.status === 202) {
+        // Retry accepted — refresh so the card picks up the working status.
+        await fetchBooks(false);
+      } else if (response.ok && data.flaggedCount > 0) {
+        // Only content-flagged pages remain — those need the resolve flow.
+        router.push(`/book/${bookId}/resolve`);
+      } else if (response.ok) {
         await fetchBooks(false);
       } else {
-        const errorData = await response.json();
-        showError(errorData.error || 'Failed to retry illustrations', 'Retry failed');
+        showError(data.error || 'Failed to retry', 'Retry failed');
       }
     } catch (error) {
-      console.error('Error retrying illustrations:', error);
-      showError('Failed to retry illustrations', 'Retry failed');
+      console.error('Error retrying book:', error);
+      showError('Failed to retry', 'Retry failed');
     } finally {
       setIsRetrying(null);
     }
