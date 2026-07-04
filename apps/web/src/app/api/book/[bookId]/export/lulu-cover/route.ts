@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
-import { generateLuluCover } from '@/lib/pdf/generateLuluCover';
+import { generateLuluCover } from '@storywink/pdf';
 import { uploadPdfToDropbox } from '@/lib/dropbox';
 import { Book, Page } from '@prisma/client';
+import { loadWebPdfFonts } from '../pdfFonts';
 
 // Define the expected Book type with Pages for the PDF generator
 type BookWithPages = Book & { pages: Page[] };
@@ -77,7 +78,10 @@ export async function POST(
 
     // Generate the cover PDF buffer
     logger.info({ bookId }, 'Generating cover PDF for Lulu...');
-    const pdfBuffer = await generateLuluCover(bookData as BookWithPages);
+    const pdfBuffer = await generateLuluCover(bookData as BookWithPages, {
+      fonts: loadWebPdfFonts(),
+      logger,
+    });
 
     // Upload to Dropbox with public shared link (avoids Cloudinary 10MB limit)
     logger.info({ bookId }, 'Uploading cover PDF to Dropbox...');

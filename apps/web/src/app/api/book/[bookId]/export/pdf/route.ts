@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
-import { generateBookPdf } from '@/lib/pdf/generateBookPdf';
+import { generateBookPdf } from '@storywink/pdf';
 import { isTitlePage } from '@storywink/shared/utils';
 import { Book, Page } from '@prisma/client';
+import { loadWebPdfFonts } from '../pdfFonts';
 
 // Define the expected Book type with Pages for the PDF generator
 type BookWithPages = Book & { pages: Page[] };
@@ -74,9 +75,11 @@ export async function GET(
     const pdfBuffer = await generateBookPdf(
       bookData as BookWithPages,
       {
+        fonts: loadWebPdfFonts(),
         titlePage: titlePageForPdf as Page | undefined,
         includeBackCover: true,
         padToFour: false,
+        logger,
       }
     );
 

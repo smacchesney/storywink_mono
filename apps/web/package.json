@@ -29,6 +29,7 @@
     "@radix-ui/react-tooltip": "^1.2.0",
     "@sparticuz/chromium": "^131.0.1",
     "@storywink/database": "*",
+    "@storywink/pdf": "*",
     "@storywink/shared": "*",
     "@stripe/stripe-js": "^8.5.3",
     "bullmq": "^5.48.1",

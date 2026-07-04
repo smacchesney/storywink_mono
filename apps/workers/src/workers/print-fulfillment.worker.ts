@@ -12,8 +12,8 @@
 import { Job } from 'bullmq';
 import prisma from '../database/client.js';
 import { PrintFulfillmentJob, getLuluLevelByTierKey } from '@storywink/shared';
-import { generateBookPdf } from '../utils/pdf/generateBookPdf.js';
-import { generateLuluCover } from '../utils/pdf/generateLuluCover.js';
+import { generateBookPdf, generateLuluCover } from '@storywink/pdf';
+import { loadWorkerPdfFonts } from '../utils/pdf-fonts.js';
 import { uploadPdfToDropbox } from '../utils/dropbox.js';
 import { getLuluClient } from '../utils/lulu-client.js';
 
@@ -84,16 +84,20 @@ export async function processPrintFulfillment(job: Job<PrintFulfillmentJob>): Pr
     // Report progress: Starting PDF generation
     await job.updateProgress({ stage: 'generating_pdfs', percent: 10 });
 
-    // 3. Generate interior PDF (all pages including cover photo)
+    // Fonts are loaded once and injected into the runtime-agnostic PDF package.
+    const pdfFonts = loadWorkerPdfFonts();
+
+    // 3. Generate interior PDF (all pages including cover photo).
+    // Lulu path uses generator defaults: no title page, no back cover, padded to 4.
     console.log(`[PrintFulfillment] Generating interior PDF (${book.pages.length} pages)...`);
-    const interiorPdfBuffer = await generateBookPdf(book);
+    const interiorPdfBuffer = await generateBookPdf(book, { fonts: pdfFonts });
     console.log(`[PrintFulfillment] Interior PDF generated: ${interiorPdfBuffer.length} bytes`);
 
     await job.updateProgress({ stage: 'interior_pdf_complete', percent: 30 });
 
     // 4. Generate cover PDF
     console.log(`[PrintFulfillment] Generating cover PDF...`);
-    const coverPdfBuffer = await generateLuluCover(book);
+    const coverPdfBuffer = await generateLuluCover(book, { fonts: pdfFonts });
     console.log(`[PrintFulfillment] Cover PDF generated: ${coverPdfBuffer.length} bytes`);
 
     await job.updateProgress({ stage: 'cover_pdf_complete', percent: 50 });
