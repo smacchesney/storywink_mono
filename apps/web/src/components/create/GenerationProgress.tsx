@@ -84,12 +84,12 @@ export function GenerationProgress({ bookId, reviewFirst }: GenerationProgressPr
     if (status === BookStatus.COMPLETED || status === BookStatus.PARTIAL) {
       router.push(`/book/${bookId}/preview`);
     } else if (status === BookStatus.STORY_READY && reviewFirst) {
+      // Review-first path: the book intentionally stops here for manual review.
       router.push(`/create/review?bookId=${bookId}`);
-    } else if (status === BookStatus.STORY_READY && !reviewFirst) {
-      // Auto-chain path stalled at STORY_READY without illustrating — the
-      // library shows live progress from here.
-      router.push('/library');
     }
+    // When reviewFirst is off, STORY_READY is a transient step — the book
+    // auto-chains into ILLUSTRATING, so we keep showing progress. The 8-minute
+    // timeout is the only escape hatch if it never advances.
   }, [status, reviewFirst, bookId, router]);
 
   // Failure surface: swap the shimmer for the retry banner in place.

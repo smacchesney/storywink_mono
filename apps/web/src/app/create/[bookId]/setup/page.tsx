@@ -158,6 +158,8 @@ export default function SetupPage() {
   }, [bookId, getToken, mergeBook, router]);
 
   // Poll for perception fields until title/eventSummary/questions all land.
+  // Perception normally lands within ~15-45s; cap the poll so a failed
+  // perception pass (non-fatal by design) doesn't poll forever.
   useEffect(() => {
     if (isLoading || generating) return;
     const needsTitle = !touched.current.title && !form.title;
@@ -165,7 +167,14 @@ export default function SetupPage() {
     const needsQuestions = !touched.current.captureQuestions && form.captureQuestions.length === 0;
     if (!needsTitle && !needsSummary && !needsQuestions) return;
 
+    let polls = 0;
+    const MAX_POLLS = 40; // ~2 minutes at 3s
     const intervalId = setInterval(async () => {
+      polls += 1;
+      if (polls > MAX_POLLS) {
+        clearInterval(intervalId);
+        return;
+      }
       try {
         const res = await fetch(`/api/book/${bookId}`);
         if (!res.ok || !isMountedRef.current) return;

@@ -25,6 +25,12 @@ interface PageControlsMenuProps {
   bookId: string;
   /** The source page these controls act on (never a cover/dedication page). */
   page: Page;
+  /**
+   * Whether "change photo" is offered. The replace-photo mechanics live in the
+   * resolve flow, which only runs on PARTIAL books — so on a COMPLETED book we
+   * hide the option rather than link to a page that bounces straight back.
+   */
+  canChangePhoto?: boolean;
   /** Called after a mutation so the parent can refresh + resume polling. */
   onMutated: () => void;
 }
@@ -35,7 +41,7 @@ interface PageControlsMenuProps {
  * work end to end here; "change photo" routes to the resolve flow (which owns
  * the replace-photo + re-render mechanics).
  */
-export function PageControlsMenu({ bookId, page, onMutated }: PageControlsMenuProps) {
+export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: PageControlsMenuProps) {
   const t = useTranslations('pageMenu');
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
@@ -113,12 +119,14 @@ export function PageControlsMenu({ bookId, page, onMutated }: PageControlsMenuPr
             <Sparkles className="mr-2 h-4 w-4" />
             {t('newIllustration')}
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => router.push(`/book/${bookId}/resolve?pageId=${page.id}`)}
-          >
-            <ImageIcon className="mr-2 h-4 w-4" />
-            {t('changePhoto')}
-          </DropdownMenuItem>
+          {canChangePhoto && (
+            <DropdownMenuItem
+              onClick={() => router.push(`/book/${bookId}/resolve?pageId=${page.id}`)}
+            >
+              <ImageIcon className="mr-2 h-4 w-4" />
+              {t('changePhoto')}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

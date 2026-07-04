@@ -35,11 +35,14 @@ interface UseBookStatusOptions {
   enabled?: boolean;
 }
 
+// Statuses at which polling can stop for good. STORY_READY is deliberately
+// NOT here: in the auto-illustrate flow it's a transient step on the way to
+// ILLUSTRATING, so we keep polling. Callers that stop at STORY_READY (the
+// review-first path) navigate away, which unmounts the hook.
 const TERMINAL_STATUSES: BookStatus[] = [
   BookStatus.COMPLETED,
   BookStatus.PARTIAL,
   BookStatus.FAILED,
-  BookStatus.STORY_READY,
 ];
 
 /**
