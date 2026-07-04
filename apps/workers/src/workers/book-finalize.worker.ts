@@ -7,6 +7,7 @@ import { createBullMQConnection } from '@storywink/shared/redis';
 import OpenAI from 'openai';
 import { optimizeCloudinaryUrlForVision } from '@storywink/shared/utils';
 import { createQCPrompt, QC_SYSTEM_PROMPT, QC_RESPONSE_SCHEMA } from '@storywink/shared/prompts/quality-check';
+import { ANALYSIS_MODEL } from '../config/models.js';
 import pino from 'pino';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -61,7 +62,7 @@ async function runQualityCheck(
   contentParts.push({ type: 'input_text', text: promptText });
 
   const result = await openai.responses.create({
-    model: 'gpt-5-mini',
+    model: ANALYSIS_MODEL,
     instructions: QC_SYSTEM_PROMPT,
     input: [{ role: 'user', content: contentParts }],
     text: {

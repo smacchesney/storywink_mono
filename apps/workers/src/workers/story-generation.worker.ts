@@ -11,6 +11,7 @@ import {
   STORY_RESPONSE_SCHEMA,
 } from '@storywink/shared/prompts/story';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
+import { STORY_MODEL } from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -152,7 +153,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
 
     // Call OpenAI with vision for story generation
     const result = await openai.responses.create({
-      model: 'gpt-5-mini',
+      model: STORY_MODEL,
       instructions: STORY_GENERATION_SYSTEM_PROMPT,
       input: [{ role: 'user', content: contentParts }],
       text: {
@@ -482,7 +483,7 @@ async function processSinglePageTextGeneration(
   } as const;
 
   const result = await openai.responses.create({
-    model: 'gpt-5-mini',
+    model: STORY_MODEL,
     instructions: STORY_GENERATION_SYSTEM_PROMPT,
     input: [
       {
