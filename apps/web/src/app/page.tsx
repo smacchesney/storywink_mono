@@ -123,21 +123,66 @@ export default function Home() {
           </div>
         </section>
 
-        {/* How It Works Section */}
-        <section className="py-6 md:py-12 px-4">
-          <div className="max-w-3xl mx-auto">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 dark:text-white text-center mb-8 md:mb-12">
+        {/* How It Works Section — responsive 3-column, real localized text */}
+        <section className="py-8 md:py-14 px-4">
+          <div className="max-w-5xl mx-auto">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-ink dark:text-white text-center mb-10 md:mb-14">
               <span className="font-playful">{t('howItWorksPrefix')}</span>{' '}
-              <span className="font-playful" style={{ color: '#F76C5E' }}>{t('howItWorksSuffix')}</span>
+              <span className="font-playful text-coral">{t('howItWorksSuffix')}</span>
             </h2>
-            <Image
-              src="https://res.cloudinary.com/storywink/image/upload/v1774702929/use-this-how-to_vq0hey.png"
-              alt={t('howItWorksAlt')}
-              width={1200}
-              height={600}
-              className="w-full h-auto"
-              priority={false}
-            />
+
+            <ol className="relative grid grid-cols-1 gap-10 sm:grid-cols-3 sm:gap-6">
+              {/* Dotted connector across the three steps (desktop only) */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute left-0 right-0 top-6 hidden border-t-2 border-dashed border-coral/30 sm:block"
+                style={{ marginLeft: '16.6%', marginRight: '16.6%' }}
+              />
+
+              {[
+                {
+                  n: 1,
+                  img: 'https://res.cloudinary.com/storywink/image/upload/c_crop,x_100,y_540,w_880,h_700/f_auto,q_auto,w_520/v1774702929/use-this-how-to_vq0hey.png',
+                  title: t('step1Title'),
+                  caption: t('step1Caption'),
+                },
+                {
+                  n: 2,
+                  img: 'https://res.cloudinary.com/storywink/image/upload/c_crop,x_1060,y_530,w_900,h_740/f_auto,q_auto,w_520/v1774702929/use-this-how-to_vq0hey.png',
+                  title: t('step2Title'),
+                  caption: t('step2Caption'),
+                },
+                {
+                  n: 3,
+                  img: 'https://res.cloudinary.com/storywink/image/upload/c_crop,x_2075,y_540,w_900,h_720/f_auto,q_auto,w_520/v1774702929/use-this-how-to_vq0hey.png',
+                  title: t('step3Title'),
+                  caption: t('step3Caption'),
+                },
+              ].map((step) => (
+                <li key={step.n} className="relative flex flex-col items-center text-center">
+                  {/* Number badge */}
+                  <span className="relative z-10 mb-4 flex h-12 w-12 items-center justify-center rounded-full border-2 border-coral bg-white font-playful text-xl font-bold text-coral shadow-sm">
+                    {step.n}
+                  </span>
+                  {/* Mascot vignette */}
+                  <div className="mb-4 flex h-40 w-full items-end justify-center sm:h-44">
+                    <Image
+                      src={step.img}
+                      alt={step.title}
+                      width={260}
+                      height={200}
+                      className="h-full w-auto object-contain"
+                    />
+                  </div>
+                  <h3 className="mb-1 font-playful text-xl text-ink dark:text-white">
+                    {step.title}
+                  </h3>
+                  <p className="max-w-[15rem] text-sm text-ink-soft dark:text-slate-300">
+                    {step.caption}
+                  </p>
+                </li>
+              ))}
+            </ol>
           </div>
         </section>
 
