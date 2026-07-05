@@ -38,6 +38,7 @@
     "step3Title": "宝物になる一冊",
     "step3Caption": "印刷してご自宅までお届け",
     "faq": "よくある質問",
+    "faqMascotAlt": "Storywink の猫と犬のマスコット",
     "faq1Q": "Storywink.ai はどうやってオリジナル絵本をつくるの？",
     "faq1A": "お子さまの写真をアップロードするだけで、AI が写真をもとにイラストを描き、お子さまが主人公の楽しいストーリーをつくります。",
     "faq2Q": "何歳くらいの子ども向けですか？",
@@ -326,7 +327,7 @@
     "retry": "もう一度試す"
   },
   "footer": {
-    "copyright": "Storywink.ai © {year} All rights reserved.",
+    "copyright": "© {year} All rights reserved.",
     "terms": "利用規約",
     "privacy": "プライバシー"
   }

@@ -38,6 +38,7 @@
     "step3Title": "A book they'll treasure",
     "step3Caption": "Printed & delivered to your door",
     "faq": "Frequently Asked Questions",
+    "faqMascotAlt": "Storywink cat and dog mascots",
     "faq1Q": "How does Storywink.ai create personalized storybooks?",
     "faq1A": "Simply upload photos of your child, and our AI will transform them into beautiful illustrated characters. We then craft engaging stories around their adventures, making them the hero of their own tale.",
     "faq2Q": "What age group is Storywink.ai designed for?",
@@ -326,7 +327,7 @@
     "retry": "Try Again"
   },
   "footer": {
-    "copyright": "Storywink.ai © {year} All rights reserved.",
+    "copyright": "© {year} All rights reserved.",
     "terms": "Terms",
     "privacy": "Privacy"
   }

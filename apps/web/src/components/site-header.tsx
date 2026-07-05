@@ -55,7 +55,7 @@ function LanguageSwitcher({ className }: { className?: string }) {
             <button
               key={lang}
               onClick={() => switchLocale(lang)}
-              className={`w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 ${lang === locale ? 'font-bold text-[#F76C5E]' : ''}`}
+              className={`w-full text-left px-3 py-1.5 text-sm hover:bg-coral-soft ${lang === locale ? 'font-bold text-coral' : ''}`}
             >
               {LANGUAGE_LABELS[lang] || lang}
             </button>
@@ -103,14 +103,15 @@ export function SiteHeader() {
         <div className="hidden md:flex items-center">
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <Image
-              src="https://res.cloudinary.com/storywink/image/upload/v1772291379/Screenshot_2026-02-28_at_10.55.32_PM_copy_xxjms6.png"
+              src="https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto,h_124/v1772291379/Screenshot_2026-02-28_at_10.55.32_PM_copy_xxjms6.png"
               alt={t('mascotAlt')}
-              width={160}
-              height={80}
+              width={124}
+              height={62}
               className="h-[62px] w-auto"
+              priority
             />
-            <span className="hidden font-bold text-3xl sm:inline-block text-slate-900 dark:text-white font-playful">
-              Storywin<span className="text-[#F76C5E]">k.ai</span>
+            <span className="hidden font-bold text-3xl sm:inline-block text-ink dark:text-white font-playful">
+              Storywin<span className="text-coral">k.ai</span>
             </span>
           </Link>
         </div>
@@ -119,14 +120,15 @@ export function SiteHeader() {
         <div className="flex items-center md:hidden">
           <Link href="/" className="flex items-center space-x-2">
             <Image
-              src="https://res.cloudinary.com/storywink/image/upload/v1772291379/Screenshot_2026-02-28_at_10.55.32_PM_copy_xxjms6.png"
+              src="https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto,h_104/v1772291379/Screenshot_2026-02-28_at_10.55.32_PM_copy_xxjms6.png"
               alt={t('mascotAlt')}
-              width={128}
-              height={64}
+              width={104}
+              height={52}
               className="h-[52px] w-auto"
+              priority
             />
-            <span className="font-bold text-2xl sm:inline-block text-slate-900 dark:text-white font-playful">
-              Storywin<span className="text-[#F76C5E]">k.ai</span>
+            <span className="font-bold text-2xl sm:inline-block text-ink dark:text-white font-playful">
+              Storywin<span className="text-coral">k.ai</span>
             </span>
           </Link>
         </div>
@@ -145,13 +147,12 @@ export function SiteHeader() {
                 </Button>
              </SignedOut>
              <SignedIn>
-                 <Link
-                  href="/library"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#F76C5E] text-white rounded-md font-playful text-sm hover:bg-[#e55d4f] transition-all group"
-                >
-                  {t('toMyStories')}
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Link>
+                 <Button asChild className="group font-playful">
+                   <Link href="/library">
+                     {t('toMyStories')}
+                     <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                   </Link>
+                 </Button>
                  <NotificationBell />
                  <LanguageSwitcher />
                  <div className="flex items-center ml-2">
@@ -186,14 +187,12 @@ export function SiteHeader() {
         >
           <nav className="container flex flex-col space-y-2 p-4">
             <SignedIn>
-              <Link
-                href="/library"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-[#F76C5E] text-white rounded-md font-playful text-sm hover:bg-[#e55d4f] transition-all group w-fit"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                {t('toMyStories')}
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </Link>
+              <Button asChild className="group font-playful w-fit">
+                <Link href="/library" onClick={() => setIsMobileMenuOpen(false)}>
+                  {t('toMyStories')}
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </Link>
+              </Button>
               <div className="py-2">
                 <UserButton afterSignOutUrl="/" />
               </div>

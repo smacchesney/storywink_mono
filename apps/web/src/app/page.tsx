@@ -69,11 +69,11 @@ export default function Home() {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen relative">
+    <div className="relative">
       <PlayfulBackground variant="landing" />
-      <main className="flex-grow relative z-10">
+      <div className="relative z-10">
         {/* Hero Section */}
-        <section className="text-center px-4 py-8 md:py-14 relative">
+        <section className="text-center px-4 py-8 md:py-14 relative overflow-x-clip">
           <div className="max-w-4xl mx-auto">
             <AnimatedHeroText
               lead={t('heroLead')}
@@ -191,13 +191,13 @@ export default function Home() {
           <div className="text-center mb-8 md:mb-12">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-4">
               <Image
-                src="https://res.cloudinary.com/storywink/image/upload/v1772291623/Screenshot_2026-02-28_at_11.12.00_PM_df2xpk.png"
-                alt="Kai the Dino FAQ"
+                src="https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto,h_240/v1772291623/Screenshot_2026-02-28_at_11.12.00_PM_df2xpk.png"
+                alt={t('faqMascotAlt')}
                 width={240}
                 height={240}
                 className="h-24 w-24 md:h-[120px] md:w-[120px]"
               />
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 dark:text-white">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-ink dark:text-white">
                 {t('faq')}
               </h2>
             </div>
@@ -207,25 +207,24 @@ export default function Home() {
             {faqItems.map((item, index) => (
               <div
                 key={index}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border-l-4 overflow-hidden"
-                style={{ borderLeftColor: 'var(--coral-primary)' }}
+                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border-l-4 border-coral overflow-hidden"
               >
                 <button
                   onClick={() => toggleFAQ(index)}
-                  className="w-full p-5 md:p-6 text-left flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className="w-full p-5 md:p-6 text-left flex items-center justify-between hover:bg-coral-soft/60 dark:hover:bg-gray-700 transition-colors"
                 >
-                  <h3 className="text-base md:text-lg font-semibold text-slate-900 dark:text-white pr-4">
+                  <h3 className="text-base md:text-lg font-semibold text-ink dark:text-white pr-4">
                     {item.question}
                   </h3>
                   {expandedFAQ === index ? (
-                    <ChevronUp className="h-5 w-5 flex-shrink-0" style={{ color: 'var(--coral-primary)' }} />
+                    <ChevronUp className="h-5 w-5 flex-shrink-0 text-coral transition-transform" />
                   ) : (
-                    <ChevronDown className="h-5 w-5 text-slate-400 flex-shrink-0" />
+                    <ChevronDown className="h-5 w-5 flex-shrink-0 text-slate-400 transition-transform" />
                   )}
                 </button>
                 {expandedFAQ === index && (
                   <div className="px-5 md:px-6 pb-5 md:pb-6">
-                    <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                    <p className="text-ink-soft dark:text-slate-300 leading-relaxed">
                       {item.answer}
                     </p>
                   </div>
@@ -239,7 +238,7 @@ export default function Home() {
           onClose={() => setSelectedBook(null)}
           onCtaClick={handleCreateStorybookClick}
         />
-      </main>
+      </div>
     </div>
   );
 }
