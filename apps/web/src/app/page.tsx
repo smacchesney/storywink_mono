@@ -71,11 +71,21 @@ export default function Home() {
     <div className="flex flex-col min-h-screen relative">
       <main className="flex-grow relative z-10">
         {/* Hero Section */}
-        <section className="text-center px-4 py-8 md:py-12 relative">
+        <section className="text-center px-4 py-8 md:py-14 relative">
           <div className="max-w-4xl mx-auto">
-            <AnimatedHeroText />
+            <AnimatedHeroText
+              lead={t('heroLead')}
+              trail={t('heroTrail')}
+              rotatingWords={[
+                t('heroWord1'),
+                t('heroWord2'),
+                t('heroWord3'),
+                t('heroWord4'),
+                t('heroWord5'),
+              ]}
+            />
 
-            <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 mb-5 max-w-2xl mx-auto">
+            <p className="mt-5 mb-6 max-w-xl mx-auto text-base sm:text-lg text-ink-soft dark:text-slate-300">
               {t('heroSubtitle')}
             </p>
 
@@ -83,14 +93,14 @@ export default function Home() {
               <Button
                 size="lg"
                 variant="default"
-                className="w-full sm:w-auto px-8 py-3 md:px-10 md:py-4 text-lg md:text-xl bg-[#F76C5E] text-white hover:bg-[#e55d4f] transition-all rounded-full font-playful group"
+                className="group w-full sm:w-auto px-9 py-4 text-lg md:text-xl font-playful shadow-md shadow-coral/25"
                 onClick={handleCreateStorybookClick}
                 disabled={!isLoaded}
               >
                 {isButtonLoading ? tc('loading') : (
                   <>
                     <svg
-                      className="mr-2 h-5 w-5 transition-transform group-hover:scale-125 group-hover:rotate-12"
+                      className="mr-1 h-5 w-5 transition-transform group-hover:scale-125 group-hover:rotate-12"
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
