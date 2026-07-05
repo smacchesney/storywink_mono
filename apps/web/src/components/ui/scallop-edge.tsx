@@ -26,8 +26,10 @@ export function ScallopEdge({
   className,
   style,
 }: ScallopEdgeProps) {
-  const W = 44; // bump width
-  const H = 16; // scallop depth
+  // Wider, softer bumps read as clouds; the previous 44px tile felt like
+  // ric-rac trim at desktop widths.
+  const W = 72; // bump width
+  const H = 20; // scallop depth
   const PAD = 4; // vertical breathing room so the 2px stroke never clips
   const height = H + PAD;
 

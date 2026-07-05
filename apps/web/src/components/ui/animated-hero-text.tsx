@@ -18,9 +18,11 @@ interface AnimatedHeroTextProps {
 /**
  * Cohesive hero headline with a single inline rotating word.
  *
- * The rotating word lives in a fixed-width inline-block slot sized to the
- * longest word, so the surrounding sentence never reflows and the animation
- * never overlaps neighbouring copy — the two bugs in the previous version.
+ * The slot hugs the CURRENT word and animates its width between words, so
+ * the sentence reads naturally ("...your little Hero") with no dead gap —
+ * while the animation still never overlaps neighbouring copy. Every word is
+ * pre-measured from hidden sizers; widths re-measure on resize because the
+ * headline's font size changes across breakpoints.
  */
 function AnimatedHeroText({
   lead = "Turn memories into a picturebook starring your little",
@@ -32,28 +34,37 @@ function AnimatedHeroText({
   const [index, setIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
   const prefersReduced = useReducedMotion();
-  const slotRef = useRef<HTMLSpanElement>(null);
-  const [slotWidth, setSlotWidth] = useState<number | undefined>(undefined);
+  const sizerRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const [widths, setWidths] = useState<number[] | null>(null);
 
   const words = useMemo(
     () => (rotatingWords.length ? rotatingWords : ["Hero"]),
     [rotatingWords],
-  );
-  const longest = useMemo(
-    () => words.reduce((a, b) => (b.length > a.length ? b : a), ""),
-    [words],
   );
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Measure the widest word once (via a hidden sizer) so the slot is fixed.
+  // Measure every word (hidden sizers share the h1's font styles) and
+  // re-measure when the viewport resizes across font-size breakpoints.
   useEffect(() => {
-    if (slotRef.current) {
-      setSlotWidth(slotRef.current.getBoundingClientRect().width);
-    }
-  }, [longest, mounted]);
+    const measure = () => {
+      const next = words.map((_, i) => sizerRefs.current[i]?.offsetWidth ?? 0);
+      if (next.every((w) => w > 0)) setWidths(next);
+    };
+    measure();
+    let raf = 0;
+    const onResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(measure);
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [words, mounted]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -65,27 +76,46 @@ function AnimatedHeroText({
   }, [index, words.length, interval, mounted]);
 
   const current = words[index];
+  const currentWidth = widths?.[index];
 
   return (
     <h1
       className={`text-balance text-3xl font-bold leading-[1.12] tracking-tight text-ink sm:text-4xl md:text-5xl lg:text-[3.4rem] ${className}`}
     >
       {lead ? <span>{lead} </span> : null}
-      {/* Fixed-width slot — sized to the longest word, never reflows */}
-      <span
-        className="relative inline-flex items-center justify-center align-baseline font-playful text-coral"
-        style={{ width: slotWidth ? `${slotWidth}px` : undefined }}
+      <motion.span
+        className="relative inline-flex justify-center overflow-visible align-baseline font-playful text-coral"
+        animate={
+          currentWidth !== undefined && !prefersReduced
+            ? { width: currentWidth }
+            : undefined
+        }
+        style={
+          currentWidth !== undefined && prefersReduced
+            ? { width: currentWidth }
+            : undefined
+        }
+        transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
       >
-        {/* Hidden sizer establishes the slot width for the longest word */}
-        <span ref={slotRef} aria-hidden className="invisible whitespace-nowrap">
-          {longest}
+        {/* Hidden sizers: one per word, inheriting the exact slot typography */}
+        <span aria-hidden className="pointer-events-none absolute left-0 top-0 -z-10 select-none opacity-0">
+          {words.map((word, i) => (
+            <span
+              key={word}
+              ref={(el) => {
+                sizerRefs.current[i] = el;
+              }}
+              className="inline-block whitespace-nowrap"
+            >
+              {word}
+            </span>
+          ))}
         </span>
         {mounted && !prefersReduced ? (
           <AnimatePresence mode="wait">
             <motion.span
               key={current}
-              className="absolute left-1/2 whitespace-nowrap"
-              style={{ x: "-50%" }}
+              className="whitespace-nowrap"
               initial={{ opacity: 0, y: "0.32em" }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: "-0.32em" }}
@@ -95,14 +125,9 @@ function AnimatedHeroText({
             </motion.span>
           </AnimatePresence>
         ) : (
-          <span
-            className="absolute left-1/2 whitespace-nowrap"
-            style={{ transform: "translateX(-50%)" }}
-          >
-            {current}
-          </span>
+          <span className="whitespace-nowrap">{current}</span>
         )}
-      </span>
+      </motion.span>
       {trail ? <span> {trail}</span> : null}
     </h1>
   );
