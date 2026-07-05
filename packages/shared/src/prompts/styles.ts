@@ -58,8 +58,38 @@ function imageCountText(refCount: number): string {
 }
 
 // ----------------------------------
+// SOURCE HIERARCHY (shared arbitration block)
+// ----------------------------------
+
+/**
+ * The single arbitration rule between the photo and the canonical character
+ * reference. Byte-identical on every page, cover, and (later) character-sheet
+ * prompt — the model must never see two prompts that resolve the
+ * photo-vs-reference fight differently.
+ */
+export const PEOPLE_SOURCE_HIERARCHY = `PEOPLE - SOURCE HIERARCHY (non-negotiable):
+Every person in the illustration must be immediately recognizable to their own family.
+Two sources describe the people in this scene. Apply them in this exact order:
+1. IDENTITY — face shape, hair color/style/length, skin tone, and distinguishing features (glasses, freckles, dimples): follow the CHARACTER IDENTITY reference when one is provided below. It is the canonical source; when the photo is ambiguous or disagrees on these features (lighting, angle, shadow, hat), the CHARACTER IDENTITY reference wins.
+2. THIS PAGE'S PHOTO — pose, body position, expression, clothing, other people present, and scene composition: follow the photo exactly. Never copy clothing, poses, or people from any style reference image.
+If no CHARACTER IDENTITY reference is provided, match every feature to the photo. If a feature is hidden in the photo (hat, angle, shadow) and no reference describes it, keep it hidden — never invent.`;
+
+// ----------------------------------
 // VIGNETTE STYLE
 // ----------------------------------
+
+/**
+ * Frozen style bible — byte-identical in the interior and cover prompts (and
+ * later the character-sheet prompt). Never paraphrase this block per builder.
+ */
+const VIGNETTE_STYLE_BIBLE = `ARTISTIC STYLE (Primary directive): Fully transform this into a hand-drawn/painted children's book illustration matching the style from the reference image(s). Apply its complete aesthetic: color palette, brush techniques, line work, textures, shading, and lighting approach. The final image must look like a hand-illustrated children's book page, not a filtered photograph—while keeping people precisely recognizable. Replace all photographic elements (realistic textures, camera lighting, photo grain) with illustrated equivalents. Backgrounds should be simplified into clean illustrated shapes and forms. Style emphasis: Create a vignette-style illustration with soft, organic edges that fade into PURE WHITE (#FFFFFF). The vignette edges and any background showing through must be pure white, not off-white, cream, or gray. Match the watercolor/pencil aesthetic, warm color palette, and hand-drawn quality shown in the reference images. Fill the entire canvas with the illustration. SCENE INTERPRETATION (Secondary directive): Use the first image as reference for: character/subject identity and their pose, the spatial layout and composition, key recognizable objects that establish the setting. Translate these elements into illustration form - a wooden fence becomes illustrated wood with simple line work, not photographic grain; metal becomes clean illustrated surfaces with simple highlights, not realistic reflections. Simplify complex backgrounds into essential illustrated elements while keeping the scene recognizable. FACIAL RENDERING STYLE (critical for consistency across pages):
+Render ALL faces using a simplified children's book style as shown in the reference images:
+- Eyes: small, simple dots or short curved lines — NOT detailed realistic eyes
+- Nose: tiny dot, small L-shape, or simple curved line — minimal and understated
+- Mouth: simple curved line for smiles, small open shape for expressions
+- Cheeks: soft rosy circles on cheeks for warmth
+- Keep facial details minimal and consistent — simpler faces are more consistent across pages
+This simplified face style must be applied uniformly to every person (adults and children alike) while still preserving each person's distinguishing features (hair, skin tone, face shape, glasses, facial hair, etc.) so they remain recognizable. A parent must look at your illustration and instantly recognize their child and family.`;
 
 function vignetteInteriorPrompt(ctx: StylePromptContext): string {
   const refCount = ctx.referenceImageCount || 1;
@@ -67,28 +97,9 @@ function vignetteInteriorPrompt(ctx: StylePromptContext): string {
   const sections = [
     `Create a children's picture book illustration ${imageCountText(refCount)}`,
 
-    `ARTISTIC STYLE (Primary directive): Fully transform this into a hand-drawn/painted children's book illustration matching the style from the reference image(s). Apply its complete aesthetic: color palette, brush techniques, line work, textures, shading, and lighting approach. The final image must look like a hand-illustrated children's book page, not a filtered photograph—while keeping people precisely recognizable. Replace all photographic elements (realistic textures, camera lighting, photo grain) with illustrated equivalents. Backgrounds should be simplified into clean illustrated shapes and forms. Style emphasis: Create a vignette-style illustration with soft, organic edges that fade into PURE WHITE (#FFFFFF). The vignette edges and any background showing through must be pure white, not off-white, cream, or gray. Match the watercolor/pencil aesthetic, warm color palette, and hand-drawn quality shown in the reference images. Fill the entire canvas with the illustration.`,
+    VIGNETTE_STYLE_BIBLE,
 
-    `SCENE INTERPRETATION (Secondary directive): Use the first image as reference for: character/subject identity and their pose, the spatial layout and composition, key recognizable objects that establish the setting. Translate these elements into illustration form - a wooden fence becomes illustrated wood with simple line work, not photographic grain; metal becomes clean illustrated surfaces with simple highlights, not realistic reflections. Simplify complex backgrounds into essential illustrated elements while keeping the scene recognizable.`,
-
-    `PEOPLE - STRICT FIDELITY (non-negotiable):
-Every person in the illustration must be immediately recognizable from the source photo.
-- Face shape, expression: match the source photo
-- Hair color, style, length: exact match to what's visible
-- Skin tone: exact match
-- Body proportions, clothing: exact match
-- If any feature is hidden (hat, angle, shadow): keep it hidden—never invent
-
-FACIAL RENDERING STYLE (critical for consistency across pages):
-Render ALL faces using a simplified children's book style as shown in the reference images:
-- Eyes: small, simple dots or short curved lines — NOT detailed realistic eyes
-- Nose: tiny dot, small L-shape, or simple curved line — minimal and understated
-- Mouth: simple curved line for smiles, small open shape for expressions
-- Cheeks: soft rosy circles on cheeks for warmth
-- Keep facial details minimal and consistent — simpler faces are more consistent across pages
-This simplified face style must be applied uniformly to every person (adults and children alike) while still preserving each person's distinguishing features (hair, skin tone, face shape, glasses, facial hair, etc.) so they remain recognizable.
-
-DO NOT reimagine or invent features for any person. A parent must look at your illustration and instantly recognize their child and family.`,
+    PEOPLE_SOURCE_HIERARCHY,
   ];
 
   // Dynamic effects
@@ -113,28 +124,9 @@ function vignetteCoverPrompt(ctx: StylePromptContext): string {
   const sections = [
     `Create a children's picture book illustration ${imageCountText(refCount)}`,
 
-    `ARTISTIC STYLE (Primary directive): Fully transform this into a hand-drawn/painted children's book illustration matching the style from the reference image(s). Apply its complete aesthetic: color palette, brush techniques, line work, textures, shading, and lighting approach. The final image must look like a hand-illustrated children's book page, not a filtered photograph—while keeping people precisely recognizable. Replace all photographic elements (realistic textures, camera lighting, photo grain) with illustrated equivalents. Backgrounds should be simplified into clean illustrated shapes and forms. Style emphasis: Create a vignette-style illustration with soft, organic edges that fade into PURE WHITE (#FFFFFF). The vignette edges and any background showing through must be pure white, not off-white, cream, or gray. Match the watercolor/pencil aesthetic, warm color palette, and hand-drawn quality shown in the reference images. Fill the entire canvas with the illustration.`,
+    VIGNETTE_STYLE_BIBLE,
 
-    `SCENE INTERPRETATION (Secondary directive): Use the first image as reference for: character/subject identity and their pose, the spatial layout and composition, key recognizable objects that establish the setting. Translate these elements into illustration form - a wooden fence becomes illustrated wood with simple line work, not photographic grain; metal becomes clean illustrated surfaces with simple highlights, not realistic reflections. Simplify complex backgrounds into essential illustrated elements while keeping the scene recognizable.`,
-
-    `PEOPLE - STRICT FIDELITY (non-negotiable):
-Every person in the illustration must be immediately recognizable from the source photo.
-- Face shape, expression: match the source photo
-- Hair color, style, length: exact match to what's visible
-- Skin tone: exact match
-- Body proportions, clothing: exact match
-- If any feature is hidden (hat, angle, shadow): keep it hidden—never invent
-
-FACIAL RENDERING STYLE (critical for consistency across pages):
-Render ALL faces using a simplified children's book style as shown in the reference images:
-- Eyes: small, simple dots or short curved lines — NOT detailed realistic eyes
-- Nose: tiny dot, small L-shape, or simple curved line — minimal and understated
-- Mouth: simple curved line for smiles, small open shape for expressions
-- Cheeks: soft rosy circles on cheeks for warmth
-- Keep facial details minimal and consistent — simpler faces are more consistent across pages
-This simplified face style must be applied uniformly to every person (adults and children alike) while still preserving each person's distinguishing features (hair, skin tone, face shape, glasses, facial hair, etc.) so they remain recognizable.
-
-DO NOT reimagine or invent features for any person. A parent must look at your illustration and instantly recognize their child and family.`,
+    PEOPLE_SOURCE_HIERARCHY,
 
     `Text: Add the title "${ctx.bookTitle}" in a bold, readable hand-drawn font matching the reference images' text style. Use a Coral (#F76C5E) fill color with a black outline/stroke on the lettering. Position naturally without covering important subjects. Size appropriately (5-7% of image height).`,
   ];
@@ -147,6 +139,46 @@ DO NOT reimagine or invent features for any person. A parent must look at your i
 // ----------------------------------
 
 /**
+ * Frozen style bible — byte-identical in the interior and cover prompts (and
+ * later the character-sheet prompt). Never paraphrase this block per builder.
+ */
+const ORIGAMI_STYLE_BIBLE = [
+  `The aesthetic is a handmade paper collage — layered cut paper and simple folded forms — NOT a photograph of a 3D miniature model. Square format, pure white background.`,
+
+  `CONSTRUCTION METHOD:
+- All elements are built from flat cut paper shapes layered on top of each other with subtle depth between layers
+- Characters and objects use simple geometric paper folds — angular, blocky, chunky construction with visible straight creases and clean-cut edges
+- Depth is minimal and comes from paper layering (like a shadow box or layered collage), not from full 3D sculpted origami
+- Paper texture is visible throughout — matte, slightly fibrous, with cut edges showing the paper thickness
+- No glossy surfaces, no digital smoothness`,
+
+  `PROPORTIONS & CHARACTER STYLE:
+- Child characters have a large head (~40% of total height), approximately 1:2.5 head-to-body ratio
+- Bodies are blocky and geometric: rectangular torso, angular folded limbs, chunky hands
+- Heads are rounded but slightly flattened — more oval panel than sphere
+- Faces are ALWAYS: two small black dot eyes, one small curved pencil line for a smile. No other facial features. No eyebrows, no nose detail, no complex expressions.
+- Hair is flat layered paper pieces in a single color matching the child's actual hair color`,
+
+  `COLOR PALETTE:
+- Warm, slightly muted matte tones — NOT hyper-saturated primaries
+- Think craft paper colors: dusty blues, warm browns, tan, olive green, muted red, soft coral, cream, earthy yellow
+- Skin tones in warm matte paper (beige, tan, light brown) matching the child's actual skin tone
+- No gradients, no metallic, no gloss, no neon or electric colors
+- The overall palette should feel cohesive and warm, like paper sourced from the same craft store`,
+
+  `LIGHTING & RENDERING:
+- Soft, flat, even lighting — no dramatic shadows or spotlight effects
+- No depth of field blur — everything is in focus
+- Subtle, natural shadows only where paper layers overlap (thin edge shadows from layering)
+- The image should look like a scanned paper collage or a carefully lit flat-lay photograph of paper art`,
+
+  `CLOTHING & APPEARANCE:
+- The child's clothing must match EXACTLY what is shown in the reference photo, translated into flat, angular paper-craft construction (face, hair, and skin follow the PEOPLE - SOURCE HIERARCHY)
+- Stay faithful to the specific outfit colors and accessories visible in the photo
+- Clothing is represented as distinct layered paper shapes (e.g., a vest is a separate paper piece layered over the shirt piece)`,
+].join(' ');
+
+/**
  * Shared origami base prompt sections (used by both interior and cover).
  * Returns the sections as an array for the caller to extend.
  */
@@ -154,39 +186,11 @@ function origamiBaseSections(ctx: StylePromptContext): string[] {
   const refCount = ctx.referenceImageCount || 1;
 
   return [
-    `Create a flat, layered paper-craft illustration ${imageCountText(refCount)} The aesthetic is a handmade paper collage — layered cut paper and simple folded forms — NOT a photograph of a 3D miniature model. Square format, pure white background.`,
+    `Create a flat, layered paper-craft illustration ${imageCountText(refCount)}`,
 
-    `CONSTRUCTION METHOD:
-- All elements are built from flat cut paper shapes layered on top of each other with subtle depth between layers
-- Characters and objects use simple geometric paper folds — angular, blocky, chunky construction with visible straight creases and clean-cut edges
-- Depth is minimal and comes from paper layering (like a shadow box or layered collage), not from full 3D sculpted origami
-- Paper texture is visible throughout — matte, slightly fibrous, with cut edges showing the paper thickness
-- No glossy surfaces, no digital smoothness`,
+    ORIGAMI_STYLE_BIBLE,
 
-    `PROPORTIONS & CHARACTER STYLE:
-- Child characters have a large head (~40% of total height), approximately 1:2.5 head-to-body ratio
-- Bodies are blocky and geometric: rectangular torso, angular folded limbs, chunky hands
-- Heads are rounded but slightly flattened — more oval panel than sphere
-- Faces are ALWAYS: two small black dot eyes, one small curved pencil line for a smile. No other facial features. No eyebrows, no nose detail, no complex expressions.
-- Hair is flat layered paper pieces in a single color matching the child's actual hair color`,
-
-    `COLOR PALETTE:
-- Warm, slightly muted matte tones — NOT hyper-saturated primaries
-- Think craft paper colors: dusty blues, warm browns, tan, olive green, muted red, soft coral, cream, earthy yellow
-- Skin tones in warm matte paper (beige, tan, light brown) matching the child's actual skin tone
-- No gradients, no metallic, no gloss, no neon or electric colors
-- The overall palette should feel cohesive and warm, like paper sourced from the same craft store`,
-
-    `LIGHTING & RENDERING:
-- Soft, flat, even lighting — no dramatic shadows or spotlight effects
-- No depth of field blur — everything is in focus
-- Subtle, natural shadows only where paper layers overlap (thin edge shadows from layering)
-- The image should look like a scanned paper collage or a carefully lit flat-lay photograph of paper art`,
-
-    `CLOTHING & APPEARANCE:
-- The child's clothing, hair, and appearance must match EXACTLY what is shown in the reference photo, translated into flat, angular paper-craft construction
-- Stay faithful to the specific outfit colors and accessories visible in the photo
-- Clothing is represented as distinct layered paper shapes (e.g., a vest is a separate paper piece layered over the shirt piece)`,
+    PEOPLE_SOURCE_HIERARCHY,
   ];
 }
 
@@ -247,29 +251,28 @@ function origamiCoverPrompt(ctx: StylePromptContext): string {
 // ----------------------------------
 
 /**
- * Shared kawaii base prompt sections (used by both interior and cover).
- * Returns the sections as an array for the caller to extend.
+ * Frozen style bible — byte-identical in the interior and cover prompts (and
+ * later the character-sheet prompt). Never paraphrase this block per builder.
  */
-function kawaiiBaseSections(): string[] {
-  return [
-    `LINE WORK:
+const KAWAII_STYLE_BIBLE = [
+  `LINE WORK:
 - Soft, rounded black outlines with a hand-drawn brush pen quality
 - Lines are slightly thicker on outer contours, slightly thinner on interior details
 - All corners and edges are rounded — nothing sharp or angular
 - Lines are clean but not perfectly mechanical — gentle, organic warmth`,
 
-    `COLORING & TEXTURE:
+  `COLORING & TEXTURE:
 - Soft, warm pastel-leaning colors with subtle watercolor/crayon grain texture throughout
 - Nothing is perfectly smooth or flat — gentle textured quality as if applied with colored pencil or soft watercolor
 - Warm and muted palette: sage green, soft pink, warm cream/yellow, light sky blue, tan, dusty rose, warm brown, soft coral, muted orange
 - No harsh or neon colors`,
 
-    `CHARACTER PROPORTIONS:
+  `CHARACTER PROPORTIONS:
 - Children: large round head (~1:2 head-to-body ratio), chunky short limbs, small rounded hands, soft rounded body shapes
 - Adults: smaller head relative to body (~1:3.5 ratio), still soft and rounded
 - All characters have soft, rounded forms`,
 
-    `FACES (CRITICAL — apply to EVERY character):
+  `FACES (CRITICAL — apply to EVERY character):
 - Eyes: small solid black oval dots, slightly vertical, placed low on face with wide spacing. Or happy closed eyes (downward-curved arcs) when showing joy.
 - Eyebrows: simple thin curved arcs — subtle but always present
 - Nose: tiny dot or absent
@@ -277,17 +280,24 @@ function kawaiiBaseSections(): string[] {
 - Blush: ALWAYS soft pink/rosy circular blush marks on both cheeks of EVERY character
 - Expression: universally warm, gentle, happy`,
 
-    `HAIR:
+  `HAIR:
 - Solid color shape with a few interior lines suggesting strands
 - Slightly darker shadow tone at the base
 - Soft, rounded silhouette
-- Match the reference photo exactly for color and style`,
+- Color and style follow the PEOPLE - SOURCE HIERARCHY`,
 
-    `CLOTHING & APPEARANCE:
-- Characters' clothing and appearance must match the reference photo
+  `CLOTHING & APPEARANCE:
+- Characters' clothing must match the reference photo
 - Simplified but recognizable — solid color fills with minimal detail
 - Patterns simplified to basic versions`,
-  ];
+].join(' ');
+
+/**
+ * Shared kawaii base prompt sections (used by both interior and cover).
+ * Returns the sections as an array for the caller to extend.
+ */
+function kawaiiBaseSections(): string[] {
+  return [KAWAII_STYLE_BIBLE, PEOPLE_SOURCE_HIERARCHY];
 }
 
 function kawaiiInteriorPrompt(ctx: StylePromptContext): string {
@@ -446,4 +456,17 @@ export function getStyleReferenceUrls(style: StyleKey): readonly string[] {
 
 export function getStylePreviewUrl(style: StyleKey): string {
   return STYLE_LIBRARY[style].referenceImageUrls[0];
+}
+
+// Frozen per-style bible blocks. Interior and cover prompts embed these
+// verbatim; the character-sheet prompt (later wave) must reuse them via
+// getStyleBible so the sheet can never become a competing style anchor.
+const STYLE_BIBLES: Record<StyleKey, string> = {
+  vignette: VIGNETTE_STYLE_BIBLE,
+  origami: ORIGAMI_STYLE_BIBLE,
+  kawaii: KAWAII_STYLE_BIBLE,
+};
+
+export function getStyleBible(style: StyleKey): string {
+  return STYLE_BIBLES[style];
 }

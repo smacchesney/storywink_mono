@@ -27,7 +27,7 @@ export function createQCPrompt(
 
   return `Evaluate these ${pageCount} children's book illustrations for quality and consistency.
 
-The images are provided in page order (page 1 through page ${pageCount}).
+The images are provided in page order (page 1 through page ${pageCount}), and each image is immediately preceded by a text label "PAGE n". In every result, set "pageNumber" to the n from that image's label — never renumber or reorder.
 
 ${characterSection}
 

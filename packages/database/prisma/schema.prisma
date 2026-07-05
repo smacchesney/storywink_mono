@@ -28,6 +28,11 @@ enum PageType {
   SPREAD
 }
 
+enum PageSource {
+  PHOTO
+  BRIDGE
+}
+
 model User {
   id            String         @id @default(cuid())
   clerkId       String         @unique
@@ -67,6 +72,9 @@ model Book {
   autoIllustrate    Boolean        @default(false) // Chain straight into illustration after story success (DB default false keeps pre-existing books on the manual flow; create route sets true for new books)
   eventSummary      String?   // One-line "what actually happened" brief — AI-drafted from photos, parent-editable, feeds the story prompt (supersedes theme when present)
   captureQuestions  Json?     // Photo-derived micro-questions + parent's tapped answers: [{id, question, options[], answer|null}]
+  generationPhase   String?   // Fine-grained pipeline phase for progress UI (finer than BookStatus)
+  firstViewedAt     DateTime? // First time the owner opened a readable preview — gates the one-time reveal
+  characterReferences Json?   // Character sheet refs keyed by (characterId, artStyle), retained across style flips
   promptTokens      Int?
   completionTokens  Int?
   totalTokens       Int?
@@ -77,6 +85,7 @@ model Book {
   notifications     Notification[]
   cartItems         CartItem[]
   printOrders       PrintOrder[]
+  illustrationQcResults IllustrationQcResult[]
 
   @@index([userId])
   @@index([status])
@@ -99,6 +108,11 @@ model Page {
   analysis          Json?    // Photo perception: {assetId, setting, action, emotion, eventSignals[], narrativeRole} — assetId marks freshness (stale when the photo was swapped)
 
   isTitlePage Boolean @default(false)
+
+  source             PageSource @default(PHOTO) // BRIDGE pages are app-authored (assetId stays null)
+  bridgeScene        Json?      // Structured scene for BRIDGE pages: {location, timeOfDay, action, charactersPresent, outfitFrom, props}
+  lastRenderProvider String?    // Stamped at render time — finalize cannot infer which provider drew the page
+  lastRenderModel    String?    // Exact model id used for the last successful render
 
   pageType         PageType
   moderationStatus String   @default("PENDING")
@@ -157,6 +171,44 @@ model Notification {
 
   @@index([userId, read])
   @@index([createdAt])
+}
+
+// Per-image QC scores persisted from book-finalize (and later cover/sheet QC).
+// target keeps cover/sheet rows out of page-drift stats.
+model IllustrationQcResult {
+  id           String   @id @default(cuid())
+  bookId       String
+  pageId       String?
+  target       String   @default("page") // 'page' | 'cover' | 'sheet'
+  qcRound      Int
+  charScore    Float?
+  styleScore   Float?
+  overallScore Float?
+  passed       Boolean
+  provider     String?
+  model        String?
+  hadSheet     Boolean  @default(false)
+  feedback     String?
+  createdAt    DateTime @default(now())
+
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([bookId])
+  @@index([createdAt])
+}
+
+// Product funnel telemetry (create started, story ready, first open, ...).
+// Deliberately unrelated (no FKs) so event writes never fail on deleted rows.
+model AppEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  bookId    String?
+  name      String
+  props     Json?
+  createdAt DateTime @default(now())
+
+  @@index([name, createdAt])
+  @@index([bookId])
 }
 
 // Worker diagnostic logging table

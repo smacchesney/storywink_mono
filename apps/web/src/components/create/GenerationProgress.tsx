@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -13,12 +13,21 @@ interface GenerationProgressProps {
   bookId: string;
   /** When true, a STORY_READY status routes to the review page. */
   reviewFirst?: boolean;
+  /**
+   * When provided, called on COMPLETED/PARTIAL instead of routing to the
+   * preview page — used when the preview itself hosts this screen and just
+   * needs to refresh in place.
+   */
+  onComplete?: (status: BookStatus) => void;
 }
 
 const MASCOT_SRC =
   'https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.57.58_PM_mijhwv.png';
 
-// 8-minute gentle timeout — not an error, just "check back later".
+// Gentle stall timeout — not an error, just "check back later". Measured
+// from the last observed progress change, never from mount: the story stage
+// writes in one batch and can legitimately sit quiet through QC + a regen,
+// so an absolute timer would fire inside a healthy run.
 const TIMEOUT_MS = 8 * 60 * 1000;
 
 const Sparkle = ({
@@ -72,18 +81,55 @@ const ProgressDots = () => (
  * brand's Kai-and-sparkles language, and routes away on its own once the
  * book is done. A parent can leave — the copy says so.
  */
-export function GenerationProgress({ bookId, reviewFirst }: GenerationProgressProps) {
+export function GenerationProgress({ bookId, reviewFirst, onComplete }: GenerationProgressProps) {
   const t = useTranslations('progress');
   const router = useRouter();
 
-  const { status, totalPages, pagesWithText, pagesWithIllustrations, isTimedOut } =
+  const { status, totalPages, pagesWithText, pagesWithIllustrations, isTimedOut, restart } =
     useBookStatus(bookId, { intervalMs: 5000, timeoutMs: TIMEOUT_MS });
 
-  // Route away on terminal, non-failure states.
+  // Tab title: while we work, the tab strip says so; on completion it becomes
+  // a free notification channel for a parent who switched tabs.
+  const originalTitleRef = useRef<string | null>(null);
   useEffect(() => {
-    if (status === BookStatus.COMPLETED || status === BookStatus.PARTIAL) {
-      router.push(`/book/${bookId}/preview`);
-    } else if (status === BookStatus.STORY_READY && reviewFirst) {
+    if (originalTitleRef.current == null) {
+      originalTitleRef.current = document.title;
+    }
+    document.title = t('tabWorking');
+    return () => {
+      if (originalTitleRef.current != null) {
+        document.title = originalTitleRef.current;
+      }
+    };
+  }, [t]);
+
+  // Move on when the book is done. If the tab is hidden, flip the title and
+  // wait for the parent to come back — a background tab can't watch the book
+  // open, but its title can announce that it's ready.
+  useEffect(() => {
+    if (status !== BookStatus.COMPLETED && status !== BookStatus.PARTIAL) return undefined;
+    const proceed = () => {
+      if (onComplete) {
+        onComplete(status);
+      } else {
+        router.push(`/book/${bookId}/preview`);
+      }
+    };
+    if (document.hidden) {
+      document.title = t('tabReady');
+      const onVisible = () => {
+        if (!document.hidden) proceed();
+      };
+      document.addEventListener('visibilitychange', onVisible);
+      return () => document.removeEventListener('visibilitychange', onVisible);
+    }
+    proceed();
+    return undefined;
+  }, [status, onComplete, bookId, router, t]);
+
+  // Review-first books route to review the moment the story is ready.
+  useEffect(() => {
+    if (status === BookStatus.STORY_READY && reviewFirst) {
       router.push(`/create/review?bookId=${bookId}`);
     }
   }, [status, reviewFirst, bookId, router]);
@@ -119,10 +165,18 @@ export function GenerationProgress({ bookId, reviewFirst }: GenerationProgressPr
     return t('readingPhotos');
   })();
 
-  const illustrationFraction =
+  // Monotone bar: finalize-QC nulls images on the pages it re-renders, which
+  // would visibly yank the bar backwards right when we do extra quality work.
+  // Hold the high-water mark instead.
+  const maxFractionRef = useRef(0);
+  const rawFraction =
     status === BookStatus.ILLUSTRATING && totalPages > 0
       ? Math.min(pagesWithIllustrations / totalPages, 1)
       : null;
+  if (rawFraction != null && rawFraction > maxFractionRef.current) {
+    maxFractionRef.current = rawFraction;
+  }
+  const illustrationFraction = rawFraction != null ? maxFractionRef.current : null;
 
   return (
     <div
@@ -218,7 +272,9 @@ export function GenerationProgress({ bookId, reviewFirst }: GenerationProgressPr
 
       {isFailed ? (
         <div className="w-full max-w-sm">
-          <BookIssueBanner bookId={bookId} status={BookStatus.FAILED} />
+          {/* restart() resumes polling; the banner unmounts once the status
+              clears, which is what resets its "trying again" spinner. */}
+          <BookIssueBanner bookId={bookId} status={BookStatus.FAILED} onRetryStarted={restart} />
         </div>
       ) : isTimedOut ? (
         <div className="flex flex-col items-center text-center">
@@ -258,7 +314,10 @@ export function GenerationProgress({ bookId, reviewFirst }: GenerationProgressPr
             <ProgressDots />
           )}
 
-          <p className="text-xs text-coral font-playful mt-8 text-center max-w-xs">
+          <p className="text-xs text-gray-500 font-playful mt-8 text-center max-w-xs">
+            {t('usuallyReady')}
+          </p>
+          <p className="text-xs text-coral font-playful mt-2 text-center max-w-xs">
             {t('canLeave')}
           </p>
         </>

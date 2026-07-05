@@ -12,9 +12,10 @@ import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getStripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
-import { coolifyImageUrl } from '@storywink/shared';
+import { coolifyImageUrl, PRINT_PRICING, SHIPPING_TIERS } from '@storywink/shared';
+import { formatMoney } from '@/lib/format';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, ArrowRight, Package, Mail } from 'lucide-react';
+import { CheckCircle, ArrowRight, Package } from 'lucide-react';
 
 interface PageProps {
   params: Promise<{
@@ -103,9 +104,12 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
 
   // Format price - prefer Stripe session, fallback to database
   const totalAmountCents = session?.amount_total || printOrder?.totalAmount;
-  const totalAmount = totalAmountCents
-    ? `$${(totalAmountCents / 100).toFixed(2)}`
-    : 'N/A';
+  const currency = session?.currency || printOrder?.currency || PRINT_PRICING.CURRENCY;
+  const totalAmount = totalAmountCents ? formatMoney(totalAmountCents, currency) : 'N/A';
+
+  // Delivery window derives from the shipping config so this copy can never
+  // drift from what Stripe quoted at checkout.
+  const shippingTier = SHIPPING_TIERS.SINGAPORE_MALAYSIA;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white py-12 px-4">
@@ -168,28 +172,16 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
           <div className="space-y-4">
             <div className="flex gap-3">
               <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                  <Mail className="w-4 h-4 text-blue-600" />
-                </div>
-              </div>
-              <div>
-                <p className="font-medium text-gray-900">Confirmation Email</p>
-                <p className="text-sm text-gray-500">
-                  You&apos;ll receive an email confirmation shortly.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <div className="flex-shrink-0">
                 <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
                   <Package className="w-4 h-4 text-orange-600" />
                 </div>
               </div>
               <div>
-                <p className="font-medium text-gray-900">Printing & Shipping</p>
+                <p className="font-medium text-gray-900">Printing &amp; Delivery</p>
                 <p className="text-sm text-gray-500">
-                  Your book will be printed and shipped within 2-3 business days.
-                  We&apos;ll email you tracking info when it ships.
+                  Your book is off to the printers. It should arrive within{' '}
+                  {shippingTier.deliveryDaysMin}&ndash;{shippingTier.deliveryDaysMax} business
+                  days.
                 </p>
               </div>
             </div>

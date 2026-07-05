@@ -31,6 +31,12 @@ export type IllustrationProviderName = 'gemini' | 'openai';
 export interface IllustrationProvider {
   readonly name: IllustrationProviderName;
   /**
+   * Exact model id sent to the provider API (e.g. "gemini-3.1-flash-image-preview",
+   * "gpt-image-2"). Stamped onto Page.lastRenderModel at render time so QC rows
+   * are attributable — the finalize worker cannot infer which model drew a page.
+   */
+  readonly modelId: string;
+  /**
    * Generate one illustration.
    *
    * Behavior contract:

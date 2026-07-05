@@ -4,6 +4,7 @@ import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperat
 import HTMLFlipBook from 'react-pageflip';
 import { Page } from '@prisma/client';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 import { coolifyImageUrl } from '@storywink/shared';
@@ -32,6 +33,12 @@ export interface BuildDisplayPagesOptions {
 
 interface FlipbookViewerProps {
   pages: Page[];
+  /**
+   * The dedicated painted cover (Book.coverImageUrl). When present it fronts
+   * the book in the cover slot; the title page's story-style render stays as
+   * the fallback for older books that never got one.
+   */
+  coverImageUrl?: string | null;
   initialPageNumber?: number;
   onPageChange?: (displayIndex: number) => void;
   className?: string;
@@ -106,6 +113,7 @@ export function buildDisplayPages(pages: Page[], options?: BuildDisplayPagesOpti
 const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
   {
     pages,
+    coverImageUrl,
     initialPageNumber = 1,
     onPageChange,
     className,
@@ -115,11 +123,20 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
   },
   ref // Receive the forwarded ref
 ) => {
+  const t = useTranslations('preview');
   const flipBookInternalRef = useRef<any>(null);
   const [containerDimensions, setContainerDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null); // Ref for the container div
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [isFlipping, setIsFlipping] = useState(false);
+  // Read once — a flip animation should be near-instant for parents who ask
+  // the OS for reduced motion.
+  const prefersReducedMotion = useMemo(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true,
+    []
+  );
 
   // Build interleaved display pages
   const displayPages = useMemo(
@@ -386,6 +403,11 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     const pageKey = `${dp.page.id}-${dp.type}-${index}`;
     const textFontClass = dp.type === 'text' && dp.language === 'ja' ? 'font-japanese' : 'font-playful';
 
+    // Index 0 is the cover slot: show the dedicated painted cover there when
+    // it exists. The title page's story render still appears as a story beat.
+    const isCoverSlot = dp.type === 'illustration' && index === 0 && dp.page.isTitlePage;
+    const imageUrl = (isCoverSlot && coverImageUrl) || dp.page.generatedImageUrl;
+
     return (
       <div key={pageKey} className="bg-white rounded-lg overflow-hidden border border-black/15">
         {dp.type === 'text' ? (
@@ -396,12 +418,12 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
               {dp.page.text}
             </p>
           </div>
-        ) : dp.page.generatedImageUrl ? (
+        ) : imageUrl ? (
           // Illustration page - full image
           <div className="absolute inset-0">
              <Image
-               src={coolifyImageUrl(dp.page.generatedImageUrl)}
-               alt={`Page ${dp.page.pageNumber} illustration`}
+               src={coolifyImageUrl(imageUrl)}
+               alt={dp.page.text || t('pageAlt', { number: dp.page.pageNumber })}
                fill
                sizes={`(max-width: 768px) 90vw, ${pageWidth}px`}
                style={{ objectFit: 'cover' }}
@@ -427,7 +449,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
       {pageWidth > 0 && pageHeight > 0 && (
         <div style={{
           transform: `translateX(${coverOffset}px)`,
-          transition: 'transform 0.7s cubic-bezier(0.4, 0, 0.2, 1)',
+          transition: prefersReducedMotion ? 'none' : 'transform 0.7s cubic-bezier(0.4, 0, 0.2, 1)',
         }}>
         <HTMLFlipBook
           ref={flipBookInternalRef}
@@ -454,7 +476,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
           // Real settings
           drawShadow
           maxShadowOpacity={0.7}
-          flippingTime={700}
+          flippingTime={prefersReducedMotion ? 150 : 700}
           usePortrait={isPortrait}
           mobileScrollSupport={false}
           clickEventForward

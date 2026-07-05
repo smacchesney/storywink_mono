@@ -60,6 +60,87 @@ The illustrator will use YOUR description as the canonical reference for maintai
   };
 }
 
+// ----------------------------------
+// STYLE TRANSLATION REFRESH (text-only)
+// ----------------------------------
+
+/**
+ * Rewrites ONLY the styleTranslation strings of an existing identity for a
+ * new art style. Used when a remapped identity carries prose written for a
+ * different style (extractedForStyle mismatch) — a cheap text-only call, so
+ * the default path never re-pays the full vision extraction.
+ */
+
+export const STYLE_TRANSLATION_REFRESH_SYSTEM_PROMPT =
+  "You are an expert art director for children's picture books. You rewrite character rendering instructions for a new art style without changing who the character is.";
+
+export interface StyleTranslationRefreshCharacter {
+  characterId: string;
+  role: string;
+  name: string | null;
+  physicalTraits: {
+    apparentAge: string;
+    hairColor: string;
+    hairStyle: string;
+    skinTone: string;
+    bodyBuild: string;
+    distinguishingFeatures: string[];
+  };
+  typicalClothing: string;
+}
+
+export function createStyleTranslationRefreshPrompt(
+  characters: StyleTranslationRefreshCharacter[],
+  artStyle: string,
+): string {
+  const characterBlocks = characters
+    .map(c => {
+      const t = c.physicalTraits;
+      return [
+        `- characterId: ${c.characterId} (${c.role}${c.name ? `, name: ${c.name}` : ''})`,
+        `  Age: ${t.apparentAge}`,
+        `  Hair: ${t.hairColor}, ${t.hairStyle}`,
+        `  Skin tone: ${t.skinTone}`,
+        `  Build: ${t.bodyBuild}`,
+        t.distinguishingFeatures.length > 0
+          ? `  Distinguishing features: ${t.distinguishingFeatures.join(', ')}`
+          : null,
+        `  Typical clothing: ${c.typicalClothing}`,
+      ]
+        .filter(Boolean)
+        .join('\n');
+    })
+    .join('\n');
+
+  return `The characters below were described for a different art style. Their physical traits are canonical and must NOT change.
+
+For EACH character, write a new "styleTranslation": how this person should be rendered in the "${artStyle}" art style while remaining instantly recognizable. Be specific about materials, construction, colors, and proportions for the target style — the same precision you would give an illustrator who has never seen these people.
+
+${characterBlocks}
+
+Return exactly one entry per characterId listed above, echoing the characterId unchanged.`;
+}
+
+export const STYLE_TRANSLATION_REFRESH_SCHEMA = {
+  type: 'object',
+  properties: {
+    translations: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          characterId: { type: 'string' },
+          styleTranslation: { type: 'string' },
+        },
+        required: ['characterId', 'styleTranslation'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['translations'],
+  additionalProperties: false,
+} as const;
+
 // Response schema for structured output (OpenAI strict mode)
 export const CHARACTER_IDENTITY_RESPONSE_SCHEMA = {
   type: 'object',

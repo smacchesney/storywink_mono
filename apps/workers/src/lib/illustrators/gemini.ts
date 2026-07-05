@@ -4,8 +4,14 @@ import type { IllustrationInput, IllustrationOutput, IllustrationProvider } from
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
+// Default stays on the production-proven preview id. GEMINI_IMAGE_MODEL exists
+// so the GA migration (gemini-3.1-flash-image) is an env flip with instant
+// rollback — the same operational pattern as ILLUSTRATION_PROVIDER.
+const DEFAULT_GEMINI_IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
+
 export class GeminiProvider implements IllustrationProvider {
   readonly name = 'gemini' as const;
+  readonly modelId: string;
   private readonly client: GoogleGenAI;
 
   constructor() {
@@ -13,6 +19,7 @@ export class GeminiProvider implements IllustrationProvider {
       throw new Error('GOOGLE_API_KEY is required when ILLUSTRATION_PROVIDER=gemini');
     }
     this.client = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
+    this.modelId = process.env.GEMINI_IMAGE_MODEL || DEFAULT_GEMINI_IMAGE_MODEL;
   }
 
   async generate(input: IllustrationInput): Promise<IllustrationOutput> {
@@ -35,7 +42,7 @@ export class GeminiProvider implements IllustrationProvider {
     ];
 
     const result = await this.client.models.generateContent({
-      model: 'gemini-3.1-flash-image-preview',
+      model: this.modelId,
       contents,
       config: {
         responseModalities: ['TEXT', 'IMAGE'],

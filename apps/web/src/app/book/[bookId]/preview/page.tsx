@@ -3,17 +3,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Book, Page, BookStatus } from '@prisma/client'; // Assuming prisma client types are available
 import { Loader2, AlertTriangle, ChevronLeft, ChevronRight, Library, Download, ArrowLeft, Maximize2, Minimize2, Eye, EyeOff } from 'lucide-react'; // Added fullscreen icons
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import BookPageGallery from '@/components/book/BookPageGallery'; // Import the new component
 import FlipbookViewer, { FlipbookActions, buildDisplayPages } from '@/components/book/FlipbookViewer'; // Import FlipbookViewer, FlipbookActions type, and buildDisplayPages
 import BookIssueBanner from '@/components/create/BookIssueBanner';
+import GenerationProgress from '@/components/create/GenerationProgress';
 import PageControlsMenu from '@/components/book/PageControlsMenu';
-import { showError } from '@/lib/toast-utils';
+import { ExportPdfDialog } from '@/components/book/ExportPdfDialog';
+import { bookContentFingerprint } from '@/lib/book-display';
+import { track } from '@/lib/track';
 import { cn } from '@/lib/utils';
 
 // Define a type for the book data we expect, including pages
@@ -48,15 +50,16 @@ async function fetchBookData(bookId: string): Promise<BookWithPages | null> {
 export default function BookPreviewPage() {
   const params = useParams();
   const bookId = params.bookId as string; // Get bookId from URL
+  const t = useTranslations('preview');
 
   const [book, setBook] = useState<BookWithPages | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0); // Example progress state
   const [currentDisplayIndex, setCurrentDisplayIndex] = useState<number>(1); // 1-based index into interleaved display pages
   const flipbookRef = useRef<FlipbookActions>(null); // Use FlipbookActions type for ref
-  // Add state for PDF export loading
-  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  // Add state for the PDF export dialog and the options sheet that launches it
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [isOptionsSheetOpen, setIsOptionsSheetOpen] = useState(false);
   // Add state for fullscreen mode
   const [isFullscreen, setIsFullscreen] = useState(false);
   // Add state for gallery visibility
@@ -64,54 +67,61 @@ export default function BookPreviewPage() {
   // Add state for detecting landscape mode
   const [isLandscape, setIsLandscape] = useState(false);
 
+  // Add isMountedRef for cleanup safety
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
+
+  const hasLoadedRef = useRef(false);
+  const fingerprintRef = useRef<string | null>(null);
+
   const loadBook = useCallback(async () => {
     if (!bookId) return;
-    setError(null);
     try {
       const data = await fetchBookData(bookId);
+      if (!isMountedRef.current) return;
       if (data) {
-        setBook(data);
-        // Set initial display index to 1 on first load
-        if (isLoading || currentDisplayIndex === 1) {
-             setCurrentDisplayIndex(1);
+        // Only swap state when the content actually changed. Keeping
+        // book.pages referentially stable means the flipbook's displayPages
+        // memo holds and react-pageflip never reloads every page mid-read.
+        const fingerprint = bookContentFingerprint(data);
+        if (fingerprint !== fingerprintRef.current) {
+          fingerprintRef.current = fingerprint;
+          setBook(data);
         }
-
-        const illustratedPages = data.pages.filter(p => p.generatedImageUrl).length;
-        const totalPages = data.pages.length;
-        setProgress(totalPages > 0 ? (illustratedPages / totalPages) * 100 : 0);
-
-      } else {
-         setError('Book not found or failed to load.');
+        setError(null);
+      } else if (!hasLoadedRef.current) {
+        setError('Book not found or failed to load.');
       }
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+      // Refetch failures mid-read are swallowed — the book on screen is
+      // intact. Only the initial load surfaces an error.
+      if (!hasLoadedRef.current && isMountedRef.current) {
+        setError(err.message || 'An unexpected error occurred.');
+      }
     } finally {
-       if (isLoading) {
-           setIsLoading(false);
-       }
+      if (!hasLoadedRef.current && isMountedRef.current) {
+        hasLoadedRef.current = true;
+        setIsLoading(false);
+      }
     }
-  // Update dependencies for useCallback
-  }, [bookId, isLoading, currentDisplayIndex]);
+  }, [bookId]);
 
   useEffect(() => {
     loadBook();
   }, [loadBook]);
 
+  // Mark the book as opened once per mount of a readable preview. The route
+  // is idempotent server-side (firstViewedAt only ever set while null).
+  const openedSentRef = useRef(false);
   useEffect(() => {
-    let intervalId: NodeJS.Timeout | null = null;
-    // Poll while the book is actively being made — covers the ILLUSTRATING
-    // render loop, a single-page re-illustration, and a story-stage retry.
-    if (book?.status === BookStatus.ILLUSTRATING || book?.status === BookStatus.GENERATING) {
-      intervalId = setInterval(() => {
-        loadBook();
-      }, 5000);
-    }
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [book?.status, loadBook]);
+    if (openedSentRef.current || book?.status !== BookStatus.COMPLETED) return;
+    openedSentRef.current = true;
+    void fetch(`/api/book/${bookId}/opened`, { method: 'POST', keepalive: true }).catch(() => {});
+    track('preview_opened', { bookId });
+  }, [book?.status, bookId]);
 
   // Handler for selecting a display page from the gallery (1-based index)
   const handleDisplayPageSelect = (displayIndex: number) => {
@@ -145,37 +155,13 @@ export default function BookPreviewPage() {
   };
 
   // --- PDF Export Handler ---
-  const handleExportPdf = async () => {
+  // ExportPdfDialog owns the whole flow: fetch → blob → auto-save, with a
+  // real "preparing" wait and the error toast. This just swaps the sheets.
+  const handleExportPdf = () => {
     if (!bookId) return;
-    setIsExportingPdf(true);
-    try {
-      // Trigger download by navigating to the API endpoint
-      // The browser will handle the download based on Content-Disposition header
-      window.location.href = `/api/book/${bookId}/export/pdf`;
-      
-      // It's hard to know exactly when the download starts/finishes from here.
-      // We'll reset the loading state after a short delay.
-      setTimeout(() => {
-         if (isMountedRef.current) { // Check if component is still mounted
-            setIsExportingPdf(false);
-         }
-      }, 3000); // Reset after 3 seconds (adjust as needed)
-
-    } catch (error) {
-      console.error("Error triggering PDF export:", error);
-      showError(error, "Unable to export PDF");
-      if (isMountedRef.current) {
-          setIsExportingPdf(false);
-      }
-    }
+    setIsOptionsSheetOpen(false);
+    setIsExportDialogOpen(true);
   };
-  
-  // Add isMountedRef for cleanup safety
-  const isMountedRef = useRef(true);
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => { isMountedRef.current = false; };
-  }, []);
 
   // Detect orientation changes and landscape mode
   useEffect(() => {
@@ -202,8 +188,15 @@ export default function BookPreviewPage() {
 
   // Fullscreen toggle handler
   const toggleFullscreen = useCallback(() => {
+    const docEl = document.documentElement;
+    // iPhone Safari has no Fullscreen API — fall back to a CSS-only
+    // immersive mode; all the chrome already keys off this state.
+    if (typeof docEl.requestFullscreen !== 'function') {
+      setIsFullscreen((prev) => !prev);
+      return;
+    }
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().then(() => {
+      docEl.requestFullscreen().then(() => {
         setIsFullscreen(true);
       }).catch((err) => {
         console.error("Error entering fullscreen:", err);
@@ -228,6 +221,34 @@ export default function BookPreviewPage() {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
   }, []);
+
+  // Keyboard navigation for the readable book: arrows/space flip, Escape
+  // leaves fullscreen (including the CSS fallback, which has no system exit).
+  useEffect(() => {
+    if (book?.status !== BookStatus.COMPLETED) return;
+    const handleKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault();
+        flipbookRef.current?.pageFlip()?.flipNext();
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        flipbookRef.current?.pageFlip()?.flipPrev();
+      } else if (e.key === 'Escape') {
+        // Native fullscreen exits itself and fires fullscreenchange; only
+        // the CSS fallback needs a hand here.
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        } else if (isFullscreen) {
+          setIsFullscreen(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [book?.status, isFullscreen]);
 
   // --- Render Logic --- //
 
@@ -256,24 +277,15 @@ export default function BookPreviewPage() {
 
   // --- Status-Based Rendering --- //
 
-  if (book.status === BookStatus.ILLUSTRATING) {
-    return (
-      <div className="flex flex-col justify-center items-center min-h-screen p-4">
-         <Card className="w-full max-w-md text-center">
-           <CardHeader>
-             <CardTitle>Generating Illustrations...</CardTitle>
-           </CardHeader>
-           <CardContent>
-             <p className="mb-4 text-muted-foreground">
-               Our digital artists are hard at work illustrating your story! This might take a few minutes.
-             </p>
-             <Progress value={progress} className="w-full mb-4 bg-muted [&>div]:bg-coral" />
-             <Loader2 className="h-6 w-6 animate-spin text-coral mx-auto" />
-             <p className="text-sm text-muted-foreground mt-2">Checking for updates...</p>
-           </CardContent>
-         </Card>
-      </div>
-    );
+  // In-flight states all share the one branded wait. GenerationProgress owns
+  // the polling; when the book turns readable it refreshes this page in
+  // place, and a book parked at STORY_READY routes itself to review.
+  if (
+    book.status === BookStatus.GENERATING ||
+    book.status === BookStatus.STORY_READY ||
+    book.status === BookStatus.ILLUSTRATING
+  ) {
+    return <GenerationProgress bookId={bookId} onComplete={() => loadBook()} />;
   }
 
   if (book.status === BookStatus.FAILED) {
@@ -285,7 +297,7 @@ export default function BookPreviewPage() {
             status={BookStatus.FAILED}
             onRetryStarted={() => {
               // Retry flips the book back into a working state on the server;
-              // reload so the ILLUSTRATING/GENERATING poll picks up from here.
+              // reload so the in-flight branch mounts the progress screen.
               loadBook();
             }}
           />
@@ -349,7 +361,7 @@ export default function BookPreviewPage() {
               >
                 {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
               </Button>
-              <Sheet>
+              <Sheet open={isOptionsSheetOpen} onOpenChange={setIsOptionsSheetOpen}>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon" aria-label="Book Options">
                     <svg width="18" height="4" viewBox="0 0 18 4" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -364,18 +376,14 @@ export default function BookPreviewPage() {
                       <Library className="h-5 w-5 text-coral" />
                       <span>Return to Library</span>
                     </Link>
-                    <Button 
-                      variant="ghost" 
-                      onClick={handleExportPdf} 
-                      disabled={isExportingPdf}
+                    <Button
+                      variant="ghost"
+                      onClick={handleExportPdf}
+                      disabled={isExportDialogOpen}
                       className="flex items-center gap-2 p-2 w-full justify-start"
                     >
-                      {isExportingPdf ? (
-                        <Loader2 className="h-5 w-5 animate-spin text-coral" />
-                      ) : (
-                        <Download className="h-5 w-5 text-coral" />
-                      )}
-                      Export PDF
+                      <Download className="h-5 w-5 text-coral" />
+                      {t('exportPdf')}
                     </Button>
                   </div>
                 </SheetContent>
@@ -407,6 +415,7 @@ export default function BookPreviewPage() {
           <FlipbookViewer
             ref={flipbookRef}
             pages={book.pages}
+            coverImageUrl={book.coverImageUrl}
             initialPageNumber={currentDisplayIndex}
             onPageChange={handleFlipbookPageChange}
             className="absolute inset-0"
@@ -414,7 +423,26 @@ export default function BookPreviewPage() {
             bookTitle={book.title}
             language={book.language}
           />
-          
+
+          {/* Screen-reader page announcement */}
+          <div aria-live="polite" className="sr-only">
+            {t('pageOf', { current: currentDisplayIndex, total: totalDisplayPages })}
+          </div>
+
+          {/* Exit button for immersive mode — the only way out on iPhone,
+              where the CSS fallback has no system gesture or Esc key */}
+          {isFullscreen && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleFullscreen}
+              aria-label={t('exitFullscreen')}
+              className="absolute top-3 right-3 z-10 h-10 w-10 rounded-full bg-background/70 shadow"
+            >
+              <Minimize2 className="h-5 w-5 text-coral" />
+            </Button>
+          )}
+
           {/* Floating Navigation Buttons */}
           <div className="absolute inset-y-0 left-0 flex items-center">
             <Button 
@@ -450,7 +478,7 @@ export default function BookPreviewPage() {
           )}>
             <div className="flex items-center bg-muted/20 rounded-full px-4 py-1">
               <span className="text-sm font-medium">
-                Page {currentDisplayIndex} of {totalDisplayPages}
+                {t('pageOf', { current: currentDisplayIndex, total: totalDisplayPages })}
               </span>
             </div>
             {menuPage && (
@@ -464,6 +492,14 @@ export default function BookPreviewPage() {
             )}
           </div>
         )}
+
+        {/* PDF export: fetches, shows the wait, auto-saves when ready */}
+        <ExportPdfDialog
+          bookId={bookId}
+          bookTitle={book.title}
+          open={isExportDialogOpen}
+          onOpenChange={setIsExportDialogOpen}
+        />
       </div>
     );
   }
@@ -487,10 +523,18 @@ export default function BookPreviewPage() {
     );
   }
 
-  // Fallback for any other status
+  // Fallback for any other status (DRAFT, mostly): a gentle nudge back into
+  // the create flow instead of a raw status enum.
   return (
-     <div className="flex justify-center items-center min-h-screen">
-       Book status is {book.status}. Preview is not available yet.
-     </div>
-   );
-} 
+    <div className="flex flex-col justify-center items-center min-h-screen p-4 text-center">
+      <p className="font-playful text-lg text-gray-800">{t('notReadyTitle')}</p>
+      <p className="mt-2 text-sm text-gray-500 max-w-xs">{t('notReadyBody')}</p>
+      <Button
+        asChild
+        className="mt-6 rounded-full bg-coral px-6 font-playful text-white hover:bg-coral/90"
+      >
+        <Link href={`/create/${bookId}/setup`}>{t('continueSetup')}</Link>
+      </Button>
+    </div>
+  );
+}

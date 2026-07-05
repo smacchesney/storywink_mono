@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createIllustrationPrompt } from './illustration.js';
+import { createIllustrationPrompt, isMainCharacterRole } from './illustration.js';
 import type { CharacterIdentity } from '../types.js';
 
 // buildCharacterIdentitySection is not exported, so we exercise it through the
@@ -75,7 +75,51 @@ describe('createIllustrationPrompt character identity section', () => {
 
   it('demands canonical consistency across pages', () => {
     expect(prompt).toContain('CHARACTER IDENTITY');
-    expect(prompt).toContain('MANDATORY');
-    expect(prompt).toMatch(/MUST match these exact descriptions across ALL pages/i);
+    expect(prompt).toContain('canonical reference');
+    expect(prompt).toMatch(/MUST match these descriptions on every page/i);
+  });
+
+  it('states the arbitration hierarchy: reference wins on identity, photo wins on the rest', () => {
+    expect(prompt).toContain('these descriptions win');
+    expect(prompt).toContain("Pose, clothing, and scene composition follow this page's photo");
+  });
+});
+
+describe('main character always included regardless of appearsOnPages', () => {
+  // Perception can miss the protagonist on ambiguous photos — exactly the
+  // pages that need the canonical block most. main-role characters must never
+  // be filtered out by appearsOnPages.
+  const prompt = createIllustrationPrompt({
+    style: 'vignette',
+    pageText: 'Ben watered the plants.',
+    bookTitle: "Aria's Big Day",
+    isTitlePage: false,
+    referenceImageCount: 1,
+    characterIdentity,
+    pageNumber: 5, // Aria's appearsOnPages is [3] — a perception miss for page 5
+  });
+
+  it('keeps the main_child on a page perception missed her on', () => {
+    expect(prompt).toContain('Aria');
+    expect(prompt).toContain('chestnut-brown');
+  });
+
+  it('still includes characters whose appearsOnPages match', () => {
+    expect(prompt).toContain('Ben');
+    expect(prompt).toContain('jet-black');
+  });
+});
+
+describe('isMainCharacterRole', () => {
+  it('matches main_child and other main-prefixed free-form roles', () => {
+    expect(isMainCharacterRole('main_child')).toBe(true);
+    expect(isMainCharacterRole('main')).toBe(true);
+  });
+
+  it('does not match non-main free-form roles', () => {
+    expect(isMainCharacterRole('parent')).toBe(false);
+    expect(isMainCharacterRole('grandparent')).toBe(false);
+    expect(isMainCharacterRole('sibling')).toBe(false);
+    expect(isMainCharacterRole('pet')).toBe(false);
   });
 });

@@ -1,0 +1,47 @@
+# Japanese copy needing native review
+
+Append-only. One line per key: `namespace.key` — why it needs a native check.
+- `progress.usuallyReady` — time-promise phrasing ("within 15 minutes of starting"); check the counter/reading for 15ふん and overall softness.
+- `progress.tabWorking` — browser tab title while generating; check it reads naturally truncated in a tab strip.
+- `progress.tabReady` — browser tab title on completion; exclamation register check.
+- `preview.pageOf` — page counter ("{total}ページちゅう {current}ページめ"); check counter word and hiragana spacing.
+- `preview.pageAlt` — image alt fallback ("{number}ページめ").
+- `preview.exitFullscreen` — aria-label for leaving immersive mode; check ぜんがめん phrasing.
+- `preview.notReadyTitle` — shown when a draft book's preview is opened; softness check.
+- `preview.notReadyBody` — companion line inviting the parent back into the create flow.
+- `preview.continueSetup` — button back into setup; check verb form matches other CTAs.
+- `preview.exportPdf` — parent-facing button inside an otherwise kid-register (hiragana) namespace; confirm standard katakana register is right here.
+- `exportDialog.preparingBody` — playful "tucking every page into place" line rendered as 「一枚ずつ整えています」; check the counter word and warmth.
+- `exportDialog.readyBody` — points to the browser downloads; on iOS Safari files land in 「ファイル」, check ダウンロード phrasing still guides correctly.
+- `exportDialog.shareErrorBody` — post-share-failure reassurance; check ダウンロードに保存されています reads naturally.
+- `landing.faq3A` — new timing promise (1分/10〜15分); check numbers read naturally and the register stays warm.
+- `landing.faq4A` — rewritten to describe the current 2-tap flow; check 教えていただくと clause flows.
+- `landing.faq5A` — privacy answer naming OpenAI/Google/Cloudinary and delete-on-request; legal-adjacent, needs careful native + owner review.
+- `create.mascotAlt` — mascot alt now the cats; check ねこたち phrasing.
+- `progress.mascotAlt` — mascot alt now the cats.
+- `library.mascotAlt` — mascot alt now the cats; check Storywinkのねこたち reads naturally.
+- `review.loadingReviewData` — rewritten to gentle register (おはなしを ひらいています…).
+- `review.loadingReviewPage` — same value as loadingReviewData; consolidation lands in copy Phase 1.
+- `review.bookIdNotFound` — reassurance rewrite; check ありますよ softness.
+- `review.errorLoadingPages` — reassurance rewrite; check ぶじですよ isn't too casual.
+- `review.storyGenerationFailed` — mirrors issue.failedMessage pattern.
+- `review.errorLoadingReviewData` — gentle retry line.
+- `review.errorCheckingStatus` — connection-blip line; check こうしんすると phrasing for "refresh".
+- `review.errorFetchingStatus` — same value as errorCheckingStatus.
+- `review.errorLoadingContent` — same value as errorCheckingStatus.
+- `review.errorStartingIllustration` — gentle retry line.
+- `review.cannotConfirm` — gentle "not ready yet" line; UI slated for deletion in copy Phase 1.
+- `review.working` — now イラストの じゅんびを しています…; confirm it fits the button context.
+- `review.textCannotBeEmpty` — validation line moved to gentle register.
+- `review.edit` — 編集 → へんしゅう register shift; confirm hiragana works on a small button.
+- `review.confirmText` — テキスト → ぶんしょう vocabulary shift.
+- `review.confirmed` — 確定済み → かくていずみ register shift.
+- `review.enterPageText` — placeholder moved to gentle register.
+- `review.noTextYet` — invitation rewrite; check 「へんしゅう」 quoting matches the button label.
+- `review.saveChanges` — 変更を保存 → へんこうを ほぞん register shift.
+- `review.saveTimeout` — gentle connection line.
+- `review.contentFlagged` — moderation jargon replaced with "needs a different photo".
+- `bookCard.illustrationFailed` — 失敗 removed; check がうまくできませんでした length on the card.
+- `bookCard.someIllustrationsFailed` — 失敗 removed.
+- `bookCard.fixIssues` — 問題を修正 → ページを直す; check consistency with issue.fixPages (ページを なおす).
+- `resolve.photoCouldntBeIllustrated` — content-policy jargon removed; check むずかしい写真もあるんです register.

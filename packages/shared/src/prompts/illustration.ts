@@ -28,6 +28,17 @@ const MAX_PROMPT_CHARS = 30000;
 // CROSS-CUTTING HELPERS
 // ----------------------------------
 
+/**
+ * Roles are free-form strings from the perception pass ('main_child',
+ * 'parent', 'grandparent', ...). Main characters must never be dropped from
+ * the identity section by a perception miss in appearsOnPages — the ambiguous
+ * photos where perception missed them are exactly the pages that need the
+ * canonical description most.
+ */
+export function isMainCharacterRole(role: string): boolean {
+  return role.startsWith('main');
+}
+
 function buildCharacterIdentitySection(
   characterIdentity: CharacterIdentity | null | undefined,
   pageNumber: number | undefined,
@@ -36,7 +47,10 @@ function buildCharacterIdentitySection(
 
   const relevantCharacters = pageNumber
     ? characterIdentity.characters.filter(
-        c => c.appearsOnPages.includes(pageNumber) || c.appearsOnPages.length === 0,
+        c =>
+          isMainCharacterRole(c.role) ||
+          c.appearsOnPages.includes(pageNumber) ||
+          c.appearsOnPages.length === 0,
       )
     : characterIdentity.characters;
 
@@ -54,7 +68,7 @@ function buildCharacterIdentitySection(
         traits.distinguishingFeatures.length > 0
           ? `  Distinguishing features: ${traits.distinguishingFeatures.join(', ')}`
           : null,
-        `  Clothing: ${c.typicalClothing}`,
+        `  Typical clothing (this page's photo takes precedence): ${c.typicalClothing}`,
         c.styleTranslation ? `  Style rendering: ${c.styleTranslation}` : null,
       ]
         .filter(Boolean)
@@ -63,9 +77,10 @@ function buildCharacterIdentitySection(
     .join('\n');
 
   return (
-    `CHARACTER IDENTITY (MANDATORY - override any visual ambiguity with these specifications):\n` +
-    `The following characters appear in this scene. Their appearance MUST match these exact descriptions across ALL pages. ` +
-    `If the source photo is ambiguous (lighting, angle, shadow), defer to these canonical descriptions:\n` +
+    `CHARACTER IDENTITY (canonical reference — wins on face, hair, and skin):\n` +
+    `The following characters appear in this scene. Their face shape, hair, skin tone, and distinguishing features MUST match these descriptions on every page; ` +
+    `when the photo is ambiguous or disagrees on those features (lighting, angle, shadow), these descriptions win. ` +
+    `Pose, clothing, and scene composition follow this page's photo:\n` +
     charDescriptions
   );
 }

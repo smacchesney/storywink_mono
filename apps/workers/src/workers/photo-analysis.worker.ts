@@ -154,6 +154,11 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
         characterIdentity: {
           characters: stampedCharacters,
           sceneContext: analysis.sceneContext,
+          // This pass runs at create time when artStyle is usually still null,
+          // so the 'vignette' fallback gets baked into styleTranslation. The
+          // stamp lets the extraction worker's reuse path detect the mismatch
+          // and refresh the translations with a cheap text-only call.
+          extractedForStyle: input.artStyle,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any, // Prisma Json column (same cast the extraction worker uses)
         ...(!current?.eventSummary || isDraftRefresh

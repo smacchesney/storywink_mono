@@ -23,6 +23,7 @@ import { useTranslations } from 'next-intl';
 import { coolifyImageUrl, calculatePrintedPageCount } from '@storywink/shared';
 import { TextShimmerWave } from '@/components/ui/text-shimmer-wave';
 import { PrintOrderSheet, PrintOrderBook } from '@/components/print/PrintOrderSheet';
+import { ExportPdfDialog } from '@/components/book/ExportPdfDialog';
 
 export interface BookCardProps {
   id: string;
@@ -54,24 +55,13 @@ const BookCard: React.FC<BookCardProps> = ({
   const router = useRouter();
   const t = useTranslations('bookCard');
   const tc = useTranslations('common');
-  const [isExporting, setIsExporting] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const [showPrintSheet, setShowPrintSheet] = useState(false);
 
   const actualPageCount = pageCount ?? 0;
 
   const handleViewClick = () => {
     router.push(`/book/${id}/preview`);
-  };
-
-  const handleExportPdf = async () => {
-    setIsExporting(true);
-    try {
-      // Open PDF in new tab - the API handles the download
-      window.open(`/api/book/${id}/export/pdf`, '_blank');
-    } finally {
-      // Reset after a short delay
-      setTimeout(() => setIsExporting(false), 1000);
-    }
   };
 
   const isIllustrating = status === BookStatus.ILLUSTRATING;
@@ -273,8 +263,8 @@ const BookCard: React.FC<BookCardProps> = ({
           <div className="flex justify-end w-full">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" disabled={isDeleting || isExporting} className="text-muted-foreground">
-                  {isDeleting || isExporting ? (
+                <Button variant="ghost" size="sm" disabled={isDeleting} className="text-muted-foreground">
+                  {isDeleting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <MoreHorizontal className="h-4 w-4" />
@@ -283,7 +273,7 @@ const BookCard: React.FC<BookCardProps> = ({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportPdf} disabled={isExporting}>
+                <DropdownMenuItem onClick={() => setShowExportDialog(true)}>
                   <Download className="mr-2 h-4 w-4" /> {t('exportPdf')}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -305,6 +295,14 @@ const BookCard: React.FC<BookCardProps> = ({
         book={printOrderBook}
         isOpen={showPrintSheet}
         onClose={() => setShowPrintSheet(false)}
+      />
+
+      {/* PDF export: fetches, shows the wait, auto-saves when ready */}
+      <ExportPdfDialog
+        bookId={id}
+        bookTitle={title}
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
       />
     </>
   );

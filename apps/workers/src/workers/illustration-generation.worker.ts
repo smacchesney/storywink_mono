@@ -8,6 +8,7 @@ import pino from 'pino';
 import { createIllustrationPrompt, IllustrationPromptOptions } from '@storywink/shared/prompts/illustration';
 // Import STYLE_LIBRARY directly from styles module to avoid barrel export race condition
 import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
+import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
 // Logo overlay for title pages, upscaling for print
 import { addLogoToTitlePage, upscaleForPrint } from '../utils/image-processing.js';
 
@@ -168,7 +169,14 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     let contentImageBuffer: Buffer | null = null;
     let contentImageMimeType: string | null = null;
     
-    const originalImageUrl = page.asset?.url || page.asset?.thumbnailUrl;
+    // Anchor the generation to the same 2048 vision-normalized URL that
+    // extraction and QC see (also converts HEIC, which the raw asset URL may
+    // be, and caps a tiny thumbnailUrl fallback from silently anchoring the
+    // page). Three pipeline stages must look at the same version of the photo.
+    const rawAnchorUrl = page.asset?.url || page.asset?.thumbnailUrl;
+    const originalImageUrl = rawAnchorUrl
+      ? optimizeCloudinaryUrlForVision(convertHeicToJpeg(rawAnchorUrl))
+      : undefined;
 
     if (originalImageUrl) {
         try {
@@ -514,9 +522,25 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         await prisma.page.update({
             where: { id: pageId },
             data: {
-                generatedImageUrl: !moderationBlocked ? finalImageUrl : null,
+                // Overwrite the image only on a successful render+upload. On a
+                // block/failure any previous image (e.g. the round-1 render a
+                // QC re-render is replacing) stays in place — an imperfect
+                // page beats an empty one.
+                ...(!moderationBlocked && finalImageUrl
+                    ? {
+                        generatedImageUrl: finalImageUrl,
+                        // Render-time attribution stamps: finalize persists QC
+                        // rows from these; it cannot infer provider/model.
+                        lastRenderProvider: illustrator.name,
+                        lastRenderModel: illustrator.modelId,
+                    }
+                    : {}),
                 moderationStatus: moderationBlocked ? "FLAGGED" : "OK",
-                moderationReason: moderationReasonText,
+                // Blocked renders never reach QC rows, so attribution for them
+                // lives in the moderation reason itself.
+                moderationReason: moderationBlocked && moderationReasonText
+                    ? `[${illustrator.name}/${illustrator.modelId}] ${moderationReasonText}`
+                    : moderationReasonText,
             },
         });
         logger.info({ 
@@ -567,7 +591,9 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
           referenceImageCount: coverRefBuffers.length,
           characterIdentity: characterIdentity || null,
           pageNumber: pageNumber,
-          qcFeedback: qcFeedback || null,
+          // QC feedback targets the interior title-page render, not the cover
+          // (a different image the QC pass never saw) — never inherit it here.
+          qcFeedback: null,
         };
         const coverTextPrompt = createIllustrationPrompt(coverPromptInput);
 

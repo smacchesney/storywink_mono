@@ -12,7 +12,17 @@ export interface RenderPdfParams {
   pdfWidthIn: string;
   /** Final PDF page height, e.g. "8.75in". */
   pdfHeightIn: string;
+  /**
+   * Timeout for page operations (navigation, `page.pdf()`) in milliseconds.
+   * Default 120_000 — puppeteer's 30s default regularly 500s big books on
+   * cold Cloudinary caches. Note: the image-load `page.evaluate` below is
+   * governed by the CDP `protocolTimeout` (set to this + 60s), not by
+   * `page.setDefaultTimeout`.
+   */
+  timeoutMs?: number;
 }
+
+const DEFAULT_TIMEOUT_MS = 120_000;
 
 /**
  * Launches a headless browser, renders the given HTML, and returns a PDF buffer.
@@ -23,6 +33,7 @@ export interface RenderPdfParams {
  * `pdf()` dimensions are the single source of truth for page size.
  */
 export async function renderPdf(params: RenderPdfParams): Promise<Buffer> {
+  const timeoutMs = params.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const executablePath =
     process.env.PUPPETEER_EXECUTABLE_PATH || (await chromium.executablePath());
 
@@ -30,10 +41,14 @@ export async function renderPdf(params: RenderPdfParams): Promise<Buffer> {
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
     executablePath,
     headless: true,
+    // CDP-level ceiling; must outlive the page-level timeout or long renders
+    // die on the 180s protocol default instead of the configured limit.
+    protocolTimeout: timeoutMs + 60_000,
   });
 
   try {
     const page = await browser.newPage();
+    page.setDefaultTimeout(timeoutMs);
 
     // Set viewport FIRST (before content) for correct layout calculation.
     await page.setViewport({
@@ -66,6 +81,7 @@ export async function renderPdf(params: RenderPdfParams): Promise<Buffer> {
       printBackground: true,
       margin: { top: '0', right: '0', bottom: '0', left: '0' },
       preferCSSPageSize: false, // Puppeteer dimensions take precedence.
+      timeout: timeoutMs,
     });
 
     return Buffer.from(pdfUint8Array);

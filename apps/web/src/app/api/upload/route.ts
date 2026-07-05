@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
+import { z } from 'zod';
 import { db as prisma } from '@/lib/db'; // Import shared instance as prisma for less code change
 import logger from '@/lib/logger';
 import { PageType } from '@prisma/client'; // Import PageType
 import { getAuthenticatedUser } from '@/lib/db/ensureUser'; // Import the new helper
+
+// Non-file form fields. bookId must be a real cuid when present — anything
+// else is a malformed request, not a missing book.
+const uploadFieldsSchema = z.object({
+  bookId: z.string().cuid().nullable(),
+});
 
 // Configure Cloudinary
 cloudinary.config({
@@ -46,10 +53,22 @@ export async function POST(request: Request) {
         logger.info({ clerkUserId: clerkId, dbUserId: dbUser.id, email: primaryEmail }, "User authentication completed in upload route.");
 
         const formData = await request.formData();
-        const files = formData.getAll('files') as File[];
-        const bookId = formData.get('bookId') as string | null; // <-- Get optional bookId
+        // Only real File entries count — string parts smuggled under 'files'
+        // are dropped before any size/type checks run.
+        const files = formData
+            .getAll('files')
+            .filter((entry): entry is File => entry instanceof File);
+        const rawBookId = formData.get('bookId');
 
-        if (!files || files.length === 0) {
+        const parsedFields = uploadFieldsSchema.safeParse({
+            bookId: typeof rawBookId === 'string' && rawBookId.length > 0 ? rawBookId : null,
+        });
+        if (!parsedFields.success) {
+            return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+        }
+        const bookId = parsedFields.data.bookId;
+
+        if (files.length === 0) {
             return NextResponse.json({ error: 'No files provided' }, { status: 400 });
         }
 

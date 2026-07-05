@@ -6,6 +6,7 @@ import { generateBookPdf } from '@storywink/pdf';
 import { isTitlePage } from '@storywink/shared/utils';
 import { Book, Page } from '@prisma/client';
 import { loadWebPdfFonts } from '../pdfFonts';
+import { optimizeForScreen, pdfContentDisposition } from '@/lib/pdf-export';
 
 // Define the expected Book type with Pages for the PDF generator
 type BookWithPages = Book & { pages: Page[] };
@@ -71,7 +72,10 @@ export async function GET(
       generatedImageUrl: bookData.coverImageUrl || coverPage.generatedImageUrl,
     } : undefined;
 
-    // 2. Generate the PDF buffer (user mode: title → dedication → ALL stories → back cover)
+    // 2. Generate the PDF buffer (user mode: title → dedication → ALL stories → back cover).
+    // optimizeForScreen swaps Cloudinary's f_auto (WebP → ~9MB lossless flate
+    // per page in the PDF) for JPEG passthrough at illustrator-native 2048px.
+    const startedAt = Date.now();
     const pdfBuffer = await generateBookPdf(
       bookData as BookWithPages,
       {
@@ -79,15 +83,21 @@ export async function GET(
         titlePage: titlePageForPdf as Page | undefined,
         includeBackCover: true,
         padToFour: false,
+        imageUrlTransform: optimizeForScreen,
         logger,
       }
+    );
+
+    logger.info(
+      { bookId, durationMs: Date.now() - startedAt, bufferSize: pdfBuffer.length },
+      'User PDF export generated.'
     );
 
     // 3. Send the PDF as response
     return new NextResponse(pdfBuffer, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${bookData.title || 'book'}.pdf"`,
+        'Content-Disposition': pdfContentDisposition(bookData.title),
       },
     });
 

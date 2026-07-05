@@ -20,6 +20,7 @@ export const QUEUE_NAMES = {
   PRINT_FULFILLMENT: 'print-fulfillment',
   CHARACTER_EXTRACTION: 'character-extraction',
   PHOTO_ANALYSIS: 'photo-analysis',
+  BOOK_REAPER: 'book-reaper',
 } as const;
 
 // Book constraints

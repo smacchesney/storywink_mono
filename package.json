@@ -24,7 +24,8 @@
     "db:push": "turbo run db:push",
     "db:migrate": "turbo run db:migrate",
     "db:studio": "turbo run db:studio",
-    "i18n:check": "npx tsx scripts/check-translations.ts"
+    "i18n:check": "npx tsx scripts/check-translations.ts",
+    "check-messages": "node scripts/check-messages.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.27.0",

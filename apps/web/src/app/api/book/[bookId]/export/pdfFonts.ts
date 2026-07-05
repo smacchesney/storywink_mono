@@ -13,13 +13,18 @@ import type { PdfFonts } from '@storywink/pdf';
  * loader reading `.ttf` files from `assets/fonts`. Excalifont is served as
  * `.woff2` here (matching the pre-unification web behaviour).
  */
+let cachedFonts: PdfFonts | null = null;
+
 export function loadWebPdfFonts(): PdfFonts {
-  return {
+  // Font files never change within a process; skip re-reading ~4.5MB of
+  // base64 from disk on every export request.
+  cachedFonts ??= {
     excalifontBase64: loadFont('Excalifont-Regular.woff2'),
     excalifontFormat: 'woff2',
     andikaBase64: loadFont('Andika-Regular.ttf'),
     zenMaruGothicBase64: loadFont('ZenMaruGothic-Regular.ttf'),
   };
+  return cachedFonts;
 }
 
 function loadFont(fileName: string): string {

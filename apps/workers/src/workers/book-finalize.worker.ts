@@ -8,7 +8,9 @@ import { createBullMQConnection } from '@storywink/shared/redis';
 import OpenAI from 'openai';
 import { optimizeCloudinaryUrlForVision } from '@storywink/shared/utils';
 import { createQCPrompt, QC_SYSTEM_PROMPT, QC_RESPONSE_SCHEMA } from '@storywink/shared/prompts/quality-check';
+import { trackEvent } from '@storywink/shared';
 import { computeBookStatus } from '../lib/computeBookStatus.js';
+import { mapQcResultsToPages, RawQcPageResult } from '../lib/qc-mapping.js';
 import { ANALYSIS_MODEL } from '../config/models.js';
 import pino from 'pino';
 
@@ -49,17 +51,21 @@ async function runQualityCheck(
 
   for (const page of illustratedPages) {
     const url = optimizeCloudinaryUrlForVision(page.generatedImageUrl!);
+    // Label each image with its 1-based presentation ordinal. The judge echoes
+    // this label's number, which indexes pageMapping — it is NOT the DB
+    // pageNumber (they diverge when un-illustrated pages are skipped).
+    contentParts.push({ type: 'input_text', text: `PAGE ${pageMapping.length + 1}` });
     contentParts.push({ type: 'input_image', image_url: url, detail: 'high' });
     pageMapping.push({ pageNumber: page.pageNumber, pageId: page.pageId });
   }
 
-  if (contentParts.length < 2) {
+  if (pageMapping.length < 2) {
     logger.warn({ bookId }, 'Skipping QC: not enough images');
     return null;
   }
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const promptText = createQCPrompt(characterIdentity, contentParts.length, language);
+  const promptText = createQCPrompt(characterIdentity, pageMapping.length, language);
 
   // Add the text prompt after all images
   contentParts.push({ type: 'input_text', text: promptText });
@@ -87,31 +93,21 @@ async function runQualityCheck(
   const qcResult = JSON.parse(rawResult) as {
     passed: boolean;
     summary: string;
-    pageResults: Array<{
-      pageNumber: number;
-      passed: boolean;
-      characterConsistencyScore: number;
-      styleConsistencyScore: number;
-      overallScore: number;
-      issues: string[];
-      suggestedPromptAdditions: string | null;
-    }>;
+    pageResults: RawQcPageResult[];
   };
 
-  // Map QC pageNumbers back to actual pageIds
-  const mappedResults = qcResult.pageResults.map((pr, idx) => {
-    const mapping = pageMapping[idx];
-    return {
-      pageNumber: mapping?.pageNumber ?? pr.pageNumber,
-      pageId: mapping?.pageId ?? '',
-      passed: pr.passed,
-      issues: pr.issues,
-      characterConsistencyScore: pr.characterConsistencyScore,
-      styleConsistencyScore: pr.styleConsistencyScore,
-      overallScore: pr.overallScore,
-      suggestedPromptAdditions: pr.suggestedPromptAdditions ?? null,
-    };
-  });
+  // Map the echoed "PAGE n" ordinals back to actual pageIds
+  const { mapped: mappedResults, unmatchedEchoes } = mapQcResultsToPages(
+    qcResult.pageResults,
+    pageMapping,
+  );
+
+  if (unmatchedEchoes.length > 0) {
+    logger.warn(
+      { bookId, unmatchedEchoes, imageCount: pageMapping.length },
+      'QC echoed page numbers matching no image label — dropped those results',
+    );
+  }
 
   const failedPageIds = mappedResults
     .filter(r => !r.passed)
@@ -250,6 +246,41 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
 
         const qcResult = await runQualityCheck(bookId, qcPages, characterIdentity, book.language);
 
+        // Persist every scored image (passes included — the pass distribution
+        // is the drift baseline). Provider/model come from the render-time
+        // stamps; finalize cannot infer them itself.
+        if (qcResult) {
+          try {
+            const renderMetaByPageId = new Map(
+              book.pages.map((p: any) => [
+                p.id,
+                { provider: p.lastRenderProvider ?? null, model: p.lastRenderModel ?? null },
+              ]),
+            );
+            await prisma.illustrationQcResult.createMany({
+              data: qcResult.pageResults.map(r => ({
+                bookId,
+                pageId: r.pageId,
+                target: 'page',
+                qcRound,
+                charScore: r.characterConsistencyScore,
+                styleScore: r.styleConsistencyScore,
+                overallScore: r.overallScore,
+                passed: r.passed,
+                provider: renderMetaByPageId.get(r.pageId)?.provider ?? null,
+                model: renderMetaByPageId.get(r.pageId)?.model ?? null,
+                hadSheet: false, // character sheets not wired into renders yet
+                feedback: r.suggestedPromptAdditions,
+              })),
+            });
+          } catch (persistError: any) {
+            logger.warn(
+              { bookId, qcRound, error: persistError.message },
+              'Failed to persist IllustrationQcResult rows — continuing',
+            );
+          }
+        }
+
         if (qcResult && !qcResult.passed && qcResult.failedPageIds.length > 0) {
           const nextRound = qcRound + 1;
           qcResult.qcRound = nextRound;
@@ -273,12 +304,14 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
               };
             });
 
-          // Clear generated images on failed pages so they get re-generated
+          // Mark failed pages for re-generation but KEEP the round-1 image:
+          // the re-render overwrites generatedImageUrl only on successful
+          // upload (the Cloudinary public_id page_{n} already overwrites), so
+          // a failed round-2 render leaves an imperfect image instead of none.
           for (const { page } of failedPagesData) {
             await prisma.page.update({
               where: { id: page.id },
               data: {
-                generatedImageUrl: null,
                 moderationStatus: 'PENDING',
                 moderationReason: null,
               },
@@ -411,6 +444,26 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
       },
     });
     logger.info({ bookId, userId, type: `BOOK_${finalStatus}` }, 'Created notification for book completion');
+
+    await trackEvent(
+      prisma,
+      {
+        name: 'book_finalized',
+        userId,
+        bookId,
+        props: {
+          status: finalStatus,
+          qcRound,
+          failedPages: book.pages.filter(
+            (p: any) =>
+              !p.generatedImageUrl ||
+              p.moderationStatus === 'FAILED' ||
+              p.moderationStatus === 'FLAGGED',
+          ).length,
+        },
+      },
+      logger,
+    );
 
     logger.info({
       bookId,

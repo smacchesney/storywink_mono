@@ -143,9 +143,14 @@ export function NotificationBell() {
       console.error('Failed to mark notification as read:', error);
     }
 
-    // Close dropdown and navigate
+    // Close dropdown and navigate. Book notifications land on the book
+    // itself; anything else keeps the library.
     setIsOpen(false);
-    router.push('/library');
+    router.push(
+      notification.bookId && notification.type.startsWith('BOOK_')
+        ? `/book/${notification.bookId}/preview`
+        : '/library'
+    );
   };
 
   // Don't render for signed out users

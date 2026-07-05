@@ -27,6 +27,7 @@ export default defineConfig({
       'packages/shared/src/**/*.test.ts',
       'packages/pdf/src/**/*.test.ts',
       'apps/workers/src/**/*.test.ts',
+      'apps/web/src/**/*.test.ts',
     ],
     environment: 'node',
   },

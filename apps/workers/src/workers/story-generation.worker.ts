@@ -19,11 +19,32 @@ import {
   STORY_QC_THRESHOLDS,
   StoryQCResponse,
   countRefrainEchoes,
+  isChildNameCheckable,
+  countChildNameEchoes,
 } from '@storywink/shared/prompts/story-check';
-import { optimizeCloudinaryUrlForVision, convertHeicToJpeg, remapCharacterPages } from '@storywink/shared/utils';
+import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
+import { trackEvent } from '@storywink/shared';
+import {
+  buildConfirmedFacts,
+  resolveCastForStory,
+  CaptureQuestionLike,
+  RawCastCharacter,
+} from '../lib/storyCast.js';
 import { STORY_MODEL, ANALYSIS_MODEL } from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+
+// Perception-pass output persisted on Page.analysis (all optional — the
+// pipeline degrades to photos-only behavior when the analysis job failed
+// or is stale).
+interface StoredPageAnalysis {
+  assetId?: string | null;
+  setting: string;
+  action: string;
+  emotion: string;
+  eventSignals: string[];
+  narrativeRole: string;
+}
 
 // Regen only happens while the total job stays inside this budget, so QC can
 // never turn a working story job into a hung one.
@@ -75,6 +96,8 @@ async function evaluateStoryQuality(
               pages: storyResponse.pages.map(p => ({ pageNumber: p.pageNumber, text: p.text })),
               language: input.language,
               theme: input.theme,
+              eventSummary: input.eventSummary,
+              confirmedFacts: input.confirmedFacts,
             }),
           },
         ],
@@ -93,6 +116,26 @@ async function evaluateStoryQuality(
   if (!result.output_text) throw new Error('Story QC returned empty response');
   const qc = JSON.parse(result.output_text) as StoryQCResponse;
 
+  // LOG-ONLY personalization checks: scored and logged for tuning against
+  // Railway data, but they never push into `problems` — every enforcing
+  // check converts into a silent extra generation during the parent's wait.
+  // The childName check is script-gated: kanji or cross-script names can
+  // never pass a raw substring check, so they log 'skipped'.
+  const childName = input.childName?.trim();
+  let childNameCheck: 'checked' | 'skipped' | 'absent' = 'absent';
+  let childNameEchoes: number | null = null;
+  let childNameInLanding: boolean | null = null;
+  if (childName) {
+    if (isChildNameCheckable(childName, input.language || 'en')) {
+      const nameEchoes = countChildNameEchoes(childName, pageTexts);
+      childNameCheck = 'checked';
+      childNameEchoes = nameEchoes.pagesWithName;
+      childNameInLanding = nameEchoes.nameInLanding;
+    } else {
+      childNameCheck = 'skipped';
+    }
+  }
+
   logger.info(
     {
       bookId,
@@ -101,6 +144,12 @@ async function evaluateStoryQuality(
       readAloudRhythm: qc.readAloudRhythm,
       lastPageLanding: qc.lastPageLanding,
       maxCaptionRisk: Math.max(0, ...qc.pages.map(p => p.captionRisk)),
+      childNameCheck,
+      childNameEchoes,
+      childNameInLanding,
+      truthToEvent: qc.truthToEvent,
+      hadEventSummary: !!input.eventSummary,
+      confirmedFactCount: input.confirmedFacts?.length ?? 0,
     },
     'Story QC scores',
   );
@@ -233,42 +282,20 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
 
     // Perception-pass context (all optional — the pipeline degrades to
     // photos-only behavior when the analysis job failed or is stale).
-    interface StoredPageAnalysis {
-      assetId?: string | null;
-      setting: string;
-      action: string;
-      emotion: string;
-      eventSignals: string[];
-      narrativeRole: string;
-    }
+    const captureQuestions = (book.captureQuestions as CaptureQuestionLike[] | null) ?? [];
+    const confirmedFacts = buildConfirmedFacts(captureQuestions);
 
-    const captureQuestions = (book.captureQuestions as
-      | { question: string; answer?: string | null }[]
-      | null) ?? [];
-    const confirmedFacts = captureQuestions
-      .filter(q => q.answer && q.answer.trim())
-      .map(q => `${q.question} → ${q.answer}`);
-
-    // appearsOnPages is creation-order-positional; remap to the CURRENT page
-    // order via the perception pass's assetId stamps. When remapping fails
-    // (legacy identity, swapped photo) we omit page-targeted character
-    // instructions entirely rather than assert wrong page numbers.
+    // appearsOnPages is creation-order-positional; remap per character to the
+    // CURRENT page order via the perception pass's assetId stamps. Characters
+    // whose photos were all removed are dropped (never reintroduce removed
+    // people); partially-resolvable characters stay in the cast page-less
+    // rather than asserting wrong page numbers.
     const rawIdentity = book.characterIdentity as
-      | { characters?: { characterId: string; role: string; name: string | null; appearsOnPages: number[]; appearsOnAssetIds?: (string | null)[] }[] }
+      | { characters?: RawCastCharacter[] }
       | null;
-    const remappedIdentity = rawIdentity?.characters?.length
-      ? remapCharacterPages(
-          { characters: rawIdentity.characters },
-          storyPages.map(p => p.assetId),
-        )
-      : null;
-    const charactersInPhotos = remappedIdentity?.characters
-      .map(c => ({
-        name: c.name || c.role.replace(/_/g, ' '),
-        role: c.role,
-        appearsOnPages: c.appearsOnPages,
-      }))
-      .filter(c => c.appearsOnPages.length > 0);
+    const charactersInPhotos = rawIdentity?.characters?.length
+      ? resolveCastForStory(rawIdentity.characters, storyPages.map(p => p.assetId))
+      : [];
 
     // Prepare story generation input using advanced prompt structure
     const storyInput: StoryGenerationInput = {
@@ -281,7 +308,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       theme: book.theme || undefined,
       eventSummary: book.eventSummary || undefined,
       confirmedFacts: confirmedFacts.length > 0 ? confirmedFacts : undefined,
-      charactersInPhotos: charactersInPhotos?.length ? charactersInPhotos : undefined,
+      charactersInPhotos: charactersInPhotos.length > 0 ? charactersInPhotos : undefined,
       language: book.language || 'en',
       suggestTitle: job.data.titleWasGenerated === true,
       storyPages: storyPages.map((page, index) => {
@@ -369,11 +396,15 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
 
     // Story QC: verify the draft before any illustration money is spent on it.
     // One regen max; QC errors and blown time budgets accept the draft as-is.
+    let qcPassed = true;
+    let regenerated = false;
     try {
       const verdict = await evaluateStoryQuality(openai, storyResponse, storyInput, bookId);
       if (!verdict.passed) {
+        qcPassed = false;
         if (Date.now() - jobStartedAt < STORY_QC_TIME_BUDGET_MS) {
           logger.warn({ bookId, feedback: verdict.feedback }, 'Story QC failed — regenerating once with corrections');
+          regenerated = true;
           storyResponse = await generateStory(verdict.feedback);
         } else {
           logger.warn({ bookId, feedback: verdict.feedback }, 'Story QC failed but time budget exhausted — accepting draft');
@@ -578,6 +609,13 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       logger.info({ bookId, title: suggestedTitle }, 'Adopted model-suggested book title');
     }
 
+    // Funnel telemetry — never throws, never blocks the pipeline.
+    await trackEvent(
+      prisma,
+      { name: 'story_ready', userId: book.userId, bookId, props: { regenerated, qcPassed } },
+      logger,
+    );
+
     // Auto-chain: hand the book straight to illustration. The chain re-enters
     // via character extraction, which owns the illustration FlowProducer flow.
     // A chain failure must NOT fail the story job — the book stays STORY_READY
@@ -697,6 +735,42 @@ async function processSinglePageTextGeneration(
     }
   }
 
+  // Context parity with full generation: cast, eventSummary + confirmed
+  // facts, and this page's fresh perception analysis. The perception roster
+  // is durable here — both refresh enqueues are DRAFT-gated, so post-DRAFT
+  // perception never re-runs; only page remapping is needed.
+  const rawIdentity = book.characterIdentity as { characters?: RawCastCharacter[] } | null;
+  const cast = rawIdentity?.characters?.length
+    ? resolveCastForStory(rawIdentity.characters, storyPages.map(p => p.assetId))
+    : [];
+  const castInfo = cast.length > 0
+    ? `People in this book's photos: ${cast
+        .map(c => `"${c.name}" (${c.role.replace(/_/g, ' ')})`)
+        .join(', ')}. NEVER invent a proper name — for unnamed people use the warm relationship word a toddler would say ("Grandma", "Daddy").`
+    : '';
+
+  const confirmedFacts = buildConfirmedFacts(book.captureQuestions as CaptureQuestionLike[] | null);
+  // Exactly ONE experience-context block, eventSummary superseding theme —
+  // same condition as full generation.
+  const eventContext = book.eventSummary
+    ? [
+        `## What actually happened (confirmed by the parent — the story must feel TRUE to this):`,
+        `- "${book.eventSummary}"`,
+        ...confirmedFacts.map(f => `- Parent confirmed: ${f}`),
+      ].join('\n')
+    : book.theme
+      ? `## Story context from the parent:\n"${book.theme}"`
+      : '';
+
+  const storedAnalysis = targetPage.analysis as StoredPageAnalysis | null;
+  // Stale analysis (photo was swapped since the perception pass) is dropped.
+  const freshAnalysis = storedAnalysis && storedAnalysis.assetId === targetPage.assetId ? storedAnalysis : null;
+  const analysisLine = freshAnalysis
+    ? `WHAT'S HERE in this page's photo (raw notes, NOT the story): ${freshAnalysis.setting}; ${freshAnalysis.action}; ${freshAnalysis.emotion}.${
+        freshAnalysis.eventSignals?.length ? ` Signals: ${freshAnalysis.eventSignals.join(', ')}.` : ''
+      } ARC ROLE: ${freshAnalysis.narrativeRole}.`
+    : '';
+
   const language = book.language || 'en';
   const languageInstruction = language === 'ja'
     ? 'Write the story text in Japanese (hiragana preferred for young children). Use simple, warm language.'
@@ -705,12 +779,15 @@ async function processSinglePageTextGeneration(
   const promptText = [
     `You are writing page ${targetPage.pageNumber} of a children's picture book titled "${book.title || 'My Special Story'}".`,
     characterInfo,
+    castInfo,
     languageInstruction,
     '',
+    ...(eventContext ? [eventContext, ''] : []),
     prevContext ? `## Story so far (previous pages):\n${prevContext}` : '## This is near the beginning of the story.',
     '',
     `## Your task:`,
     `Write story text for page ${targetPage.pageNumber} based on the photo provided. Write 2-4 sentences (max 50 words). The text should feel warm, playful, and natural when read aloud to a toddler.`,
+    ...(analysisLine ? [analysisLine] : []),
     '',
     nextContext ? `## What comes after (for continuity):\n${nextContext}` : '## This is near the end of the story.',
     '',

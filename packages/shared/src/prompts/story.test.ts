@@ -1,0 +1,79 @@
+import { describe, it, expect } from 'vitest';
+import { createStoryGenerationPrompt, StoryGenerationInput } from './story.js';
+
+function promptText(input: StoryGenerationInput): string {
+  return createStoryGenerationPrompt(input)
+    .map(part => ('text' in part ? part.text : ''))
+    .join('\n');
+}
+
+const baseInput: StoryGenerationInput = {
+  bookTitle: 'Splash Day',
+  isDoubleSpread: false,
+  childName: 'Emma',
+  language: 'en',
+  storyPages: [
+    { pageId: 'p1', pageNumber: 1, assetId: 'a1', originalImageUrl: null, analysis: null },
+    { pageId: 'p2', pageNumber: 2, assetId: 'a2', originalImageUrl: null, analysis: null },
+  ],
+};
+
+describe('createStoryGenerationPrompt — cast rendering', () => {
+  it('always includes the never-invent-names policy (en)', () => {
+    const text = promptText(baseInput);
+    expect(text).toContain('NEVER invent a proper name for anyone');
+    expect(text).toContain('For unnamed pets');
+  });
+
+  it('includes the ja relationship-word policy for ja books', () => {
+    const text = promptText({ ...baseInput, language: 'ja' });
+    expect(text).toContain('おばあちゃん');
+    expect(text).toContain('わんちゃん');
+  });
+
+  it('renders exact pages for fully-resolved supporting characters', () => {
+    const text = promptText({
+      ...baseInput,
+      charactersInPhotos: [
+        { name: 'Grandma', role: 'grandparent', appearsOnPages: [1, 2] },
+      ],
+    });
+    expect(text).toContain('Grandma (grandparent) appears on page(s) 1, 2');
+    expect(text).not.toContain('exact pages unknown');
+  });
+
+  it('renders the page-less variant when appearsOnPages is empty', () => {
+    const text = promptText({
+      ...baseInput,
+      charactersInPhotos: [
+        { name: 'Grandma', role: 'grandparent', appearsOnPages: [] },
+      ],
+    });
+    expect(text).toContain('Grandma (grandparent) appears in several of the photos (exact pages unknown)');
+    expect(text).toContain('include them only on pages where you can actually see them');
+    expect(text).not.toContain('appears on page(s)');
+  });
+
+  it('mixes exact and page-less variants per character', () => {
+    const text = promptText({
+      ...baseInput,
+      charactersInPhotos: [
+        { name: 'Grandma', role: 'grandparent', appearsOnPages: [2] },
+        { name: 'sibling', role: 'sibling', appearsOnPages: [] },
+      ],
+    });
+    expect(text).toContain('Grandma (grandparent) appears on page(s) 2');
+    expect(text).toContain('sibling (sibling) appears in several of the photos');
+    expect(text).toContain('include them only on pages where you can actually see them');
+  });
+
+  it('excludes the main child from the supporting cast block', () => {
+    const text = promptText({
+      ...baseInput,
+      charactersInPhotos: [
+        { name: 'Emma', role: 'main_child', appearsOnPages: [1, 2] },
+      ],
+    });
+    expect(text).not.toContain('SUPPORTING CAST');
+  });
+});

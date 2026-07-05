@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { countRefrainEchoes } from './story-check.js';
+import {
+  countRefrainEchoes,
+  isChildNameCheckable,
+  countChildNameEchoes,
+  createStoryQCPrompt,
+} from './story-check.js';
+import type { StoryArc } from './story.js';
 
 describe('countRefrainEchoes (en)', () => {
   const refrain = 'Splish, splash, one more splash!';
@@ -57,5 +63,122 @@ describe('countRefrainEchoes (ja)', () => {
   it('returns 0 when no page shares a 4-char run with the refrain', () => {
     const pages = ['ねこが ねむる', 'とりが とぶ'];
     expect(countRefrainEchoes(refrain, pages, 'ja')).toBe(0);
+  });
+});
+
+describe('isChildNameCheckable (script gate)', () => {
+  it('accepts Latin names in en books', () => {
+    expect(isChildNameCheckable('Emma', 'en')).toBe(true);
+    expect(isChildNameCheckable('Anne-Marie', 'en')).toBe(true);
+    expect(isChildNameCheckable('Léa')).toBe(true); // defaults to en
+  });
+
+  it('accepts kana names in ja books', () => {
+    expect(isChildNameCheckable('えま', 'ja')).toBe(true);
+    expect(isChildNameCheckable('ケンタ', 'ja')).toBe(true);
+    expect(isChildNameCheckable('リーサ', 'ja')).toBe(true); // long vowel mark
+  });
+
+  it('rejects kanji names in any language (reading is unknown)', () => {
+    expect(isChildNameCheckable('健太', 'ja')).toBe(false);
+    expect(isChildNameCheckable('健太', 'en')).toBe(false);
+    expect(isChildNameCheckable('さくら花', 'ja')).toBe(false); // mixed kana+kanji
+  });
+
+  it('rejects cross-script names', () => {
+    // Latin name in a ja book gets transliterated to katakana by the prompt.
+    expect(isChildNameCheckable('Emma', 'ja')).toBe(false);
+    // Kana name in an en book — no reliable rendering to check against.
+    expect(isChildNameCheckable('えま', 'en')).toBe(false);
+    // Mixed-script names are never checkable.
+    expect(isChildNameCheckable('Emmaちゃん', 'en')).toBe(false);
+    expect(isChildNameCheckable('Emmaちゃん', 'ja')).toBe(false);
+  });
+
+  it('rejects empty and whitespace names', () => {
+    expect(isChildNameCheckable('', 'en')).toBe(false);
+    expect(isChildNameCheckable('  ', 'ja')).toBe(false);
+  });
+});
+
+describe('countChildNameEchoes', () => {
+  it('counts pages mentioning a Latin name, case- and punctuation-insensitively', () => {
+    const pages = [
+      'Emma wiggles her toes.',
+      'The waves whisper to EMMA!',
+      'The dog runs home.',
+      '"Goodnight, Emma," says Mama.',
+    ];
+    const result = countChildNameEchoes('Emma', pages);
+    expect(result.pagesWithName).toBe(3);
+    expect(result.nameInLanding).toBe(true);
+  });
+
+  it('does not match a Latin name inside a longer word', () => {
+    const result = countChildNameEchoes('Sam', ['Samantha runs.', 'Sam jumps!']);
+    expect(result.pagesWithName).toBe(1);
+  });
+
+  it('reports nameInLanding false when the name misses the final pages', () => {
+    const pages = [
+      'Emma at the park.',
+      'Emma on the swing.',
+      'Up and up she goes.',
+      'Down for a nap.',
+      'Sleep tight, little one.',
+    ];
+    const result = countChildNameEchoes('Emma', pages);
+    expect(result.pagesWithName).toBe(2);
+    expect(result.nameInLanding).toBe(false);
+  });
+
+  it('matches kana names as substrings (particles attach directly)', () => {
+    const pages = ['えまが わらう', 'ざぶーん！', 'おやすみ、えま。'];
+    const result = countChildNameEchoes('えま', pages);
+    expect(result.pagesWithName).toBe(2);
+    expect(result.nameInLanding).toBe(true);
+  });
+
+  it('handles empty inputs', () => {
+    expect(countChildNameEchoes('', ['text'])).toEqual({ pagesWithName: 0, nameInLanding: false });
+    expect(countChildNameEchoes('Emma', [])).toEqual({ pagesWithName: 0, nameInLanding: false });
+  });
+});
+
+describe('createStoryQCPrompt context block', () => {
+  const storyArc: StoryArc = {
+    desire: 'To splash in every puddle',
+    refrain: 'Splish, splash!',
+    emotionalPeak: 'The biggest puddle of all',
+    resolution: 'Warm and dry at home',
+  };
+  const pages = [{ pageNumber: 1, text: 'Splish!' }];
+
+  it('renders eventSummary with confirmedFacts, superseding theme', () => {
+    const prompt = createStoryQCPrompt({
+      storyArc,
+      pages,
+      theme: 'A rainy day',
+      eventSummary: "Emma's first rainy walk to the park",
+      confirmedFacts: ['Who joined? → Grandma'],
+    });
+    expect(prompt).toContain("Emma's first rainy walk to the park");
+    expect(prompt).toContain('- Parent confirmed: Who joined? → Grandma');
+    expect(prompt).not.toContain('A rainy day');
+    expect(prompt).toContain('truthToEvent (0-10, or null)');
+    expect(prompt).not.toContain('return null');
+  });
+
+  it('falls back to theme without eventSummary and nulls truthToEvent', () => {
+    const prompt = createStoryQCPrompt({
+      storyArc,
+      pages,
+      theme: 'A rainy day',
+      confirmedFacts: ['Who joined? → Grandma'],
+    });
+    expect(prompt).toContain('A rainy day');
+    // Facts render only under the eventSummary-present condition, mirroring generation.
+    expect(prompt).not.toContain('Parent confirmed');
+    expect(prompt).toContain('No event summary was provided — return null.');
   });
 });

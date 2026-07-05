@@ -36,6 +36,7 @@ function isContentPolicyBlock(err: any): boolean {
 
 export class OpenAIProvider implements IllustrationProvider {
   readonly name = 'openai' as const;
+  readonly modelId = 'gpt-image-2';
   private readonly client: OpenAI;
   private readonly quality: QualityLevel;
   private readonly thinking: boolean;
@@ -69,7 +70,7 @@ export class OpenAIProvider implements IllustrationProvider {
 
     try {
       const response = await this.client.images.edit({
-        model: 'gpt-image-2',
+        model: this.modelId,
         image: imageFiles,
         prompt: input.prompt,
         size: '2048x2048',

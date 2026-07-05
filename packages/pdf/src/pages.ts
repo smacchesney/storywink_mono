@@ -1,5 +1,5 @@
 import { PAGE_TEXT } from '@storywink/shared/constants';
-import type { BookWithPages, Page } from './types.js';
+import type { BookWithPages, ImageUrlTransform, Page } from './types.js';
 import {
   PAGE_WIDTH_WITH_BLEED_IN,
   PAGE_HEIGHT_WITH_BLEED_IN,
@@ -39,7 +39,10 @@ export interface InteriorPage {
 // ---------------------------------------------------------------------------
 
 /** Full-bleed illustration page. */
-export function generateIllustrationPageHtml(page: Page): string {
+export function generateIllustrationPageHtml(
+  page: Page,
+  imageUrlTransform?: ImageUrlTransform
+): string {
   const pageStyle = `
     width: ${PAGE_WIDTH_WITH_BLEED_IN}in;
     height: ${PAGE_HEIGHT_WITH_BLEED_IN}in;
@@ -60,7 +63,7 @@ export function generateIllustrationPageHtml(page: Page): string {
     <div class="page" style="${pageStyle}">
       ${
         page.generatedImageUrl
-          ? `<img src="${optimizeForPrint(page.generatedImageUrl)}" alt="Page ${page.pageNumber} Illustration" style="${imageStyle}" />`
+          ? `<img src="${(imageUrlTransform ?? optimizeForPrint)(page.generatedImageUrl)}" alt="Page ${page.pageNumber} Illustration" style="${imageStyle}" />`
           : '<div style="display:flex; align-items:center; justify-content:center; height:100%;">Image not generated</div>'
       }
     </div>
@@ -107,7 +110,8 @@ export function generateTextPageHtml(page: Page, language: string): string {
 export function generateDedicationPageHtml(
   childName: string | null,
   bookTitle: string,
-  language: string
+  language: string,
+  imageUrlTransform?: ImageUrlTransform
 ): string {
   const displayName = childName || bookTitle || 'You';
   const texts = PAGE_TEXT[language as keyof typeof PAGE_TEXT] || PAGE_TEXT.en;
@@ -152,7 +156,7 @@ export function generateDedicationPageHtml(
         ${dedicationHtml}
       </div>
       <img
-        src="${DEDICATION_MASCOT_URL}"
+        src="${imageUrlTransform ? imageUrlTransform(DEDICATION_MASCOT_URL) : DEDICATION_MASCOT_URL}"
         alt="Storywink mascot"
         style="
           position: absolute;
@@ -171,7 +175,8 @@ export function generateDedicationPageHtml(
 export function generateEndingPageHtml(
   childName: string | null,
   bookTitle: string,
-  language: string
+  language: string,
+  imageUrlTransform?: ImageUrlTransform
 ): string {
   const displayName = childName || bookTitle || 'You';
   const texts = PAGE_TEXT[language as keyof typeof PAGE_TEXT] || PAGE_TEXT.en;
@@ -218,7 +223,7 @@ export function generateEndingPageHtml(
         ">${displayName}!</p>
       </div>
       <img
-        src="${ENDING_MASCOT_URL}"
+        src="${imageUrlTransform ? imageUrlTransform(ENDING_MASCOT_URL) : ENDING_MASCOT_URL}"
         alt="Storywink mascot"
         style="
           margin-top: 0.4in;
@@ -235,7 +240,7 @@ export function generateEndingPageHtml(
  * Back cover page (user PDF only).
  * White background with centered "Storywink.ai" branding and mascot below.
  */
-export function generateBackCoverPageHtml(): string {
+export function generateBackCoverPageHtml(imageUrlTransform?: ImageUrlTransform): string {
   const pageStyle = `
     width: ${PAGE_WIDTH_WITH_BLEED_IN}in;
     height: ${PAGE_HEIGHT_WITH_BLEED_IN}in;
@@ -261,7 +266,7 @@ export function generateBackCoverPageHtml(): string {
         <span>Storywin</span><span style="color: #F76C5E;">k.ai</span>
       </div>
       <img
-        src="${BACK_COVER_MASCOT_URL}"
+        src="${imageUrlTransform ? imageUrlTransform(BACK_COVER_MASCOT_URL) : BACK_COVER_MASCOT_URL}"
         alt="Storywink mascot"
         style="
           margin-top: 0.4in;
@@ -296,6 +301,12 @@ export interface AssembleInteriorOptions {
   titlePage?: Page;
   includeBackCover?: boolean;
   padToFour?: boolean;
+  /**
+   * Applied to every illustration and mascot URL. Omitted: illustrations get
+   * optimizeForPrint, mascots stay raw (the Lulu path, frozen by
+   * pages.lulu-snapshot.test.ts).
+   */
+  imageUrlTransform?: ImageUrlTransform;
 }
 
 /**
@@ -316,7 +327,7 @@ export function assembleInteriorPages(
   bookData: BookWithPages,
   options?: AssembleInteriorOptions
 ): InteriorPage[] {
-  const { titlePage, includeBackCover = false, padToFour = true } = options ?? {};
+  const { titlePage, includeBackCover = false, padToFour = true, imageUrlTransform } = options ?? {};
   const language = bookData.language || 'en';
 
   const sortedPages = [...bookData.pages].sort((a, b) => a.pageNumber - b.pageNumber);
@@ -326,7 +337,7 @@ export function assembleInteriorPages(
   if (titlePage) {
     pages.push({
       kind: 'title',
-      html: generateIllustrationPageHtml(titlePage),
+      html: generateIllustrationPageHtml(titlePage, imageUrlTransform),
       pageNumber: titlePage.pageNumber,
     });
   }
@@ -334,24 +345,28 @@ export function assembleInteriorPages(
   // Dedication page (recto).
   pages.push({
     kind: 'dedication',
-    html: generateDedicationPageHtml(bookData.childName, bookData.title, language),
+    html: generateDedicationPageHtml(bookData.childName, bookData.title, language, imageUrlTransform),
   });
 
   // Story pages: text (verso) + illustration (recto) pairs.
   for (const page of sortedPages) {
     pages.push({ kind: 'text', html: generateTextPageHtml(page, language), pageNumber: page.pageNumber });
-    pages.push({ kind: 'illustration', html: generateIllustrationPageHtml(page), pageNumber: page.pageNumber });
+    pages.push({
+      kind: 'illustration',
+      html: generateIllustrationPageHtml(page, imageUrlTransform),
+      pageNumber: page.pageNumber,
+    });
   }
 
   // Ending page.
   pages.push({
     kind: 'ending',
-    html: generateEndingPageHtml(bookData.childName, bookData.title, language),
+    html: generateEndingPageHtml(bookData.childName, bookData.title, language, imageUrlTransform),
   });
 
   // Back cover (user PDF only).
   if (includeBackCover) {
-    pages.push({ kind: 'backCover', html: generateBackCoverPageHtml() });
+    pages.push({ kind: 'backCover', html: generateBackCoverPageHtml(imageUrlTransform) });
   }
 
   // Pad to multiple of 4 for Lulu saddle stitch (skipped for user PDF).

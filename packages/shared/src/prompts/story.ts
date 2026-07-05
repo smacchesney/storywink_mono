@@ -89,7 +89,7 @@ export interface StoryGenerationInput {
   charactersInPhotos?: {
     name: string;
     role: string;
-    appearsOnPages: number[];
+    appearsOnPages: number[]; // empty = present in the photos, but exact pages unknown (page-less prompt variant)
   }[]; // From the perception pass — who actually appears where
   storyPages: {
     pageId: string;
@@ -180,16 +180,34 @@ export function createStoryGenerationPrompt(
 
   // Supporting-cast weaving: the perception pass knows who appears on which
   // pages, so recurring family members get real roles instead of cameos.
+  // Characters with an empty appearsOnPages survived a photo change but their
+  // exact pages are unknown — they get the page-less variant instead of
+  // asserted (possibly wrong) page numbers.
   if (input.charactersInPhotos?.length) {
-    const supporting = input.charactersInPhotos.filter(c => c.role !== 'main_child' && c.appearsOnPages.length > 0);
+    const supporting = input.charactersInPhotos.filter(c => c.role !== 'main_child');
     if (supporting.length > 0) {
       characterInstruction += `\n  - SUPPORTING CAST (from the actual photos — weave them in, don't just mention them):`;
       for (const c of supporting) {
-        characterInstruction += `\n    - ${c.name} (${c.role.replace(/_/g, ' ')}) appears on page(s) ${c.appearsOnPages.join(', ')}. Give them a real supporting role in the story: introduce them naturally when they first appear, involve them in at least one emotional beat (a shared laugh, a steadying hand, a discovery together), and if they are present near the end, include them in the landing.`;
+        if (c.appearsOnPages.length > 0) {
+          characterInstruction += `\n    - ${c.name} (${c.role.replace(/_/g, ' ')}) appears on page(s) ${c.appearsOnPages.join(', ')}. Give them a real supporting role in the story: introduce them naturally when they first appear, involve them in at least one emotional beat (a shared laugh, a steadying hand, a discovery together), and if they are present near the end, include them in the landing.`;
+        } else {
+          characterInstruction += `\n    - ${c.name} (${c.role.replace(/_/g, ' ')}) appears in several of the photos (exact pages unknown). Give them a real supporting role wherever you can SEE them in the storyboard images: introduce them naturally where they first appear, and involve them in at least one emotional beat.`;
+        }
       }
       characterInstruction += `\n    - Never invent appearances: a character speaks or acts on a page ONLY if they are actually on that page (or plausibly just off-frame on an adjacent one).`;
+      if (supporting.some(c => c.appearsOnPages.length === 0)) {
+        characterInstruction += ` For characters whose exact pages are unknown, include them only on pages where you can actually see them in the storyboard images.`;
+      }
     }
   }
+
+  // Name discipline: names come from the parent, never from the model.
+  characterInstruction += [
+    ``,
+    `  - NEVER invent a proper name for anyone. Use ONLY the names given above.`,
+    `  - For unnamed people, use the warm relationship word a toddler would say — "Grandma", "Grandpa", "Daddy", "Mummy", "Auntie", "the little sister" — based on their listed role. If the relationship is unclear, use a neutral warm term like "a friend".`,
+    `  - For unnamed pets, use simple animal words ("the dog", "the cat"). Never name a pet the parent didn't name.`,
+  ].join('\n');
 
   const baseInstructions = [
     `# Instructions & Guiding Principles:`,
@@ -285,6 +303,7 @@ export function createStoryGenerationPrompt(
         `- Maintain the same warm, playful, read-aloud quality described above, adapted for Japanese.`,
         `- Use Japanese onomatopoeia naturally (ざぶーん, どきどき, ぴょんぴょん, きらきら, etc.).`,
         `- Character names should remain as provided (do not transliterate to katakana unless they are clearly non-Japanese names).`,
+        `- For unnamed people, use the warm hiragana relationship word a toddler would say (おばあちゃん、おじいちゃん、おかあさん、おとうさん、おねえちゃん、おにいちゃん、いもうと、おとうと) — NEVER invent a name. For unnamed pets use わんちゃん / ねこちゃん style words.`,
         `- **Length constraint (replaces the English rule above):** 2-4 sentences per page, **maximum 80 characters** per page.`,
         `- The "illustrationNotes" field must remain in **English** (the illustration AI only understands English).`,
       ].join('\n')

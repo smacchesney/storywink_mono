@@ -9,6 +9,9 @@ import {
   CHARACTER_IDENTITY_SYSTEM_PROMPT,
   CHARACTER_IDENTITY_RESPONSE_SCHEMA,
   CharacterExtractionInput,
+  createStyleTranslationRefreshPrompt,
+  STYLE_TRANSLATION_REFRESH_SYSTEM_PROMPT,
+  STYLE_TRANSLATION_REFRESH_SCHEMA,
 } from '@storywink/shared/prompts/character-identity';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg, remapCharacterPages } from '@storywink/shared/utils';
 import { ANALYSIS_MODEL } from '../config/models.js';
@@ -56,8 +59,29 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         'Reusing perception-pass character identity (remapped to current page order) — skipping extraction vision call',
       );
       characterIdentity = remappedIdentity;
+
+      // The styleTranslation prose is style-specific: the perception pass runs
+      // at create time when artStyle is still unset (it bakes in 'vignette'),
+      // so on nearly every non-vignette book — and after any style switch —
+      // the stamp mismatches. Refresh ONLY the translation strings via a cheap
+      // text-only call; the remapped identity itself stays valid (never
+      // hard-invalidate, which would re-add a vision extraction to the
+      // default path).
+      if (characterIdentity.extractedForStyle !== artStyle) {
+        const refreshed = await refreshStyleTranslations(characterIdentity, artStyle, bookId);
+        if (refreshed) {
+          characterIdentity = refreshed;
+          await prisma.book.update({
+            where: { id: bookId },
+            data: { characterIdentity: characterIdentity as any },
+          });
+        }
+        // On refresh failure: proceed with the stale translations (graceful
+        // degradation) and leave the stamp untouched so the next run retries.
+      }
+
       await createIllustrationFlow(bookId, userId, characterIdentity, pageIds);
-      return { success: true, characterCount: remappedIdentity.characters.length, reused: true };
+      return { success: true, characterCount: characterIdentity.characters.length, reused: true };
     }
 
     // 3. Parse additional characters
@@ -123,7 +147,9 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
       if (!rawResult) {
         logger.error({ bookId }, 'OpenAI returned empty response for character extraction');
       } else {
-        characterIdentity = JSON.parse(rawResult);
+        // Stamp the style the styleTranslation prose was written for — the
+        // reuse path refreshes the translations when this stamp mismatches.
+        characterIdentity = { ...JSON.parse(rawResult), extractedForStyle: artStyle };
 
         // 7. Store on Book record
         await prisma.book.update({
@@ -150,6 +176,85 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
   await createIllustrationFlow(bookId, userId, characterIdentity, pageIds);
 
   return { success: true, characterCount: characterIdentity?.characters?.length ?? 0 };
+}
+
+/**
+ * Rewrites ONLY the styleTranslation strings of an identity for a new art
+ * style via a text-only gpt-5-mini call (no images — this must stay cheap
+ * enough for the default path of every non-vignette book). Returns the
+ * refreshed identity stamped with the new style, or null on any failure so
+ * the caller degrades to the stale translations.
+ */
+async function refreshStyleTranslations(
+  identity: CharacterIdentity,
+  artStyle: string,
+  bookId: string,
+): Promise<CharacterIdentity | null> {
+  if (!process.env.OPENAI_API_KEY) {
+    logger.warn({ bookId }, 'Skipping styleTranslation refresh: OPENAI_API_KEY not configured');
+    return null;
+  }
+
+  try {
+    const promptText = createStyleTranslationRefreshPrompt(
+      identity.characters.map(c => ({
+        characterId: c.characterId,
+        role: c.role,
+        name: c.name,
+        physicalTraits: c.physicalTraits,
+        typicalClothing: c.typicalClothing,
+      })),
+      artStyle,
+    );
+
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const result = await openai.responses.create({
+      model: ANALYSIS_MODEL,
+      instructions: STYLE_TRANSLATION_REFRESH_SYSTEM_PROMPT,
+      input: [{ role: 'user', content: [{ type: 'input_text', text: promptText }] }],
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'style_translation_refresh',
+          strict: true,
+          schema: STYLE_TRANSLATION_REFRESH_SCHEMA as Record<string, unknown>,
+        },
+      },
+    });
+
+    const rawResult = result.output_text;
+    if (!rawResult) {
+      logger.warn({ bookId, artStyle }, 'styleTranslation refresh returned empty response');
+      return null;
+    }
+
+    const parsed = JSON.parse(rawResult) as {
+      translations: Array<{ characterId: string; styleTranslation: string }>;
+    };
+    const translationById = new Map(
+      parsed.translations.map(t => [t.characterId, t.styleTranslation]),
+    );
+
+    logger.info(
+      { bookId, artStyle, refreshedCount: translationById.size, characterCount: identity.characters.length },
+      'Refreshed styleTranslation strings for new art style',
+    );
+
+    return {
+      ...identity,
+      extractedForStyle: artStyle,
+      characters: identity.characters.map(c => ({
+        ...c,
+        styleTranslation: translationById.get(c.characterId) ?? c.styleTranslation,
+      })),
+    };
+  } catch (error) {
+    logger.warn(
+      { bookId, artStyle, error: error instanceof Error ? error.message : 'Unknown error' },
+      'styleTranslation refresh failed — proceeding with existing translations',
+    );
+    return null;
+  }
 }
 
 /**

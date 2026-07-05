@@ -26,6 +26,7 @@ export { generateCoverHtml, resolveCoverImageUrl } from './cover.js';
 
 export type {
   BookWithPages,
+  ImageUrlTransform,
   PdfFonts,
   PdfLogger,
   GenerateBookPdfOptions,

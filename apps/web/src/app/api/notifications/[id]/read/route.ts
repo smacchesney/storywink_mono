@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from '@/lib/db';
+
+// Notification ids are cuids — anything else never hits the database.
+const paramsSchema = z.object({ id: z.string().cuid() });
 
 // POST /api/notifications/[id]/read - Mark a notification as read
 export async function POST(
@@ -9,11 +13,12 @@ export async function POST(
 ) {
   try {
     const { dbUser } = await getAuthenticatedUser();
-    const { id: notificationId } = await params;
+    const parsedParams = paramsSchema.safeParse(await params);
 
-    if (!notificationId) {
-      return NextResponse.json({ error: 'Missing notification ID' }, { status: 400 });
+    if (!parsedParams.success) {
+      return NextResponse.json({ error: 'Invalid notification ID' }, { status: 400 });
     }
+    const { id: notificationId } = parsedParams.data;
 
     // Verify notification belongs to user and update
     const notification = await prisma.notification.findFirst({

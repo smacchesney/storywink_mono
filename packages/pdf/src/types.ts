@@ -38,6 +38,9 @@ export interface PdfLogger {
   error: (context: Record<string, unknown>, message: string) => void;
 }
 
+/** Rewrite applied to an image URL before it is embedded in page HTML. */
+export type ImageUrlTransform = (url: string) => string;
+
 /** Options controlling interior PDF layout. */
 export interface GenerateBookPdfOptions {
   /** Fonts to embed (required — supplied by the consuming runtime). */
@@ -48,6 +51,13 @@ export interface GenerateBookPdfOptions {
   includeBackCover?: boolean;
   /** Pad to multiple of 4 for Lulu saddle stitch (default: true). */
   padToFour?: boolean;
+  /**
+   * Optional rewrite applied to every image URL embedded in interior HTML
+   * (illustrations and mascots). Omitted (Lulu path): illustrations get
+   * optimizeForPrint (f_auto,q_auto:best) and mascots stay raw — byte-identical
+   * to the pre-option behaviour, frozen by pages.lulu-snapshot.test.ts.
+   */
+  imageUrlTransform?: ImageUrlTransform;
   /** Optional structured logger (defaults to a console shim). */
   logger?: PdfLogger;
 }

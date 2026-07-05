@@ -21,7 +21,8 @@ import {
   DrawerFooter,
 } from '@/components/ui/drawer';
 import { QuantitySelector } from './QuantitySelector';
-import { coolifyImageUrl, PRINT_PRICING } from '@storywink/shared';
+import { coolifyImageUrl, PRINT_PRICING, SHIPPING_TIERS } from '@storywink/shared';
+import { formatMoney } from '@/lib/format';
 
 export interface PrintOrderBook {
   id: string;
@@ -34,10 +35,6 @@ interface PrintOrderSheetProps {
   book: PrintOrderBook;
   isOpen: boolean;
   onClose: () => void;
-}
-
-function formatPrice(cents: number): string {
-  return `S$${(cents / 100).toFixed(2)}`;
 }
 
 // Panel content (shared between Sheet and Drawer)
@@ -54,6 +51,10 @@ function PanelContent({
 
   const bookPrice = PRINT_PRICING.RETAIL_PRICE_CENTS;
   const subtotal = bookPrice * quantity;
+  // Flat per-order shipping — the same tier Stripe applies at checkout.
+  const shippingTier = SHIPPING_TIERS.SINGAPORE_MALAYSIA;
+  const total = subtotal + shippingTier.priceCents;
+  const currency = PRINT_PRICING.CURRENCY;
 
   const handleCheckout = async () => {
     setIsLoading(true);
@@ -120,7 +121,7 @@ function PanelContent({
               {book.pageCount} pages
             </p>
             <p className="text-sm font-medium text-coral mt-1">
-              {formatPrice(bookPrice)} per book
+              {formatMoney(bookPrice, currency)} per book
             </p>
           </div>
         </div>
@@ -146,14 +147,23 @@ function PanelContent({
       {/* Footer with total and checkout button */}
       <DrawerFooter className="border-t pt-4">
         {/* Price summary */}
-        <div className="flex justify-between items-center mb-1">
-          <span className="text-sm text-muted-foreground">
-            {quantity > 1 ? `${quantity} books` : '1 book'}
-          </span>
-          <span className="text-lg font-bold">{formatPrice(subtotal)}</span>
+        <div className="space-y-1 mb-1">
+          <div className="flex justify-between items-center text-sm text-muted-foreground">
+            <span>Subtotal ({quantity > 1 ? `${quantity} books` : '1 book'})</span>
+            <span>{formatMoney(subtotal, currency)}</span>
+          </div>
+          <div className="flex justify-between items-center text-sm text-muted-foreground">
+            <span>Shipping</span>
+            <span>{formatMoney(shippingTier.priceCents, currency)}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium">Total</span>
+            <span className="text-lg font-bold">{formatMoney(total, currency)}</span>
+          </div>
         </div>
         <p className="text-xs text-muted-foreground mb-3">
-          + S$20 shipping, calculated at checkout
+          Arrives in {shippingTier.deliveryDaysMin}&ndash;{shippingTier.deliveryDaysMax} business
+          days.
         </p>
 
         {error && (
@@ -171,7 +181,7 @@ function PanelContent({
               Loading...
             </>
           ) : (
-            <>Checkout {formatPrice(subtotal)}</>
+            <>Checkout &middot; {formatMoney(total, currency)}</>
           )}
         </Button>
 

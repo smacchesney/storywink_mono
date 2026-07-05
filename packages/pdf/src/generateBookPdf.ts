@@ -35,7 +35,7 @@ export async function generateBookPdf(
   bookData: BookWithPages,
   options: GenerateBookPdfOptions
 ): Promise<Buffer> {
-  const { fonts, titlePage, includeBackCover = false, padToFour = true } = options;
+  const { fonts, titlePage, includeBackCover = false, padToFour = true, imageUrlTransform } = options;
   const log = resolveLogger(options.logger);
 
   log.info({ bookId: bookData.id, hasTitle: !!titlePage, includeBackCover, padToFour }, 'Starting PDF generation...');
@@ -47,7 +47,12 @@ export async function generateBookPdf(
     const fontFaces = buildInteriorFontFaces(fonts, language);
 
     // Assemble the ordered interior page array (pure, testable).
-    const pages = assembleInteriorPages(bookData, { titlePage, includeBackCover, padToFour });
+    const pages = assembleInteriorPages(bookData, {
+      titlePage,
+      includeBackCover,
+      padToFour,
+      imageUrlTransform,
+    });
     const pageHtmlArray = pages.map((p) => p.html);
 
     // Compose the full HTML document.

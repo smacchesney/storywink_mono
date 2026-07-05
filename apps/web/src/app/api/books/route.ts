@@ -20,6 +20,7 @@ export async function GET() {
             id: true,
             originalImageUrl: true,
             generatedImageUrl: true,
+            isTitlePage: true,
           },
           orderBy: { pageNumber: 'asc' },
         },

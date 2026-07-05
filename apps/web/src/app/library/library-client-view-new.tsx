@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { showError, showErrorWithRetry } from '@/lib/toast-utils';
+import { resolveCoverImageUrl } from '@/lib/book-display';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { SortDesc } from 'lucide-react';
@@ -39,12 +40,14 @@ type LibraryBook = {
   title: string;
   status: BookStatus;
   qcRound?: number;
+  coverImageUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   pages: Array<{
     id: string;
     originalImageUrl?: string | null;
     generatedImageUrl?: string | null;
+    isTitlePage?: boolean;
   }>;
 };
 
@@ -166,13 +169,9 @@ export function LibraryClientView() {
     });
   };
 
-  const getCoverImageUrl = (book: LibraryBook): string | null => {
-    // Find the first page with an image
-    const pageWithImage = book.pages.find(page =>
-      page.generatedImageUrl || page.originalImageUrl
-    );
-    return pageWithImage?.generatedImageUrl || pageWithImage?.originalImageUrl || null;
-  };
+  // Dedicated painted cover first, then the title page's illustration, then
+  // any illustration, then the original photos.
+  const getCoverImageUrl = (book: LibraryBook): string | null => resolveCoverImageUrl(book);
 
   // Handle retry for failed books. The status-aware /retry endpoint decides
   // whether to re-run story generation or re-enter illustration itself.

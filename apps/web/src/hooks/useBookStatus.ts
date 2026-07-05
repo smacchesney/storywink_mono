@@ -23,12 +23,25 @@ export interface BookStatusData {
   isTimedOut: boolean;
 }
 
+export interface BookStatusResult extends BookStatusData {
+  /**
+   * Clears the last observed status and resumes polling. This is the
+   * recovery primitive behind "Try again" on a FAILED book: the retry
+   * endpoint flips the book back into a working state server-side, and
+   * restart() lets the hook pick that up instead of staying parked on the
+   * terminal status it already saw.
+   */
+  restart: () => void;
+}
+
 interface UseBookStatusOptions {
   /** Poll cadence in ms. Defaults to 5000. */
   intervalMs?: number;
   /**
-   * When set, the hook stops polling after this many ms and flips
-   * `isTimedOut` to true. The caller decides how gentle to make that.
+   * Stall window in ms. The hook flips `isTimedOut` only after this long
+   * with NO observed change to the status snapshot (status + page counts) —
+   * a healthy long run keeps resetting the clock, while a genuinely wedged
+   * book still gets the gentle exit. The caller decides how gentle.
    */
   timeoutMs?: number;
   /** Pass false to hold polling (e.g. before a bookId is known). */
@@ -47,12 +60,13 @@ const TERMINAL_STATUSES: BookStatus[] = [
 
 /**
  * Polls book status on an interval. Starts when a bookId is present and
- * `enabled`, stops cleanly on unmount, on a terminal status, and on timeout.
+ * `enabled`, stops cleanly on unmount, on a terminal status, and after a
+ * progress stall longer than `timeoutMs`.
  */
 export function useBookStatus(
   bookId: string | null | undefined,
   { intervalMs = 5000, timeoutMs, enabled = true }: UseBookStatusOptions = {}
-): BookStatusData {
+): BookStatusResult {
   const [data, setData] = useState<BookStatusData>({
     status: null,
     totalPages: 0,
@@ -62,8 +76,15 @@ export function useBookStatus(
     error: null,
     isTimedOut: false,
   });
+  // Bumping the epoch re-runs the polling effect from scratch — see restart().
+  const [pollEpoch, setPollEpoch] = useState(0);
 
   const isMountedRef = useRef(true);
+  // Last observed status snapshot and when it last changed. Fetch errors
+  // deliberately do NOT touch these: a dead API converges to the gentle
+  // timeout the same way a wedged book does.
+  const snapshotRef = useRef<string | null>(null);
+  const lastChangeAtRef = useRef(0);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -84,6 +105,17 @@ export function useBookStatus(
       const json = await res.json();
       if (!isMountedRef.current) return null;
       const status = json.status as BookStatus;
+      const snapshot = [
+        status,
+        json.totalPages ?? 0,
+        json.pagesWithText ?? 0,
+        json.pagesWithIllustrations ?? 0,
+        json.failedPages ?? 0,
+      ].join('|');
+      if (snapshot !== snapshotRef.current) {
+        snapshotRef.current = snapshot;
+        lastChangeAtRef.current = Date.now();
+      }
       setData((prev) => ({
         ...prev,
         status,
@@ -104,11 +136,17 @@ export function useBookStatus(
     }
   }, [bookId]);
 
+  const restart = useCallback(() => {
+    setData((prev) => ({ ...prev, status: null, isTimedOut: false }));
+    setPollEpoch((e) => e + 1);
+  }, []);
+
   useEffect(() => {
     if (!bookId || !enabled) return;
 
     let intervalId: ReturnType<typeof setInterval> | null = null;
-    const startedAt = Date.now();
+    snapshotRef.current = null;
+    lastChangeAtRef.current = Date.now();
 
     const stop = () => {
       if (intervalId) {
@@ -125,7 +163,7 @@ export function useBookStatus(
     intervalId = setInterval(async () => {
       if (!isMountedRef.current) return;
 
-      if (timeoutMs != null && Date.now() - startedAt >= timeoutMs) {
+      if (timeoutMs != null && Date.now() - lastChangeAtRef.current >= timeoutMs) {
         stop();
         setData((prev) => ({ ...prev, isTimedOut: true }));
         return;
@@ -137,9 +175,9 @@ export function useBookStatus(
     }, intervalMs);
 
     return stop;
-  }, [bookId, enabled, intervalMs, timeoutMs, fetchStatus]);
+  }, [bookId, enabled, intervalMs, timeoutMs, fetchStatus, pollEpoch]);
 
-  return data;
+  return { ...data, restart };
 }
 
 export default useBookStatus;

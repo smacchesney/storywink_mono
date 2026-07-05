@@ -17,7 +17,7 @@ if ((process.stderr as any)._handle?.setBlocking) {
 // Disable Pino's internal buffering for immediate log writes
 process.env.PINO_NO_BUFFER = 'true';
 
-import { Worker } from 'bullmq';
+import { Worker, Queue } from 'bullmq';
 import Redis from 'ioredis';
 import { config } from 'dotenv';
 import * as Sentry from '@sentry/node';
@@ -89,6 +89,8 @@ import { processBookFinalize } from './workers/book-finalize.worker.js';
 import { processPrintFulfillment } from './workers/print-fulfillment.worker.js';
 import { processCharacterExtraction } from './workers/character-extraction.worker.js';
 import { processPhotoAnalysis } from './workers/photo-analysis.worker.js';
+import { processBookReaper } from './workers/book-reaper.worker.js';
+import { REAPER_INTERVAL_MS } from './workers/book-reaper.helpers.js';
 import { getIllustrator } from './lib/illustrators/index.js';
 
 // CRITICAL: Pre-load and validate STYLE_LIBRARY before processing any jobs
@@ -247,6 +249,42 @@ const photoAnalysisWorker = new Worker(
     lockDuration: 300000, // 5 minutes for multi-image vision analysis
   }
 );
+
+const bookReaperWorker = new Worker(
+  QUEUE_NAMES.BOOK_REAPER,
+  processBookReaper,
+  {
+    connection: redis,
+    concurrency: 1, // sweeps must never overlap
+  }
+);
+
+// Repeatable schedule for the stuck-book reaper. upsertJobScheduler is
+// idempotent across restarts/redeploys (same scheduler id replaces the old
+// schedule), so every boot converges on one sweep per interval.
+const bookReaperQueue = new Queue(QUEUE_NAMES.BOOK_REAPER, {
+  connection: createBullMQConnection(),
+});
+bookReaperQueue
+  .upsertJobScheduler(
+    'book-reaper-sweep',
+    { every: REAPER_INTERVAL_MS },
+    {
+      name: 'reap-stuck-books',
+      opts: {
+        removeOnComplete: { count: 24 },
+        removeOnFail: { count: 50 },
+      },
+    }
+  )
+  .then(() => {
+    logger.info({ everyMs: REAPER_INTERVAL_MS }, 'Book reaper sweep scheduled');
+  })
+  .catch((err: Error) => {
+    // Scheduling failure must not crash the other workers; the next deploy or
+    // restart retries the upsert.
+    logger.error({ error: err.message }, 'Failed to schedule book reaper sweep');
+  });
 
 // Worker event handlers
 storyWorker.on('active', (job) => {
@@ -519,6 +557,17 @@ photoAnalysisWorker.on('failed', (job, err) => {
   }, 'Photo perception pass failed');
 });
 
+// Book Reaper Worker event handlers
+bookReaperWorker.on('completed', (job) => {
+  logger.info({ jobId: job.id, result: job.returnvalue }, 'Book reaper sweep completed');
+});
+
+bookReaperWorker.on('failed', (job, err) => {
+  // The processor swallows its own errors, so this only fires on infra-level
+  // failures (lost lock, Redis hiccup). The next scheduled sweep retries.
+  logger.error({ jobId: job?.id, error: err.message }, 'Book reaper sweep job failed');
+});
+
 // Graceful shutdown
 const shutdown = async () => {
   logger.info('Shutting down workers...');
@@ -529,6 +578,8 @@ const shutdown = async () => {
   await printFulfillmentWorker.close();
   await characterExtractionWorker.close();
   await photoAnalysisWorker.close();
+  await bookReaperWorker.close();
+  await bookReaperQueue.close();
   await redis.quit();
 
   process.exit(0);

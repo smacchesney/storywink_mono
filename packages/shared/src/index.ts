@@ -9,3 +9,4 @@ export * from './prompts/story.js';
 export * from './prompts/illustration.js';
 export * from './lulu.js';
 export * from './shipping.js';
+export * from './telemetry.js';

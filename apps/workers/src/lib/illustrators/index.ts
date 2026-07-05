@@ -33,6 +33,7 @@ export function getIllustrator(): IllustrationProvider {
   logger.info(
     {
       provider: cachedProvider.name,
+      model: cachedProvider.modelId,
       quality: process.env.OPENAI_IMAGE_QUALITY ?? '(default)',
       thinking: process.env.OPENAI_THINKING ?? 'false',
     },

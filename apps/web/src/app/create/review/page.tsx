@@ -412,8 +412,10 @@ function ReviewPageContent() {
         const result = await response.json().catch(() => ({}));
         console.log("Illustration Job Request Result:", result);
 
-        // Redirect to library immediately
-        router.push('/library');
+        // Back to setup, which renders the branded progress screen for
+        // in-flight books — the parent keeps the "you can leave" reassurance
+        // instead of being dumped on the library grid.
+        router.push(`/create/${bookIdToUse}/setup`);
 
      } catch (error) {
         console.error("Error initiating illustration generation:", error);

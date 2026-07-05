@@ -175,6 +175,15 @@ export interface IllustrationGenerationJobV2 extends IllustrationGenerationJob {
 export interface CharacterIdentity {
   characters: CharacterDescription[];
   sceneContext: string;
+  /**
+   * The artStyle the characters' styleTranslation prose was written for,
+   * stamped at write time by the photo-analysis and character-extraction
+   * workers. A mismatch with the book's current artStyle means the
+   * translations are stale and need a text-only refresh — never a full
+   * re-extraction. Absent on identities written before this stamp existed
+   * (treat as mismatched).
+   */
+  extractedForStyle?: string;
 }
 
 export interface CharacterDescription {

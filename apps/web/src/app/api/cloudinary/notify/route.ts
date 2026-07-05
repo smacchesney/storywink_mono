@@ -1,10 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
 import { PageType } from '@prisma/client';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { convertHeicToJpeg } from '@storywink/shared/utils';
+import { BOOK_CONSTRAINTS } from '@storywink/shared/constants';
 import { QueueName, getQueue } from '@/lib/queue/index';
+
+// Exactly the payload uploadPhotos.ts sends per asset (CloudinaryAssetPayload).
+// Unknown keys are stripped; anything structurally off is a 400, not a crash
+// or a poisoned Asset row.
+const notifyAssetSchema = z.object({
+  publicId: z.string().min(1).max(512),
+  url: z.string().url().max(2048),
+  thumbnailUrl: z.string().url().max(2048).nullish(),
+  format: z.string().max(32).nullish(),
+  bytes: z.number().int().nonnegative(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+});
+
+const notifyBodySchema = z.object({
+  assets: z.array(notifyAssetSchema).min(1).max(BOOK_CONSTRAINTS.MAX_PHOTOS),
+  bookId: z.string().cuid().nullish(),
+});
 
 // This endpoint is called after successful Cloudinary uploads to create database records
 export async function POST(request: NextRequest) {
@@ -13,13 +33,19 @@ export async function POST(request: NextRequest) {
     const { dbUser, clerkId } = await getAuthenticatedUser();
     logger.info({ clerkUserId: clerkId, dbUserId: dbUser.id }, "Cloudinary notify endpoint called");
 
-    const body = await request.json();
-    const { assets, bookId } = body;
-    console.log(`>>> DEBUG: Cloudinary notify - dbUserId: ${dbUser.id}, assetCount: ${assets?.length || 0}, bookId: ${bookId || 'none'}`);
-
-    if (!assets || !Array.isArray(assets)) {
-      return NextResponse.json({ error: 'No assets provided' }, { status: 400 });
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
+
+    const parsed = notifyBodySchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+    const { assets, bookId } = parsed.data;
+    console.log(`>>> DEBUG: Cloudinary notify - dbUserId: ${dbUser.id}, assetCount: ${assets.length}, bookId: ${bookId || 'none'}`);
 
     const createdAssets = [];
     let bookPageCount = 0;
