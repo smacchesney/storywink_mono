@@ -9,6 +9,7 @@ import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useTranslations } from 'next-intl';
 import { AnimatedHeroText } from "@/components/ui/animated-hero-text";
+import PlayfulBackground from "@/components/ui/playful-background";
 import { EXAMPLE_BOOKS, ExampleBook } from "@/components/landing-page/example-books-data";
 
 // Lazy load components
@@ -69,6 +70,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen relative">
+      <PlayfulBackground variant="landing" />
       <main className="flex-grow relative z-10">
         {/* Hero Section */}
         <section className="text-center px-4 py-8 md:py-14 relative">

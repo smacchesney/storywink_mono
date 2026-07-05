@@ -8,6 +8,7 @@ import { MenuIcon, ArrowRight, Globe } from "lucide-react";
 import { useState, useEffect, useRef, useTransition } from "react";
 import { useTranslations, useLocale } from 'next-intl';
 import { NotificationBell } from "@/components/notification-bell";
+import { ScallopEdge } from "@/components/ui/scallop-edge";
 import { LANGUAGE_LABELS } from '@storywink/shared/constants';
 import { SUPPORTED_LANGUAGES } from '@storywink/shared/schemas';
 
@@ -208,37 +209,8 @@ export function SiteHeader() {
           </nav>
         </div>
       )}
-      {/* Cloud/scallop bottom edge — 320px wide tile with 5 varied bumps */}
-      <svg
-        className="absolute left-0 right-0 pointer-events-none z-30"
-        style={{ bottom: '-28px' }}
-        width="100%"
-        height="28"
-        aria-hidden="true"
-      >
-        <defs>
-          <pattern
-            id="cloud-scallop"
-            x="0"
-            y="0"
-            width="320"
-            height="28"
-            patternUnits="userSpaceOnUse"
-          >
-            <path
-              d="M0,0 L0,1.5 C2,14 60,13 62,2.5 C65,30 142,28 145,1 C147,18 198,16 200,3 C203,32 272,30 275,1.5 C277,17 318,18 320,1.5 L320,0 Z"
-              fill="white"
-            />
-            <path
-              d="M0,1.5 C2,14 60,13 62,2.5 C65,30 142,28 145,1 C147,18 198,16 200,3 C203,32 272,30 275,1.5 C277,17 318,18 320,1.5"
-              fill="none"
-              stroke="#F76C5E"
-              strokeWidth="2.5"
-            />
-          </pattern>
-        </defs>
-        <rect width="100%" height="28" fill="url(#cloud-scallop)" />
-      </svg>
+      {/* Seamless scalloped cloud edge below the header */}
+      <ScallopEdge className="absolute left-0 right-0 z-30" style={{ bottom: '-20px' }} />
     </header>
   );
 } 

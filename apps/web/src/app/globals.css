@@ -188,6 +188,29 @@
   font-family: 'Excalifont', cursive;
 }
 
+/* Ambient cloud drift for the storybook background. Very slow, very subtle. */
+@keyframes cloud-drift {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(22px);
+  }
+}
+.cloud-drift-slow {
+  animation: cloud-drift 26s ease-in-out infinite;
+}
+.cloud-drift-slower {
+  animation: cloud-drift 38s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cloud-drift-slow,
+  .cloud-drift-slower {
+    animation: none;
+  }
+}
+
 /* Japanese story text font */
 .font-japanese {
   font-family: 'Zen Maru Gothic', 'Hiragino Maru Gothic Pro', sans-serif;

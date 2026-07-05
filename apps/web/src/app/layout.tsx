@@ -8,7 +8,6 @@ import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { Toaster } from "@/components/ui/sonner";
-import PlayfulBackground from "@/components/ui/playful-background";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -106,7 +105,6 @@ export default async function RootLayout({
           style={{ backgroundColor: 'var(--bg-playful)' }}
         >
           <NextIntlClientProvider messages={messages}>
-            <PlayfulBackground variant="default" showCornerDoodles={false} />
             <SiteHeader />
             <main className="flex-grow relative z-10 pt-[28px]">{children}</main>
             <SiteFooter />
