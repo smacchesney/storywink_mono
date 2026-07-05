@@ -234,7 +234,7 @@ export default function BookPreviewPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-[#F76C5E]" />
+        <Loader2 className="h-8 w-8 animate-spin text-coral" />
         <p className="ml-2 text-muted-foreground">Loading your amazing book...</p>
       </div>
     );
@@ -267,8 +267,8 @@ export default function BookPreviewPage() {
              <p className="mb-4 text-muted-foreground">
                Our digital artists are hard at work illustrating your story! This might take a few minutes.
              </p>
-             <Progress value={progress} className="w-full mb-4 bg-muted [&>div]:bg-[#F76C5E]" />
-             <Loader2 className="h-6 w-6 animate-spin text-[#F76C5E] mx-auto" />
+             <Progress value={progress} className="w-full mb-4 bg-muted [&>div]:bg-coral" />
+             <Loader2 className="h-6 w-6 animate-spin text-coral mx-auto" />
              <p className="text-sm text-muted-foreground mt-2">Checking for updates...</p>
            </CardContent>
          </Card>
@@ -321,7 +321,7 @@ export default function BookPreviewPage() {
           )}>
             <Button variant="ghost" size="icon" asChild>
               <Link href="/library" aria-label="Return to Library">
-                <ArrowLeft className="h-5 w-5 text-[#F76C5E]" />
+                <ArrowLeft className="h-5 w-5 text-coral" />
               </Link>
             </Button>
             <h1 className={cn(
@@ -361,7 +361,7 @@ export default function BookPreviewPage() {
                   <SheetTitle className="sr-only">Book Options</SheetTitle>
                   <div className="py-4 space-y-4">
                     <Link href="/library" className="flex items-center gap-2 p-2 hover:bg-muted rounded-md w-full">
-                      <Library className="h-5 w-5 text-[#F76C5E]" />
+                      <Library className="h-5 w-5 text-coral" />
                       <span>Return to Library</span>
                     </Link>
                     <Button 
@@ -371,9 +371,9 @@ export default function BookPreviewPage() {
                       className="flex items-center gap-2 p-2 w-full justify-start"
                     >
                       {isExportingPdf ? (
-                        <Loader2 className="h-5 w-5 animate-spin text-[#F76C5E]" />
+                        <Loader2 className="h-5 w-5 animate-spin text-coral" />
                       ) : (
-                        <Download className="h-5 w-5 text-[#F76C5E]" />
+                        <Download className="h-5 w-5 text-coral" />
                       )}
                       Export PDF
                     </Button>
@@ -425,7 +425,7 @@ export default function BookPreviewPage() {
               aria-label="Previous Page"
               className="h-10 w-10 bg-background/70 rounded-r-full shadow"
             >
-              <ChevronLeft className="h-6 w-6 text-[#F76C5E]" />
+              <ChevronLeft className="h-6 w-6 text-coral" />
             </Button>
           </div>
           <div className="absolute inset-y-0 right-0 flex items-center">
@@ -437,7 +437,7 @@ export default function BookPreviewPage() {
               aria-label="Next Page"
               className="h-10 w-10 bg-background/70 rounded-l-full shadow"
             >
-              <ChevronRight className="h-6 w-6 text-[#F76C5E]" />
+              <ChevronRight className="h-6 w-6 text-coral" />
             </Button>
           </div>
         </div>

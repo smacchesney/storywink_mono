@@ -110,7 +110,7 @@ export default function CreateBookPage() {
           {t('startCreating')}
         </h1>
         <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-gray-100/80 px-4 py-2">
-          <Camera className="h-4 w-4 shrink-0 text-[#F76C5E]" />
+          <Camera className="h-4 w-4 shrink-0 text-coral" />
           <p className="text-sm text-gray-500">
             {t('photoLimit', { max: BOOK_CONSTRAINTS.MAX_PHOTOS })}
           </p>
@@ -129,7 +129,7 @@ export default function CreateBookPage() {
               onClick={() => setLanguage(value)}
               className={`rounded-full px-4 py-1.5 font-playful text-sm transition-all duration-200 ${
                 language === value
-                  ? 'bg-[#F76C5E] text-white shadow-sm'
+                  ? 'bg-coral text-white shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -151,7 +151,7 @@ export default function CreateBookPage() {
           <button
             onClick={handleContinue}
             disabled={!hasReady || isCreating}
-            className="mx-auto flex w-full max-w-md items-center justify-center gap-2 rounded-full bg-[#F76C5E] px-6 py-3.5 font-playful text-lg text-white shadow-md transition-colors hover:bg-[#F76C5E]/90 disabled:opacity-60"
+            className="mx-auto flex w-full max-w-md items-center justify-center gap-2 rounded-full bg-coral px-6 py-3.5 font-playful text-lg text-white shadow-md transition-colors hover:bg-coral/90 disabled:opacity-60"
           >
             {isCreating ? (
               <>

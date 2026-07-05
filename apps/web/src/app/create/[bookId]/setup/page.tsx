@@ -329,7 +329,7 @@ export default function SetupPage() {
   if (isLoading) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-[#F76C5E]" />
+        <Loader2 className="h-8 w-8 animate-spin text-coral" />
       </div>
     );
   }
@@ -340,7 +340,7 @@ export default function SetupPage() {
         <p className="font-playful text-gray-700">{t('loadError')}</p>
         <button
           onClick={() => router.push('/create')}
-          className="rounded-full bg-[#F76C5E] px-6 py-2 font-playful text-white"
+          className="rounded-full bg-coral px-6 py-2 font-playful text-white"
         >
           {t('goBack')}
         </button>

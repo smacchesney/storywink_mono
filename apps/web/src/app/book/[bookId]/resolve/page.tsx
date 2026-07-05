@@ -519,7 +519,7 @@ export default function BookResolvePage() {
   if (isLoading) {
     return (
       <div className="flex flex-col justify-center items-center min-h-screen gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-[#F76C5E]" />
+        <Loader2 className="h-8 w-8 animate-spin text-coral" />
         <p className="text-muted-foreground font-playful">{t('loading')}</p>
       </div>
     );
@@ -536,7 +536,7 @@ export default function BookResolvePage() {
             setIsLoading(true);
             fetchBook();
           }}
-          className="bg-[#F76C5E] hover:bg-[#E55A4C] text-white rounded-full font-playful"
+          className="bg-coral hover:bg-[#E55A4C] text-white rounded-full font-playful"
         >
           {t('retry')}
         </Button>
@@ -600,7 +600,7 @@ export default function BookResolvePage() {
                     onClick={() => goToFixPage(indexInActionable)}
                     aria-label={`Page ${page.pageNumber} - needs attention`}
                     className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all cursor-pointer
-                      ${isSelected ? 'border-[#F76C5E] ring-2 ring-[#F76C5E]/30' : 'border-amber-400 hover:border-amber-500'}`}
+                      ${isSelected ? 'border-coral ring-2 ring-coral/30' : 'border-amber-400 hover:border-amber-500'}`}
                   >
                     {page.originalImageUrl ? (
                       <Image
@@ -627,7 +627,7 @@ export default function BookResolvePage() {
               return (
                 <div
                   key={page.id}
-                  className={`relative aspect-square rounded-lg overflow-hidden border-2 ${isReplaced ? 'border-[#F76C5E]/40' : 'border-green-200'}`}
+                  className={`relative aspect-square rounded-lg overflow-hidden border-2 ${isReplaced ? 'border-coral/40' : 'border-green-200'}`}
                 >
                   {page.generatedImageUrl || page.originalImageUrl ? (
                     <Image
@@ -644,7 +644,7 @@ export default function BookResolvePage() {
                   )}
                   <div className="absolute top-0.5 right-0.5">
                     <Check
-                      className={`h-3 w-3 ${isReplaced ? 'text-[#F76C5E]' : 'text-green-600'}`}
+                      className={`h-3 w-3 ${isReplaced ? 'text-coral' : 'text-green-600'}`}
                     />
                   </div>
                   <span className="absolute bottom-0 left-0 right-0 text-[10px] text-center bg-black/40 text-white">
@@ -718,7 +718,7 @@ export default function BookResolvePage() {
                       <Button
                         onClick={handleReplaceClick}
                         disabled={isReplacing}
-                        className="w-full sm:flex-1 bg-[#F76C5E] hover:bg-[#E55A4C] text-white rounded-full font-playful disabled:opacity-70"
+                        className="w-full sm:flex-1 bg-coral hover:bg-[#E55A4C] text-white rounded-full font-playful disabled:opacity-70"
                       >
                         {isReplacing ? (
                           <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
@@ -765,7 +765,7 @@ export default function BookResolvePage() {
               </p>
               <Button
                 onClick={handleGenerateStory}
-                className="w-full bg-[#F76C5E] hover:bg-[#E55A4C] text-white rounded-full font-playful text-lg py-6"
+                className="w-full bg-coral hover:bg-[#E55A4C] text-white rounded-full font-playful text-lg py-6"
               >
                 {t('generateStory')}
               </Button>
@@ -780,7 +780,7 @@ export default function BookResolvePage() {
           <CardContent className="pt-6">
             {isGeneratingText ? (
               <div className="flex flex-col items-center gap-3 py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-[#F76C5E]" />
+                <Loader2 className="h-6 w-6 animate-spin text-coral" />
                 <p className="text-muted-foreground font-playful">
                   {t('generatingTextCount', { count: replacedPageIds.length })}
                 </p>
@@ -792,7 +792,7 @@ export default function BookResolvePage() {
                 </p>
                 <Button
                   onClick={handleRetryTextGen}
-                  className="bg-[#F76C5E] hover:bg-[#E55A4C] text-white rounded-full font-playful"
+                  className="bg-coral hover:bg-[#E55A4C] text-white rounded-full font-playful"
                 >
                   {t('retry')}
                 </Button>
@@ -838,7 +838,7 @@ export default function BookResolvePage() {
             <Button
               onClick={handleIllustrate}
               disabled={!allConfirmed || isSubmitting}
-              className="w-full bg-[#F76C5E] hover:bg-[#E55A4C] text-white rounded-full font-playful text-lg py-6 disabled:opacity-50"
+              className="w-full bg-coral hover:bg-[#E55A4C] text-white rounded-full font-playful text-lg py-6 disabled:opacity-50"
             >
               {isSubmitting && (
                 <Loader2 className="h-5 w-5 mr-2 animate-spin" />

@@ -102,7 +102,7 @@ const BookCard: React.FC<BookCardProps> = ({
           {/* Centered shimmer text and time estimate on image */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <TextShimmerWave
-              className="text-lg font-semibold font-playful [--base-color:#e2e8f0] [--base-gradient-color:#F76C5E]"
+              className="text-lg font-semibold font-playful [--base-color:#e2e8f0] [--base-gradient-color:var(--coral-primary)]"
               duration={1}
               spread={1}
               zDistance={1}
@@ -183,7 +183,7 @@ const BookCard: React.FC<BookCardProps> = ({
           <Button
             onClick={status === BookStatus.PARTIAL ? () => router.push(`/book/${id}/resolve`) : onRetryClick}
             size="sm"
-            className="flex-grow mr-2 bg-[#F76C5E] hover:bg-[#E55A4C] rounded-full font-playful"
+            className="flex-grow mr-2 bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
             disabled={isRetrying}
           >
             {isRetrying ? (
@@ -262,7 +262,7 @@ const BookCard: React.FC<BookCardProps> = ({
             <Button
               onClick={() => setShowPrintSheet(true)}
               size="sm"
-              className="flex-1 bg-[#F76C5E] hover:bg-[#E55A4C] rounded-full font-playful"
+              className="flex-1 bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
             >
               <Printer className="h-4 w-4 mr-1.5" />
               {t('orderPrint')}

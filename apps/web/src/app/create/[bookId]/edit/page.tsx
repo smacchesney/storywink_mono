@@ -52,7 +52,7 @@ export default function LegacyEditRedirect() {
 
   return (
     <div className="flex min-h-[70vh] items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-[#F76C5E]" />
+      <Loader2 className="h-8 w-8 animate-spin text-coral" />
     </div>
   );
 }

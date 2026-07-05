@@ -72,7 +72,7 @@ export function BookIssueBanner({
         </p>
         <Button
           onClick={() => router.push(`/book/${bookId}/resolve`)}
-          className="rounded-full bg-[#F76C5E] px-6 font-playful text-white hover:bg-[#F76C5E]/90"
+          className="rounded-full bg-coral px-6 font-playful text-white hover:bg-coral/90"
         >
           <Wrench className="mr-2 h-4 w-4" />
           {t('fixPages')}
@@ -83,14 +83,14 @@ export function BookIssueBanner({
 
   // FAILED
   return (
-    <div className="flex flex-col items-center gap-3 rounded-2xl border border-[#F76C5E]/25 bg-[#FFF5F0] p-5 text-center">
-      <AlertTriangle className="h-7 w-7 text-[#F76C5E]" />
+    <div className="flex flex-col items-center gap-3 rounded-2xl border border-coral/25 bg-[#FFF5F0] p-5 text-center">
+      <AlertTriangle className="h-7 w-7 text-coral" />
       <p className="font-playful text-base text-gray-800">{t('somethingWentWrong')}</p>
       <p className="text-sm text-gray-500 max-w-xs">{t('failedMessage')}</p>
       <Button
         onClick={handleRetry}
         disabled={isRetrying}
-        className="rounded-full bg-[#F76C5E] px-6 font-playful text-white hover:bg-[#F76C5E]/90"
+        className="rounded-full bg-coral px-6 font-playful text-white hover:bg-coral/90"
       >
         {isRetrying ? (
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />

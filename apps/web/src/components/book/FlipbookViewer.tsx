@@ -291,7 +291,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
                      style={{ fontSize: `${smallBodySize}px` }}>
                     {texts.dedicationLine1}
                   </p>
-                  <p className={`${fontClass} text-[#F76C5E] font-bold mt-1`}
+                  <p className={`${fontClass} text-coral font-bold mt-1`}
                      style={{ fontSize: `${nameSize}px` }}>
                     {displayName}
                   </p>
@@ -306,7 +306,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
                      style={{ fontSize: `${smallBodySize}px` }}>
                     {texts.dedicationLine1}<br />{texts.dedicationLine2}
                   </p>
-                  <p className={`${fontClass} text-[#F76C5E] font-bold mt-1`}
+                  <p className={`${fontClass} text-coral font-bold mt-1`}
                      style={{ fontSize: `${nameSize}px` }}>
                     {displayName}
                   </p>
@@ -342,7 +342,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
                  style={{ fontSize: `${smallBodySize}px` }}>
                 {texts.endingLine}
               </p>
-              <p className={`${fontClass} text-[#F76C5E] font-bold mt-1`}
+              <p className={`${fontClass} text-coral font-bold mt-1`}
                  style={{ fontSize: `${nameSize}px` }}>
                 {displayName}!
               </p>
@@ -366,7 +366,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
           <div className="absolute inset-0 flex flex-col justify-center items-center">
             <div className="text-center">
               <span className="font-playful font-bold text-[#1a1a1a]" style={{ fontSize: `${brandSize}px` }}>
-                Storywin<span className="text-[#F76C5E]">k.ai</span>
+                Storywin<span className="text-coral">k.ai</span>
               </span>
             </div>
             <Image

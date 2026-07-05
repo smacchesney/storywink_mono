@@ -104,9 +104,9 @@ export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: Pa
             className="h-9 w-9 rounded-full bg-background/70 shadow"
           >
             {isReillustrating ? (
-              <Loader2 className="h-5 w-5 animate-spin text-[#F76C5E]" />
+              <Loader2 className="h-5 w-5 animate-spin text-coral" />
             ) : (
-              <MoreVertical className="h-5 w-5 text-[#F76C5E]" />
+              <MoreVertical className="h-5 w-5 text-coral" />
             )}
           </Button>
         </DropdownMenuTrigger>
@@ -139,7 +139,7 @@ export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: Pa
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={4}
-            className="w-full resize-none rounded-xl border border-black/10 bg-white px-3 py-2 font-playful text-base text-gray-800 focus:border-[#F76C5E] focus:outline-none focus:ring-1 focus:ring-[#F76C5E]"
+            className="w-full resize-none rounded-xl border border-black/10 bg-white px-3 py-2 font-playful text-base text-gray-800 focus:border-coral focus:outline-none focus:ring-1 focus:ring-coral"
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)} disabled={isSavingText}>
@@ -148,7 +148,7 @@ export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: Pa
             <Button
               onClick={handleSaveText}
               disabled={isSavingText}
-              className="bg-[#F76C5E] font-playful text-white hover:bg-[#F76C5E]/90"
+              className="bg-coral font-playful text-white hover:bg-coral/90"
             >
               {isSavingText ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {t('save')}

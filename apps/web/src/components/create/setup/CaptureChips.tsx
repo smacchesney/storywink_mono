@@ -52,8 +52,8 @@ export function CaptureChips({ questions, onChange }: CaptureChipsProps) {
                     className={cn(
                       'rounded-full border px-3 py-1 text-sm font-playful transition-colors',
                       active
-                        ? 'border-[#F76C5E] bg-[#F76C5E] text-white'
-                        : 'border-black/10 bg-white text-gray-700 hover:border-[#F76C5E]/50'
+                        ? 'border-coral bg-coral text-white'
+                        : 'border-black/10 bg-white text-gray-700 hover:border-coral/50'
                     )}
                   >
                     {opt}

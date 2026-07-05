@@ -65,7 +65,7 @@ const PageCard = ({
       {/* Page Label - Centered above image */}
       <div className="text-center mb-3 flex items-center justify-center gap-2">
         <h3
-          className="text-sm font-medium text-[#F76C5E]"
+          className="text-sm font-medium text-coral"
           aria-label={isTitlePage ? `${t('page', { n: pageNumber })}, ${t('coverBadge')}` : undefined}
         >
           {t('page', { n: pageNumber })}
@@ -73,7 +73,7 @@ const PageCard = ({
         {isTitlePage && (
           <span
             aria-hidden="true"
-            className="text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#F76C5E]/10 text-[#B8483E] border border-[#F76C5E]/40"
+            className="text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-coral/10 text-[#B8483E] border border-coral/40"
           >
             {t('coverBadge')}
           </span>
@@ -123,7 +123,7 @@ const PageCard = ({
             className={`flex-1 text-white ${
               isConfirmed 
                 ? 'bg-green-600 hover:bg-green-700' 
-                : 'bg-[#F76C5E] hover:bg-[#F76C5E]/90'
+                : 'bg-coral hover:bg-coral/90'
             }`}
             onClick={onConfirm}
             disabled={isSaving}
@@ -169,7 +169,7 @@ const PageCard = ({
               </Button>
               <Button
                 onClick={handleSaveText}
-                className="flex-1 bg-[#F76C5E] hover:bg-[#F76C5E]/90 text-white"
+                className="flex-1 bg-coral hover:bg-coral/90 text-white"
               >
                 {t('saveChanges')}
               </Button>

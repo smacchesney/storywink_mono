@@ -250,7 +250,7 @@ export function LibraryClientView() {
 
           {/* Create new book button */}
           <Link href="/create">
-            <Button size="sm" className="w-full sm:w-auto bg-[#F76C5E] hover:bg-[#E55A4C] text-white rounded-full font-playful group">
+            <Button size="sm" className="w-full sm:w-auto bg-coral hover:bg-[#E55A4C] text-white rounded-full font-playful group">
               <svg
                 className="mr-2 h-4 w-4 transition-transform group-hover:scale-125 group-hover:rotate-12"
                 viewBox="0 0 24 24"

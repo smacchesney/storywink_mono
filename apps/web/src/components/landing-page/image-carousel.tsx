@@ -120,7 +120,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
               })}
            </div>
            {/* Label - Stays on top */}
-           <div className="absolute bottom-2 left-2 z-20 bg-[#F76C5E]/80 text-white text-xs font-semibold px-2 py-1 rounded pointer-events-none">
+           <div className="absolute bottom-2 left-2 z-20 bg-coral/80 text-white text-xs font-semibold px-2 py-1 rounded pointer-events-none">
             Storywink Style!
           </div>
         </div>
@@ -133,7 +133,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
              onClick={() => setCurrentIndex(index)}
              className={cn(
                'h-2 w-2 rounded-full transition-colors',
-               index === currentIndex ? 'bg-[#F76C5E]' : 'bg-gray-300 hover:bg-gray-400'
+               index === currentIndex ? 'bg-coral' : 'bg-gray-300 hover:bg-gray-400'
              )}
              aria-label={`Go to image ${index + 1}`}
            />

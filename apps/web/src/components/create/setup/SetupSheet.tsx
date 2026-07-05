@@ -95,11 +95,11 @@ export function SetupSheet({
           maxLength={50}
           className={cn(
             'font-playful text-base',
-            showNameError && 'border-[#F76C5E] focus-visible:ring-[#F76C5E]',
+            showNameError && 'border-coral focus-visible:ring-coral',
           )}
         />
         {showNameError && (
-          <p className="text-xs text-[#F76C5E]">{t('childNameRequired')}</p>
+          <p className="text-xs text-coral">{t('childNameRequired')}</p>
         )}
       </section>
 
@@ -119,7 +119,7 @@ export function SetupSheet({
           />
           {titlePending && !form.title && (
             <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center gap-2 text-gray-400">
-              <Sparkles className="h-3.5 w-3.5 animate-pulse text-[#F76C5E]" />
+              <Sparkles className="h-3.5 w-3.5 animate-pulse text-coral" />
               <span className="animate-pulse font-playful text-sm">
                 {t('titleThinking')}
               </span>
@@ -143,7 +143,7 @@ export function SetupSheet({
             onChange={(e) => onChange('eventSummary', e.target.value)}
             placeholder={t('eventSummaryPlaceholder')}
             rows={2}
-            className="w-full resize-none rounded-xl border border-black/10 bg-white px-3 py-2 font-playful text-sm text-gray-800 focus:border-[#F76C5E] focus:outline-none focus:ring-1 focus:ring-[#F76C5E]"
+            className="w-full resize-none rounded-xl border border-black/10 bg-white px-3 py-2 font-playful text-sm text-gray-800 focus:border-coral focus:outline-none focus:ring-1 focus:ring-coral"
           />
         </section>
       )}
@@ -186,7 +186,7 @@ export function SetupSheet({
         <button
           onClick={onSubmit}
           disabled={isSubmitting}
-          className="mx-auto flex w-full max-w-md items-center justify-center gap-2 rounded-full bg-[#F76C5E] px-6 py-3.5 font-playful text-lg text-white shadow-md transition-colors hover:bg-[#F76C5E]/90 disabled:opacity-70"
+          className="mx-auto flex w-full max-w-md items-center justify-center gap-2 rounded-full bg-coral px-6 py-3.5 font-playful text-lg text-white shadow-md transition-colors hover:bg-coral/90 disabled:opacity-70"
         >
           {isSubmitting ? (
             <>

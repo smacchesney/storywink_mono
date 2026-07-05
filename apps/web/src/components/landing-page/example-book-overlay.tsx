@@ -148,7 +148,7 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
                   {book.title}
                 </h2>
                 <p className="font-playful text-sm md:text-base mt-0.5">
-                  Style: <span className="text-[#F76C5E]">{book.styleLabel}</span>
+                  Style: <span className="text-coral">{book.styleLabel}</span>
                 </p>
               </div>
 
@@ -167,7 +167,7 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
                 <button
                   onClick={handlePrev}
                   disabled={currentPage <= 1}
-                  className="absolute left-1 md:left-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/80 hover:bg-white shadow-md flex items-center justify-center text-[#F76C5E] hover:text-[#e55d4f] transition-all disabled:opacity-0 disabled:pointer-events-none cursor-pointer"
+                  className="absolute left-1 md:left-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/80 hover:bg-white shadow-md flex items-center justify-center text-coral hover:text-coral-hover transition-all disabled:opacity-0 disabled:pointer-events-none cursor-pointer"
                   aria-label="Previous page"
                 >
                   <ChevronLeft className="w-5 h-5 md:w-6 md:h-6" />
@@ -177,7 +177,7 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
                 <button
                   onClick={handleNext}
                   disabled={currentPage >= totalPages}
-                  className="absolute right-1 md:right-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/80 hover:bg-white shadow-md flex items-center justify-center text-[#F76C5E] hover:text-[#e55d4f] transition-all disabled:opacity-0 disabled:pointer-events-none cursor-pointer"
+                  className="absolute right-1 md:right-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/80 hover:bg-white shadow-md flex items-center justify-center text-coral hover:text-coral-hover transition-all disabled:opacity-0 disabled:pointer-events-none cursor-pointer"
                   aria-label="Next page"
                 >
                   <ChevronRight className="w-5 h-5 md:w-6 md:h-6" />
@@ -188,7 +188,7 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
               <div className="flex justify-center mt-3">
                 <button
                   onClick={handleRestart}
-                  className={`flex items-center gap-2 px-4 py-1.5 text-sm font-playful text-[#F76C5E] hover:text-[#e55d4f] hover:bg-[#F76C5E]/5 border border-[#F76C5E]/40 rounded-full transition-all duration-300 cursor-pointer ${isAtEnd ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                  className={`flex items-center gap-2 px-4 py-1.5 text-sm font-playful text-coral hover:text-coral-hover hover:bg-coral/5 border border-coral/40 rounded-full transition-all duration-300 cursor-pointer ${isAtEnd ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                 >
                   <RotateCcw className="w-4 h-4" />
                   Read Again
@@ -206,7 +206,7 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
                       className={`
                         h-1.5 rounded-full transition-all duration-300
                         ${isCurrent ? 'w-4' : 'w-1.5'}
-                        ${isRead || isCurrent ? 'bg-[#F76C5E]' : 'bg-gray-300'}
+                        ${isRead || isCurrent ? 'bg-coral' : 'bg-gray-300'}
                       `}
                     />
                   );
@@ -218,7 +218,7 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
                 <Button
                   size="lg"
                   variant="default"
-                  className="w-full sm:w-auto px-6 py-2.5 md:px-8 md:py-3 text-base md:text-lg bg-[#F76C5E] text-white hover:bg-[#e55d4f] transition-all rounded-full font-playful group"
+                  className="w-full sm:w-auto px-6 py-2.5 md:px-8 md:py-3 text-base md:text-lg bg-coral text-white hover:bg-coral-hover transition-all rounded-full font-playful group"
                   onClick={onCtaClick}
                 >
                   <svg

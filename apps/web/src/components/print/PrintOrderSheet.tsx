@@ -119,7 +119,7 @@ function PanelContent({
             <p className="text-sm text-muted-foreground">
               {book.pageCount} pages
             </p>
-            <p className="text-sm font-medium text-[#F76C5E] mt-1">
+            <p className="text-sm font-medium text-coral mt-1">
               {formatPrice(bookPrice)} per book
             </p>
           </div>
@@ -163,7 +163,7 @@ function PanelContent({
         <Button
           onClick={handleCheckout}
           disabled={isLoading}
-          className="w-full bg-[#F76C5E] hover:bg-[#E55A4C] text-white py-6 text-base font-semibold"
+          className="w-full bg-coral hover:bg-[#E55A4C] text-white py-6 text-base font-semibold"
         >
           {isLoading ? (
             <>

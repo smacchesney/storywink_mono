@@ -42,8 +42,8 @@ export function ArtStyleStrip({ value, onChange }: ArtStyleStripProps) {
             className={cn(
               'relative aspect-square overflow-hidden rounded-xl border transition-all',
               selected
-                ? 'border-[#F76C5E] ring-2 ring-[#F76C5E] ring-offset-1'
-                : 'border-black/10 hover:border-[#F76C5E]/50'
+                ? 'border-coral ring-2 ring-coral ring-offset-1'
+                : 'border-black/10 hover:border-coral/50'
             )}
             aria-pressed={selected}
           >
@@ -55,7 +55,7 @@ export function ArtStyleStrip({ value, onChange }: ArtStyleStripProps) {
               className="object-cover"
             />
             {selected && (
-              <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#F76C5E] text-white shadow">
+              <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-coral text-white shadow">
                 <Check className="h-3 w-3" />
               </span>
             )}

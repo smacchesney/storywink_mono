@@ -111,7 +111,7 @@ function SortableThumb({
       </div>
 
       {isCover && (
-        <span className="absolute bottom-0 inset-x-0 bg-[#F76C5E] text-white text-[9px] leading-tight font-playful text-center py-0.5 pointer-events-none">
+        <span className="absolute bottom-0 inset-x-0 bg-coral text-white text-[9px] leading-tight font-playful text-center py-0.5 pointer-events-none">
           {coverLabel}
         </span>
       )}
@@ -152,12 +152,12 @@ function AddTile({
       onClick={onClick}
       disabled={busy}
       aria-label={label}
-      className="group flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-[#F76C5E]/40 bg-[#F76C5E]/[0.04] transition-colors hover:border-[#F76C5E] hover:bg-[#F76C5E]/[0.08] disabled:opacity-60"
+      className="group flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-coral/40 bg-coral/[0.04] transition-colors hover:border-coral hover:bg-coral/[0.08] disabled:opacity-60"
     >
       {busy ? (
-        <Loader2 className="h-5 w-5 animate-spin text-[#F76C5E]" />
+        <Loader2 className="h-5 w-5 animate-spin text-coral" />
       ) : (
-        <ImagePlus className="h-5 w-5 text-[#F76C5E] transition-transform group-hover:scale-110" />
+        <ImagePlus className="h-5 w-5 text-coral transition-transform group-hover:scale-110" />
       )}
     </button>
   );

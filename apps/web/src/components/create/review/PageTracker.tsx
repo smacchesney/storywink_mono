@@ -69,7 +69,7 @@ const PageTracker = ({
           className={cn(
             "ml-2 transition-colors duration-200 whitespace-nowrap",
             allPagesConfirmed && !isProcessing
-              ? "bg-[#F76C5E] text-white hover:bg-[#F76C5E]/90"
+              ? "bg-coral text-white hover:bg-coral/90"
               : "bg-gray-400 text-white cursor-not-allowed hover:bg-gray-400"
           )}
         >

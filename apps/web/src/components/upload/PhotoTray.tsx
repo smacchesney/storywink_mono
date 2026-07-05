@@ -364,7 +364,7 @@ function AddTile({
       <button
         type="button"
         onClick={onClick}
-        className="group col-span-3 flex flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-[#F76C5E]/40 bg-[#F76C5E]/[0.04] px-6 py-10 transition-colors hover:border-[#F76C5E] hover:bg-[#F76C5E]/[0.08] sm:col-span-4 md:col-span-5"
+        className="group col-span-3 flex flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-coral/40 bg-coral/[0.04] px-6 py-10 transition-colors hover:border-coral hover:bg-coral/[0.08] sm:col-span-4 md:col-span-5"
       >
         <Image
           src={KAI_MASCOT_URL}
@@ -374,7 +374,7 @@ function AddTile({
           className="h-20 w-20 object-contain transition-transform duration-300 group-hover:scale-105 md:h-24 md:w-24"
           priority
         />
-        <span className="flex items-center gap-2 rounded-full bg-[#F76C5E] px-5 py-2.5 font-playful text-base text-white shadow-md transition-transform group-hover:scale-[1.02]">
+        <span className="flex items-center gap-2 rounded-full bg-coral px-5 py-2.5 font-playful text-base text-white shadow-md transition-transform group-hover:scale-[1.02]">
           <ImagePlus className="h-5 w-5" />
           {addLabel}
         </span>
@@ -387,9 +387,9 @@ function AddTile({
       type="button"
       onClick={onClick}
       aria-label={addLabel}
-      className="group flex aspect-square items-center justify-center rounded-2xl border-2 border-dashed border-[#F76C5E]/40 bg-[#F76C5E]/[0.04] transition-colors hover:border-[#F76C5E] hover:bg-[#F76C5E]/[0.08]"
+      className="group flex aspect-square items-center justify-center rounded-2xl border-2 border-dashed border-coral/40 bg-coral/[0.04] transition-colors hover:border-coral hover:bg-coral/[0.08]"
     >
-      <ImagePlus className="h-7 w-7 text-[#F76C5E] transition-transform duration-200 group-hover:scale-110" />
+      <ImagePlus className="h-7 w-7 text-coral transition-transform duration-200 group-hover:scale-110" />
     </button>
   );
 }
@@ -482,7 +482,7 @@ function ProgressRing({ pct }: { pct: number }) {
         cy={size / 2}
         r={radius}
         fill="none"
-        stroke="#F76C5E"
+        stroke="var(--coral-primary)"
         strokeWidth={stroke}
         strokeLinecap="round"
         strokeDasharray={circumference}

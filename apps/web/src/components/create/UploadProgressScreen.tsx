@@ -36,7 +36,7 @@ export function UploadProgressScreen({
       {/* Text with Shimmer Effect - Properly contained */}
       <div className="isolate">
         <TextShimmerWave
-          className="text-lg md:text-xl font-excalifont [--base-color:#374151] [--base-gradient-color:#F76C5E] dark:[--base-color:#D1D5DB] dark:[--base-gradient-color:#F76C5E]"
+          className="text-lg md:text-xl font-excalifont [--base-color:#374151] [--base-gradient-color:var(--coral-primary)] dark:[--base-color:#D1D5DB] dark:[--base-gradient-color:var(--coral-primary)]"
           duration={1}
           spread={1}
           zDistance={1}
@@ -55,7 +55,7 @@ export function UploadProgressScreen({
           </p>
           <div className="w-64 bg-gray-200 rounded-full h-2">
             <div 
-              className="bg-[#F76C5E] h-2 rounded-full transition-all duration-300"
+              className="bg-coral h-2 rounded-full transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>

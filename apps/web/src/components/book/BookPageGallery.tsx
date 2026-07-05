@@ -127,11 +127,11 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
                 disabled={dp.type === 'illustration' && (isPending || isFailed)}
                 className={cn(
                   'w-full h-full relative rounded-md overflow-hidden',
-                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F76C5E] focus-visible:ring-offset-2',
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2',
                   'touch-manipulation',
                   isActive
-                    ? 'ring-2 ring-[#F76C5E] shadow-md transition-all duration-200 ease-in-out'
-                    : 'ring-1 ring-muted/40 hover:ring-[#F76C5E]/50 transition-all duration-150',
+                    ? 'ring-2 ring-coral shadow-md transition-all duration-200 ease-in-out'
+                    : 'ring-1 ring-muted/40 hover:ring-coral/50 transition-all duration-150',
                   (dp.type === 'illustration' && (isPending || isFailed)) && 'cursor-default'
                 )}
                 aria-label={getAriaLabel(dp, isActive)}
@@ -144,12 +144,12 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
                 {dp.type === 'dedication' ? (
                   // Dedication page thumbnail
                   <div className="w-full h-full bg-white flex items-center justify-center">
-                    <Heart className="h-5 w-5 text-[#F76C5E]" />
+                    <Heart className="h-5 w-5 text-coral" />
                   </div>
                 ) : dp.type === 'ending' ? (
                   // Ending page thumbnail
                   <div className="w-full h-full bg-white flex items-center justify-center">
-                    <Star className="h-5 w-5 text-[#F76C5E]" />
+                    <Star className="h-5 w-5 text-coral" />
                   </div>
                 ) : dp.type === 'back-cover' ? (
                   // Back cover thumbnail
@@ -184,7 +184,7 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
 
                 <div className={cn(
                   "absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] py-0.5 font-medium text-center",
-                  isActive && "bg-[#F76C5E]/80"
+                  isActive && "bg-coral/80"
                 )}>
                    {getThumbLabel(dp)}
                 </div>

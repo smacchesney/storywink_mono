@@ -145,7 +145,7 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
               <p className="text-sm text-gray-500 mb-1">
                 Quantity: {quantity}
               </p>
-              <p className="text-sm font-medium text-[#F76C5E]">
+              <p className="text-sm font-medium text-coral">
                 Total: {totalAmount}
               </p>
             </div>
@@ -200,7 +200,7 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
         <div className="space-y-3">
           <Link href="/library" className="block">
             <Button
-              className="w-full bg-[#F76C5E] hover:bg-[#E55A4C] text-white py-6"
+              className="w-full bg-coral hover:bg-[#E55A4C] text-white py-6"
               size="lg"
             >
               Back to Library
@@ -212,7 +212,7 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
         {/* Help Text */}
         <p className="text-center text-sm text-gray-500 mt-6">
           Questions about your order?{' '}
-          <a href="mailto:support@storywink.ai" className="text-[#F76C5E] hover:underline">
+          <a href="mailto:support@storywink.ai" className="text-coral hover:underline">
             Contact Support
           </a>
         </p>

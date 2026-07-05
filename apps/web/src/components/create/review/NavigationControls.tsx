@@ -33,7 +33,7 @@ const NavigationControls = ({
         onClick={onPrevious}
         disabled={!canGoPrevious || isProcessing}
         size="sm"
-        className="flex-1 max-w-[120px] border-[#F76C5E] text-[#F76C5E] hover:bg-[#F76C5E] hover:text-white"
+        className="flex-1 max-w-[120px] border-coral text-coral hover:bg-coral hover:text-white"
       >
         <ChevronLeft className="h-4 w-4 mr-1" /> {t('previous')}
       </Button>
@@ -47,7 +47,7 @@ const NavigationControls = ({
         onClick={onNext}
         disabled={!canGoNext || isProcessing}
         size="sm"
-        className="flex-1 max-w-[120px] border-[#F76C5E] text-[#F76C5E] hover:bg-[#F76C5E] hover:text-white"
+        className="flex-1 max-w-[120px] border-coral text-coral hover:bg-coral hover:text-white"
       >
         {t('next')} <ChevronRight className="h-4 w-4 ml-1" />
       </Button>

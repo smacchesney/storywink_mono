@@ -45,7 +45,7 @@ const Sparkle = ({
       animation: `sparkle-drift ${duration}s ease-in-out ${delay}s infinite`,
     }}
   >
-    <svg viewBox="0 0 24 24" fill="#F76C5E" className="w-full h-full">
+    <svg viewBox="0 0 24 24" fill="var(--coral-primary)" className="w-full h-full">
       <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7L12 17l-6.3 4 2.3-7-6-4.6h7.6L12 2z" />
     </svg>
   </div>
@@ -56,7 +56,7 @@ const ProgressDots = () => (
     {[0, 1, 2].map((i) => (
       <div
         key={i}
-        className="w-1.5 h-1.5 rounded-full bg-[#F76C5E]"
+        className="w-1.5 h-1.5 rounded-full bg-coral"
         style={{
           opacity: 0.4,
           animation: `pulse-dot 1.4s ease-in-out ${i * 0.2}s infinite`,
@@ -227,7 +227,7 @@ export function GenerationProgress({ bookId, reviewFirst }: GenerationProgressPr
           </p>
           <button
             onClick={() => router.push('/library')}
-            className="mt-6 rounded-full bg-[#F76C5E] px-6 py-2.5 text-white font-playful shadow-sm hover:bg-[#F76C5E]/90 transition-colors"
+            className="mt-6 rounded-full bg-coral px-6 py-2.5 text-white font-playful shadow-sm hover:bg-coral/90 transition-colors"
           >
             {t('goToLibrary')}
           </button>
@@ -236,7 +236,7 @@ export function GenerationProgress({ bookId, reviewFirst }: GenerationProgressPr
         <>
           <div className="isolate mb-6 text-center">
             <TextShimmerWave
-              className="text-2xl md:text-3xl font-semibold font-playful [--base-color:#374151] [--base-gradient-color:#F76C5E]"
+              className="text-2xl md:text-3xl font-semibold font-playful [--base-color:#374151] [--base-gradient-color:var(--coral-primary)]"
               duration={1.2}
               spread={1}
               zDistance={1}
@@ -248,9 +248,9 @@ export function GenerationProgress({ bookId, reviewFirst }: GenerationProgressPr
           </div>
 
           {illustrationFraction != null ? (
-            <div className="w-48 h-1.5 rounded-full bg-[#F76C5E]/15 overflow-hidden">
+            <div className="w-48 h-1.5 rounded-full bg-coral/15 overflow-hidden">
               <div
-                className="h-full rounded-full bg-[#F76C5E] transition-[width] duration-700 ease-out"
+                className="h-full rounded-full bg-coral transition-[width] duration-700 ease-out"
                 style={{ width: `${Math.round(illustrationFraction * 100)}%` }}
               />
             </div>
@@ -258,7 +258,7 @@ export function GenerationProgress({ bookId, reviewFirst }: GenerationProgressPr
             <ProgressDots />
           )}
 
-          <p className="text-xs text-[#F76C5E] font-playful mt-8 text-center max-w-xs">
+          <p className="text-xs text-coral font-playful mt-8 text-center max-w-xs">
             {t('canLeave')}
           </p>
         </>
