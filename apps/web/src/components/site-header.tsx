@@ -108,6 +108,7 @@ export function SiteHeader() {
               width={124}
               height={62}
               className="h-[62px] w-auto"
+              style={{ width: 'auto', height: '62px' }}
               priority
             />
             <span className="hidden font-bold text-3xl sm:inline-block text-ink dark:text-white font-playful">
@@ -125,6 +126,7 @@ export function SiteHeader() {
               width={104}
               height={52}
               className="h-[52px] w-auto"
+              style={{ width: 'auto', height: '52px' }}
               priority
             />
             <span className="font-bold text-2xl sm:inline-block text-ink dark:text-white font-playful">
