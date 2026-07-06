@@ -38,6 +38,9 @@ export interface RawCastCharacter {
 }
 
 export interface ResolvedCastMember {
+  /** Stable roster id, carried through to the prompt so bridge pages (which
+   * reference characters by id) can be grounded and validated. */
+  characterId: string;
   name: string;
   role: string;
   /** Exact 1-based current page positions; empty = pages unknown (page-less prompt variant). */
@@ -78,6 +81,7 @@ export function resolveCastForStory(
     if (pages.length === 0) continue; // every photo with this character was removed
 
     resolved.push({
+      characterId: character.characterId,
       name: character.name || character.role.replace(/_/g, ' '),
       role: character.role,
       appearsOnPages:

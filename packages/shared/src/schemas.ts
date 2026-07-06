@@ -64,6 +64,32 @@ export const generateIllustrationSchema = z.object({
   pageIds: z.array(z.string()).optional(),
 });
 
+// ---------------------------------------------------------------------------
+// Story response additions (BRIDGE_PAGES_ENABLED)
+// ---------------------------------------------------------------------------
+
+/**
+ * Shape validation for one model-proposed bridge page (story response).
+ * The story worker validates-or-DROPS each entry against this schema before
+ * the deterministic checks (cap, one-per-gap, roster subset) — a malformed
+ * bridge must never fail the story job.
+ */
+export const bridgeSceneSchema = z.object({
+  location: z.string().min(1).max(300),
+  timeOfDay: z.string().min(1).max(100),
+  action: z.string().min(1).max(500),
+  charactersPresent: z.array(z.string().min(1).max(100)).min(1).max(8),
+  outfitFrom: z.enum(['previous', 'next']),
+  props: z.array(z.string().max(200)).max(10),
+});
+
+export const bridgePageResponseSchema = z.object({
+  afterPhotoPage: z.number().int().min(1),
+  text: z.string().trim().min(1).max(600),
+  illustrationNotes: z.string().max(600).nullable(),
+  scene: bridgeSceneSchema,
+});
+
 // Type exports
 export type CreateBookInput = z.infer<typeof createBookSchema>;
 export type UpdateBookInput = z.infer<typeof updateBookSchema>;
@@ -71,3 +97,4 @@ export type UpdatePageInput = z.infer<typeof updatePageSchema>;
 export type GenerateStoryInput = z.infer<typeof generateStorySchema>;
 export type GenerateIllustrationInput = z.infer<typeof generateIllustrationSchema>;
 export type AdditionalCharacterInput = z.infer<typeof additionalCharacterSchema>;
+export type BridgePageResponseInput = z.infer<typeof bridgePageResponseSchema>;

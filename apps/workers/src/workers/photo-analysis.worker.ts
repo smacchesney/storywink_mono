@@ -76,6 +76,15 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
       } | null)
     : null;
 
+  // Positional numbering runs over PHOTO pages only (assetId != null). The
+  // normal flow never sees anything else (bridges don't exist at create),
+  // but a refresh on a book that has app-authored bridge rows would
+  // otherwise desync every appearsOnPages / pageAnalysis position: the
+  // vision call only receives imaged pages, so numbering must match exactly
+  // what the model sees.
+  const photoPages = book.pages.filter(p => p.assetId != null);
+  if (!photoPages.length) throw new Error('Book has no photo pages');
+
   const input: PhotoAnalysisInput = {
     childName: book.childName,
     additionalCharacters,
@@ -86,7 +95,7 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
       role: c.role,
       name: c.name,
     })),
-    storyPages: book.pages.map((p, i) => ({
+    storyPages: photoPages.map((p, i) => ({
       pageNumber: i + 1,
       assetId: p.assetId,
       imageUrl: p.asset?.url || p.asset?.thumbnailUrl || p.originalImageUrl || '',
@@ -152,8 +161,9 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
   // Persist per-page analysis, stamped with the page's current assetId so
   // consumers can detect staleness after a photo swap.
   await prisma.$transaction(async (tx) => {
-    for (let i = 0; i < book.pages.length; i++) {
-      const page = book.pages[i];
+    // Same positional convention as the vision input: photo pages only.
+    for (let i = 0; i < photoPages.length; i++) {
+      const page = photoPages[i];
       const pageAnalysis = analysis.pageAnalysis.find(a => a.pageNumber === i + 1);
       if (!pageAnalysis) continue;
       await tx.page.update({

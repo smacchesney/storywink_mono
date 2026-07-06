@@ -14,8 +14,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Trash2, Eye, Loader2, AlertTriangle, RefreshCw, Download, Printer, Pencil } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { calculatePrintedPageCount } from '@storywink/shared';
+import { isPrintShippableLocale } from '@/lib/print-availability';
+import { track } from '@/lib/track';
+import { cn } from '@/lib/utils';
 import { TextShimmerWave } from '@/components/ui/text-shimmer-wave';
 import { PrintOrderSheet, PrintOrderBook } from '@/components/print/PrintOrderSheet';
 import { ExportPdfDialog } from '@/components/book/ExportPdfDialog';
@@ -58,8 +61,21 @@ const BookCard: React.FC<BookCardProps> = ({
   const router = useRouter();
   const t = useTranslations('bookCard');
   const tc = useTranslations('common');
+  const tWhatNow = useTranslations('whatNow');
+  const locale = useLocale();
+  // Where print can actually ship today (SHIPPING_TIERS covers SG/MY). The
+  // ja locale keeps an honest "printing comes soon" line in the kebab —
+  // never a checkout it can't finish — and the PDF takes the footer slot.
+  const printShippable = isPrintShippableLocale(locale);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showPrintSheet, setShowPrintSheet] = useState(false);
+  const [printInterestSent, setPrintInterestSent] = useState(false);
+
+  const handlePrintInterest = () => {
+    if (printInterestSent) return;
+    setPrintInterestSent(true);
+    track('print_interest', { bookId: id, props: { locale, surface: 'bookCard' } });
+  };
 
   const actualPageCount = pageCount ?? 0;
   const displayTitle = title || t('untitledBook');
@@ -172,9 +188,29 @@ const BookCard: React.FC<BookCardProps> = ({
             <DropdownMenuContent align="end">
               {isCompleted && (
                 <>
-                  <DropdownMenuItem onClick={() => setShowPrintSheet(true)}>
-                    <Printer className="mr-2 h-4 w-4" /> {t('orderPrint')}
-                  </DropdownMenuItem>
+                  {printShippable ? (
+                    <DropdownMenuItem onClick={() => setShowPrintSheet(true)}>
+                      <Printer className="mr-2 h-4 w-4" /> {t('orderPrint')}
+                    </DropdownMenuItem>
+                  ) : (
+                    // Honest replacement where "Order Print" used to sit:
+                    // one tap registers interest, the item stays open to
+                    // say thanks. Reuses the whatNow copy so every surface
+                    // speaks the same line.
+                    <DropdownMenuItem
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        handlePrintInterest();
+                      }}
+                      className={cn(
+                        'max-w-[15rem] text-xs',
+                        printInterestSent ? 'text-coral focus:text-coral' : 'text-muted-foreground',
+                      )}
+                    >
+                      <Printer className="mr-2 h-4 w-4 shrink-0" />
+                      {printInterestSent ? tWhatNow('printThanks') : tWhatNow('printSoon')}
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={() => setShowExportDialog(true)}>
                     <Download className="mr-2 h-4 w-4" /> {t('savePdf')}
                   </DropdownMenuItem>
@@ -231,14 +267,26 @@ const BookCard: React.FC<BookCardProps> = ({
               <Eye className="h-4 w-4 mr-1.5" />
               {t('view')}
             </Button>
-            <Button
-              onClick={() => setShowPrintSheet(true)}
-              size="sm"
-              className="flex-1 bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
-            >
-              <Printer className="h-4 w-4 mr-1.5" />
-              {t('orderPrint')}
-            </Button>
+            {printShippable ? (
+              <Button
+                onClick={() => setShowPrintSheet(true)}
+                size="sm"
+                className="flex-1 bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
+              >
+                <Printer className="h-4 w-4 mr-1.5" />
+                {t('orderPrint')}
+              </Button>
+            ) : (
+              // Non-shippable locales get the deliverable they CAN have.
+              <Button
+                onClick={() => setShowExportDialog(true)}
+                size="sm"
+                className="flex-1 bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
+              >
+                <Download className="h-4 w-4 mr-1.5" />
+                {t('savePdf')}
+              </Button>
+            )}
           </div>
         )}
         {isPartial && (
@@ -298,12 +346,14 @@ const BookCard: React.FC<BookCardProps> = ({
 
       {isCompleted && (
         <>
-          {/* Print Order Sheet */}
-          <PrintOrderSheet
-            book={printOrderBook}
-            isOpen={showPrintSheet}
-            onClose={() => setShowPrintSheet(false)}
-          />
+          {/* Print Order Sheet — mounted only where print can ship */}
+          {printShippable && (
+            <PrintOrderSheet
+              book={printOrderBook}
+              isOpen={showPrintSheet}
+              onClose={() => setShowPrintSheet(false)}
+            />
+          )}
 
           {/* PDF export: fetches, shows the wait, auto-saves when ready */}
           <ExportPdfDialog

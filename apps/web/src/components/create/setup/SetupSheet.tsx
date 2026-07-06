@@ -26,6 +26,12 @@ export interface SetupFormState {
 interface SetupSheetProps {
   photos: StripPhoto[];
   form: SetupFormState;
+  /**
+   * Child name the server prefilled from the parent's most recent book.
+   * While the field still holds it, a one-line "for {name} again!" shows
+   * under the input; any edit makes the line step aside.
+   */
+  prefilledName?: string | null;
   /** True until perception fills the title — drives the shimmer. */
   titlePending: boolean;
   /** True once eventSummary has arrived from perception. */
@@ -53,6 +59,7 @@ interface SetupSheetProps {
 export function SetupSheet({
   photos,
   form,
+  prefilledName,
   titlePending,
   hasEventSummary,
   isSubmitting,
@@ -119,6 +126,14 @@ export function SetupSheet({
         {showNameError && (
           <p className="text-xs text-coral">{t('childNameRequired')}</p>
         )}
+        {!showNameError &&
+          prefilledName &&
+          form.childName === prefilledName && (
+            <p className="text-xs text-gray-500">
+              <Sparkles className="mr-1 inline h-3 w-3 text-coral" />
+              {t('childNameAgain', { name: prefilledName })}
+            </p>
+          )}
       </section>
 
       {/* Title — AI-prefilled with a thinking shimmer */}

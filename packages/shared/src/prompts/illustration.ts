@@ -1,5 +1,6 @@
 import { StyleKey, getStyleDefinition, StylePromptContext } from './styles.js';
 import { CharacterIdentity } from '../types.js';
+import type { BridgeScene } from './story.js';
 
 // ----------------------------------
 // TYPES
@@ -20,6 +21,14 @@ export interface IllustrationPromptOptions {
   characterSheetCount?: number;
   /** 1 when the approved interior render rides along as a ref (cover calls). */
   interiorRenderCount?: number;
+  /**
+   * BRIDGE pages (source=BRIDGE, no photo of their own): the structured
+   * scene authored by the story model. When present, the prompt redefines
+   * image 1's role — the ADJACENT photo is an identity/outfit/setting anchor,
+   * never a pose to copy — and the identity section filters the roster by
+   * scene.charactersPresent instead of appearsOnPages.
+   */
+  bridgeScene?: BridgeScene | null;
 }
 
 // ----------------------------------
@@ -46,17 +55,28 @@ export function isMainCharacterRole(role: string): boolean {
 function buildCharacterIdentitySection(
   characterIdentity: CharacterIdentity | null | undefined,
   pageNumber: number | undefined,
+  bridgeCharacterIds?: string[] | null,
 ): string | null {
   if (!characterIdentity?.characters?.length) return null;
 
-  const relevantCharacters = pageNumber
-    ? characterIdentity.characters.filter(
-        c =>
-          isMainCharacterRole(c.role) ||
-          c.appearsOnPages.includes(pageNumber) ||
-          c.appearsOnPages.length === 0,
-      )
-    : characterIdentity.characters;
+  // BRIDGE pages have no perception rows, so appearsOnPages can never match
+  // them — filter by the story-authored cast instead. If none of the authored
+  // ids resolve (roster re-extracted since the story ran), fall back to the
+  // photo-page filter rather than dropping the identity block entirely.
+  const bridgeFiltered = bridgeCharacterIds?.length
+    ? characterIdentity.characters.filter(c => bridgeCharacterIds.includes(c.characterId))
+    : [];
+
+  const relevantCharacters = bridgeFiltered.length
+    ? bridgeFiltered
+    : pageNumber
+      ? characterIdentity.characters.filter(
+          c =>
+            isMainCharacterRole(c.role) ||
+            c.appearsOnPages.includes(pageNumber) ||
+            c.appearsOnPages.length === 0,
+        )
+      : characterIdentity.characters;
 
   if (relevantCharacters.length === 0) return null;
 
@@ -87,6 +107,30 @@ function buildCharacterIdentitySection(
     `Pose, clothing, and scene composition follow this page's photo:\n` +
     charDescriptions
   );
+}
+
+/**
+ * BRIDGE pages: overrides the style prompt's default reading of image 1.
+ * The anchor is the ADJACENT original photo — ground truth for identity,
+ * outfits, and setting continuity — but the moment to depict is NEW. This
+ * section must stay consistent with (never contradict) the PEOPLE - SOURCE
+ * HIERARCHY: identity still follows the character reference, and the photo
+ * still rules outfits — only pose/composition/moment are released.
+ */
+function buildBridgeSceneSection(bridgeScene: BridgeScene | null | undefined): string | null {
+  if (!bridgeScene) return null;
+
+  const props = bridgeScene.props.filter(p => p.trim());
+  return [
+    `BRIDGE PAGE — THIS PAGE HAS NO PHOTO OF ITS OWN (overrides the scene-interpretation instructions above):`,
+    `Image 1 is a PHOTO of the SAME people taken moments around this scene — the same people moments later. Use it ONLY for identity, outfits, and setting continuity — do NOT copy its pose, its composition, or its moment.`,
+    `DEPICT THIS NEW MOMENT INSTEAD: ${bridgeScene.action}`,
+    `Location: ${bridgeScene.location}. Time of day: ${bridgeScene.timeOfDay}.`,
+    props.length ? `Include these objects from the surrounding photos: ${props.join(', ')}.` : null,
+    `Outfits: exactly as worn in the photo (image 1). The people must be instantly recognizable as the same people from the photo.`,
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 function buildQCFeedbackSection(qcFeedback: string | null | undefined): string | null {
@@ -125,13 +169,20 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
     ? style.buildCoverPrompt(ctx)
     : style.buildInteriorPrompt(ctx);
 
-  // 2. Cross-cutting: character identity
-  const charSection = buildCharacterIdentitySection(opts.characterIdentity, opts.pageNumber);
+  // 2. Bridge pages: re-role image 1 (adjacent photo = anchor, not the scene)
+  const bridgeSection = buildBridgeSceneSection(opts.bridgeScene);
 
-  // 3. Cross-cutting: QC feedback
+  // 3. Cross-cutting: character identity
+  const charSection = buildCharacterIdentitySection(
+    opts.characterIdentity,
+    opts.pageNumber,
+    opts.bridgeScene?.charactersPresent ?? null,
+  );
+
+  // 4. Cross-cutting: QC feedback
   const qcSection = buildQCFeedbackSection(opts.qcFeedback);
 
-  const prompt = [stylePrompt, charSection, qcSection].filter(Boolean).join(' ');
+  const prompt = [stylePrompt, bridgeSection, charSection, qcSection].filter(Boolean).join(' ');
 
   return prompt.length > MAX_PROMPT_CHARS
     ? prompt.slice(0, MAX_PROMPT_CHARS - 1) + '\u2026'

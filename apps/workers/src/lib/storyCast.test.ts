@@ -55,7 +55,7 @@ describe('resolveCastForStory', () => {
       ['asset-c', 'asset-b', 'asset-a'],
     );
     expect(cast).toEqual([
-      { name: 'grandparent', role: 'grandparent', appearsOnPages: [1, 3] },
+      { characterId: 'adult_1', name: 'grandparent', role: 'grandparent', appearsOnPages: [1, 3] },
     ]);
   });
 
@@ -65,7 +65,7 @@ describe('resolveCastForStory', () => {
       ['asset-a', 'asset-b'], // asset-c was removed
     );
     expect(cast).toEqual([
-      { name: 'grandparent', role: 'grandparent', appearsOnPages: [] },
+      { characterId: 'adult_1', name: 'grandparent', role: 'grandparent', appearsOnPages: [] },
     ]);
   });
 
@@ -78,7 +78,7 @@ describe('resolveCastForStory', () => {
       ['asset-b'], // asset-a and asset-c gone — the grandparent must not re-enter the story
     );
     expect(cast).toEqual([
-      { name: 'main child', role: 'main_child', appearsOnPages: [1] },
+      { characterId: 'child_1', name: 'main child', role: 'main_child', appearsOnPages: [1] },
     ]);
   });
 
@@ -93,7 +93,7 @@ describe('resolveCastForStory', () => {
       ['asset-b', 'asset-a'],
     );
     expect(cast).toEqual([
-      { name: 'grandparent', role: 'grandparent', appearsOnPages: [2] },
+      { characterId: 'adult_1', name: 'grandparent', role: 'grandparent', appearsOnPages: [2] },
     ]);
   });
 

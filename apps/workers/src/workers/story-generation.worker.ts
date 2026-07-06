@@ -10,7 +10,9 @@ import {
   StoryGenerationInput,
   STORY_GENERATION_SYSTEM_PROMPT,
   StoryResponse,
+  StoryBridgePageResponse,
   STORY_RESPONSE_SCHEMA,
+  STORY_RESPONSE_SCHEMA_WITH_BRIDGES,
 } from '@storywink/shared/prompts/story';
 import {
   createStoryQCPrompt,
@@ -25,6 +27,12 @@ import {
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
 import { trackEvent } from '@storywink/shared';
 import { buildConfirmedFacts } from '../lib/storyCast.js';
+import {
+  bridgePagesEnabled,
+  bridgeCapForPhotoCount,
+  validateBridgePages,
+  planPageSequence,
+} from '../lib/bridge-pages.js';
 import {
   mergeCastNames,
   resolveCastEntries,
@@ -103,12 +111,39 @@ async function evaluateStoryQuality(
   storyResponse: StoryResponse,
   input: StoryGenerationInput,
   bookId: string,
+  acceptedBridges: StoryBridgePageResponse[] = [],
 ): Promise<{ passed: boolean; feedback: string }> {
   const problems: string[] = [];
-  const pageTexts = storyResponse.pages.map(p => p.text || '');
+  const sortedPages = [...storyResponse.pages].sort((a, b) => a.pageNumber - b.pageNumber);
+  // Photo-positional texts (page 1..N = storyboard photos), used where
+  // positions matter (castNameCoverage's appearsOnPages windows).
+  const pageTexts = sortedPages.map(p => p.text || '');
+
+  // Reading-order texts (bridges interleaved) — the book the parent will
+  // actually read. Refrain echoes and the childName counts judge this.
+  const bridgesByGap = new Map(acceptedBridges.map(b => [b.afterPhotoPage, b]));
+  const readingOrderTexts: string[] = [];
+  sortedPages.forEach(p => {
+    readingOrderTexts.push(p.text || '');
+    const bridge = bridgesByGap.get(p.pageNumber);
+    if (bridge) readingOrderTexts.push(bridge.text);
+  });
+
+  // QC-model input keeps PHOTO-POSITIONAL numbering (feedback like "Page 5
+  // reads like a caption" must point at the storyboard page the regen model
+  // sees). Bridges join as labeled entries between pages: ordinal N + 0.5
+  // plus an explicit "[BRIDGE PAGE — inserted after page N]" label, so the
+  // judge reads the true sequence without renumbering any photo page.
+  const qcPages = [
+    ...sortedPages.map(p => ({ pageNumber: p.pageNumber, text: p.text })),
+    ...acceptedBridges.map(b => ({
+      pageNumber: b.afterPhotoPage + 0.5,
+      text: `[BRIDGE PAGE — inserted after page ${b.afterPhotoPage}, generated without a photo]\n${b.text}`,
+    })),
+  ].sort((a, b) => a.pageNumber - b.pageNumber);
 
   const refrain = storyResponse.storyArc?.refrain || '';
-  const echoes = countRefrainEchoes(refrain, pageTexts, input.language);
+  const echoes = countRefrainEchoes(refrain, readingOrderTexts, input.language);
   if (echoes < STORY_QC_THRESHOLDS.minRefrainEchoes) {
     problems.push(
       `The refrain "${refrain}" is only recognizable on ${echoes} page(s). It must echo (with variation) on at least ${STORY_QC_THRESHOLDS.minRefrainEchoes} pages.`,
@@ -126,7 +161,7 @@ async function evaluateStoryQuality(
             type: 'input_text',
             text: createStoryQCPrompt({
               storyArc: storyResponse.storyArc,
-              pages: storyResponse.pages.map(p => ({ pageNumber: p.pageNumber, text: p.text })),
+              pages: qcPages,
               language: input.language,
               theme: input.theme,
               eventSummary: input.eventSummary,
@@ -160,7 +195,7 @@ async function evaluateStoryQuality(
   let childNameInLanding: boolean | null = null;
   if (childName) {
     if (isChildNameCheckable(childName, input.language || 'en')) {
-      const nameEchoes = countChildNameEchoes(childName, pageTexts);
+      const nameEchoes = countChildNameEchoes(childName, readingOrderTexts);
       childNameCheck = 'checked';
       childNameEchoes = nameEchoes.pagesWithName;
       childNameInLanding = nameEchoes.nameInLanding;
@@ -281,6 +316,33 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       throw new Error('Book not found');
     }
 
+    // PURGE-AT-START (bridge pages): BRIDGE rows are app-authored derivatives
+    // of a PREVIOUS story, so a fresh generation must never inherit them —
+    // this makes BullMQ retries idempotent and re-generation from COMPLETED
+    // clean. Data-driven rather than flag-gated: stale rows left behind by a
+    // flag rollback must not survive a regen either. Runs BEFORE the
+    // pageLength comparison below so the mismatch warn can't fire spuriously,
+    // and pageLength is recomputed in the same transaction.
+    if (book.pages.some(p => p.source === 'BRIDGE')) {
+      const survivors = book.pages.filter(p => p.source !== 'BRIDGE');
+      await prisma.$transaction(async (tx) => {
+        await tx.page.deleteMany({ where: { bookId, source: 'BRIDGE' } });
+        for (let i = 0; i < survivors.length; i++) {
+          await tx.page.update({
+            where: { id: survivors[i].id },
+            data: { index: i, pageNumber: i + 1 },
+          });
+        }
+        await tx.book.update({ where: { id: bookId }, data: { pageLength: survivors.length } });
+      });
+      logger.info(
+        { bookId, purgedBridges: book.pages.length - survivors.length, remainingPages: survivors.length },
+        'Purged stale bridge pages before story generation',
+      );
+      book.pages = survivors.map((p, i) => ({ ...p, index: i, pageNumber: i + 1 }));
+      book.pageLength = survivors.length;
+    }
+
     // All pages participate in story generation (including cover page)
     const storyPages = book.pages;
 
@@ -397,6 +459,15 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       ? resolveCastEntries(mergedCharacters, storyPages.map(p => p.assetId))
       : [];
 
+    // BRIDGE_PAGES_ENABLED: request bridges only when the flag is on AND a
+    // grounded roster exists (identity-less books get no bridges — there is
+    // nothing to validate charactersPresent against). Cap is code-enforced
+    // again at validation time.
+    const bridgeCap =
+      bridgePagesEnabled() && charactersInPhotos.length > 0
+        ? bridgeCapForPhotoCount(storyPages.length)
+        : 0;
+
     // Prepare story generation input using advanced prompt structure
     const storyInput: StoryGenerationInput = {
       bookTitle: book.title || 'My Special Story',
@@ -409,6 +480,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       eventSummary: book.eventSummary || undefined,
       confirmedFacts: confirmedFacts.length > 0 ? confirmedFacts : undefined,
       charactersInPhotos: charactersInPhotos.length > 0 ? charactersInPhotos : undefined,
+      bridgeCap: bridgeCap > 0 ? bridgeCap : undefined,
       language: book.language || 'en',
       suggestTitle: job.data.titleWasGenerated === true,
       storyPages: storyPages.map((page, index) => {
@@ -461,7 +533,12 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
             type: 'json_schema',
             name: 'story_response',
             strict: true,
-            schema: STORY_RESPONSE_SCHEMA as Record<string, unknown>,
+            // The bridge-enabled schema is requested ONLY when the prompt
+            // carries the bridge section; flag-off requests are byte-identical
+            // to the legacy schema.
+            schema: (bridgeCap > 0
+              ? STORY_RESPONSE_SCHEMA_WITH_BRIDGES
+              : STORY_RESPONSE_SCHEMA) as unknown as Record<string, unknown>,
           },
         },
       });
@@ -494,13 +571,37 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
 
     let storyResponse = await generateStory();
 
+    // Validate-or-DROP the model's proposed bridges (cap, one-per-gap,
+    // roster-only characters). A bad bridge never fails the story — the book
+    // simply stays a photo-per-page book.
+    const validateBridges = (response: StoryResponse): StoryBridgePageResponse[] => {
+      if (bridgeCap === 0) return [];
+      const validation = validateBridgePages(response.bridgePages, {
+        photoCount: storyPages.length,
+        rosterCharacterIds: charactersInPhotos.map(c => c.characterId),
+      });
+      if ((response.bridgePages?.length ?? 0) > 0 || validation.dropped.length > 0) {
+        logger.info(
+          {
+            bookId,
+            bridgesProposed: response.bridgePages?.length ?? 0,
+            bridgesAccepted: validation.accepted.length,
+            bridgesDropped: validation.dropped,
+          },
+          'Bridge page validation',
+        );
+      }
+      return validation.accepted;
+    };
+    let acceptedBridges = validateBridges(storyResponse);
+
     // Story QC: verify the draft before any illustration money is spent on it.
     // One regen max; QC errors and blown time budgets accept the draft as-is.
     await setGenerationPhase(bookId, 'story_check');
     let qcPassed = true;
     let regenerated = false;
     try {
-      const verdict = await evaluateStoryQuality(openai, storyResponse, storyInput, bookId);
+      const verdict = await evaluateStoryQuality(openai, storyResponse, storyInput, bookId, acceptedBridges);
       if (!verdict.passed) {
         qcPassed = false;
         if (Date.now() - jobStartedAt < STORY_QC_TIME_BUDGET_MS) {
@@ -510,6 +611,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
           // this write is also what keeps the UI's stall clock honest.
           await setGenerationPhase(bookId, 'story');
           storyResponse = await generateStory(verdict.feedback);
+          acceptedBridges = validateBridges(storyResponse);
         } else {
           logger.warn({ bookId, feedback: verdict.feedback }, 'Story QC failed but time budget exhausted — accepting draft');
         }
@@ -620,11 +722,53 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
           });
           updateResults.push(result);
         }
+
+        // Bridge insertion + renumber, in the SAME transaction as the text
+        // writes: interleave accepted bridges into the photo order, shift the
+        // photo rows' index/pageNumber to their final positions, and keep
+        // Book.pageLength truthful. No-op (zero extra writes) when no bridges
+        // were accepted — the flag-off path is byte-identical to before.
+        if (acceptedBridges.length > 0) {
+          const plan = planPageSequence(storyPages.map(p => p.id), acceptedBridges);
+          for (const entry of plan) {
+            if (entry.kind === 'photo') {
+              await tx.page.update({
+                where: { id: entry.photoPageId! },
+                data: { index: entry.index, pageNumber: entry.pageNumber },
+              });
+            } else {
+              await tx.page.create({
+                data: {
+                  bookId,
+                  index: entry.index,
+                  pageNumber: entry.pageNumber,
+                  text: entry.bridge!.text,
+                  // Born with text — the review illustrate-gate must pass.
+                  textConfirmed: true,
+                  illustrationNotes: entry.bridge!.illustrationNotes,
+                  source: 'BRIDGE',
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  bridgeScene: entry.bridge!.scene as any, // Prisma Json column
+                  // assetId stays NULL: pointing at the anchor's asset would
+                  // corrupt isTitlePage and character remapping.
+                  assetId: null,
+                  originalImageUrl: null,
+                  isTitlePage: false,
+                  pageType: 'SINGLE',
+                  moderationStatus: 'PENDING',
+                },
+              });
+            }
+          }
+          await tx.book.update({ where: { id: bookId }, data: { pageLength: plan.length } });
+        }
+
         return updateResults;
       });
       logger.info({
         bookId,
         successfulUpdates: results.length,
+        insertedBridges: acceptedBridges.length,
         totalExpected: storyPages.length
       }, 'Batch update completed');
     } catch (error) {
@@ -719,7 +863,12 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
     // Funnel telemetry — never throws, never blocks the pipeline.
     await trackEvent(
       prisma,
-      { name: 'story_ready', userId: book.userId, bookId, props: { regenerated, qcPassed } },
+      {
+        name: 'story_ready',
+        userId: book.userId,
+        bookId,
+        props: { regenerated, qcPassed, bridgePages: acceptedBridges.length },
+      },
       logger,
     );
 

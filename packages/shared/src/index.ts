@@ -10,3 +10,4 @@ export * from './prompts/illustration.js';
 export * from './lulu.js';
 export * from './shipping.js';
 export * from './telemetry.js';
+export * from './cloudinary.js';

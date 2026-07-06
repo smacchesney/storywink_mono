@@ -24,6 +24,15 @@ export interface QCPromptOptions {
    * EXPECTED and must match expectedTitle exactly.
    */
   cover?: { expectedTitle: string } | null;
+  /**
+   * BRIDGE pages (generated WITHOUT a source photo), identified by their
+   * "PAGE n" presentation ordinals — the same 1-based labels the caller
+   * attaches to each page image (NOT DB page numbers). When non-empty the
+   * prompt adds bridge-specific judging lines: strict character consistency
+   * against the canonical description/sheet, and a near-duplicate-composition
+   * failure check against the neighboring pages.
+   */
+  bridgePageOrdinals?: number[];
 }
 
 export function createQCPrompt(
@@ -56,10 +65,17 @@ export function createQCPrompt(
 The cover PASSES only if titleMatches is true AND overall score >= 6 AND character consistency >= 5.\n`
     : '';
 
+  const bridgeOrdinals = options.bridgePageOrdinals ?? [];
+  const bridgeSection = bridgeOrdinals.length > 0
+    ? `\nPage${bridgeOrdinals.length === 1 ? '' : 's'} ${bridgeOrdinals.map(n => `PAGE ${n}`).join(', ')} ${bridgeOrdinals.length === 1 ? 'was' : 'were'} generated WITHOUT a source photo (app-authored bridge pages). For ${bridgeOrdinals.length === 1 ? 'this page' : 'these pages'}:
+- Judge character consistency STRICTLY against the canonical description${sheetCount > 0 ? ' and the REFERENCE SHEET' : ''} and against the adjacent pages — with no photo behind it, any drift here is pure model error.
+- ALSO FAIL the page if it is a near-duplicate of a neighboring page's composition (same pose, same framing, same moment) — a bridge page must depict its own new moment, not restate the neighboring illustration.\n`
+    : '';
+
   return `Evaluate these ${pageCount} children's book illustrations for quality and consistency.
 
 The page images are provided in page order (page 1 through page ${pageCount}), and each page image is immediately preceded by a text label "PAGE n". In every result, set "pageNumber" to the n from that image's label — never renumber or reorder.
-${sheetSection}${coverSection}
+${sheetSection}${coverSection}${bridgeSection}
 ${characterSection}
 
 For each illustration, evaluate:

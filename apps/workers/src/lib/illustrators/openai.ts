@@ -41,12 +41,17 @@ export class OpenAIProvider implements IllustrationProvider {
   private readonly quality: QualityLevel;
   private readonly thinking: boolean;
 
-  constructor() {
+  /**
+   * `quality` override serves the QC escalation ladder (gpt-image-2 at
+   * medium for a page's final re-render); without it OPENAI_IMAGE_QUALITY
+   * applies as before.
+   */
+  constructor(opts?: { quality?: QualityLevel }) {
     if (!process.env.OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY is required when ILLUSTRATION_PROVIDER=openai');
     }
     this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    this.quality = readQuality();
+    this.quality = opts?.quality ?? readQuality();
     this.thinking = readThinking();
   }
 

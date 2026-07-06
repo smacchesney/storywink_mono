@@ -13,6 +13,8 @@ export type StoryPromptPart = TextPart | ImagePlaceholder;
 
 // JSON Schema for OpenAI structured output (strict mode)
 // Array-based format: { pages: [{ pageNumber, text, illustrationNotes }, ...] }
+// NOTE: this legacy shape stays byte-identical — bridge pages are requested
+// via STORY_RESPONSE_SCHEMA_WITH_BRIDGES only when BRIDGE_PAGES_ENABLED.
 export const STORY_RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
@@ -72,6 +74,77 @@ export const STORY_RESPONSE_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+// Bridge pages (BRIDGE_PAGES_ENABLED): app-authored in-between pages the
+// model may insert where a narrative beat is missing between two photos.
+// An insertion list — the photo `pages[]` contract above is untouched.
+const BRIDGE_PAGES_SCHEMA = {
+  type: 'array',
+  description:
+    'OPTIONAL bridge pages — extra pages WITHOUT a photo, inserted only where a narrative beat is genuinely missing. Most books need ZERO: return an empty array.',
+  items: {
+    type: 'object',
+    properties: {
+      afterPhotoPage: {
+        type: 'number',
+        description:
+          'The 1-based storyboard page this bridge follows (the last page number = a wind-down after the final photo). Never before the first photo.',
+      },
+      text: {
+        type: 'string',
+        description: 'The story text for this bridge page (same rules as every page)',
+      },
+      illustrationNotes: {
+        type: ['string', 'null'],
+        description: 'Visual effects suggestion for the illustration, or null if none',
+      },
+      scene: {
+        type: 'object',
+        description: 'Structured continuity record — the illustrator has NO photo for this page',
+        properties: {
+          location: {
+            type: 'string',
+            description: 'Where this moment happens — plausibly between the adjacent photos’ settings',
+          },
+          timeOfDay: { type: 'string', description: 'e.g. "morning", "golden afternoon"' },
+          action: { type: 'string', description: 'What the characters are DOING in this new moment' },
+          charactersPresent: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'characterIds from the roster — ONLY people/pets from the roster',
+          },
+          outfitFrom: {
+            type: 'string',
+            enum: ['previous', 'next'],
+            description: 'Which adjacent photo the outfits come from',
+          },
+          props: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Concrete objects carried over from the adjacent photos',
+          },
+        },
+        required: ['location', 'timeOfDay', 'action', 'charactersPresent', 'outfitFrom', 'props'],
+        additionalProperties: false,
+      },
+    },
+    required: ['afterPhotoPage', 'text', 'illustrationNotes', 'scene'],
+    additionalProperties: false,
+  },
+} as const;
+
+/**
+ * Strict-mode variant requested ONLY when BRIDGE_PAGES_ENABLED: identical to
+ * STORY_RESPONSE_SCHEMA plus a required `bridgePages` array (empty = none).
+ */
+export const STORY_RESPONSE_SCHEMA_WITH_BRIDGES = {
+  ...STORY_RESPONSE_SCHEMA,
+  properties: {
+    ...STORY_RESPONSE_SCHEMA.properties,
+    bridgePages: BRIDGE_PAGES_SCHEMA,
+  },
+  required: [...STORY_RESPONSE_SCHEMA.required, 'bridgePages'],
+} as const;
+
 // Simplified Input Type - Expects pre-filtered/sorted pages
 export interface StoryGenerationInput {
   bookTitle: string;
@@ -87,11 +160,20 @@ export interface StoryGenerationInput {
   eventSummary?: string; // Parent-confirmed "what actually happened" brief. When present it REPLACES theme in the prompt.
   confirmedFacts?: string[]; // Parent's tapped answers to photo-derived questions ("This was Emma's first beach trip")
   charactersInPhotos?: {
+    /** Stable roster id — bridge pages reference characters by this id. */
+    characterId?: string;
     name: string;
     role: string;
     appearsOnPages: number[]; // empty = present in the photos, but exact pages unknown (page-less prompt variant)
     namedVia?: 'chip' | 'childName' | 'fallback'; // provenance of `name`; chip/childName = parent-confirmed, must appear verbatim
   }[]; // From the perception pass — who actually appears where
+  /**
+   * BRIDGE_PAGES_ENABLED: maximum bridge pages the model may propose
+   * (code-enforced again in the worker). 0/undefined = no bridge section in
+   * the prompt and no bridgePages in the response schema — the legacy prompt
+   * stays byte-identical.
+   */
+  bridgeCap?: number;
   storyPages: {
     pageId: string;
     pageNumber: number;
@@ -218,6 +300,26 @@ export function createStoryGenerationPrompt(
     `  - For unnamed pets, use simple animal words ("the dog", "the cat"). Never name a pet the parent didn't name. A pet the parent DID name is a character too — use that name.`,
   ].join('\n');
 
+  // BRIDGE PAGES (BRIDGE_PAGES_ENABLED): rendered only when the worker set a
+  // positive cap AND the roster carries characterIds (identity-less books
+  // must never get bridges — there is nothing to ground them to).
+  const bridgeRoster = (input.charactersInPhotos ?? []).filter(c => c.characterId);
+  const bridgeSection =
+    input.bridgeCap && input.bridgeCap > 0 && bridgeRoster.length > 0
+      ? [
+          ``,
+          `## BRIDGE PAGES (optional — most books need ZERO):`,
+          `- You may add up to ${input.bridgeCap} bridge page(s) — an extra page WITHOUT a photo — but ONLY where a narrative beat is genuinely missing between two adjacent photos (a journey, an approach, an anticipation) or as a wind-down AFTER the last photo. A bridge exists to make the page-turn feel inevitable, never to pad. Report them in the "bridgePages" array; return an empty array when none are needed (the usual case).`,
+          `- At most ONE bridge per gap, and never before the first photo. "afterPhotoPage" is the storyboard page the bridge follows (${input.storyPages.length} = after the last photo).`,
+          `- GROUNDING (non-negotiable): a bridge may show ONLY people and pets from this roster, referenced by characterId in "scene.charactersPresent":`,
+          ...bridgeRoster.map(
+            c => `    - characterId "${c.characterId}" = ${c.name} (${c.role.replace(/_/g, ' ')})`,
+          ),
+          `- Never invent a person, a pet, or a named place. The setting must sit plausibly BETWEEN the adjacent photos' settings (use their WHAT'S HERE notes); the action must grow out of what the adjacent photos actually show. Set "scene.outfitFrom" to whichever adjacent photo the outfits should copy.`,
+          `- Bridge text follows every rule in this prompt (refrain, hand-off, length limits) and must read as part of the same continuous story.`,
+        ].join('\n')
+      : '';
+
   const baseInstructions = [
     `# Instructions & Guiding Principles:`,
     `- Imagine a parent curled up with their toddler at bedtime, reading aloud. Every sentence should feel warm, playful, and alive in a parent's voice.`,
@@ -240,6 +342,7 @@ export function createStoryGenerationPrompt(
     `- **Connective device**: If the photos read as a montage of separate moments rather than one continuous event, choose ONE thread and pull every page through it: a wondering question the child carries ("will the waves say hello back?"), a tiny quest, something the child is collecting or counting, or the refrain itself acting as a heartbeat. Never let pages sit side by side unconnected.`,
     `- **Hand-off rule**: Every page except the last must END with something that leans into the next page — a sound getting closer, a glance toward something new, a question, a "and then...?" energy. The listener should NEED the page turn.`,
     `- **Callbacks**: In the LANDING, echo one concrete detail from the OPENING (an object, a sound, the refrain in its softest form). This is what makes a story feel whole instead of a list of moments.`,
+    ...(bridgeSection ? [bridgeSection] : []),
     ``,
     `## Recurring Refrain (REQUIRED):`,
     `- Create a short phrase (4-8 words) that echoes through the story at least 3 times.`,
@@ -334,7 +437,7 @@ export function createStoryGenerationPrompt(
     `  - If no dynamic effect fits, set "illustrationNotes" to null or empty.`,
     `\n- Effects must feel playful but natural, blending into the scene without overwhelming it.`,
     `\n- Final Output:`,
-    `\nReturn ONLY a valid JSON object with a "storyArc" object, a "suggestedTitle" string, AND a "pages" array. Plan the storyArc FIRST (desire, refrain, emotionalPeak, resolution), then write pages that follow that arc.`,
+    `\nReturn ONLY a valid JSON object with a "storyArc" object, a "suggestedTitle" string, AND a "pages" array${bridgeSection ? ', AND a "bridgePages" array (empty when no bridges are needed — the usual case)' : ''}. Plan the storyArc FIRST (desire, refrain, emotionalPeak, resolution), then write pages that follow that arc.`,
     `Each page element must have "pageNumber" (number), "text" (string), and "illustrationNotes" (string or null).`,
     `Example format: {"storyArc":{"desire":"...","refrain":"...","emotionalPeak":"...","resolution":"..."},"suggestedTitle":"...","pages":[{"pageNumber":1,"text":"Sample text...","illustrationNotes":"Suggestion..."}]}`
   ].join('');
@@ -360,8 +463,33 @@ export interface StoryArc {
   resolution: string;
 }
 
+/**
+ * Structured continuity record for a BRIDGE page — written by the story
+ * model, validated in the worker, persisted on Page.bridgeScene, and read by
+ * the illustration worker (which has no photo for this page).
+ */
+export interface BridgeScene {
+  location: string;
+  timeOfDay: string;
+  action: string;
+  /** characterIds from the roster (validated: subset, or the bridge is dropped). */
+  charactersPresent: string[];
+  outfitFrom: 'previous' | 'next';
+  props: string[];
+}
+
+export interface StoryBridgePageResponse {
+  /** 1-based storyboard page this bridge follows; N = trailing wind-down. */
+  afterPhotoPage: number;
+  text: string;
+  illustrationNotes: string | null;
+  scene: BridgeScene;
+}
+
 export interface StoryResponse {
   storyArc: StoryArc;
   suggestedTitle: string;
   pages: StoryPageResponse[];
+  /** Present only when STORY_RESPONSE_SCHEMA_WITH_BRIDGES was requested. */
+  bridgePages?: StoryBridgePageResponse[];
 }

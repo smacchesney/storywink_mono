@@ -24,6 +24,7 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@clerk/nextjs';
@@ -40,6 +41,8 @@ interface PageData {
   generatedImageUrl: string | null;
   moderationStatus: string;
   isTitlePage: boolean;
+  /** 'PHOTO' | 'BRIDGE' — bridges get "Try drawing again" instead of Replace photo. */
+  source?: string;
   text: string | null;
   textConfirmed: boolean | null;
   asset?: { url: string; thumbnailUrl: string | null } | null;
@@ -110,6 +113,7 @@ export default function BookResolvePage() {
     loadReplacedPageIds(bookId),
   );
   const [isReplacing, setIsReplacing] = useState(false);
+  const [isRedrawing, setIsRedrawing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [pageToDelete, setPageToDelete] = useState<PageData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -293,6 +297,37 @@ export default function BookResolvePage() {
       toast.error(t('removeError'));
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // Bridge pages have no photo to replace — "Try drawing again" re-renders
+  // the page via the existing scoped reillustrate endpoint. The route flips
+  // the book to ILLUSTRATING, so the next fetch trips the route guard and
+  // lands the parent on the preview's progress screen.
+  const handleRedrawBridge = async () => {
+    if (!selectedFixPage || isRedrawing) return;
+    setIsRedrawing(true);
+    try {
+      const token = await getToken();
+      const response = await fetch(
+        `/api/book/${bookId}/page/${selectedFixPage.id}/reillustrate`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      if (response.status !== 202) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to start re-illustration');
+      }
+      toast.info(t('bridgeRedrawStarted'));
+      await fetchBook();
+    } catch (err: any) {
+      // Raw error text goes to the log, never to the parent.
+      console.error('Error redrawing bridge page:', err);
+      toast.error(t('bridgeRedrawError'));
+    } finally {
+      setIsRedrawing(false);
     }
   };
 
@@ -708,24 +743,43 @@ export default function BookResolvePage() {
                       })}
                     </h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {t('photoCouldntBeIllustrated')}
+                      {selectedFixPage.source === 'BRIDGE'
+                        ? t('bridgeCouldntBeDrawn')
+                        : t('photoCouldntBeIllustrated')}
                     </p>
                     <div className="flex flex-col sm:flex-row gap-2 mt-4">
-                      <Button
-                        onClick={handleReplaceClick}
-                        disabled={isReplacing}
-                        className="w-full sm:flex-1 bg-coral hover:bg-[#E55A4C] text-white rounded-full font-playful disabled:opacity-70"
-                      >
-                        {isReplacing ? (
-                          <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                        ) : (
-                          <ImagePlus className="h-4 w-4 mr-1.5" />
-                        )}
-                        {isReplacing ? tUpload('replacing') : t('replacePhoto')}
-                      </Button>
+                      {selectedFixPage.source === 'BRIDGE' ? (
+                        // Bridge pages have no photo to replace — offer a
+                        // fresh drawing instead.
+                        <Button
+                          onClick={handleRedrawBridge}
+                          disabled={isRedrawing}
+                          className="w-full sm:flex-1 bg-coral hover:bg-[#E55A4C] text-white rounded-full font-playful disabled:opacity-70"
+                        >
+                          {isRedrawing ? (
+                            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-4 w-4 mr-1.5" />
+                          )}
+                          {t('tryDrawingAgain')}
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={handleReplaceClick}
+                          disabled={isReplacing}
+                          className="w-full sm:flex-1 bg-coral hover:bg-[#E55A4C] text-white rounded-full font-playful disabled:opacity-70"
+                        >
+                          {isReplacing ? (
+                            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                          ) : (
+                            <ImagePlus className="h-4 w-4 mr-1.5" />
+                          )}
+                          {isReplacing ? tUpload('replacing') : t('replacePhoto')}
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
-                        disabled={isReplacing}
+                        disabled={isReplacing || isRedrawing}
                         onClick={() => {
                           setPageToDelete(selectedFixPage);
                           setShowDeleteDialog(true);

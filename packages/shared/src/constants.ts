@@ -22,6 +22,7 @@ export const QUEUE_NAMES = {
   PHOTO_ANALYSIS: 'photo-analysis',
   BOOK_REAPER: 'book-reaper',
   LULU_STATUS_POLL: 'lulu-status-poll',
+  ASSET_CLEANUP: 'asset-cleanup',
 } as const;
 
 // Book constraints

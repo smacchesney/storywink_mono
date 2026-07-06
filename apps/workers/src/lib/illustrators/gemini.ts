@@ -14,12 +14,17 @@ export class GeminiProvider implements IllustrationProvider {
   readonly modelId: string;
   private readonly client: GoogleGenAI;
 
-  constructor() {
+  /**
+   * `modelId` override serves the QC escalation ladder (e.g.
+   * gemini-3-pro-image for a page's final re-render); without it the
+   * env/default selection applies.
+   */
+  constructor(opts?: { modelId?: string }) {
     if (!process.env.GOOGLE_API_KEY) {
       throw new Error('GOOGLE_API_KEY is required when ILLUSTRATION_PROVIDER=gemini');
     }
     this.client = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
-    this.modelId = process.env.GEMINI_IMAGE_MODEL || DEFAULT_GEMINI_IMAGE_MODEL;
+    this.modelId = opts?.modelId || process.env.GEMINI_IMAGE_MODEL || DEFAULT_GEMINI_IMAGE_MODEL;
   }
 
   async generate(input: IllustrationInput): Promise<IllustrationOutput> {

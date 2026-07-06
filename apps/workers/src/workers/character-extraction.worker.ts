@@ -16,6 +16,7 @@ import {
 } from '@storywink/shared/prompts/character-identity';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg, remapCharacterPages } from '@storywink/shared/utils';
 import { mergeCastNames, CaptureAnswerLike } from '../lib/resolveCast.js';
+import { bridgePagesEnabled } from '../lib/bridge-pages.js';
 import { ANALYSIS_MODEL } from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -158,12 +159,15 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
       }
     }
 
-    // 4. Build prompt
+    // 4. Build prompt. Positional numbering runs over PHOTO pages only
+    // (assetId != null): bridge rows have no photo, and numbering them would
+    // desync every appearsOnPages position the model echoes back.
+    const photoPages = storyPages.filter(p => p.assetId != null);
     const extractionInput: CharacterExtractionInput = {
       childName: book.childName,
       additionalCharacters,
       artStyle,
-      storyPages: storyPages.map((p, i) => ({
+      storyPages: photoPages.map((p, i) => ({
         pageNumber: i + 1,
         imageUrl: p.asset?.url || p.asset?.thumbnailUrl || p.originalImageUrl || '',
       })),
@@ -213,7 +217,19 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
       } else {
         // Stamp the style the styleTranslation prose was written for — the
         // reuse path refreshes the translations when this stamp mismatches.
-        characterIdentity = { ...JSON.parse(rawResult), extractedForStyle: artStyle };
+        // Also stamp appearsOnAssetIds (same convention as the perception
+        // pass, photo-analysis.worker.ts): appearsOnPages is positional over
+        // the PHOTO pages sent above, and without the asset stamps this
+        // identity could never be remapped after a reorder or bridge insert.
+        const parsedIdentity = JSON.parse(rawResult) as CharacterIdentity;
+        characterIdentity = {
+          ...parsedIdentity,
+          extractedForStyle: artStyle,
+          characters: (parsedIdentity.characters ?? []).map(c => ({
+            ...c,
+            appearsOnAssetIds: c.appearsOnPages.map(n => photoPages[n - 1]?.assetId ?? null),
+          })),
+        };
 
         // Fresh extractions mint new characterIds, so chip answers rarely
         // join here — but the merge still stamps main_child's name with its
@@ -400,6 +416,7 @@ async function createIllustrationFlow(
           isTitlePage: true,
           moderationStatus: true,
           generatedImageUrl: true,
+          source: true,
         },
       },
     },
@@ -424,8 +441,16 @@ async function createIllustrationFlow(
     // No specific pages requested — use existing smart retry / first-run logic
     const isRetry = book.status === 'PARTIAL' || book.status === 'FAILED';
 
+    // BRIDGE_PAGES_ENABLED off: bridge rows (left behind by a flag rollback)
+    // must not enqueue from the implicit paths. Explicit pageIds requests
+    // above are still honored — a parent's direct "try drawing again" on an
+    // existing bridge row renders fine via the worker's DB-driven branch, and
+    // silently dropping it would strand the book in ILLUSTRATING.
+    const includeBridges = bridgePagesEnabled();
+
     if (isRetry) {
       pagesToProcess = book.pages.filter((page) => {
+        if (page.source === 'BRIDGE' && !includeBridges) return false;
         if (page.moderationStatus === 'OK' && page.generatedImageUrl) return false;
         if (page.moderationStatus === 'FLAGGED') return false;
         return true;
@@ -441,6 +466,7 @@ async function createIllustrationFlow(
     } else {
       // For first-time illustration, filter to pages that have text ready
       pagesToProcess = book.pages.filter((p) => {
+        if (p.source === 'BRIDGE' && !includeBridges) return false;
         const hasText = !!(p.text && p.text.trim());
         return hasText;
       });

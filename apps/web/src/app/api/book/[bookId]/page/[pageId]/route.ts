@@ -153,11 +153,12 @@ export async function DELETE(
       );
     }
 
-    // CONSTRAINT 2: Must have at least 2 pages after deletion
+    // CONSTRAINT 2: Must have at least 2 pages after deletion. The guard
+    // counts PAGES (bridge pages included), not photos — the copy must too.
     if (book.pages.length <= 2) {
       logger.warn({ clerkId, bookId, pageId, currentCount: book.pages.length }, 'API: Cannot delete - minimum pages required');
       return NextResponse.json(
-        { code: 'MIN_PAGES', error: 'Cannot delete. Your book must have at least 2 photos.' },
+        { code: 'MIN_PAGES', error: 'Cannot delete. Your book must keep at least 2 pages.' },
         { status: 400 }
       );
     }
@@ -220,8 +221,12 @@ export async function DELETE(
       }
     }
 
-    // Auto-complete: if book is PARTIAL and all remaining pages are now OK, mark as COMPLETED
-    if (book.status === BookStatus.PARTIAL) {
+    // Auto-complete: recompute status after the delete for any book past
+    // illustration (not just PARTIAL — removing a failed bridge page from a
+    // FAILED book must also un-wedge it). Upgrade-only: a delete can never
+    // make the remaining pages worse, so the only legal transition here is
+    // "every remaining page is OK" → COMPLETED.
+    if (book.status === BookStatus.PARTIAL || book.status === BookStatus.FAILED) {
       const remainingPages = await prisma.page.findMany({
         where: { bookId },
         select: { moderationStatus: true, generatedImageUrl: true, isTitlePage: true },
@@ -236,7 +241,7 @@ export async function DELETE(
           where: { id: bookId },
           data: { status: BookStatus.COMPLETED },
         });
-        logger.info({ bookId }, 'API: PARTIAL book auto-completed after removing flagged page');
+        logger.info({ bookId, previousStatus: book.status }, 'API: Book auto-completed after removing failed page');
       }
     }
 

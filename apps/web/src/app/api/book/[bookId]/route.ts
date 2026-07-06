@@ -2,8 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from '@/lib/db';
 import { z } from 'zod'; // Import Zod
-import { STORY_MOODS } from '@storywink/shared/constants';
+import { QUEUE_NAMES, STORY_MOODS } from '@storywink/shared/constants';
+import {
+  collectBookGeneratedPublicIds,
+  excludeSharedAssetIds,
+  bookGeneratedFolderPrefix,
+  type AssetCleanupJobPayload,
+} from '@storywink/shared';
+import { createBullMQConnection } from '@storywink/shared/redis';
+import { Queue } from 'bullmq';
 import logger from '@/lib/logger'; // Import logger
+
+// Lazy singleton for the asset-cleanup queue (the shared QueueName enum in
+// @/lib/queue predates this queue; workers resolve it via QUEUE_NAMES).
+let assetCleanupQueue: Queue | null = null;
+function getAssetCleanupQueue(): Queue {
+  if (!assetCleanupQueue) {
+    assetCleanupQueue = new Queue(QUEUE_NAMES.ASSET_CLEANUP, {
+      connection: createBullMQConnection(),
+    });
+  }
+  return assetCleanupQueue;
+}
 
 // Zod schema for additional characters in the story
 const additionalCharacterSchema = z.object({
@@ -87,9 +107,29 @@ export async function GET(
     }
 
     console.log(`Successfully fetched book ${bookId} with ${book.pages.length} pages including assets.`);
+
+    // Setup prefill: a returning parent's unnamed draft carries the child's
+    // name from their most recent book. Derived server-side so the setup
+    // page never needs a "list every book" fetch just to read one name.
+    // Only unnamed DRAFTs pay the extra query — every named or in-flight
+    // book skips it.
+    let childNameSuggestion: string | null = null;
+    if (!book.childName && book.status === 'DRAFT') {
+      const priorBook = await prisma.book.findFirst({
+        where: {
+          userId: dbUser.id,
+          id: { not: bookId },
+          childName: { not: null },
+        },
+        orderBy: { updatedAt: 'desc' },
+        select: { childName: true },
+      });
+      childNameSuggestion = priorBook?.childName ?? null;
+    }
+
     // You might want to conditionally return data based on status if needed
     // For preview, we generally want the data regardless of status to show progress/errors
-    return NextResponse.json(book, { status: 200 });
+    return NextResponse.json({ ...book, childNameSuggestion }, { status: 200 });
 
   } catch (error) {
     // Handle authentication errors
@@ -229,6 +269,63 @@ export async function DELETE(
       return NextResponse.json({ error: 'Missing bookId parameter' }, { status: 400 });
     }
 
+    // Photo-deletion pipeline: collect every Cloudinary public id this book
+    // owns BEFORE the rows cascade away — original photos (via Asset.publicId,
+    // minus any asset another book also references), generated illustrations,
+    // the cover render, and character sheets. If collection fails the request
+    // 500s WITHOUT deleting, so a retry can never leak photos silently.
+    const book = await prisma.book.findUnique({
+      where: {
+        id: bookId,
+        userId: dbUser.id, // Use database user ID for ownership check
+      },
+      select: {
+        coverAssetId: true,
+        coverImageUrl: true,
+        characterReferences: true,
+        pages: { select: { assetId: true, generatedImageUrl: true } },
+      },
+    });
+
+    if (!book) {
+      logger.warn({ clerkId, dbUserId: dbUser.id, bookId }, 'API: Book delete failed - Book not found or user does not own it.');
+      const bookExists = await prisma.book.findUnique({ where: { id: bookId }, select: { id: true } });
+      const status = bookExists ? 403 : 404;
+      const message = bookExists ? 'Permission denied' : 'Book not found';
+      return NextResponse.json({ error: message }, { status });
+    }
+
+    // Shared-asset guard: the create route accepts arbitrary owned assetIds,
+    // so another book (page photo or cover) may reference the same upload.
+    const candidateAssetIds = excludeSharedAssetIds(
+      [...book.pages.map((p) => p.assetId), book.coverAssetId],
+      [],
+    );
+    const [externalPages, externalCovers] = await Promise.all([
+      prisma.page.findMany({
+        where: { assetId: { in: candidateAssetIds }, bookId: { not: bookId } },
+        select: { assetId: true },
+      }),
+      prisma.book.findMany({
+        where: { coverAssetId: { in: candidateAssetIds }, id: { not: bookId } },
+        select: { coverAssetId: true },
+      }),
+    ]);
+    const deletableAssetIds = excludeSharedAssetIds(candidateAssetIds, [
+      ...externalPages.map((p) => p.assetId),
+      ...externalCovers.map((b) => b.coverAssetId),
+    ]);
+    const deletableAssets = await prisma.asset.findMany({
+      where: { id: { in: deletableAssetIds } },
+      select: { publicId: true },
+    });
+    const publicIds = Array.from(
+      new Set([
+        ...deletableAssets.map((a) => a.publicId),
+        ...collectBookGeneratedPublicIds(book),
+      ]),
+    );
+
     // Delete only if the authenticated user owns the book.
     // Relies on onDelete: Cascade to remove pages/related records.
     const deleteResult = await prisma.book.deleteMany({
@@ -244,6 +341,39 @@ export async function DELETE(
       const status = bookExists ? 403 : 404;
       const message = bookExists ? 'Permission denied' : 'Book not found';
       return NextResponse.json({ error: message }, { status });
+    }
+
+    // Enqueue AFTER the DB delete commits (the worker enforces or dry-runs
+    // per ASSET_CLEANUP_ENFORCE). The book folder prefix also catches renders
+    // superseded by QC rounds, which no row points at anymore. An enqueue
+    // failure must not fail the request — the book is already gone — but it
+    // is logged loudly because it means photos remain in Cloudinary.
+    try {
+      await getAssetCleanupQueue().add(
+        `cleanup-book-${bookId}`,
+        {
+          publicIds,
+          prefixes: [bookGeneratedFolderPrefix(bookId)],
+          reason: 'book_deleted',
+          userId: dbUser.id,
+          bookId,
+        } satisfies AssetCleanupJobPayload,
+        {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 10000 },
+          removeOnComplete: { count: 100 },
+          removeOnFail: { count: 500 },
+        },
+      );
+      logger.info(
+        { clerkId, dbUserId: dbUser.id, bookId, publicIdCount: publicIds.length },
+        'API: Asset cleanup enqueued for deleted book.',
+      );
+    } catch (queueError) {
+      logger.error(
+        { clerkId, dbUserId: dbUser.id, bookId, publicIdCount: publicIds.length, error: queueError },
+        'API: FAILED to enqueue asset cleanup — Cloudinary assets for this deleted book were NOT removed.',
+      );
     }
 
     logger.info({ clerkId, dbUserId: dbUser.id, bookId }, 'API: Book deleted successfully.');

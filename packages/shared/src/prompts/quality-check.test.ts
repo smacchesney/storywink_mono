@@ -76,3 +76,23 @@ describe('QC_RESPONSE_SCHEMA coverResult extension', () => {
     });
   });
 });
+
+describe('createQCPrompt bridge-page lines', () => {
+  it('is absent when no bridge ordinals are passed (flag-off / photo-only books)', () => {
+    const prompt = createQCPrompt(null, 8, 'en', {});
+    expect(prompt).not.toContain('WITHOUT a source photo');
+    expect(prompt).not.toContain('near-duplicate');
+  });
+
+  it('names the bridge pages by their PAGE-n presentation ordinals', () => {
+    const prompt = createQCPrompt(null, 8, 'en', { bridgePageOrdinals: [3, 7] });
+    expect(prompt).toContain('PAGE 3, PAGE 7');
+    expect(prompt).toContain('generated WITHOUT a source photo');
+  });
+
+  it('adds the strict-consistency and near-duplicate-composition instructions', () => {
+    const prompt = createQCPrompt(null, 8, 'en', { bridgePageOrdinals: [3], sheetCount: 1 });
+    expect(prompt).toContain('STRICTLY against the canonical description and the REFERENCE SHEET');
+    expect(prompt).toContain('near-duplicate of a neighboring page');
+  });
+});

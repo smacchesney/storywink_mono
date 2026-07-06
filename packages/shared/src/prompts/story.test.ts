@@ -77,3 +77,42 @@ describe('createStoryGenerationPrompt — cast rendering', () => {
     expect(text).not.toContain('SUPPORTING CAST');
   });
 });
+
+describe('createStoryGenerationPrompt — bridge pages (BRIDGE_PAGES_ENABLED)', () => {
+  const rosterInput: StoryGenerationInput = {
+    ...baseInput,
+    charactersInPhotos: [
+      { characterId: 'char-1', name: 'Emma', role: 'main_child', appearsOnPages: [1, 2] },
+      { characterId: 'char-2', name: 'Grandma', role: 'grandparent', appearsOnPages: [2] },
+    ],
+  };
+
+  it('renders NO bridge section without a cap (flag-off stays byte-identical)', () => {
+    expect(promptText(rosterInput)).not.toContain('BRIDGE PAGES');
+    expect(promptText({ ...rosterInput, bridgeCap: 0 })).not.toContain('BRIDGE PAGES');
+  });
+
+  it('renders NO bridge section when the roster carries no characterIds', () => {
+    const text = promptText({
+      ...baseInput,
+      bridgeCap: 2,
+      charactersInPhotos: [{ name: 'Grandma', role: 'grandparent', appearsOnPages: [2] }],
+    });
+    expect(text).not.toContain('BRIDGE PAGES');
+  });
+
+  it('renders the capped, roster-grounded section when enabled', () => {
+    const text = promptText({ ...rosterInput, bridgeCap: 2 });
+    expect(text).toContain('BRIDGE PAGES (optional — most books need ZERO)');
+    expect(text).toContain('up to 2 bridge page(s)');
+    expect(text).toContain('characterId "char-1" = Emma (main child)');
+    expect(text).toContain('characterId "char-2" = Grandma (grandparent)');
+    expect(text).toContain('At most ONE bridge per gap, and never before the first photo');
+    expect(text).toContain('"bridgePages" array');
+  });
+
+  it('states the trailing-bridge convention with the real page count', () => {
+    const text = promptText({ ...rosterInput, bridgeCap: 1 });
+    expect(text).toContain('(2 = after the last photo)');
+  });
+});

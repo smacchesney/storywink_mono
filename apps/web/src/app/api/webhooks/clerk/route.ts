@@ -5,6 +5,62 @@ import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
 import { NextResponse } from 'next/server';
 import { ensureUser } from '@/lib/db/ensureUser';
+import { Queue } from 'bullmq';
+import { QUEUE_NAMES } from '@storywink/shared/constants';
+import { createBullMQConnection } from '@storywink/shared/redis';
+import {
+  collectBookGeneratedPublicIds,
+  bookGeneratedFolderPrefix,
+  userUploadsFolderPrefix,
+  type AssetCleanupJobPayload,
+} from '@storywink/shared';
+
+// Lazy singleton for the asset-cleanup queue (the shared QueueName enum in
+// @/lib/queue predates this queue; workers resolve it via QUEUE_NAMES).
+let assetCleanupQueue: Queue | null = null;
+function getAssetCleanupQueue(): Queue {
+  if (!assetCleanupQueue) {
+    assetCleanupQueue = new Queue(QUEUE_NAMES.ASSET_CLEANUP, {
+      connection: createBullMQConnection(),
+    });
+  }
+  return assetCleanupQueue;
+}
+
+/**
+ * Everything a user owns in Cloudinary, collected while the rows still exist:
+ * every uploaded photo (Asset.publicId), every generated illustration, cover
+ * render, and character sheet across all their books, plus the scoped folder
+ * prefixes that catch strays (superseded QC renders, uploads never attached
+ * to a book). No shared-asset guard is needed — assets are user-scoped and
+ * every book of this user is being deleted.
+ */
+async function collectUserCloudinaryTargets(dbUserId: string) {
+  const [assets, books] = await Promise.all([
+    prisma.asset.findMany({ where: { userId: dbUserId }, select: { publicId: true } }),
+    prisma.book.findMany({
+      where: { userId: dbUserId },
+      select: {
+        id: true,
+        coverImageUrl: true,
+        characterReferences: true,
+        pages: { select: { generatedImageUrl: true } },
+      },
+    }),
+  ]);
+
+  const publicIds = new Set<string>(assets.map((a) => a.publicId));
+  for (const book of books) {
+    for (const id of collectBookGeneratedPublicIds(book)) publicIds.add(id);
+  }
+
+  const prefixes = [
+    userUploadsFolderPrefix(dbUserId),
+    ...books.map((b) => bookGeneratedFolderPrefix(b.id)),
+  ];
+
+  return { publicIds: Array.from(publicIds), prefixes };
+}
 
 // Ensure Clerk Webhook Secret is set in environment variables
 const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
@@ -102,11 +158,57 @@ export async function POST(req: Request) {
         
         if (deleted && deletedClerkId) { // Ensure it's a true deletion event and ID is present
             logger.info({ clerkUserId: deletedClerkId }, `Attempting to delete user based on clerkId...`);
+
+            // Photo-deletion pipeline: collect the user's Cloudinary content
+            // BEFORE the rows cascade away. If collection throws, the webhook
+            // 500s without deleting anything and Clerk retries — photos are
+            // never leaked by a half-run.
+            const dbUser = await prisma.user.findUnique({
+              where: { clerkId: deletedClerkId },
+              select: { id: true },
+            });
+            const cloudinaryTargets = dbUser
+              ? await collectUserCloudinaryTargets(dbUser.id)
+              : null;
+
             const deleteResult = await prisma.user.deleteMany({
               where: { clerkId: deletedClerkId },
             });
             if (deleteResult.count > 0) {
                 logger.info({ clerkUserId: deletedClerkId }, `User deleted successfully from DB.`);
+
+                // Enqueue AFTER the DB delete commits (the worker enforces or
+                // dry-runs per ASSET_CLEANUP_ENFORCE). An enqueue failure must
+                // not fail the webhook — the user row is already gone — but it
+                // is logged loudly because photos remain in Cloudinary.
+                if (dbUser && cloudinaryTargets) {
+                  try {
+                    await getAssetCleanupQueue().add(
+                      `cleanup-user-${dbUser.id}`,
+                      {
+                        publicIds: cloudinaryTargets.publicIds,
+                        prefixes: cloudinaryTargets.prefixes,
+                        reason: 'user_deleted',
+                        userId: dbUser.id,
+                      } satisfies AssetCleanupJobPayload,
+                      {
+                        attempts: 3,
+                        backoff: { type: 'exponential', delay: 10000 },
+                        removeOnComplete: { count: 100 },
+                        removeOnFail: { count: 500 },
+                      },
+                    );
+                    logger.info(
+                      { clerkUserId: deletedClerkId, dbUserId: dbUser.id, publicIdCount: cloudinaryTargets.publicIds.length },
+                      'Asset cleanup enqueued for deleted user.',
+                    );
+                  } catch (queueError) {
+                    logger.error(
+                      { clerkUserId: deletedClerkId, dbUserId: dbUser.id, publicIdCount: cloudinaryTargets.publicIds.length, error: queueError },
+                      'FAILED to enqueue asset cleanup — Cloudinary assets for this deleted user were NOT removed.',
+                    );
+                  }
+                }
             } else {
                 logger.warn({ clerkUserId: deletedClerkId }, `User deletion webhook (clerkId) received, but user not found in DB.`);
             }

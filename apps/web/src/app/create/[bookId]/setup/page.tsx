@@ -2,13 +2,11 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useAuth } from '@clerk/nextjs';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { BookStatus } from '@prisma/client';
 import { isValidStyle, StyleKey } from '@storywink/shared/prompts/styles';
-import { apiClient } from '@/lib/api-client';
 import SetupSheet, {
   SetupFormState,
 } from '@/components/create/setup/SetupSheet';
@@ -37,6 +35,8 @@ interface BookData {
   status: BookStatus;
   title: string;
   childName: string | null;
+  /** Server-derived from the parent's most recent book when this one is an unnamed draft. */
+  childNameSuggestion?: string | null;
   artStyle: string | null;
   eventSummary: string | null;
   captureQuestions: CaptureQuestion[] | null;
@@ -47,7 +47,6 @@ interface BookData {
 export default function SetupPage() {
   const params = useParams();
   const router = useRouter();
-  const { getToken } = useAuth();
   const t = useTranslations('setup');
   const bookId = params.bookId as string;
 
@@ -57,6 +56,9 @@ export default function SetupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showNameError, setShowNameError] = useState(false);
   const [generating, setGenerating] = useState(false);
+  // The name the server prefilled from the parent's most recent book —
+  // drives the "for {name} again!" line until the parent edits the field.
+  const [prefilledName, setPrefilledName] = useState<string | null>(null);
 
   const [form, setForm] = useState<SetupFormState>({
     childName: '',
@@ -154,23 +156,18 @@ export default function SetupPage() {
 
         mergeBook(book);
 
-        // Prefill child name from the parent's most recent other book.
-        if (!book.childName) {
-          const token = await getToken();
-          if (token && !cancelled && isMountedRef.current) {
-            const booksRes = await apiClient.getBooks(token);
-            const list =
-              (booksRes?.data as
-                | Array<{ id: string; childName: string | null }>
-                | undefined) ?? [];
-            const recent = list.find((b) => b.id !== bookId && b.childName);
-            if (recent?.childName && !touched.current.childName) {
-              setForm((prev) => ({
-                ...prev,
-                childName: recent.childName as string,
-              }));
-            }
-          }
+        // Prefill child name from the parent's most recent other book —
+        // server-derived (childNameSuggestion rides the same response), so
+        // no extra fetch. Still just a suggestion: fully editable, and the
+        // sheet shows a one-line "for {name} again!" while it stands.
+        if (
+          !book.childName &&
+          book.childNameSuggestion &&
+          !touched.current.childName
+        ) {
+          const suggestion = book.childNameSuggestion;
+          setPrefilledName(suggestion);
+          setForm((prev) => ({ ...prev, childName: suggestion }));
         }
       } catch (err) {
         if (!cancelled && isMountedRef.current) {
@@ -183,7 +180,7 @@ export default function SetupPage() {
     return () => {
       cancelled = true;
     };
-  }, [bookId, getToken, mergeBook, router]);
+  }, [bookId, mergeBook, router]);
 
   // Poll for perception fields until title/eventSummary/questions all land.
   // Perception normally lands within ~15-45s; cap the poll so a failed
@@ -354,6 +351,7 @@ export default function SetupPage() {
     <SetupSheet
       photos={photos}
       form={form}
+      prefilledName={prefilledName}
       titlePending={titlePending}
       hasEventSummary={hasEventSummary}
       isSubmitting={isSubmitting}

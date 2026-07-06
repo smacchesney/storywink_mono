@@ -1,4 +1,5 @@
 import pino from 'pino';
+import { providerNameForModel } from '../escalation.js';
 import { GeminiProvider } from './gemini.js';
 import { OpenAIProvider } from './openai.js';
 import type { IllustrationProvider, IllustrationProviderName } from './types.js';
@@ -45,4 +46,29 @@ export function getIllustrator(): IllustrationProvider {
     'Illustration provider selected',
   );
   return cachedProvider;
+}
+
+const escalationProviders = new Map<string, IllustrationProvider>();
+
+/**
+ * Returns a provider for a single escalated render (QC escalation ladder):
+ * gpt-* model ids run on OpenAI at quality medium; anything else is a Gemini
+ * model id passed straight through. Memoized per model id, independent of the
+ * default provider cache. Throws when the target provider's API key is
+ * missing — the caller falls back to the default illustrator.
+ */
+export function getEscalationIllustrator(model: string): IllustrationProvider {
+  const cached = escalationProviders.get(model);
+  if (cached) return cached;
+
+  const provider =
+    providerNameForModel(model) === 'openai'
+      ? new OpenAIProvider({ quality: 'medium' })
+      : new GeminiProvider({ modelId: model });
+  escalationProviders.set(model, provider);
+  logger.info(
+    { provider: provider.name, model: provider.modelId },
+    'Escalation illustration provider created',
+  );
+  return provider;
 }

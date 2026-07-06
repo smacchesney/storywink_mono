@@ -149,3 +149,15 @@ Append-only. One line per key: `namespace.key` — why it needs a native check.
 - `resolve.generatingTextCount` — rewritten without テキスト/生成 (あたらしい#ページのぶんしょうを書いています…); counter + plural-other check.
 - `resolve.reviewSubtitle` — Confirm tap removed; new line invites reading + optional editing (気になるところは編集してください).
 - `resolve.illustrateBook` — unified to イラストをつくる to match review.illustrateBook.
+- `pageMenu.removePage` / `removePageTitle` / `removePageBody` / `removeConfirm` / `pageRemoved` / `removeError` — bridge-page removal (app-authored pages); check 「けす」 register vs 「さくじょ」, and えいきょうしません naturalness.
+- `resolve.bridgeCouldntBeDrawn` — bridge fix-card framing ("we added this little page…"); check たした ページ phrasing for an app-authored page.
+- `resolve.tryDrawingAgain` — bridge primary action (もういちど かく); check it reads as "draw again", not "write again" (かく ambiguity — may want えを かきなおす).
+- `resolve.bridgeRedrawStarted` / `bridgeRedrawError` — redraw progress/failure lines; かきなおしています register check.
+- `review.bridgePlaceholder` — imageless bridge card at review; quotes the イラストをつくる button label — verify it stays in sync if that label changes.
+- `setup.childNameAgain` — prefilled-name confirmation line (また {name}の えほんですね！); {name} is parent-entered (often kanji) inside a hiragana line — check の attachment, and that ですね register isn't presumptuous when the new book is for a different child.
+- `email.readyCompletedSubject` — ready-email subject (「{title}」ができあがりました); lives in apps/workers/src/lib/email.helpers.ts, not next-intl; parent-facing standard polite register, check with a kanji title inside 「」.
+- `email.readyCompletedBody` — ready-email body (すべてのページにイラストが入りました。ひらいてみてください。); check イラストが入りました phrasing and the invitation softness.
+- `email.readyPartialSubject` — PARTIAL variant subject (「{title}」が読めるようになりました); must promise readable-now without claiming finished.
+- `email.readyPartialBody` — PARTIAL body (いくつかのページは、あとすこしで完成します。アプリからかんたんに仕上げられます。); check 仕上げられます isn't stiff and the line doesn't over-promise auto-fixing.
+- `email.readyButton` — the single coral button (えほんをひらく); mirrors reveal.open.
+- `email.readyFooter` — footer line (Storywink.ai より); check より reads as a warm sign-off, not a formal letter closing.

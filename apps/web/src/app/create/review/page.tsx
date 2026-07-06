@@ -21,6 +21,7 @@ type PageData = {
   pageNumber: number; // Added pageNumber field
   generatedImageUrl?: string | null; // Populated after illustration
   isTitlePage?: boolean; // Add a flag for easy identification
+  source?: string; // 'PHOTO' | 'BRIDGE' — bridge pages get a branded imageless placeholder
   moderationStatus?: string;
   moderationReason?: string | null;
 };
@@ -116,11 +117,12 @@ function ReviewPageContent() {
             const mappedPages: PageData[] = sortedPages.map((p: Page) => ({
               id: p.id,
               text: p.text,
-              originalImageUrl: p.originalImageUrl, 
+              originalImageUrl: p.originalImageUrl,
               assetId: p.assetId,
               generatedImageUrl: p.generatedImageUrl,
               isTitlePage: p.isTitlePage || false,
               pageNumber: p.pageNumber,
+              source: p.source,
               moderationStatus: p.moderationStatus,
               moderationReason: p.moderationReason
             }));
@@ -204,7 +206,7 @@ function ReviewPageContent() {
                   const fetchedBook = await contentRes.json();
                   if (!isMountedRef.current) return;
                   if (fetchedBook.pages) {
-                      const updatedPageData: PageData[] = fetchedBook.pages.map((p: Page) => ({ 
+                      const updatedPageData: PageData[] = fetchedBook.pages.map((p: Page) => ({
                           id: p.id || undefined,
                           text: p.text || '',
                           originalImageUrl: p.originalImageUrl,
@@ -212,6 +214,7 @@ function ReviewPageContent() {
                           pageNumber: p.pageNumber,
                           generatedImageUrl: p.generatedImageUrl || null,
                           isTitlePage: p.isTitlePage || false,
+                          source: p.source,
                           moderationStatus: p.moderationStatus,
                           moderationReason: p.moderationReason
                       }));
@@ -473,6 +476,7 @@ function ReviewPageContent() {
           text={currentPageData?.text}
           pageNumber={currentIndex + 1}
           isTitlePage={isTitlePageSelected}
+          source={currentPageData?.source}
           moderationStatus={currentPageData?.moderationStatus}
           moderationReason={currentPageData?.moderationReason}
           isSaving={isSavingPage}

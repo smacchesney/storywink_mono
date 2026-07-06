@@ -13,6 +13,9 @@ import { trackEvent } from '@storywink/shared';
 import { computeBookStatus } from '../lib/computeBookStatus.js';
 import { mapQcResultsToPages, RawQcPageResult } from '../lib/qc-mapping.js';
 import { characterSheetsEnabled, sheetRefsForStyle } from '../lib/character-sheets.js';
+import { escalationModel, illustrationEscalationEnabled, shouldEscalate } from '../lib/escalation.js';
+import { maybeSendReadyEmail } from '../lib/email.js';
+import { normalizeBookPalette, paletteNormalizeEnabled } from '../lib/palette.js';
 import { generateAndStoreCover } from '../lib/cover-generation.js';
 import { fetchImageInput, resizeForReference } from '../lib/images.js';
 import { ANALYSIS_MODEL } from '../config/models.js';
@@ -516,10 +519,24 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
           const nextRound = qcRound + 1;
           qcResult.qcRound = nextRound;
 
+          // ESCALATION LADDER (ILLUSTRATION_ESCALATION_ENABLED): the final
+          // re-render round is the book's last chance, so it runs on the
+          // stronger escalation model instead of re-rolling the same dice.
+          // Marker rides in job data; keep-old-image semantics are untouched
+          // (an escalated failure still leaves the previous render in place).
+          const escalationModelId = shouldEscalate(
+            nextRound,
+            MAX_QC_ROUNDS,
+            illustrationEscalationEnabled(),
+          )
+            ? escalationModel()
+            : null;
+
           logger.info({
             bookId,
             qcRound: nextRound,
             failedPages: qcResult.failedPageIds.length,
+            ...(escalationModelId ? { escalationModel: escalationModelId } : {}),
           }, 'QC failed — re-queuing failed pages for re-illustration');
 
           console.log(`[BookFinalize/QC] QC round ${nextRound} failed for book ${bookId} — re-queuing ${qcResult.failedPageIds.length} pages`);
@@ -578,6 +595,9 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
               ...(sheets.length ? { characterSheets: sheets } : {}),
               qcRound: nextRound,
               qcFeedback,
+              // Final-round escalation: the illustration worker honors this
+              // model override for exactly this one re-render.
+              ...(escalationModelId ? { escalation: { model: escalationModelId } } : {}),
             },
             opts: {
               attempts: 5,
@@ -613,6 +633,23 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
             console.log(`[BookFinalize/QC] Re-illustration flow created for book ${bookId} (QC round ${nextRound})`);
             console.log(`  - Re-illustrating: ${pageChildren.length} pages`);
             console.log(`  - Flow Job ID: ${flow.job.id}`);
+
+            // One event per escalated page — the telemetry that says whether
+            // the ladder earns its cost (trackEvent never throws).
+            if (escalationModelId) {
+              for (const { page } of failedPagesData) {
+                await trackEvent(
+                  prisma,
+                  {
+                    name: 'qc_escalated',
+                    userId,
+                    bookId,
+                    props: { pageId: page.id, model: escalationModelId },
+                  },
+                  logger,
+                );
+              }
+            }
           } finally {
             await flowProducer.close();
           }
@@ -641,6 +678,27 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
       }
     } else if (finalStatus === 'COMPLETED' && qcRound >= MAX_QC_ROUNDS) {
       console.log(`[BookFinalize/QC] Max QC rounds (${MAX_QC_ROUNDS}) reached for book ${bookId} — accepting current quality`);
+    }
+
+    // PALETTE_NORMALIZE_ENABLED: with the QC gate cleared and no requeue
+    // pending, nudge every page render toward the title-page palette (40%
+    // channel-mean/std transfer). Full runs only — a scoped run's siblings
+    // were already normalized, and re-normalizing compounds the transfer.
+    // Never fatal; hard 60s budget inside.
+    if (finalStatus === 'COMPLETED' && !isScopedRun && paletteNormalizeEnabled()) {
+      await setGenerationPhase(bookId, 'finishing');
+      await normalizeBookPalette({
+        bookId,
+        artStyle: book.artStyle,
+        coverAssetId: book.coverAssetId,
+        pages: book.pages.map((p: any) => ({
+          id: p.id,
+          pageNumber: p.pageNumber,
+          assetId: p.assetId,
+          generatedImageUrl: p.generatedImageUrl,
+        })),
+        logger,
+      });
     }
 
     // Update book status (reset qcRound on completion so it's clean for
@@ -685,6 +743,18 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
       },
     });
     logger.info({ bookId, userId, type: `BOOK_${finalStatus}` }, 'Created notification for book completion');
+
+    // READY_EMAIL_ENABLED: one email per book (COMPLETED and PARTIAL
+    // variants; FAILED never mails). Idempotent via an AppEvent guard and
+    // never throws — email trouble must not fail the finalize job.
+    await maybeSendReadyEmail({
+      bookId,
+      userId,
+      status: finalStatus,
+      title: book.title,
+      language: book.language || 'en',
+      logger,
+    });
 
     await trackEvent(
       prisma,

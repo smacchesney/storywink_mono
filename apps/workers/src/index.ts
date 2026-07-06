@@ -93,6 +93,11 @@ import { processBookReaper } from './workers/book-reaper.worker.js';
 import { REAPER_INTERVAL_MS } from './workers/book-reaper.helpers.js';
 import { processLuluStatusPoll } from './workers/lulu-status-poll.worker.js';
 import { LULU_POLL_INTERVAL_MS } from './workers/lulu-status-poll.helpers.js';
+import { processAssetCleanup } from './workers/asset-cleanup.worker.js';
+import {
+  DRAFT_SWEEP_JOB_NAME,
+  DRAFT_SWEEP_INTERVAL_MS,
+} from './workers/asset-cleanup.helpers.js';
 import { getIllustrator } from './lib/illustrators/index.js';
 
 // CRITICAL: Pre-load and validate STYLE_LIBRARY before processing any jobs
@@ -274,6 +279,16 @@ const luluStatusPollWorker = new Worker(
   }
 );
 
+const assetCleanupWorker = new Worker(
+  QUEUE_NAMES.ASSET_CLEANUP,
+  processAssetCleanup,
+  {
+    connection: redis,
+    concurrency: 1, // serializes the draft sweep with deletion jobs
+    lockDuration: 300000, // 5 minutes: large accounts mean many Admin API calls
+  }
+);
+
 // Repeatable schedule for the stuck-book reaper. upsertJobScheduler is
 // idempotent across restarts/redeploys (same scheduler id replaces the old
 // schedule), so every boot converges on one sweep per interval.
@@ -325,6 +340,34 @@ luluStatusPollQueue
     // Scheduling failure must not crash the other workers; the next deploy or
     // restart retries the upsert.
     logger.error({ error: err.message }, 'Failed to schedule Lulu status poll');
+  });
+
+// Repeatable schedule for the draft-retention sweep (same idempotent
+// upsertJobScheduler pattern as the reaper above). The sweep job shares the
+// asset-cleanup queue with enqueued deletion jobs; the processor branches on
+// the job name.
+const assetCleanupQueue = new Queue(QUEUE_NAMES.ASSET_CLEANUP, {
+  connection: createBullMQConnection(),
+});
+assetCleanupQueue
+  .upsertJobScheduler(
+    'draft-retention-sweep-schedule',
+    { every: DRAFT_SWEEP_INTERVAL_MS },
+    {
+      name: DRAFT_SWEEP_JOB_NAME,
+      opts: {
+        removeOnComplete: { count: 24 },
+        removeOnFail: { count: 50 },
+      },
+    }
+  )
+  .then(() => {
+    logger.info({ everyMs: DRAFT_SWEEP_INTERVAL_MS }, 'Draft retention sweep scheduled');
+  })
+  .catch((err: Error) => {
+    // Scheduling failure must not crash the other workers; the next deploy or
+    // restart retries the upsert.
+    logger.error({ error: err.message }, 'Failed to schedule draft retention sweep');
   });
 
 // Worker event handlers
@@ -620,6 +663,28 @@ luluStatusPollWorker.on('failed', (job, err) => {
   logger.error({ jobId: job?.id, error: err.message }, 'Lulu status poll sweep job failed');
 });
 
+// Asset Cleanup Worker event handlers
+assetCleanupWorker.on('completed', (job) => {
+  logger.info({ jobId: job.id, jobName: job.name, result: job.returnvalue }, 'Asset cleanup job completed');
+});
+
+assetCleanupWorker.on('failed', (job, err) => {
+  // Deletion jobs rethrow Cloudinary API errors so BullMQ retries them; the
+  // sweep swallows its own errors, so sweep failures here are infra-level.
+  logger.error(
+    {
+      jobId: job?.id,
+      jobName: job?.name,
+      bookId: job?.data?.bookId,
+      userId: job?.data?.userId,
+      reason: job?.data?.reason,
+      attempts: job?.attemptsMade,
+      error: err.message,
+    },
+    'Asset cleanup job failed',
+  );
+});
+
 // Graceful shutdown
 const shutdown = async () => {
   logger.info('Shutting down workers...');
@@ -634,6 +699,8 @@ const shutdown = async () => {
   await bookReaperQueue.close();
   await luluStatusPollWorker.close();
   await luluStatusPollQueue.close();
+  await assetCleanupWorker.close();
+  await assetCleanupQueue.close();
   await redis.quit();
 
   process.exit(0);

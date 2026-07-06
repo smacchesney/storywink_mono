@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { MoreVertical, Pencil, Sparkles, ImageIcon, Loader2 } from 'lucide-react';
+import { MoreVertical, Pencil, Sparkles, ImageIcon, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Page } from '@prisma/client';
 import { Button } from '@/components/ui/button';
@@ -39,7 +39,9 @@ interface PageControlsMenuProps {
  * The per-page power menu on the preview: edit the page's story text inline,
  * request a fresh illustration, or swap the photo. Text and re-illustration
  * work end to end here; "change photo" routes to the resolve flow (which owns
- * the replace-photo + re-render mechanics).
+ * the replace-photo + re-render mechanics). Bridge pages (source=BRIDGE,
+ * app-authored) additionally get "Remove this page" — the one-tap decline for
+ * content the parent never chose.
  */
 export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: PageControlsMenuProps) {
   const t = useTranslations('pageMenu');
@@ -48,6 +50,12 @@ export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: Pa
   const [text, setText] = useState(page.text ?? '');
   const [isSavingText, setIsSavingText] = useState(false);
   const [isReillustrating, setIsReillustrating] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+
+  // Bridge pages are app-authored — the parent gets a one-tap decline.
+  // Photo pages are never removable from here (their photos are the book).
+  const isBridgePage = page.source === 'BRIDGE';
 
   useEffect(() => {
     setText(page.text ?? '');
@@ -70,6 +78,22 @@ export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: Pa
       toast.error(t('textSaveError'));
     } finally {
       setIsSavingText(false);
+    }
+  };
+
+  const handleRemovePage = async () => {
+    if (isRemoving) return;
+    setIsRemoving(true);
+    try {
+      const res = await fetch(`/api/book/${bookId}/page/${page.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('remove failed');
+      toast.success(t('pageRemoved'));
+      setRemoveOpen(false);
+      onMutated();
+    } catch {
+      toast.error(t('removeError'));
+    } finally {
+      setIsRemoving(false);
     }
   };
 
@@ -127,8 +151,39 @@ export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: Pa
               {t('changePhoto')}
             </DropdownMenuItem>
           )}
+          {isBridgePage && (
+            <DropdownMenuItem
+              onClick={() => setRemoveOpen(true)}
+              className="text-red-600 focus:text-red-600"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {t('removePage')}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <Dialog open={removeOpen} onOpenChange={setRemoveOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-playful">{t('removePageTitle')}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{t('removePageBody')}</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveOpen(false)} disabled={isRemoving}>
+              {t('cancel')}
+            </Button>
+            <Button
+              onClick={handleRemovePage}
+              disabled={isRemoving}
+              className="bg-red-600 font-playful text-white hover:bg-red-700"
+            >
+              {isRemoving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {t('removeConfirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-md">

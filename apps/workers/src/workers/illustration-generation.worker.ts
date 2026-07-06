@@ -1,11 +1,14 @@
 import { Job } from 'bullmq';
 import prisma from '../database/index.js';
 import { IllustrationGenerationJobV2 } from '@storywink/shared/types';
-import { getIllustrator } from '../lib/illustrators/index.js';
+import { getEscalationIllustrator, getIllustrator } from '../lib/illustrators/index.js';
 import type { IllustrationInput } from '../lib/illustrators/index.js';
+import type { EscalationJobFields } from '../lib/escalation.js';
 import { v2 as cloudinary } from 'cloudinary';
 import pino from 'pino';
 import { createIllustrationPrompt, IllustrationPromptOptions } from '@storywink/shared/prompts/illustration';
+import type { BridgeScene } from '@storywink/shared/prompts/story';
+import { resolveBridgeAnchor } from '../lib/bridge-pages.js';
 // Import STYLE_LIBRARY directly from styles module to avoid barrel export race condition
 import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
@@ -133,9 +136,29 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       throw new Error('Missing required job data: bookId, pageId, or userId');
     }
 
-    const illustrator = getIllustrator();
+    // QC escalation (ILLUSTRATION_ESCALATION_ENABLED): finalize marks a
+    // page's FINAL re-render with a model override. Honor it for this render
+    // only; a missing API key for the escalation provider degrades to the
+    // default illustrator rather than failing the page.
+    const escalation = (job.data as IllustrationGenerationJobV2 & EscalationJobFields).escalation;
+    let illustrator = getIllustrator();
+    if (escalation?.model) {
+      try {
+        illustrator = getEscalationIllustrator(escalation.model);
+        console.log(`[IllustrationWorker] QC escalation for page ${pageNumber}: rendering on ${illustrator.name}/${illustrator.modelId}`);
+        logger.info(
+          { jobId: job.id, pageId, pageNumber, provider: illustrator.name, model: illustrator.modelId },
+          'Escalated re-render — using escalation model override',
+        );
+      } catch (escalationError: any) {
+        logger.warn(
+          { jobId: job.id, pageId, pageNumber, model: escalation.model, error: escalationError.message },
+          'Escalation provider unavailable — falling back to default illustrator',
+        );
+      }
+    }
 
-    logger.info({ 
+    logger.info({
       jobId: job.id, 
       userId, 
       bookId, 
@@ -172,12 +195,51 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     
     let contentImageBuffer: Buffer | null = null;
     let contentImageMimeType: string | null = null;
-    
+
+    // BRIDGE pages: the DB row is the single source of truth. Branching on
+    // page.source (never job data) keeps every enqueuer correct for free —
+    // the QC requeue path in book-finalize builds child jobs directly and
+    // carries no bridge fields, and scoped reillustrate does the same.
+    const isBridgePage = page.source === 'BRIDGE';
+    const bridgeScene = isBridgePage
+      ? (page.bridgeScene as unknown as BridgeScene | null)
+      : null;
+
     // Anchor the generation to the same 2048 vision-normalized URL that
     // extraction and QC see (also converts HEIC, which the raw asset URL may
     // be, and caps a tiny thumbnailUrl fallback from silently anchoring the
     // page). Three pipeline stages must look at the same version of the photo.
-    const rawAnchorUrl = page.asset?.url || page.asset?.thumbnailUrl;
+    let rawAnchorUrl = page.asset?.url || page.asset?.thumbnailUrl;
+
+    // A bridge page has no photo of its own — ALWAYS resolve the anchor
+    // (nearest preceding, else following, PHOTO page's asset) from the DB at
+    // execution time. Any anchor in job data would be at most a stale cache.
+    if (isBridgePage) {
+      const photoPages = await prisma.page.findMany({
+        where: { bookId, source: 'PHOTO', assetId: { not: null } },
+        orderBy: { pageNumber: 'asc' },
+        select: {
+          pageNumber: true,
+          source: true,
+          asset: { select: { url: true, thumbnailUrl: true } },
+        },
+      });
+      const anchor = resolveBridgeAnchor(
+        photoPages.map(p => ({
+          pageNumber: p.pageNumber,
+          source: p.source,
+          assetUrl: p.asset?.url || p.asset?.thumbnailUrl || null,
+        })),
+        page.pageNumber,
+      );
+      rawAnchorUrl = anchor?.assetUrl ?? undefined;
+      console.log(`[IllustrationWorker] Bridge page ${pageNumber}: anchoring to photo page ${anchor?.pageNumber ?? 'NONE'}`);
+      logger.info(
+        { jobId: job.id, pageId, pageNumber, anchorPageNumber: anchor?.pageNumber ?? null },
+        'Bridge page — resolved anchor photo from DB',
+      );
+    }
+
     const originalImageUrl = rawAnchorUrl
       ? optimizeCloudinaryUrlForVision(convertHeicToJpeg(rawAnchorUrl))
       : undefined;
@@ -363,6 +425,9 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         pageNumber: pageNumber,
         qcFeedback: qcFeedback || null,
         characterSheetCount: sheetRefs.length,
+        // Bridge pages: re-roles image 1 (anchor photo, not this page's
+        // scene) and filters identity by scene.charactersPresent.
+        bridgeScene,
     };
     
     logger.info({ jobId: job.id, pageId, promptInput }, "Constructed promptInput for createIllustrationPrompt");

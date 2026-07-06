@@ -13,6 +13,12 @@ interface PageCardProps {
   text: string | null;
   pageNumber: number;
   isTitlePage: boolean;
+  /**
+   * Page.source — 'BRIDGE' pages are app-authored connectors with no photo,
+   * so the null-image fallback explains them instead of showing a bare
+   * "Page N" placeholder.
+   */
+  source?: string;
   moderationStatus?: string;
   moderationReason?: string | null;
   isSaving: boolean;
@@ -26,12 +32,16 @@ interface PageCardProps {
  * PageCard displays a single page with its image and text
  * Provides editing functionality; "Save changes" writes the text through.
  */
+const MASCOT_URL =
+  'https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.58.09_PM_gnknk5.png';
+
 const PageCard = ({
   id: _id,
   imageUrl,
   text,
   pageNumber,
   isTitlePage,
+  source,
   moderationStatus,
   moderationReason: _moderationReason,
   isSaving,
@@ -91,6 +101,16 @@ const PageCard = ({
             className="object-contain"
             priority={pageNumber < 3}
           />
+        ) : source === 'BRIDGE' ? (
+          // Bridge pages have no photo before illustration — the branded
+          // fallback explains the page the app added instead of showing a
+          // blank "Page N" card.
+          <div className="w-full h-full flex flex-col items-center justify-center gap-3 rounded-md border-2 border-dashed border-coral/40 bg-coral/5 px-6 text-center">
+            <Image src={MASCOT_URL} alt="" width={56} height={56} className="h-14 w-14" />
+            <span className="font-playful text-sm text-gray-700">
+              {t('bridgePlaceholder')}
+            </span>
+          </div>
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <span className="text-2xl font-semibold text-muted-foreground">

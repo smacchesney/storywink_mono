@@ -169,3 +169,75 @@ describe('role-labeled reference ordering (character sheets)', () => {
     expect(prompt).toContain("image 3 is the book's approved interior illustration of this same scene");
   });
 });
+
+describe('bridge prompt variant (source=BRIDGE pages)', () => {
+  const bridgeScene = {
+    location: 'the sandy path to the beach',
+    timeOfDay: 'morning',
+    action: 'marching down the path, bucket swinging',
+    charactersPresent: ['child_1'],
+    outfitFrom: 'previous' as const,
+    props: ['red bucket'],
+  };
+
+  const bridgePrompt = createIllustrationPrompt({
+    style: 'vignette',
+    pageText: 'Almost there, almost there!',
+    bookTitle: "Aria's Big Day",
+    isTitlePage: false,
+    referenceImageCount: 3,
+    characterIdentity,
+    pageNumber: 4, // a bridge's own pageNumber never matches appearsOnPages
+    bridgeScene,
+  });
+
+  it('is absent from ordinary photo pages', () => {
+    const photoPrompt = createIllustrationPrompt({
+      style: 'vignette',
+      pageText: 'Aria spun in the sunshine.',
+      bookTitle: "Aria's Big Day",
+      isTitlePage: false,
+      referenceImageCount: 3,
+      characterIdentity,
+      pageNumber: 3,
+    });
+    expect(photoPrompt).not.toContain('BRIDGE PAGE');
+    expect(photoPrompt).not.toContain('do NOT copy its pose');
+  });
+
+  it('re-roles image 1: same people moments later, never a pose to copy', () => {
+    expect(bridgePrompt).toContain('BRIDGE PAGE — THIS PAGE HAS NO PHOTO OF ITS OWN');
+    expect(bridgePrompt).toContain('the same people moments later');
+    expect(bridgePrompt).toContain('do NOT copy its pose');
+    expect(bridgePrompt).toContain('DEPICT THIS NEW MOMENT INSTEAD: marching down the path, bucket swinging');
+    expect(bridgePrompt).toContain('Location: the sandy path to the beach');
+    expect(bridgePrompt).toContain('red bucket');
+  });
+
+  it('keeps the PEOPLE - SOURCE HIERARCHY block verbatim', () => {
+    expect(bridgePrompt).toContain('PEOPLE - SOURCE HIERARCHY (non-negotiable)');
+  });
+
+  it('filters the identity section by scene.charactersPresent instead of appearsOnPages', () => {
+    // child_1 is present per the scene (appearsOnPages could never match a
+    // bridge pageNumber); adult_1 is not in the scene and must be excluded.
+    expect(bridgePrompt).toContain('Aria (main_child)');
+    expect(bridgePrompt).not.toContain('Ben (parent)');
+  });
+
+  it('falls back to the photo-page identity filter when no authored id resolves', () => {
+    const stalePrompt = createIllustrationPrompt({
+      style: 'vignette',
+      pageText: 'Almost there!',
+      bookTitle: "Aria's Big Day",
+      isTitlePage: false,
+      referenceImageCount: 3,
+      characterIdentity,
+      pageNumber: 4,
+      bridgeScene: { ...bridgeScene, charactersPresent: ['gone_id'] },
+    });
+    // Roster re-extracted since the story ran: main character still rides
+    // along via the main-role rule rather than losing the identity block.
+    expect(stalePrompt).toContain('Aria (main_child)');
+  });
+});
