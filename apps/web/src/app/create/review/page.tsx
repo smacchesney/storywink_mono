@@ -158,9 +158,10 @@ function ReviewPageContent() {
            throw new Error(`Book status is ${fetchedBook.status}, but no pages were loaded.`);
         }
       } catch (error) {
+        // Raw error text goes to the log, never to the parent.
         console.error("Error fetching initial review data:", error);
         if (isMountedRef.current) {
-          toast.error(t('errorLoadingReviewData', { error: error instanceof Error ? error.message : String(error) }));
+          toast.error(t('errorLoadingReviewData'));
           // Optionally redirect or show a persistent error state
         }
       } finally {
@@ -184,7 +185,7 @@ function ReviewPageContent() {
       if (!isMountedRef.current) return;
       if (!statusRes.ok) {
         const errorText = await statusRes.text().catch(() => `HTTP error ${statusRes.status}`);
-        throw new Error(t('errorFetchingStatus', { error: errorText }));
+        throw new Error(errorText);
       }
       const statusData = await statusRes.json();
       if (!isMountedRef.current) return;
@@ -223,10 +224,11 @@ function ReviewPageContent() {
                       throw new Error("Fetched book content missing pages data.");
                   }
               } catch (contentError) {
+                  // Raw error text goes to the log, never to the parent.
                   console.error("Error fetching or processing book content:", contentError);
                   if (isMountedRef.current) {
                       setIsLoadingText(false);
-                      toast.error(t('errorLoadingContent', { error: contentError instanceof Error ? contentError.message : String(contentError) }));
+                      toast.error(t('errorCheckingStatus'));
                   }
               }
           } else {
@@ -244,12 +246,13 @@ function ReviewPageContent() {
           console.log("Still generating text, continuing poll...");
       }
     } catch (error) {
+      // Raw error text goes to the log, never to the parent.
       console.error("Text polling error:", error);
       if (textPollingIntervalRef.current) clearInterval(textPollingIntervalRef.current);
-      if (isMountedRef.current) { 
-          setNeedsTextPolling(false); 
+      if (isMountedRef.current) {
+          setNeedsTextPolling(false);
           setIsLoadingText(false);
-          toast.error(t('errorCheckingStatus', { error: error instanceof Error ? error.message : String(error) }));
+          toast.error(t('errorCheckingStatus'));
       }
     }
   }, [bookIdFromUrl, needsTextPolling, isLoadingText]); // <-- Update dependencies
@@ -325,23 +328,18 @@ function ReviewPageContent() {
     });
   };
 
-  // Toggle confirmation per page
-  const toggleConfirm = async () => {
+  // Persist a page's text. Called by PageCard's "Save changes" — the old
+  // per-page Confirm tap is gone, so saving an edit is what writes through.
+  const savePage = async (text: string) => {
     const currentPage = pages[currentIndex];
     const bookIdToUse = bookIdFromUrl;
 
-    // No bookId or trying to confirm non-existent page index
-    if (!bookIdToUse || !currentPage) { 
-        toast.error(t('cannotConfirm'));
-        return; 
-    }
-    
-    // Skip if already confirmed
-    if (confirmed[currentIndex]) {
+    // No bookId or a non-existent page index — nothing to save against.
+    if (!bookIdToUse || !currentPage) {
+      console.error('Save requested without a book or page in state.');
       return;
     }
-    
-    // --- Save and Confirm ---
+
     setIsSavingPage(true);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -350,7 +348,7 @@ function ReviewPageContent() {
       const response = await fetch(`/api/book/${bookIdToUse}/page/${currentPage.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: currentPage.text || '', textConfirmed: true }),
+        body: JSON.stringify({ text, textConfirmed: true }),
         signal: controller.signal,
       });
 
@@ -359,24 +357,17 @@ function ReviewPageContent() {
         throw new Error(errorData.error || `Failed to save (Status: ${response.status})`);
       }
 
-      // Mark as confirmed locally
+      // Mark as saved locally
       setConfirmed(arr => {
         const copy = [...arr];
         copy[currentIndex] = true;
         return copy;
       });
 
-      // Auto-advance to next page after confirmation if not on last page
-      if (currentIndex < pages.length - 1) {
-        goNext();
-      }
-
     } catch (error) {
+      // Raw error text goes to the log, never to the parent.
       console.error("Error saving page:", error);
-      const message = error instanceof DOMException && error.name === 'AbortError'
-        ? t('saveTimeout')
-        : error instanceof Error ? error.message : String(error);
-      toast.error(message);
+      toast.error(t('saveTimeout'));
     } finally {
        clearTimeout(timeoutId);
        if (isMountedRef.current) {
@@ -418,9 +409,10 @@ function ReviewPageContent() {
         router.push(`/create/${bookIdToUse}/setup`);
 
      } catch (error) {
+        // Raw error text goes to the log, never to the parent.
         console.error("Error initiating illustration generation:", error);
         if (isMountedRef.current) {
-           toast.error(t('errorStartingIllustration', { error: error instanceof Error ? error.message : String(error) }));
+           toast.error(t('errorStartingIllustration'));
            setIsStartingIllustration(false);
         }
      }
@@ -481,13 +473,12 @@ function ReviewPageContent() {
           text={currentPageData?.text}
           pageNumber={currentIndex + 1}
           isTitlePage={isTitlePageSelected}
-          isConfirmed={confirmed[currentIndex]}
           moderationStatus={currentPageData?.moderationStatus}
           moderationReason={currentPageData?.moderationReason}
           isSaving={isSavingPage}
           bookId={bookIdFromUrl || ''}
           onTextChange={handleTextChange}
-          onConfirm={toggleConfirm}
+          onSave={savePage}
         />
       </div>
       
@@ -509,7 +500,7 @@ function ReviewPageContent() {
 export default function ReviewPage() {
   const t = useTranslations('review');
   return (
-    <Suspense fallback={<div className="p-6 flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin mr-2" /> {t('loadingReviewPage')}</div>}>
+    <Suspense fallback={<div className="p-6 flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin mr-2" /> {t('loadingReviewData')}</div>}>
       <ReviewPageContent />
     </Suspense>
   );

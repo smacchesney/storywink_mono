@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Camera, Loader2 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import { useTranslations, useLocale } from 'next-intl';
 import { apiClient } from '@/lib/api-client';
+import { track } from '@/lib/track';
 import logger from '@/lib/logger';
 import { BOOK_CONSTRAINTS } from '@storywink/shared';
 import type { BookLanguage } from '@storywink/shared/schemas';
@@ -29,6 +30,11 @@ export default function CreateBookPage() {
 
   const trayRef = useRef<PhotoTrayHandle>(null);
 
+  // Funnel telemetry: the create journey starts when this page mounts.
+  useEffect(() => {
+    track('create_started');
+  }, []);
+
   const handleAssetsChange = useCallback((next: UploadedAsset[]) => {
     setAssets(next);
     setPendingCount(trayRef.current?.pendingCount() ?? 0);
@@ -40,12 +46,15 @@ export default function CreateBookPage() {
 
   // Wait (poll) until no tile is still uploading, so Continue never drops
   // in-flight photos. Caps at ~60s to avoid hanging on a wedged upload.
-  const waitForUploads = useCallback(async () => {
+  // Returns how many photos were still pending when we gave up, so the
+  // parent hears about anything left behind instead of silence.
+  const waitForUploads = useCallback(async (): Promise<number> => {
     const start = Date.now();
     while (trayRef.current?.hasPending()) {
       if (Date.now() - start > 60_000) break;
       await new Promise((r) => setTimeout(r, 300));
     }
+    return trayRef.current?.pendingCount() ?? 0;
   }, []);
 
   const handleContinue = useCallback(async () => {
@@ -56,7 +65,10 @@ export default function CreateBookPage() {
     }
     setIsCreating(true);
     try {
-      await waitForUploads();
+      const leftBehind = await waitForUploads();
+      if (leftBehind > 0) {
+        toast.warning(t('photosLeftBehind', { count: leftBehind }));
+      }
 
       const finalAssets = trayRef.current?.getUploadedAssets() ?? assets;
       const assetIds = finalAssets.map((a) => a.id);
@@ -80,10 +92,9 @@ export default function CreateBookPage() {
       const bookId = (response.data as { id: string }).id;
       router.push(`/create/${bookId}/setup`);
     } catch (err) {
+      // Raw error text goes to the log, never to the parent.
       logger.error({ err }, 'Book creation failed');
-      toast.error(
-        `${t('createFailed')}: ${err instanceof Error ? err.message : 'Unknown error'}`,
-      );
+      toast.error(t('createFailed'), { description: t('createFailedHint') });
       setIsCreating(false);
     }
   }, [
@@ -144,6 +155,28 @@ export default function CreateBookPage() {
         onAssetsChange={handleAssetsChange}
         onBatchSettled={handleBatchSettled}
       />
+
+      {/* Photo curation tips — copy only, no interactions. Which photos go
+          in bounds everything downstream (story, arc, consistency). */}
+      <div className="mx-auto mt-6 w-full max-w-md rounded-2xl border border-coral/15 bg-[#FFF9F5] px-5 py-4">
+        <p className="font-playful text-sm font-semibold text-[#1a1a1a]">
+          {t('tipsTitle')}
+        </p>
+        <ul className="mt-2 space-y-1.5 text-sm text-gray-600">
+          <li className="flex gap-2">
+            <span aria-hidden="true" className="text-coral">✦</span>
+            {t('tipVariety')}
+          </li>
+          <li className="flex gap-2">
+            <span aria-hidden="true" className="text-coral">✦</span>
+            {t('tipArc')}
+          </li>
+          <li className="flex gap-2">
+            <span aria-hidden="true" className="text-coral">✦</span>
+            {t('tipSkipDupes')}
+          </li>
+        </ul>
+      </div>
 
       {/* Continue — primary coral, enabled once at least one upload has finished */}
       {(hasReady || pendingCount > 0) && (

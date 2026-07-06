@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import Image from "next/image";
-import { MenuIcon, ArrowRight, Globe } from "lucide-react";
+import { MenuIcon, ArrowRight, Globe, Package } from "lucide-react";
 import { useState, useEffect, useRef, useTransition } from "react";
 import { useTranslations, useLocale } from 'next-intl';
 import { NotificationBell } from "@/components/notification-bell";
@@ -63,6 +63,22 @@ function LanguageSwitcher({ className }: { className?: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+/** Clerk user menu with a "My orders" entry — the quiet home for print orders. */
+function UserMenu() {
+  const t = useTranslations('orders');
+  return (
+    <UserButton afterSignOutUrl="/">
+      <UserButton.MenuItems>
+        <UserButton.Link
+          label={t('myOrders')}
+          labelIcon={<Package className="h-4 w-4" />}
+          href="/orders"
+        />
+      </UserButton.MenuItems>
+    </UserButton>
   );
 }
 
@@ -158,7 +174,7 @@ export function SiteHeader() {
                  <NotificationBell />
                  <LanguageSwitcher />
                  <div className="flex items-center ml-2">
-                   <UserButton afterSignOutUrl="/" />
+                   <UserMenu />
                  </div>
              </SignedIn>
           </div>
@@ -196,7 +212,7 @@ export function SiteHeader() {
                 </Link>
               </Button>
               <div className="py-2">
-                <UserButton afterSignOutUrl="/" />
+                <UserMenu />
               </div>
             </SignedIn>
             <SignedOut>

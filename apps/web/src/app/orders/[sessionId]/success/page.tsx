@@ -10,6 +10,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
+import { getTranslations } from 'next-intl/server';
 import { getStripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import { coolifyImageUrl, PRINT_PRICING, SHIPPING_TIERS } from '@storywink/shared';
@@ -24,6 +25,8 @@ interface PageProps {
 }
 
 async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
+  const tOrders = await getTranslations('orders');
+
   // Authenticate user
   const { userId: clerkUserId } = await auth();
   if (!clerkUserId) {
@@ -111,19 +114,27 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
   // drift from what Stripe quoted at checkout.
   const shippingTier = SHIPPING_TIERS.SINGAPORE_MALAYSIA;
 
+  // Brand restyle: the just-paid moment stays in Storywink's coral-and-cream
+  // world (matches the progress screen's warm radial background).
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-white py-12 px-4">
+    <div
+      className="min-h-screen py-12 px-4"
+      style={{
+        background:
+          'radial-gradient(ellipse at 50% 30%, #FFF9F5 0%, #FFFBF5 50%, #FFF5F0 100%)',
+      }}
+    >
       <div className="max-w-lg mx-auto">
         {/* Success Icon */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-4">
-            <CheckCircle className="w-10 h-10 text-green-600" />
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-coral/10 mb-4">
+            <CheckCircle className="w-10 h-10 text-coral" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Order Confirmed!
+          <h1 className="font-playful text-2xl font-bold text-[#1a1a1a] mb-2">
+            {tOrders('confirmedTitle')}
           </h1>
           <p className="text-gray-600">
-            Thank you for your order. We&apos;re preparing your book for printing.
+            {tOrders('confirmedBody')}
           </p>
         </div>
 
@@ -143,14 +154,14 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
               </div>
             )}
             <div className="flex-grow">
-              <h2 className="font-semibold text-lg text-gray-900 mb-1">
+              <h2 className="font-semibold text-lg text-[#1a1a1a] mb-1">
                 {bookTitle}
               </h2>
               <p className="text-sm text-gray-500 mb-1">
-                Quantity: {quantity}
+                {tOrders('quantityLabel', { count: quantity })}
               </p>
               <p className="text-sm font-medium text-coral">
-                Total: {totalAmount}
+                {tOrders('totalLabel', { amount: totalAmount })}
               </p>
             </div>
           </div>
@@ -158,7 +169,7 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
           {/* Order Number */}
           {printOrder && (
             <div className="border-t pt-4">
-              <p className="text-sm text-gray-500">Order Number</p>
+              <p className="text-sm text-gray-500">{tOrders('orderNumberLabel')}</p>
               <p className="font-mono text-sm font-medium">
                 {printOrder.id.slice(0, 8).toUpperCase()}
               </p>
@@ -168,20 +179,20 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
 
         {/* Next Steps */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          <h3 className="font-semibold text-gray-900 mb-4">What&apos;s Next?</h3>
+          <h3 className="font-semibold text-[#1a1a1a] mb-4">{tOrders('printingTitle')}</h3>
           <div className="space-y-4">
             <div className="flex gap-3">
               <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
-                  <Package className="w-4 h-4 text-orange-600" />
+                <div className="w-8 h-8 rounded-full bg-coral/10 flex items-center justify-center">
+                  <Package className="w-4 h-4 text-coral" />
                 </div>
               </div>
               <div>
-                <p className="font-medium text-gray-900">Printing &amp; Delivery</p>
                 <p className="text-sm text-gray-500">
-                  Your book is off to the printers. It should arrive within{' '}
-                  {shippingTier.deliveryDaysMin}&ndash;{shippingTier.deliveryDaysMax} business
-                  days.
+                  {tOrders('printingBody', {
+                    min: shippingTier.deliveryDaysMin,
+                    max: shippingTier.deliveryDaysMax,
+                  })}
                 </p>
               </div>
             </div>
@@ -192,20 +203,25 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
         <div className="space-y-3">
           <Link href="/library" className="block">
             <Button
-              className="w-full bg-coral hover:bg-[#E55A4C] text-white py-6"
+              className="w-full bg-coral hover:bg-coral/90 text-white py-6 font-playful"
               size="lg"
             >
-              Back to Library
+              {tOrders('backToLibrary')}
               <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </Link>
+          <Link href="/orders" className="block">
+            <Button variant="outline" className="w-full py-6" size="lg">
+              {tOrders('trackYourOrder')}
             </Button>
           </Link>
         </div>
 
         {/* Help Text */}
         <p className="text-center text-sm text-gray-500 mt-6">
-          Questions about your order?{' '}
+          {tOrders('helpPrompt')}{' '}
           <a href="mailto:support@storywink.ai" className="text-coral hover:underline">
-            Contact Support
+            {tOrders('contactSupport')}
           </a>
         </p>
       </div>
@@ -215,12 +231,19 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
 
 export default async function OrderSuccessPage({ params }: PageProps) {
   const { sessionId } = await params;
+  const tOrders = await getTranslations('orders');
 
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-gradient-to-b from-green-50 to-white py-12 px-4 flex items-center justify-center">
-          <div className="animate-pulse text-gray-500">Loading order details...</div>
+        <div
+          className="min-h-screen py-12 px-4 flex items-center justify-center"
+          style={{
+            background:
+              'radial-gradient(ellipse at 50% 30%, #FFF9F5 0%, #FFFBF5 50%, #FFF5F0 100%)',
+          }}
+        >
+          <div className="animate-pulse text-gray-500">{tOrders('loading')}</div>
         </div>
       }
     >

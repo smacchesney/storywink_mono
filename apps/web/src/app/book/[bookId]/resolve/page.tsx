@@ -120,7 +120,6 @@ export default function BookResolvePage() {
 
   // review-text phase
   const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
-  const [confirmed, setConfirmed] = useState<boolean[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -167,7 +166,11 @@ export default function BookResolvePage() {
   const replacedPages =
     book?.pages.filter((p) => replacedPageIds.includes(p.id)) || [];
   const currentReviewPage = replacedPages[currentReviewIndex] || null;
-  const allConfirmed = confirmed.length > 0 && confirmed.every((c) => c);
+  // "Illustrate my book" unlocks when every new page has words — the old
+  // per-page Confirm tap is gone (editing a page still saves its text).
+  const allConfirmed =
+    replacedPages.length > 0 &&
+    replacedPages.every((p) => (p.text || '').trim().length > 0);
 
   // --- Fetch book data ---
   const fetchBook = useCallback(async () => {
@@ -218,7 +221,6 @@ export default function BookResolvePage() {
 
     if (allHaveText) {
       setReplacedPageIds(validIds);
-      setConfirmed(validIds.map(() => false));
       setPhase('review-text');
       return;
     }
@@ -286,7 +288,9 @@ export default function BookResolvePage() {
       setShowDeleteDialog(false);
       await fetchBook();
     } catch (err: any) {
-      toast.error(err.message);
+      // Raw error text goes to the log, never to the parent.
+      console.error('Error removing page:', err);
+      toast.error(t('removeError'));
     } finally {
       setIsDeleting(false);
     }
@@ -343,7 +347,9 @@ export default function BookResolvePage() {
 
       await fetchBook();
     } catch (err: any) {
-      toast.error(err?.message || tUpload('errorNetwork'));
+      // Raw error text goes to the log, never to the parent.
+      console.error('Error replacing photo:', err);
+      toast.error(tUpload('errorGeneric'));
     } finally {
       setIsReplacing(false);
     }
@@ -371,7 +377,6 @@ export default function BookResolvePage() {
           if (allHaveText) {
             clearPolling();
             setIsGeneratingText(false);
-            setConfirmed(pageIds.map(() => false));
             setPhase('review-text');
           }
         } catch {
@@ -419,7 +424,9 @@ export default function BookResolvePage() {
 
       startTextPolling(replacedPageIds);
     } catch (err: any) {
-      toast.error(err.message);
+      // Raw error text goes to the log, never to the parent.
+      console.error('Error starting page text generation:', err);
+      toast.error(t('textStartError'));
       setIsGeneratingText(false);
       setPhase('fix-photos');
     }
@@ -444,16 +451,11 @@ export default function BookResolvePage() {
         ),
       };
     });
-
-    // Mark as unconfirmed
-    setConfirmed((prev) => {
-      const copy = [...prev];
-      copy[currentReviewIndex] = false;
-      return copy;
-    });
   };
 
-  const handleConfirm = async () => {
+  // Persists a page's text — called by PageCard's "Save changes" (the old
+  // per-page Confirm tap is gone).
+  const handleSaveText = async (newText: string) => {
     if (!currentReviewPage) return;
     setIsSaving(true);
     try {
@@ -466,25 +468,17 @@ export default function BookResolvePage() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ text: currentReviewPage.text }),
+          body: JSON.stringify({ text: newText }),
         },
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to save text');
+        throw new Error(err.error || 'save rejected');
       }
-
-      const newConfirmed = [...confirmed];
-      newConfirmed[currentReviewIndex] = true;
-      setConfirmed(newConfirmed);
-
-      // Auto-advance to next unconfirmed page
-      const nextUnconfirmed = newConfirmed.findIndex(
-        (c, i) => !c && i > currentReviewIndex,
-      );
-      if (nextUnconfirmed !== -1) setCurrentReviewIndex(nextUnconfirmed);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to save text');
+      // Raw error text goes to the log, never to the parent.
+      console.error('Error saving page text:', err);
+      toast.error(t('saveTextError'));
     } finally {
       setIsSaving(false);
     }
@@ -510,7 +504,9 @@ export default function BookResolvePage() {
       clearReplacedPageIds(bookId);
       router.push('/library');
     } catch (err: any) {
-      toast.error(err.message);
+      // Raw error text goes to the log, never to the parent.
+      console.error('Error starting illustration:', err);
+      toast.error(t('illustrateStartError'));
       setIsSubmitting(false);
     }
   };
@@ -815,11 +811,10 @@ export default function BookResolvePage() {
             text={currentReviewPage.text}
             pageNumber={currentReviewPage.pageNumber}
             isTitlePage={false}
-            isConfirmed={confirmed[currentReviewIndex]}
             isSaving={isSaving}
             bookId={bookId}
             onTextChange={handleTextChange}
-            onConfirm={handleConfirm}
+            onSave={handleSaveText}
           />
 
           {/* NavigationControls — reused from review flow */}

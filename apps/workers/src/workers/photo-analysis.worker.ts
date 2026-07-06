@@ -8,6 +8,7 @@ import {
   PHOTO_ANALYSIS_RESPONSE_SCHEMA,
   PhotoAnalysisInput,
   PhotoAnalysisResponse,
+  scopeCaptureQuestions,
 } from '@storywink/shared/prompts/photo-analysis';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
 import { ANALYSIS_MODEL } from '../config/models.js';
@@ -66,11 +67,25 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
     }
   }
 
+  // On a refresh, feed the prior roster back so the model reuses the SAME
+  // characterId for the same real person/animal — an answered naming chip's
+  // characterId link must survive a photo add/remove.
+  const priorIdentity = refresh
+    ? (book.characterIdentity as {
+        characters?: { characterId: string; role: string; name: string | null }[];
+      } | null)
+    : null;
+
   const input: PhotoAnalysisInput = {
     childName: book.childName,
     additionalCharacters,
     artStyle: book.artStyle || 'vignette',
     language: book.language || 'en',
+    priorCharacters: priorIdentity?.characters?.map(c => ({
+      characterId: c.characterId,
+      role: c.role,
+      name: c.name,
+    })),
     storyPages: book.pages.map((p, i) => ({
       pageNumber: i + 1,
       assetId: p.assetId,
@@ -108,6 +123,19 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
 
   if (!result.output_text) throw new Error('Photo analysis returned empty response');
   const analysis = JSON.parse(result.output_text) as PhotoAnalysisResponse;
+
+  // The prompt asks for scoped, naming-first questions; the guarantee is
+  // enforced here deterministically: naming questions only for unnamed
+  // characters recurring on 2+ photos who share a photo with the main child
+  // (never background strangers), sorted first, capped at 2 of the 3 slots.
+  const scopedQuestions = scopeCaptureQuestions(analysis.captureQuestions, analysis.characters);
+  if (scopedQuestions.length !== analysis.captureQuestions.length) {
+    logger.info(
+      { bookId, before: analysis.captureQuestions.length, after: scopedQuestions.length },
+      'Scoped capture questions (dropped out-of-scope naming questions)',
+    );
+  }
+  analysis.captureQuestions = scopedQuestions;
 
   // Stamp each character's appearsOnPages with the assetIds behind those
   // positions. appearsOnPages is creation-order-positional and goes stale if

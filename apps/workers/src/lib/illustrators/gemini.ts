@@ -23,8 +23,9 @@ export class GeminiProvider implements IllustrationProvider {
   }
 
   async generate(input: IllustrationInput): Promise<IllustrationOutput> {
-    // Order matters: content image first, then style refs, then text prompt.
-    // Prompts in packages/shared assume this ordering.
+    // Order matters: content image first, then character refs (sheets /
+    // interior render), then style refs, then text prompt. Prompts in
+    // packages/shared name each image's role by this position.
     const contents = [
       {
         inlineData: {
@@ -32,6 +33,12 @@ export class GeminiProvider implements IllustrationProvider {
           data: input.contentImage.buffer.toString('base64'),
         },
       },
+      ...(input.characterRefs ?? []).map((ref) => ({
+        inlineData: {
+          mimeType: ref.mimeType,
+          data: ref.buffer.toString('base64'),
+        },
+      })),
       ...input.styleRefs.map((ref) => ({
         inlineData: {
           mimeType: ref.mimeType,

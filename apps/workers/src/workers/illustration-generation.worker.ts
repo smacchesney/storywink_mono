@@ -9,8 +9,12 @@ import { createIllustrationPrompt, IllustrationPromptOptions } from '@storywink/
 // Import STYLE_LIBRARY directly from styles module to avoid barrel export race condition
 import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
-// Logo overlay for title pages, upscaling for print
-import { addLogoToTitlePage, upscaleForPrint } from '../utils/image-processing.js';
+// Upscaling for print (the cover's logo overlay lives in lib/cover-generation)
+import { upscaleForPrint } from '../utils/image-processing.js';
+import { characterSheetsEnabled } from '../lib/character-sheets.js';
+import { generateAndStoreCover } from '../lib/cover-generation.js';
+import { fetchImageInput, resizeForReference } from '../lib/images.js';
+import type { IllustrationImageInput } from '../lib/illustrators/index.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -222,9 +226,33 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       throw new Error(`Invalid style key: ${styleKey}. Available styles: ${Object.keys(STYLE_LIBRARY).join(', ')}`);
     }
 
+    // Character sheets (CHARACTER_SHEETS_ENABLED): validated 2x2 turnaround
+    // grids snapshotted into job data by the extraction/finalize workers.
+    // Fetch failures degrade gracefully — a page render must never fail
+    // because a reference sheet went missing.
+    const sheetRefs: IllustrationImageInput[] = [];
+    if (characterSheetsEnabled() && job.data.characterSheets?.length) {
+      for (const sheet of job.data.characterSheets) {
+        try {
+          sheetRefs.push(await fetchImageInput(optimizeCloudinaryUrlForVision(sheet.url)));
+        } catch (sheetFetchError: any) {
+          logger.warn(
+            { jobId: job.id, pageNumber, characterId: sheet.characterId, error: sheetFetchError.message },
+            'Failed to fetch character sheet — continuing without it',
+          );
+        }
+      }
+      console.log(`[IllustrationWorker] Fetched ${sheetRefs.length} character sheet(s) for page ${pageNumber}`);
+    }
+
     // All pages (including cover) use standard style references for the story illustration.
     // Cover pages get a separate cover-style illustration generated afterwards.
-    const styleReferenceUrls: string[] = [...styleData.referenceImageUrls];
+    // With character sheets in the stack, trim the style exemplars to 2
+    // (kawaii ships 4) to keep the reference budget for identity.
+    const styleReferenceUrls: string[] =
+      sheetRefs.length > 0
+        ? [...styleData.referenceImageUrls].slice(0, 2)
+        : [...styleData.referenceImageUrls];
 
     // ============================================================================
     // DIAGNOSTIC: Database-persisted logging to survive process crashes
@@ -334,6 +362,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         characterIdentity: characterIdentity || null,
         pageNumber: pageNumber,
         qcFeedback: qcFeedback || null,
+        characterSheetCount: sheetRefs.length,
     };
     
     logger.info({ jobId: job.id, pageId, promptInput }, "Constructed promptInput for createIllustrationPrompt");
@@ -370,6 +399,9 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
 
        const illustrationInput: IllustrationInput = {
          contentImage: { buffer: contentImageBuffer, mimeType: contentImageMimeType },
+         // Ordered between photo and style refs; the prompt's role line
+         // (characterSheetCount) names each image by this position.
+         ...(sheetRefs.length > 0 ? { characterRefs: sheetRefs } : {}),
          styleRefs: styleReferenceBuffers,
          prompt: textPrompt,
        };
@@ -462,6 +494,9 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     } // end content policy retry loop
 
     let finalImageUrl: string | undefined = undefined;
+    // Hoisted out of the upload try-block: the cover generation below reuses
+    // the approved interior render as a reference image.
+    let interiorRenderBuffer: Buffer | null = null;
     if (generatedImageBase64 && !moderationBlocked) {
       try {
           logger.info({ jobId: job.id, pageId, pageNumber }, 'Decoding and uploading generated image to Cloudinary...');
@@ -473,6 +508,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
               logger.info({ jobId: job.id, pageId, pageNumber }, 'Upscaling image for print quality (2048 → 2625px)...');
               console.log(`[IllustrationWorker] Upscaling page ${pageNumber} to 2625×2625 for print`);
               generatedImageBuffer = await upscaleForPrint(generatedImageBuffer);
+              interiorRenderBuffer = generatedImageBuffer;
               logger.info({ jobId: job.id, pageId, pageNumber }, 'Image upscaled successfully.');
           } catch (upscaleError: any) {
               const errorMessage = `Image upscaling failed: ${upscaleError.message}`;
@@ -566,83 +602,35 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     if (isTitlePage && !moderationBlocked && finalImageUrl) {
       console.log(`[IllustrationWorker] Generating separate cover illustration for title page ${pageNumber}...`);
       try {
-        // Use cover-specific style references if available
-        const coverStyleRefs = styleData.coverReferenceImageUrls?.length
-          ? [...styleData.coverReferenceImageUrls]
-          : [...styleData.referenceImageUrls];
+        // Cover binding (CHARACTER_SHEETS_ENABLED): the cover call receives
+        // the character sheet(s) plus the approved interior title-page render
+        // as references, so the two renders of the same photo stop diverging.
+        const interiorRenderRef =
+          characterSheetsEnabled() && interiorRenderBuffer
+            ? await resizeForReference(interiorRenderBuffer)
+            : null;
 
-        // Fetch cover style reference images
-        const coverRefBuffers: { buffer: Buffer; mimeType: string }[] = [];
-        for (const refUrl of coverStyleRefs) {
-          const refRes = await fetch(refUrl);
-          const refArrayBuffer = await refRes.arrayBuffer();
-          const mimeType = refRes.headers.get('content-type') || 'image/png';
-          coverRefBuffers.push({ buffer: Buffer.from(refArrayBuffer), mimeType });
-        }
-
-        // Build cover-style prompt (isTitlePage: true uses buildCoverPrompt)
-        const coverPromptInput: IllustrationPromptOptions = {
-          style: styleKey,
+        const coverOutcome = await generateAndStoreCover({
+          bookId,
+          styleKey,
+          bookTitle: bookTitle ?? null,
           pageText: text,
-          bookTitle: bookTitle,
-          isTitlePage: true,
-          illustrationNotes: illustrationNotes,
+          illustrationNotes: illustrationNotes ?? null,
           language: language || 'en',
-          referenceImageCount: coverRefBuffers.length,
           characterIdentity: characterIdentity || null,
-          pageNumber: pageNumber,
+          pageNumber,
+          contentImage: { buffer: contentImageBuffer, mimeType: contentImageMimeType },
+          characterSheetRefs: sheetRefs,
+          interiorRenderRef,
           // QC feedback targets the interior title-page render, not the cover
           // (a different image the QC pass never saw) — never inherit it here.
+          // Cover-targeted feedback only flows through finalize's regen round.
           qcFeedback: null,
-        };
-        const coverTextPrompt = createIllustrationPrompt(coverPromptInput);
+          logger,
+        });
 
-        const coverInput: IllustrationInput = {
-          contentImage: { buffer: contentImageBuffer, mimeType: contentImageMimeType },
-          styleRefs: coverRefBuffers,
-          prompt: coverTextPrompt,
-        };
-
-        const coverResult = await illustrator.generate(coverInput);
-
-        if (coverResult.imageBase64) {
-          let coverBuffer = Buffer.from(coverResult.imageBase64, 'base64');
-
-          // Upscale for print
-          coverBuffer = await upscaleForPrint(coverBuffer);
-
-          // Apply logo overlay to cover illustration
-          coverBuffer = await addLogoToTitlePage(coverBuffer);
-
-          // Upload cover illustration to Cloudinary
-          const coverUpload = await new Promise<any>((resolve, reject) => {
-            cloudinary.uploader.upload_stream(
-              {
-                folder: `storywink/${bookId}/generated`,
-                public_id: `cover_illustration`,
-                overwrite: true,
-                tags: [`book:${bookId}`, `cover`, `style:${styleKey}`],
-                resource_type: 'image',
-              },
-              (error, result) => {
-                if (error) reject(error); else resolve(result);
-              },
-            ).end(coverBuffer);
-          });
-
-          if (coverUpload?.secure_url) {
-            await prisma.book.update({
-              where: { id: bookId },
-              data: { coverImageUrl: coverUpload.secure_url },
-            });
-            console.log(`[IllustrationWorker] Cover illustration generated and stored: ${coverUpload.secure_url}`);
-            logger.info({ jobId: job.id, bookId, coverUrl: coverUpload.secure_url }, 'Cover illustration stored in Book.coverImageUrl');
-          }
-        } else {
-          logger.warn(
-            { jobId: job.id, bookId, pageNumber, reason: coverResult.blockedReason },
-            'Cover illustration generation returned no image data',
-          );
+        if ('coverUrl' in coverOutcome) {
+          console.log(`[IllustrationWorker] Cover illustration generated and stored: ${coverOutcome.coverUrl}`);
         }
       } catch (coverError: any) {
         // Cover illustration failure is non-fatal -- the story illustration is already saved

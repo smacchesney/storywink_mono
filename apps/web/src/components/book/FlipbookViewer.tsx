@@ -6,30 +6,26 @@ import { Page } from '@prisma/client';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
-import { Loader2 } from 'lucide-react';
-import { coolifyImageUrl } from '@storywink/shared';
 import { PAGE_TEXT } from '@storywink/shared/constants';
+import { tinyThumbUrl } from '@/lib/cloudinary-loader';
+import BookArtImage from './BookArtImage';
+import {
+  buildDisplayPages,
+  remapDisplayIndex,
+  type BookLayout,
+  type DisplayPage,
+} from './display-pages';
+
+// Layout logic lives in ./display-pages (pure, unit-tested); re-export so
+// existing importers keep working.
+export { buildDisplayPages, remapDisplayIndex } from './display-pages';
+export type { BookLayout, DisplayPage, BuildDisplayPagesOptions } from './display-pages';
 
 // Mascot URLs
 const DEDICATION_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.58.09_PM_gnknk5.png';
 const ENDING_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291378/Screenshot_2026-02-28_at_10.57.54_PM_sxcasb.png';
 const BACK_COVER_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291378/Screenshot_2026-02-28_at_10.57.29_PM_qwoqr0.png';
 const BLANK_PAGE_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291382/Screenshot_2026-02-28_at_10.54.21_PM_saradc.png';
-
-// Display page types for interleaved layout
-export type DisplayPage =
-  | { type: 'illustration'; page: Page }
-  | { type: 'text'; page: Page; language: string }
-  | { type: 'dedication'; childName: string | null; bookTitle: string; language: string }
-  | { type: 'ending'; childName: string | null; bookTitle: string; language: string }
-  | { type: 'back-cover' }
-  | { type: 'blank' };
-
-export interface BuildDisplayPagesOptions {
-  childName?: string | null;
-  bookTitle?: string;
-  language?: string;
-}
 
 interface FlipbookViewerProps {
   pages: Page[];
@@ -41,6 +37,12 @@ interface FlipbookViewerProps {
   coverImageUrl?: string | null;
   initialPageNumber?: number;
   onPageChange?: (displayIndex: number) => void;
+  /**
+   * Fires whenever the auto-detected layout ('spread' on wide containers,
+   * 'portrait' on phones held upright) settles or changes, so the parent can
+   * build matching display pages for its own chrome (gallery, footer count).
+   */
+  onLayoutChange?: (layout: BookLayout) => void;
   className?: string;
   childName?: string | null;
   bookTitle?: string;
@@ -52,63 +54,6 @@ export interface FlipbookActions {
   pageFlip: () => any; // Expose the pageFlip API instance
 }
 
-/**
- * Build interleaved display pages matching the Lulu print layout:
- *
- * With showCover=true, index 0 is solo right (front cover) and the last
- * index is solo left (back cover). Middle pages pair as (1,2), (3,4), etc.
- * where odd indices are LEFT and even indices are RIGHT.
- *
- * Layout:
- *   [0] Cover illustration (solo right)
- *   [1] Blank inside front cover (left) — saddle stitch: inside covers not printable
- *   [2] Dedication (right)
- *   [3] Text story 1 (left)  +  [4] Illustration story 1 (right)
- *   [5] Text story 2 (left)  +  [6] Illustration story 2 (right)
- *   ...
- *   [N] Ending (left)  +  [N+1] Blank padding (right)
- *   [N+2] Back cover (solo left)
- */
-export function buildDisplayPages(pages: Page[], options?: BuildDisplayPagesOptions): DisplayPage[] {
-  const displayPages: DisplayPage[] = [];
-  const language = options?.language || 'en';
-  // Find the cover page and render it first
-  const coverPage = pages.find(p => p.isTitlePage);
-  if (coverPage) {
-    // Cover page (solo right with showCover)
-    displayPages.push({ type: 'illustration', page: coverPage });
-    // Blank inside front cover (left side of first spread)
-    displayPages.push({ type: 'blank' });
-    // Dedication (right side of first spread)
-    displayPages.push({
-      type: 'dedication',
-      childName: options?.childName ?? null,
-      bookTitle: options?.bookTitle ?? 'You',
-      language,
-    });
-  }
-  // All pages get text+illustration pairs in story order
-  // Only include text page if the page actually has story text
-  for (const page of pages) {
-    if (page.text && page.text.trim()) {
-      displayPages.push({ type: 'text', page, language });
-    }
-    displayPages.push({ type: 'illustration', page });
-  }
-  // Ending page (left side of last story spread)
-  displayPages.push({
-    type: 'ending',
-    childName: options?.childName ?? null,
-    bookTitle: options?.bookTitle ?? 'You',
-    language,
-  });
-  // Blank padding (right side, keeps middle page count even)
-  displayPages.push({ type: 'blank' });
-  // Back cover (solo left with showCover)
-  displayPages.push({ type: 'back-cover' });
-  return displayPages;
-}
-
 // Use forwardRef to allow passing ref from parent
 const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
   {
@@ -116,6 +61,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     coverImageUrl,
     initialPageNumber = 1,
     onPageChange,
+    onLayoutChange,
     className,
     childName,
     bookTitle,
@@ -136,12 +82,6 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
       typeof window !== 'undefined' &&
       window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true,
     []
-  );
-
-  // Build interleaved display pages
-  const displayPages = useMemo(
-    () => buildDisplayPages(pages, { childName, bookTitle, language }),
-    [pages, childName, bookTitle, language]
   );
 
   // Expose the pageFlip instance via the forwarded ref
@@ -187,7 +127,8 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
       // Use most of available width/height, maintaining aspect ratio
       const pageWidth = availableWidth;
       const pageHeight = availableHeight;
-      const pageAspectRatio = 1.0; // Square pages (illustrations are 2048x2048)
+      // Combined story pages: square illustration on top + text strip below
+      const pageAspectRatio = 0.78;
 
       let finalWidth = pageWidth;
       let finalHeight = pageHeight;
@@ -230,6 +171,78 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
   const { width: pageWidth, height: pageHeight, isPortrait } =
     containerDimensions.width > 0 ? calculateBookDimensions() : { width: 0, height: 0, isPortrait: false };
 
+  const layout: BookLayout = isPortrait ? 'portrait' : 'spread';
+
+  // Build interleaved display pages for the active layout
+  const displayPages = useMemo(
+    () => buildDisplayPages(pages, { childName, bookTitle, language, layout }),
+    [pages, childName, bookTitle, language, layout]
+  );
+
+  // Warm-window image mounting: pages near the reader (current ± 3) mount
+  // their full-resolution art eagerly; pages already loaded never regress to
+  // the blurred backdrop when flipping backwards.
+  const loadedPagesRef = useRef<Set<number>>(new Set());
+  const shouldMountImage = (index: number): boolean => {
+    if (
+      index <= 2 ||
+      Math.abs(index - currentPageIndex) <= 3 ||
+      loadedPagesRef.current.has(index)
+    ) {
+      loadedPagesRef.current.add(index);
+      return true;
+    }
+    return false;
+  };
+
+  // Rotation handling: when the layout flips mid-read, the flipbook remounts
+  // (key below) and the reader lands on the same story beat via a source-id
+  // remap. currentIndexRef mirrors currentPageIndex for use in effects;
+  // pendingInitIndexRef carries the mapped index into the remounted book.
+  const currentIndexRef = useRef(0);
+  const pendingInitIndexRef = useRef<number | null>(null);
+  const layoutSnapshotRef = useRef<{ layout: BookLayout; displayPages: DisplayPage<Page>[] } | null>(null);
+
+  useEffect(() => {
+    if (containerDimensions.width === 0) return; // not measured yet
+    const prev = layoutSnapshotRef.current;
+    if (prev && prev.layout !== layout) {
+      const mapped = remapDisplayIndex(prev.displayPages, currentIndexRef.current, displayPages);
+      loadedPagesRef.current = new Set(); // indices mean different pages now
+      currentIndexRef.current = mapped;
+      pendingInitIndexRef.current = mapped;
+      setCurrentPageIndex(mapped);
+      try {
+        // If the remounted flipbook is already live, jump straight there;
+        // otherwise onInit picks pendingInitIndexRef up.
+        flipBookInternalRef.current?.pageFlip()?.turnToPage(mapped);
+      } catch {
+        // The remount lands on the mapped page via onInit.
+      }
+      if (onPageChange) {
+        onPageChange(mapped + 1);
+      }
+    }
+    if (!prev || prev.layout !== layout) {
+      onLayoutChange?.(layout);
+    }
+    layoutSnapshotRef.current = { layout, displayPages };
+  }, [layout, displayPages, containerDimensions.width, onPageChange, onLayoutChange]);
+
+  // Gallery jumps arrive as a turnToPage on the exposed pageFlip instance,
+  // which fires no flip event — but the parent reflects the new position
+  // back through initialPageNumber. Sync it so the warm window and cover
+  // centering track jumps, not just flips.
+  useEffect(() => {
+    // While a rotation remap is in flight, initialPageNumber still speaks the
+    // previous layout's numbering — leave the mapped index alone until the
+    // remounted book has landed (onInit clears the pending marker).
+    if (pendingInitIndexRef.current !== null) return;
+    const idx = Math.max(0, Math.min(initialPageNumber - 1, displayPages.length - 1));
+    currentIndexRef.current = idx;
+    setCurrentPageIndex(idx);
+  }, [initialPageNumber, displayPages.length]);
+
   // Center front/back covers in spread mode (they only occupy half the spread area)
   // When a flip starts, immediately uncenter so the shift animates WITH the page flip
   const shouldCenterCover = !isPortrait && !isFlipping;
@@ -240,6 +253,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
   // Handler for page flip event from the library
   const handleFlip = useCallback((e: any) => {
     const currentPage = e.data;
+    currentIndexRef.current = currentPage;
     setCurrentPageIndex(currentPage);
     setIsFlipping(false);
     if (onPageChange) {
@@ -256,10 +270,16 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     }
   }, []);
 
-  // Add onInit handler to turn to initial page once ready
+  // Add onInit handler to turn to initial page once ready. A pending index
+  // from a layout rotation wins over the parent's initialPageNumber (which
+  // is still expressed in the previous layout's numbering).
   const handleInit = useCallback(() => {
-     if (flipBookInternalRef.current && initialPageNumber) {
-        const pageIndex = Math.max(0, Math.min(initialPageNumber - 1, displayPages.length - 1));
+     const pending = pendingInitIndexRef.current;
+     pendingInitIndexRef.current = null;
+     const target = pending ?? (initialPageNumber ? initialPageNumber - 1 : 0);
+     const pageIndex = Math.max(0, Math.min(target, displayPages.length - 1));
+     currentIndexRef.current = pageIndex;
+     if (flipBookInternalRef.current) {
             try {
                flipBookInternalRef.current?.pageFlip()?.turnToPage(pageIndex);
             } catch (e) {
@@ -268,8 +288,23 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
      }
   }, [initialPageNumber, displayPages.length]);
 
+  /** Tiny Cloudinary variant, blurred by CSS — paints before any art loads */
+  const renderBlurBackdrop = (url: string) => (
+    <div
+      aria-hidden
+      className="absolute inset-0"
+      style={{
+        backgroundImage: `url(${tinyThumbUrl(url)})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        filter: 'blur(10px)',
+        transform: 'scale(1.08)',
+      }}
+    />
+  );
+
   /** Render a single display page */
-  const renderDisplayPage = (dp: DisplayPage, index: number) => {
+  const renderDisplayPage = (dp: DisplayPage<Page>, index: number) => {
     // Container-relative font sizes (scale with page width, not viewport)
     const bodySize = Math.max(12, Math.min(Math.round(pageWidth * 0.05), 22));
     const smallBodySize = Math.max(11, Math.min(Math.round(pageWidth * 0.045), 18));
@@ -399,6 +434,69 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
       );
     }
 
+    // Shared placeholder for a page whose picture isn't ready yet
+    // (mid-generation, a re-render, or a PARTIAL book read before its fix).
+    const renderCookingPlaceholder = () => (
+      <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#FFFBF5] px-[10%] text-center">
+        <Image
+          src={DEDICATION_MASCOT_URL}
+          alt=""
+          width={200}
+          height={200}
+          className="object-contain opacity-80"
+          style={{ height: '18%', width: 'auto' }}
+        />
+        <p
+          className="font-playful text-gray-500 mt-3 leading-relaxed"
+          style={{ fontSize: `${smallBodySize}px` }}
+        >
+          {t('pageCooking')}
+        </p>
+      </div>
+    );
+
+    // Portrait-only combined page: square art on top, text strip below —
+    // the words stay on screen with their picture.
+    if (dp.type === 'story') {
+      const pageKey = `${dp.page.id}-story-${index}`;
+      const storyFontClass = dp.language === 'ja' ? 'font-japanese' : 'font-playful';
+      const imageUrl = dp.page.generatedImageUrl;
+      const mountImage = shouldMountImage(index);
+      return (
+        <div key={pageKey} className="bg-white rounded-lg overflow-hidden border border-black/15">
+          <div className="absolute inset-0 flex flex-col">
+            <div className="relative w-full aspect-square shrink-0 overflow-hidden">
+              {imageUrl ? (
+                <>
+                  {renderBlurBackdrop(imageUrl)}
+                  {mountImage && (
+                    <BookArtImage
+                      src={imageUrl}
+                      alt={dp.page.text || t('pageAlt', { number: dp.page.pageNumber })}
+                      sizes={`(max-width: 768px) 90vw, ${pageWidth}px`}
+                      priority={index <= 2}
+                      eager
+                      fadeIn
+                    />
+                  )}
+                </>
+              ) : (
+                renderCookingPlaceholder()
+              )}
+            </div>
+            <div className="flex-1 min-h-0 flex items-center justify-center px-[8%]">
+              {dp.page.text && dp.page.text.trim() && (
+                <p className={`${storyFontClass} text-[#1a1a1a] text-center leading-snug`}
+                   style={{ fontSize: `${bodySize}px` }}>
+                  {dp.page.text}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // Existing text/illustration rendering (dp is narrowed to text | illustration here)
     const pageKey = `${dp.page.id}-${dp.type}-${index}`;
     const textFontClass = dp.type === 'text' && dp.language === 'ja' ? 'font-japanese' : 'font-playful';
@@ -407,6 +505,35 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     // it exists. The title page's story render still appears as a story beat.
     const isCoverSlot = dp.type === 'illustration' && index === 0 && dp.page.isTitlePage;
     const imageUrl = (isCoverSlot && coverImageUrl) || dp.page.generatedImageUrl;
+    const mountImage = dp.type === 'illustration' && shouldMountImage(index);
+
+    // Portrait pages are taller than the square art (0.78 aspect): the cover
+    // letterboxes vertically centered, like a book cover sitting on paper.
+    if (dp.type === 'illustration' && layout === 'portrait') {
+      return (
+        <div key={pageKey} className="bg-white rounded-lg overflow-hidden border border-black/15">
+          {imageUrl ? (
+            <div className="absolute inset-0 flex items-center">
+              <div className="relative w-full aspect-square overflow-hidden">
+                {renderBlurBackdrop(imageUrl)}
+                {mountImage && (
+                  <BookArtImage
+                    src={imageUrl}
+                    alt={dp.page.text || t('pageAlt', { number: dp.page.pageNumber })}
+                    sizes={`(max-width: 768px) 90vw, ${pageWidth}px`}
+                    priority={index <= 2}
+                    eager
+                    fadeIn
+                  />
+                )}
+              </div>
+            </div>
+          ) : (
+            renderCookingPlaceholder()
+          )}
+        </div>
+      );
+    }
 
     return (
       <div key={pageKey} className="bg-white rounded-lg overflow-hidden border border-black/15">
@@ -419,23 +546,22 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
             </p>
           </div>
         ) : imageUrl ? (
-          // Illustration page - full image
-          <div className="absolute inset-0">
-             <Image
-               src={coolifyImageUrl(imageUrl)}
-               alt={dp.page.text || t('pageAlt', { number: dp.page.pageNumber })}
-               fill
-               sizes={`(max-width: 768px) 90vw, ${pageWidth}px`}
-               style={{ objectFit: 'cover' }}
-               priority={index <= 2}
-             />
+          // Illustration page - full image over its blurred tiny backdrop
+          <div className="absolute inset-0 overflow-hidden">
+            {renderBlurBackdrop(imageUrl)}
+            {mountImage && (
+              <BookArtImage
+                src={imageUrl}
+                alt={dp.page.text || t('pageAlt', { number: dp.page.pageNumber })}
+                sizes={`(max-width: 768px) 90vw, ${pageWidth}px`}
+                priority={index <= 2}
+                eager
+                fadeIn
+              />
+            )}
           </div>
         ) : (
-          // Placeholder for loading or failed state
-          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-            <p>Loading page {dp.page.pageNumber}...</p>
-          </div>
+          renderCookingPlaceholder()
         )}
       </div>
     );
@@ -452,6 +578,10 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
           transition: prefersReducedMotion ? 'none' : 'transform 0.7s cubic-bezier(0.4, 0, 0.2, 1)',
         }}>
         <HTMLFlipBook
+          // Remount on layout change: PageFlip bakes its dimensions and
+          // portrait/spread mode in at construction, and the rotation remap
+          // lands the reader back on the same beat via onInit.
+          key={layout}
           ref={flipBookInternalRef}
           width={pageWidth}
           height={pageHeight}

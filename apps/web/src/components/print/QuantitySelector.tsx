@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import { Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -20,6 +21,7 @@ export function QuantitySelector({
   max = 10,
   className,
 }: QuantitySelectorProps) {
+  const t = useTranslations('print');
   const handleDecrement = () => {
     if (quantity > min) {
       onChange(quantity - 1);
@@ -41,7 +43,7 @@ export function QuantitySelector({
         onClick={handleDecrement}
         disabled={quantity <= min}
         className="h-9 w-9 rounded-full"
-        aria-label="Decrease quantity"
+        aria-label={t('decreaseQuantity')}
       >
         <Minus className="h-4 w-4" />
       </Button>
@@ -57,7 +59,7 @@ export function QuantitySelector({
         onClick={handleIncrement}
         disabled={quantity >= max}
         className="h-9 w-9 rounded-full"
-        aria-label="Increase quantity"
+        aria-label={t('increaseQuantity')}
       >
         <Plus className="h-4 w-4" />
       </Button>

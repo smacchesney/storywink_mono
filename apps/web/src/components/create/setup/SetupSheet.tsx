@@ -7,6 +7,7 @@ import type { StyleKey } from '@storywink/shared/prompts/styles';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import { track } from '@/lib/track';
 import PhotoStrip, { StripPhoto } from '@/components/create/setup/PhotoStrip';
 import ArtStyleStrip from '@/components/create/setup/ArtStyleStrip';
 import CaptureChips, {
@@ -63,6 +64,23 @@ export function SetupSheet({
   onSubmit,
 }: SetupSheetProps) {
   const t = useTranslations('setup');
+
+  const handleSubmitClick = () => {
+    // Funnel telemetry — fire only for taps that pass the one required field,
+    // matching what actually submits (fire-and-forget, never blocks).
+    if (form.childName.trim()) {
+      track('setup_submitted', {
+        ...(bookId ? { bookId } : {}),
+        props: {
+          reviewFirst: form.reviewFirst,
+          chipsAnswered: form.captureQuestions.filter(
+            (q) => q.answer && q.answer !== '__skip__',
+          ).length,
+        },
+      });
+    }
+    onSubmit();
+  };
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 pb-28 pt-4">
@@ -184,7 +202,7 @@ export function SetupSheet({
       {/* Primary CTA — fixed to the bottom on mobile */}
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-black/5 bg-white/90 px-4 py-3 backdrop-blur">
         <button
-          onClick={onSubmit}
+          onClick={handleSubmitClick}
           disabled={isSubmitting}
           className="mx-auto flex w-full max-w-md items-center justify-center gap-2 rounded-full bg-coral px-6 py-3.5 font-playful text-lg text-white shadow-md transition-colors hover:bg-coral/90 disabled:opacity-70"
         >

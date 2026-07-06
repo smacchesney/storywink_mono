@@ -36,10 +36,10 @@ export function createCharacterExtractionPrompt(
 ${characterContext}
 ${additionalContext}
 
-For EACH distinct person appearing across the photos, extract:
+For EACH distinct person appearing across the photos, AND each animal companion (pet) that appears in 2+ photos or is clearly central to a moment, extract:
 
-1. **Character ID**: A unique identifier (child_1, adult_1, adult_2, sibling_1, etc.)
-2. **Role**: Their role (main_child, parent, sibling, grandparent, friend, etc.)
+1. **Character ID**: A unique identifier (child_1, adult_1, adult_2, sibling_1, pet_1, etc.)
+2. **Role**: Their role (main_child, parent, sibling, grandparent, friend, pet, etc.)
 3. **Name**: If identifiable from context provided above, otherwise null
 4. **Physical Traits** (be extremely precise — these must match across all illustrations):
    - Apparent age range
@@ -51,6 +51,8 @@ For EACH distinct person appearing across the photos, extract:
 5. **Typical Clothing**: What they wear across the photos (note if it varies per photo)
 6. **Style Translation**: How this person should be rendered in "${input.artStyle}" style while remaining instantly recognizable. Be specific about materials, construction, colors, and proportions for the target style.
 7. **Pages**: Which page numbers (from the photo sequence 1-${input.storyPages.length}) this person appears in
+
+For pets, reuse the same fields naturally: hair color/style = fur or coat color and texture, distinguishing features = collar, markings, ear shape, size; typical clothing = collar/harness or "none".
 
 Also describe the overall scene context (indoor/outdoor settings, time of day patterns, general environment).
 
@@ -138,6 +140,132 @@ export const STYLE_TRANSLATION_REFRESH_SCHEMA = {
     },
   },
   required: ['translations'],
+  additionalProperties: false,
+} as const;
+
+// ----------------------------------
+// CHARACTER SHEET (2x2 turnaround) GENERATION + VALIDATION
+// ----------------------------------
+
+/**
+ * Character subset needed to describe one person on a sheet prompt.
+ * Structurally compatible with CharacterDescription in types.ts.
+ */
+export interface SheetCharacterInput {
+  characterId: string;
+  role: string;
+  name: string | null;
+  physicalTraits: {
+    apparentAge: string;
+    hairColor: string;
+    hairStyle: string;
+    skinTone: string;
+    bodyBuild: string;
+    distinguishingFeatures: string[];
+  };
+  styleTranslation: string;
+}
+
+function sheetCharacterBlock(character: SheetCharacterInput): string {
+  const t = character.physicalTraits;
+  return [
+    `CHARACTER (canonical identity — every panel must match this exactly):`,
+    `- ${character.name || character.characterId} (${character.role})`,
+    `- Age: ${t.apparentAge}`,
+    `- Hair: ${t.hairColor}, ${t.hairStyle}`,
+    `- Skin tone: ${t.skinTone}`,
+    `- Build: ${t.bodyBuild}`,
+    t.distinguishingFeatures.length > 0
+      ? `- Distinguishing features: ${t.distinguishingFeatures.join(', ')}`
+      : null,
+    character.styleTranslation ? `- Style rendering: ${character.styleTranslation}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
+ * Prompt for generating one 2x2 turnaround character sheet.
+ *
+ * Image order the caller must send: the character's source photos first
+ * (ground-truth identity), then the SAME 2 style exemplar images the book's
+ * pages use. The style bible block must be the frozen constant from
+ * getStyleBible() — a paraphrased or prose-only sheet drifts off-style and
+ * then wins the arbitration fight against the page exemplars.
+ */
+export function createCharacterSheetPrompt(input: {
+  character: SheetCharacterInput;
+  photoCount: number;
+  styleRefCount: number;
+  styleBible: string;
+}): string {
+  const { character, photoCount, styleRefCount, styleBible } = input;
+  return [
+    `Create ONE image: a 2x2 character model sheet (turnaround grid) of the SAME child, ` +
+      `using the ${photoCount + styleRefCount} images provided, in this order: ` +
+      `the first ${photoCount === 1 ? 'image is a photo' : `${photoCount} images are photos`} of the character (ground truth for identity); ` +
+      `the final ${styleRefCount === 1 ? 'image shows' : `${styleRefCount} images show`} the artistic style to apply.`,
+    `THE GRID (exactly 4 panels, equal size, on a single plain PURE WHITE background):`,
+    `- Top-left: front view, standing, neutral-happy expression`,
+    `- Top-right: three-quarter view`,
+    `- Bottom-left: side profile view`,
+    `- Bottom-right: back view`,
+    `Every panel depicts the SAME character at the same scale with identical face, hair, skin tone, proportions, and outfit. Full body visible in each panel.`,
+    sheetCharacterBlock(character),
+    styleBible,
+    `STRICT RULES: no text, no labels, no captions, no watermarks, no panel borders, no props, no background scenery — just the character four times on pure white. Do NOT copy any person, clothing, or pose from the style reference images; they define ONLY the artistic style.`,
+  ].join(' ');
+}
+
+export const SHEET_VALIDATION_SYSTEM_PROMPT =
+  "You are a meticulous art director for children's picture books. You verify that a generated character model sheet faithfully represents a real child from their photos and matches the book's art style.";
+
+/**
+ * Prompt for validating a generated sheet with a vision model.
+ *
+ * Image order the caller must send: source photos, then the candidate sheet,
+ * then the 2 style exemplars.
+ */
+export function createSheetValidationPrompt(input: {
+  character: SheetCharacterInput;
+  photoCount: number;
+  styleRefCount: number;
+  artStyle: string;
+}): string {
+  const { character, photoCount, styleRefCount, artStyle } = input;
+  return [
+    `You are shown ${photoCount + 1 + styleRefCount} images, in this order: ` +
+      `${photoCount === 1 ? '1 photo' : `${photoCount} photos`} of a real child (ground truth), ` +
+      `then 1 candidate 2x2 character model sheet, ` +
+      `then ${styleRefCount} art style exemplar image(s) for the "${artStyle}" style.`,
+    sheetCharacterBlock(character),
+    `Evaluate the candidate sheet:`,
+    `1. sameCharacter: Is the character on the sheet recognizably the SAME child as in the photos (hair color/style, skin tone, distinguishing features)? Judge against the photos and the description above.`,
+    `2. allPanelsConsistent: Do all four panels depict the same character with identical features, proportions, and outfit?`,
+    `3. styleMatches: Does the sheet's rendering match the art style exemplars (line work, palette, construction method)?`,
+    `4. noTextArtifacts: Is the sheet free of any text, labels, captions, watermarks, and obvious anatomical errors (wrong finger count, fused features)?`,
+    `Set passed=true only if ALL four checks pass. Describe any failure precisely in notes.`,
+  ].join('\n\n');
+}
+
+export const SHEET_VALIDATION_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    sameCharacter: { type: 'boolean' },
+    allPanelsConsistent: { type: 'boolean' },
+    styleMatches: { type: 'boolean' },
+    noTextArtifacts: { type: 'boolean' },
+    passed: { type: 'boolean' },
+    notes: { type: 'string' },
+  },
+  required: [
+    'sameCharacter',
+    'allPanelsConsistent',
+    'styleMatches',
+    'noTextArtifacts',
+    'passed',
+    'notes',
+  ],
   additionalProperties: false,
 } as const;
 

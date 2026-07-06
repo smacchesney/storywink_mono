@@ -166,6 +166,37 @@ export interface IllustrationGenerationJobV2 extends IllustrationGenerationJob {
   characterIdentity?: CharacterIdentity | null;
   qcRound?: number;
   qcFeedback?: string | null;
+  /**
+   * Validated character-sheet references for the book's current art style,
+   * snapshotted into the job like characterIdentity. Present only when
+   * CHARACTER_SHEETS_ENABLED produced (or reused) sheets for this run.
+   */
+  characterSheets?: CharacterSheetRef[];
+}
+
+/**
+ * One validated character turnaround sheet, as carried in illustration job
+ * data and resolved from Book.characterReferences for the current art style.
+ */
+export interface CharacterSheetRef {
+  characterId: string;
+  /** Character name for prompt role-labeling (falls back to characterId). */
+  name: string | null;
+  /** Cloudinary URL of the validated 2x2 turnaround sheet. */
+  url: string;
+}
+
+/**
+ * One entry of Book.characterReferences (Json array). Keyed by
+ * (characterId, artStyle); entries are RETAINED across style flips so an
+ * A→B→A style change never re-buys a sheet.
+ */
+export interface CharacterReferenceEntry {
+  characterId: string;
+  artStyle: string;
+  url: string;
+  /** ISO timestamp of the successful gpt-5-mini validation. */
+  validatedAt: string;
 }
 
 /**
@@ -193,6 +224,15 @@ export interface CharacterDescription {
   role: string;
   /** Character name if known from book metadata */
   name: string | null;
+  /**
+   * How `name` was established, stamped by the workers' capture-answer merge
+   * (resolveCast): 'chip' = the parent tapped/typed it on a naming chip,
+   * 'childName' = the setup sheet's child name, 'fallback' = derived from the
+   * role. Absent on names the perception/extraction model filled from book
+   * metadata. Deterministic QC name-coverage checks only trust
+   * 'chip'/'childName' entries.
+   */
+  namedVia?: 'chip' | 'childName' | 'fallback';
   /** Physical appearance traits extracted from photos */
   physicalTraits: {
     apparentAge: string;
@@ -233,6 +273,22 @@ export interface PageQCResult {
 }
 
 /**
+ * QC result for the generated cover illustration (scored against its own
+ * rubric variant: painted title text is EXPECTED and must match the book
+ * title exactly).
+ */
+export interface CoverQCResult {
+  passed: boolean;
+  /** Whether the painted title matches the book title exactly. */
+  titleMatches: boolean;
+  characterConsistencyScore: number;
+  styleConsistencyScore: number;
+  overallScore: number;
+  issues: string[];
+  suggestedPromptAdditions: string | null;
+}
+
+/**
  * QC result for the entire book
  */
 export interface BookQCResult {
@@ -241,4 +297,6 @@ export interface BookQCResult {
   pageResults: PageQCResult[];
   failedPageIds: string[];
   summary: string;
+  /** Present when the cover joined the QC call (CHARACTER_SHEETS_ENABLED). */
+  coverResult?: CoverQCResult | null;
 }

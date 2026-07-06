@@ -273,19 +273,27 @@ export function PhotoStrip({
         });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          // Surface the server's guard message (cover / min-2) as a toast.
-          throw new Error(body.error || tUpload('errorGeneric'));
+          // Map the server's guard codes (cover / min-2) to friendly copy;
+          // the raw message goes to the log, never to the parent.
+          logger.warn({ body }, 'PhotoStrip page delete rejected');
+          const friendly =
+            body.code === 'COVER_LOCKED'
+              ? t('coverLocked')
+              : body.code === 'MIN_PAGES'
+                ? t('minPages')
+                : tUpload('errorGeneric');
+          toast.error(friendly);
+          return;
         }
         await onPhotosChanged?.();
       } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : tUpload('errorGeneric'),
-        );
+        logger.error({ err }, 'PhotoStrip page delete failed');
+        toast.error(tUpload('errorGeneric'));
       } finally {
         setRemovingId(null);
       }
     },
-    [bookId, getToken, onPhotosChanged, tUpload],
+    [bookId, getToken, onPhotosChanged, t, tUpload],
   );
 
   return (

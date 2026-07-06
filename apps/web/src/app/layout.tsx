@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     default: "Storywink - AI Storybooks from Your Photos",
     template: "%s | Storywink"
   },
-  description: "Transform your photos into personalized, illustrated children's storybooks with AI. Create magical stories featuring your child as the hero in minutes.",
+  description: "Transform your photos into personalized, illustrated children's storybooks with AI. Your child becomes the hero of their own tale — the finished book is usually ready in 10-15 minutes.",
   keywords: ["AI storybooks", "personalized children's books", "photo to illustration", "custom storybooks", "AI children's stories"],
   authors: [{ name: "Storywink" }],
   creator: "Storywink",

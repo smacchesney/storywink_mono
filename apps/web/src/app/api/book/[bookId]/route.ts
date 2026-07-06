@@ -19,6 +19,10 @@ const captureQuestionSchema = z.object({
   id: z.string().max(100),
   question: z.string().max(300),
   options: z.array(z.string().max(200)).max(8),
+  // Links a naming question to its roster character. Nested zod objects strip
+  // unknown keys, so without this the id would silently vanish on PATCH and
+  // the parent's answer could never merge back into the cast.
+  characterId: z.string().max(50).nullable().optional(),
   answer: z.string().max(500).nullable().optional(),
 });
 

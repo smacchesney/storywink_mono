@@ -1,6 +1,7 @@
 import { Job, FlowProducer } from 'bullmq';
 import prisma from '../database/index.js';
-import { CharacterExtractionJob, CharacterIdentity, QUEUE_NAMES } from '@storywink/shared';
+import { CharacterExtractionJob, CharacterIdentity, CharacterSheetRef, QUEUE_NAMES } from '@storywink/shared';
+import { characterSheetsEnabled, ensureCharacterSheets } from '../lib/character-sheets.js';
 import OpenAI from 'openai';
 import { createBullMQConnection } from '@storywink/shared/redis';
 import pino from 'pino';
@@ -14,14 +15,32 @@ import {
   STYLE_TRANSLATION_REFRESH_SCHEMA,
 } from '@storywink/shared/prompts/character-identity';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg, remapCharacterPages } from '@storywink/shared/utils';
+import { mergeCastNames, CaptureAnswerLike } from '../lib/resolveCast.js';
 import { ANALYSIS_MODEL } from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+
+/**
+ * Best-effort write of Book.generationPhase — the honest-progress signal the
+ * wait screen narrates from. A phase write must never fail a job.
+ */
+async function setGenerationPhase(bookId: string, phase: string | null): Promise<void> {
+  try {
+    await prisma.book.update({ where: { id: bookId }, data: { generationPhase: phase } });
+  } catch (error) {
+    logger.warn(
+      { bookId, phase, error: error instanceof Error ? error.message : 'Unknown error' },
+      'Failed to write generationPhase — continuing',
+    );
+  }
+}
 
 export async function processCharacterExtraction(job: Job<CharacterExtractionJob>) {
   const { bookId, userId, artStyle, pageIds } = job.data;
 
   logger.info({ bookId, userId, artStyle }, 'Starting character identity extraction');
+
+  await setGenerationPhase(bookId, 'characters');
 
   let characterIdentity: CharacterIdentity | null = null;
 
@@ -42,12 +61,44 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
     // 2. Get all pages (including cover page)
     const storyPages = book.pages;
 
+    // Re-apply the capture-answer merge (same resolveCast helper the story
+    // worker uses) BEFORE the reuse branch and BEFORE character sheets: an
+    // in-flight DRAFT perception refresh can overwrite the roster after the
+    // story worker persisted its merge, and this closes that race at the
+    // exact consumer that feeds names into the illustration prompts.
+    let existingIdentity = book.characterIdentity as CharacterIdentity | null;
+    if (existingIdentity?.characters?.length) {
+      const merge = mergeCastNames({
+        characters: existingIdentity.characters,
+        captureQuestions: (book.captureQuestions as CaptureAnswerLike[] | null) ?? [],
+        childName: book.childName,
+      });
+      if (merge.changed) {
+        existingIdentity = { ...existingIdentity, characters: merge.characters };
+        try {
+          await prisma.book.update({
+            where: { id: bookId },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            data: { characterIdentity: existingIdentity as any },
+          });
+          logger.info(
+            { bookId, namedCharacters: merge.characters.filter(c => c.name).length },
+            'Re-applied capture-answer merge to character identity before reuse',
+          );
+        } catch (mergeError) {
+          logger.warn(
+            { bookId, error: mergeError instanceof Error ? mergeError.message : 'Unknown error' },
+            'Capture-answer merge persist failed — continuing with in-memory merged identity',
+          );
+        }
+      }
+    }
+
     // Skip the vision call when the perception pass's identity can be
     // remapped onto the CURRENT page order (appearsOnAssetIds stamps present
     // and every referenced asset still on the book). Remapping — not raw
     // reuse — is what makes the skip safe after the parent reorders photos;
     // a swapped/removed photo makes remap return null and we re-extract.
-    const existingIdentity = book.characterIdentity as CharacterIdentity | null;
     const remappedIdentity =
       existingIdentity?.characters?.length && storyPages.length > 0
         ? remapCharacterPages(existingIdentity, storyPages.map(p => p.assetId))
@@ -80,7 +131,20 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         // degradation) and leave the stamp untouched so the next run retries.
       }
 
-      await createIllustrationFlow(bookId, userId, characterIdentity, pageIds);
+      // Sheets are ensured on BOTH paths — this remap-skip early return is
+      // the common path (single-page fixes, retries), and skipping it here
+      // would strip sheets from exactly those re-renders.
+      const characterSheets = await ensureCharacterSheets({
+        bookId,
+        userId,
+        artStyle,
+        identity: characterIdentity,
+        pages: storyPages,
+        existingReferences: book.characterReferences,
+        logger,
+      });
+
+      await createIllustrationFlow(bookId, userId, characterIdentity, pageIds, characterSheets);
       return { success: true, characterCount: characterIdentity.characters.length, reused: true };
     }
 
@@ -151,6 +215,18 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         // reuse path refreshes the translations when this stamp mismatches.
         characterIdentity = { ...JSON.parse(rawResult), extractedForStyle: artStyle };
 
+        // Fresh extractions mint new characterIds, so chip answers rarely
+        // join here — but the merge still stamps main_child's name with its
+        // childName provenance, and never guesses on failed joins.
+        const freshMerge = mergeCastNames({
+          characters: characterIdentity!.characters,
+          captureQuestions: (book.captureQuestions as CaptureAnswerLike[] | null) ?? [],
+          childName: book.childName,
+        });
+        if (freshMerge.changed) {
+          characterIdentity = { ...characterIdentity!, characters: freshMerge.characters };
+        }
+
         // 7. Store on Book record
         await prisma.book.update({
           where: { id: bookId },
@@ -171,9 +247,47 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
     }, 'Character identity extraction failed — proceeding without character identity');
   }
 
-  // 8. Create the illustration FlowProducer flow
+  // 8. Ensure character sheets (fresh-extraction path; the remap path above
+  // has its own call). The book is re-fetched because the extraction `book`
+  // is scoped to the try block; ensureCharacterSheets itself never throws.
+  let characterSheets: CharacterSheetRef[] = [];
+  try {
+    const bookForSheets = characterSheetsEnabled()
+      ? await prisma.book.findUnique({
+          where: { id: bookId },
+          select: {
+            characterReferences: true,
+            pages: {
+              orderBy: { index: 'asc' },
+              select: {
+                assetId: true,
+                asset: { select: { url: true, thumbnailUrl: true } },
+              },
+            },
+          },
+        })
+      : null;
+    if (bookForSheets) {
+      characterSheets = await ensureCharacterSheets({
+        bookId,
+        userId,
+        artStyle,
+        identity: characterIdentity,
+        pages: bookForSheets.pages,
+        existingReferences: bookForSheets.characterReferences,
+        logger,
+      });
+    }
+  } catch (sheetError) {
+    logger.warn(
+      { bookId, error: sheetError instanceof Error ? sheetError.message : 'Unknown error' },
+      'Character sheet step failed — proceeding without sheets',
+    );
+  }
+
+  // 9. Create the illustration FlowProducer flow
   // This runs regardless of whether extraction succeeded (graceful degradation)
-  await createIllustrationFlow(bookId, userId, characterIdentity, pageIds);
+  await createIllustrationFlow(bookId, userId, characterIdentity, pageIds, characterSheets);
 
   return { success: true, characterCount: characterIdentity?.characters?.length ?? 0 };
 }
@@ -267,6 +381,7 @@ async function createIllustrationFlow(
   userId: string,
   characterIdentity: CharacterIdentity | null,
   pageIds?: string[],
+  characterSheets?: CharacterSheetRef[],
 ): Promise<void> {
   // Re-fetch book to get latest page data
   const book = await prisma.book.findUnique({
@@ -353,6 +468,9 @@ async function createIllustrationFlow(
       illustrationNotes: page.illustrationNotes,
       originalImageUrl: page.originalImageUrl,
       characterIdentity,
+      // Snapshot sheet refs like characterIdentity — the illustration worker
+      // must not depend on Book row state at render time.
+      ...(characterSheets?.length ? { characterSheets } : {}),
       language: book.language,
     },
     opts: {
@@ -388,7 +506,11 @@ async function createIllustrationFlow(
       childJobCount: pageChildren.length,
       flowJobId: flow.job.id,
       hasCharacterIdentity: !!characterIdentity,
+      characterSheetCount: characterSheets?.length ?? 0,
     }, 'Created illustration flow from character extraction worker');
+
+    // Renders are now in flight — the wait screen can start counting pages.
+    await setGenerationPhase(bookId, 'illustrating');
   } finally {
     await flowProducer.close();
   }

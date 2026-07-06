@@ -23,6 +23,13 @@ export interface PhotoAnalysisInput {
   additionalCharacters: { name: string; relationship: string }[] | null;
   artStyle: string;
   language?: string; // "en" | "ja"
+  /**
+   * Roster from an earlier pass over this book (set on refresh runs).
+   * Lets the model reuse the same characterId for the same real
+   * person/animal, so an already-answered naming chip's characterId link
+   * survives a photo add/remove.
+   */
+  priorCharacters?: { characterId: string; role: string; name: string | null }[];
   storyPages: {
     pageNumber: number;
     assetId: string | null;
@@ -45,6 +52,12 @@ export interface CaptureQuestion {
   id: string;
   question: string;
   options: string[];
+  /**
+   * Set on NAMING questions: links the question to the roster entry it asks
+   * about, so the parent's answer can merge back into that character's name.
+   * Null for every other question kind.
+   */
+  characterId?: string | null;
   answer?: string | null; // set by the parent in the UI
 }
 
@@ -65,11 +78,17 @@ export function createPhotoAnalysisPrompt(input: PhotoAnalysisInput): string {
     ? `Other people who may appear: ${input.additionalCharacters.map(c => `${c.name} (${c.relationship})`).join(', ')}.`
     : '';
   const lang = input.language === 'ja' ? 'ja' : 'en';
+  const priorRosterContext = input.priorCharacters?.length
+    ? `These characters were identified in an earlier pass over this book's photos: ${input.priorCharacters
+        .map(c => `${c.characterId} (${c.role}${c.name ? `, name: ${c.name}` : ''})`)
+        .join('; ')}. Reuse the SAME characterId for the same real person or animal wherever they still appear.`
+    : '';
 
   return `Analyze all ${input.storyPages.length} photos, provided in page order. They come from one family and will become a personalized picture book for a toddler, illustrated in a "${input.artStyle}" art style.
 
 ${characterContext}
 ${additionalContext}
+${priorRosterContext}
 
 Produce ALL of the following:
 
@@ -82,7 +101,8 @@ Produce ALL of the following:
 - characterIds: which of your characters (below) appear in this photo.
 
 ## 2. Character identity ("characters" + "sceneContext")
-For EACH distinct person across the photos: characterId (child_1, adult_1, ...), role (main_child, parent, grandparent, sibling, friend...), name (from the context above if identifiable, else null), physicalTraits (apparentAge; hairColor as an exact shade; hairStyle with length/texture/parting/accessories; skinTone with warm/cool specificity; bodyBuild; distinguishingFeatures[]), typicalClothing, styleTranslation (how to render them in "${input.artStyle}" while staying instantly recognizable — materials, construction, colors, proportions), appearsOnPages (photo numbers 1-${input.storyPages.length}).
+For EACH distinct person across the photos, AND each animal companion (pet) that appears in 2+ photos or is clearly central to a moment: characterId (child_1, adult_1, pet_1, ...), role (main_child, parent, grandparent, sibling, friend, pet...), name (from the context above if identifiable, else null), physicalTraits (apparentAge; hairColor as an exact shade; hairStyle with length/texture/parting/accessories; skinTone with warm/cool specificity; bodyBuild; distinguishingFeatures[]), typicalClothing, styleTranslation (how to render them in "${input.artStyle}" while staying instantly recognizable — materials, construction, colors, proportions), appearsOnPages (photo numbers 1-${input.storyPages.length}).
+For pets, reuse the same trait fields naturally: hairColor = fur/coat color, hairStyle = coat length and texture, distinguishingFeatures = collar, markings, ear shape, size; typicalClothing = collar/harness or "none".
 Be ruthlessly specific — an illustrator will use this as the canonical reference on every page. "Brown hair" is insufficient; "medium-length wavy dark brown hair parted slightly left, small red clip on the right" is the standard. Also give sceneContext: the overall environment pattern across photos.
 
 ## 3. The story brief ("eventSummary")
@@ -91,13 +111,19 @@ ONE warm sentence a parent would recognize as their day: "Emma's first trip to t
 ## 4. A suggested title ("suggestedTitle")
 Short (2-6 words), warm, specific to these photos. ${lang === 'ja' ? 'In Japanese, hiragana/katakana only, no kanji.' : ''} Avoid generic titles like "A Special Day".
 
-## 5. Micro-questions for the parent ("captureQuestions", 2-3 maximum)
-Ask ONLY what the photos cannot tell you and what would most change the story. The parent answers with one tap, so each question needs 2-4 SHORT tappable options (the UI adds "skip" and free-text automatically — do not include them). ${lang === 'ja' ? 'Write questions and options in natural Japanese.' : ''}
-Good kinds of questions:
+## 5. Micro-questions for the parent ("captureQuestions", 3 maximum)
+Ask ONLY what the photos cannot tell you and what would most change the story. The parent answers with one tap, so each question needs 2-4 SHORT tappable options (the UI adds "skip" automatically, and on naming questions it also adds a "Someone else…" free-text option — do not include either). ${lang === 'ja' ? 'Write questions and options in natural Japanese.' : ''}
+
+FIRST — naming questions (REQUIRED, with "characterId" set to the roster entry above):
+Emit ONE naming question for EVERY character above whose name you do not know, who appears in 2 or more photos AND shares at least one photo with the main child. Never ask about background strangers or one-photo passersby. At most 2 naming questions — if more characters qualify, pick the two who appear most often.
+- Anchor the question visually so the parent knows who you mean: "Who is the woman with the silver hair who's in several photos?" — for a pet: "Who is the fluffy grey cat?"
+- Options must be the words the child would actually say: "Grandma" / "Grandpa" / "Auntie" / "Mummy" (for a pet: "Our dog" / "Grandma's dog"). A generic category like "Family friend" may appear as ONE option at most — it describes the relationship, it is not what a toddler calls someone.
+
+THEN — other question kinds ("characterId": null), up to 3 questions total:
 - Firsts/meaning: "Was this a special first?" with options like "First beach trip" / "First swim" / "Just a fun day"
-- Unidentified recurring people: "Who is the woman with ${input.childName || 'the child'} in several photos?" with options like "Grandma" / "Aunt" / "Family friend" (ONLY if someone recurs and isn't named in the context above)
 - The moment that mattered: "What was the highlight?" with options drawn from the actual photos ("The huge splash" / "Ice cream after" / "Building the sandcastle")
-Give each an id like "q1", "q2". Never ask what you already know, never ask more than 3.`;
+
+Naming questions always come FIRST in the array. Give each an id like "q1", "q2". Never ask what you already know, never ask more than 3.`;
 }
 
 export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
@@ -160,8 +186,9 @@ export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
           id: { type: 'string' },
           question: { type: 'string' },
           options: { type: 'array', items: { type: 'string' } },
+          characterId: { type: ['string', 'null'] },
         },
-        required: ['id', 'question', 'options'],
+        required: ['id', 'question', 'options', 'characterId'],
         additionalProperties: false,
       },
     },
@@ -169,3 +196,65 @@ export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
   required: ['pageAnalysis', 'characters', 'sceneContext', 'eventSummary', 'suggestedTitle', 'captureQuestions'],
   additionalProperties: false,
 } as const;
+
+/** The character shape scopeCaptureQuestions needs — structurally satisfied
+ * by CharacterIdentity['characters'] entries. */
+export interface ScopeCharacterLike {
+  characterId: string;
+  role: string;
+  name: string | null;
+  appearsOnPages: number[];
+}
+
+/** How many of the (at most 3) chip slots naming questions may occupy, so a
+ * firsts/highlight question usually survives. */
+export const MAX_NAMING_QUESTIONS = 2;
+export const MAX_CAPTURE_QUESTIONS = 3;
+
+/**
+ * Deterministic post-filter over the model's captureQuestions. The prompt
+ * asks for scoped, naming-first questions, but the guarantee lives here:
+ *
+ * - a naming question (characterId set) survives ONLY when its character
+ *   exists in the roster, is still unnamed, appears on 2+ photos, AND shares
+ *   at least one photo with the main child — never background strangers
+ * - one naming question per character (first wins)
+ * - naming questions sort FIRST, capped at MAX_NAMING_QUESTIONS so a
+ *   highlight/firsts question usually keeps a slot (overflow naming
+ *   questions refill trailing slots when there aren't enough other kinds)
+ * - MAX_CAPTURE_QUESTIONS total
+ */
+export function scopeCaptureQuestions(
+  questions: CaptureQuestion[],
+  characters: ScopeCharacterLike[],
+): CaptureQuestion[] {
+  const mainChild = characters.find(c => c.role === 'main_child');
+  const mainPages = new Set(mainChild?.appearsOnPages ?? []);
+  const byId = new Map(characters.map(c => [c.characterId, c]));
+
+  const seenCharacterIds = new Set<string>();
+  const naming: CaptureQuestion[] = [];
+  const other: CaptureQuestion[] = [];
+
+  for (const q of questions) {
+    if (!q.characterId) {
+      other.push(q);
+      continue;
+    }
+    const character = byId.get(q.characterId);
+    if (!character || character.name) continue; // unknown target, or already named
+    if (character.role === 'main_child') continue; // the child is named on the sheet, never via a chip
+    if (seenCharacterIds.has(q.characterId)) continue;
+    const pages = character.appearsOnPages ?? [];
+    if (pages.length < 2) continue; // one-photo passerby
+    if (!pages.some(p => mainPages.has(p))) continue; // background stranger — never sharing a photo with the child
+    seenCharacterIds.add(q.characterId);
+    naming.push(q);
+  }
+
+  return [
+    ...naming.slice(0, MAX_NAMING_QUESTIONS),
+    ...other,
+    ...naming.slice(MAX_NAMING_QUESTIONS),
+  ].slice(0, MAX_CAPTURE_QUESTIONS);
+}

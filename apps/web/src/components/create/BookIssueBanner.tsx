@@ -7,6 +7,7 @@ import { AlertTriangle, RefreshCw, Loader2, Wrench } from 'lucide-react';
 import { BookStatus } from '@prisma/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import logger from '@/lib/logger';
 
 interface BookIssueBannerProps {
   bookId: string;
@@ -53,12 +54,14 @@ export function BookIssueBanner({
         return;
       }
       if (!res.ok) {
-        throw new Error(data.error || 'Retry failed');
+        throw new Error(data.error || 'Retry rejected');
       }
       // 200 with nothing to retry — fall back to resuming polling.
       onRetryStarted?.();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Retry failed');
+      // Raw error text goes to the log, never to the parent.
+      logger.error({ err }, 'Book retry failed');
+      toast.error(t('retryFailed'));
       setIsRetrying(false);
     }
   };

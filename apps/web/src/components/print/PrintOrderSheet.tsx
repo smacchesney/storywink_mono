@@ -2,9 +2,11 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import useMediaQuery from '@/hooks/useMediaQuery';
+import logger from '@/lib/logger';
 import {
   Sheet,
   SheetContent,
@@ -45,6 +47,8 @@ function PanelContent({
   book: PrintOrderBook;
   onClose: () => void;
 }) {
+  const t = useTranslations('print');
+  const tc = useTranslations('common');
   const [quantity, setQuantity] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +90,10 @@ function PanelContent({
         throw new Error('No checkout URL returned');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      // Raw error text goes to the log, never to the parent. Failure is
+      // pre-Stripe-redirect, so "nothing was charged" holds.
+      logger.error({ err }, 'Print checkout failed to start');
+      setError(t('checkoutError'));
       setIsLoading(false);
     }
   };
@@ -101,27 +108,27 @@ function PanelContent({
             {book.coverImageUrl ? (
               <Image
                 src={coolifyImageUrl(book.coverImageUrl)}
-                alt={book.title || 'Book cover'}
+                alt={book.title || t('untitledBook')}
                 fill
                 sizes="80px"
                 className="object-cover"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">
-                No cover
+                {t('noCover')}
               </div>
             )}
           </div>
           {/* Book details */}
           <div className="flex-grow min-w-0">
             <h3 className="font-semibold text-base truncate">
-              {book.title || 'Untitled Book'}
+              {book.title || t('untitledBook')}
             </h3>
             <p className="text-sm text-muted-foreground">
-              {book.pageCount} pages
+              {t('pageCount', { count: book.pageCount })}
             </p>
             <p className="text-sm font-medium text-coral mt-1">
-              {formatMoney(bookPrice, currency)} per book
+              {t('perBook', { price: formatMoney(bookPrice, currency) })}
             </p>
           </div>
         </div>
@@ -132,7 +139,7 @@ function PanelContent({
 
       {/* Quantity selector */}
       <div className="px-4 py-4">
-        <label className="block text-sm font-medium mb-2">Quantity</label>
+        <label className="block text-sm font-medium mb-2">{t('quantity')}</label>
         <QuantitySelector
           quantity={quantity}
           onChange={setQuantity}
@@ -149,21 +156,23 @@ function PanelContent({
         {/* Price summary */}
         <div className="space-y-1 mb-1">
           <div className="flex justify-between items-center text-sm text-muted-foreground">
-            <span>Subtotal ({quantity > 1 ? `${quantity} books` : '1 book'})</span>
+            <span>{t('subtotal', { count: quantity })}</span>
             <span>{formatMoney(subtotal, currency)}</span>
           </div>
           <div className="flex justify-between items-center text-sm text-muted-foreground">
-            <span>Shipping</span>
+            <span>{t('shipping')}</span>
             <span>{formatMoney(shippingTier.priceCents, currency)}</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Total</span>
+            <span className="text-sm font-medium">{t('total')}</span>
             <span className="text-lg font-bold">{formatMoney(total, currency)}</span>
           </div>
         </div>
         <p className="text-xs text-muted-foreground mb-3">
-          Arrives in {shippingTier.deliveryDaysMin}&ndash;{shippingTier.deliveryDaysMax} business
-          days.
+          {t('arrives', {
+            min: shippingTier.deliveryDaysMin,
+            max: shippingTier.deliveryDaysMax,
+          })}
         </p>
 
         {error && (
@@ -178,19 +187,19 @@ function PanelContent({
           {isLoading ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Loading...
+              {t('startingCheckout')}
             </>
           ) : (
-            <>Checkout &middot; {formatMoney(total, currency)}</>
+            t('checkout', { price: formatMoney(total, currency) })
           )}
         </Button>
 
         <Button variant="ghost" onClick={onClose} className="w-full">
-          Cancel
+          {tc('cancel')}
         </Button>
 
         <p className="text-xs text-muted-foreground text-center mt-2">
-          Ships to Singapore &amp; Malaysia.
+          {t('shipsTo')}
         </p>
       </DrawerFooter>
     </div>
@@ -198,6 +207,7 @@ function PanelContent({
 }
 
 export function PrintOrderSheet({ book, isOpen, onClose }: PrintOrderSheetProps) {
+  const t = useTranslations('print');
   const isDesktop = useMediaQuery('(min-width: 768px)');
 
   if (isDesktop) {
@@ -205,8 +215,8 @@ export function PrintOrderSheet({ book, isOpen, onClose }: PrintOrderSheetProps)
       <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()} modal={false} shouldScaleBackground={false}>
         <DrawerContent className="h-full w-[380px] mt-0 fixed right-0 left-auto rounded-none border-l">
           <DrawerHeader>
-            <DrawerTitle>Order Print</DrawerTitle>
-            <DrawerDescription>Get a physical copy of your book</DrawerDescription>
+            <DrawerTitle>{t('title')}</DrawerTitle>
+            <DrawerDescription>{t('subtitle')}</DrawerDescription>
           </DrawerHeader>
           <PanelContent book={book} onClose={onClose} />
         </DrawerContent>
@@ -218,8 +228,8 @@ export function PrintOrderSheet({ book, isOpen, onClose }: PrintOrderSheetProps)
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="bottom" className="h-[85vh] flex flex-col p-0">
         <SheetHeader className="px-4 pt-4 pb-2">
-          <SheetTitle>Order Print</SheetTitle>
-          <SheetDescription>Get a physical copy of your book</SheetDescription>
+          <SheetTitle>{t('title')}</SheetTitle>
+          <SheetDescription>{t('subtitle')}</SheetDescription>
         </SheetHeader>
         <PanelContent book={book} onClose={onClose} />
       </SheetContent>

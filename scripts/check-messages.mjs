@@ -22,7 +22,6 @@ for (const key of ja.keys()) if (!en.has(key)) problems.push(`en.json is missing
 
 for (const [name, catalog] of [['en', en], ['ja', ja]]) {
   for (const [key, value] of catalog) {
-    if (key.startsWith('editor.')) continue; // dead namespace, zero consumers; removed in copy Phase 3
     if (value.includes('{error}')) problems.push(`${name}: ${key} interpolates {error} — raw errors go to the log, not the parent`);
     if (value.includes('...')) problems.push(`${name}: ${key} uses '...' — use '…'`);
     if (BANNED.test(value)) problems.push(`${name}: ${key} uses a system word ("${value.match(BANNED)[0]}")`);

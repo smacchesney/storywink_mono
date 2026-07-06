@@ -20,6 +20,7 @@ import {
   type UploadErrorKey,
   type UploadedAsset,
 } from '@/lib/uploadPhotos';
+import { track } from '@/lib/track';
 import logger from '@/lib/logger';
 
 const KAI_MASCOT_URL =
@@ -178,6 +179,13 @@ export function PhotoTray({
             return tile;
           }),
         );
+        // Funnel telemetry: a batch finished with at least one photo landed.
+        if (assets.length > 0) {
+          track('upload_completed', {
+            ...(bookId ? { bookId } : {}),
+            props: { count: assets.length, failed: batch.length - assets.length },
+          });
+        }
         onBatchSettled?.(assets);
       } catch (err) {
         // Batch-level failure (e.g. no signature). Mark every uploading tile failed.

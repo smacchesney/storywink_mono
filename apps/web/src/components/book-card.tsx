@@ -1,14 +1,9 @@
 "use client";
 
 import React, { useState } from 'react';
-import Image from 'next/image';
+import Link from 'next/link';
 import { BookStatus } from '@prisma/client';
-import {
-  Card,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -17,13 +12,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Trash2, Eye, Loader2, AlertTriangle, RefreshCw, Download, Printer } from 'lucide-react';
+import { MoreHorizontal, Trash2, Eye, Loader2, AlertTriangle, RefreshCw, Download, Printer, Pencil } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { coolifyImageUrl, calculatePrintedPageCount } from '@storywink/shared';
+import { calculatePrintedPageCount } from '@storywink/shared';
 import { TextShimmerWave } from '@/components/ui/text-shimmer-wave';
 import { PrintOrderSheet, PrintOrderBook } from '@/components/print/PrintOrderSheet';
 import { ExportPdfDialog } from '@/components/book/ExportPdfDialog';
+import BookArtImage from '@/components/book/BookArtImage';
 
 export interface BookCardProps {
   id: string;
@@ -38,6 +34,13 @@ export interface BookCardProps {
   isDeleting?: boolean;
   isRetrying?: boolean;
 }
+
+// CSS-only stack of pages peeking out under the cover — the card reads as a
+// book object, not a dashboard tile.
+const PAGE_STACK_SHADOW =
+  '3px 3px 0 -1px #fff, 3px 3px 0 0 #e5e5e5, 6px 6px 0 -1px #fff, 6px 6px 0 0 #d9d9d9';
+
+const COVER_SIZES = '(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw';
 
 const BookCard: React.FC<BookCardProps> = ({
   id,
@@ -59,148 +62,25 @@ const BookCard: React.FC<BookCardProps> = ({
   const [showPrintSheet, setShowPrintSheet] = useState(false);
 
   const actualPageCount = pageCount ?? 0;
-
-  const handleViewClick = () => {
-    router.push(`/book/${id}/preview`);
-  };
-
-  const isIllustrating = status === BookStatus.ILLUSTRATING;
-  const isError = status === BookStatus.FAILED || status === BookStatus.PARTIAL;
-
+  const displayTitle = title || t('untitledBook');
   const displayImageUrl = coverImageUrl;
 
-  // ILLUSTRATING STATE - Consistent layout with completed cards
-  if (isIllustrating) {
-    return (
-      <Card className="flex flex-col hover:shadow-md transition-shadow overflow-hidden">
-        {/* Image area with blur and shimmer overlay */}
-        <div className="relative w-full aspect-video bg-muted overflow-hidden">
-          {displayImageUrl ? (
-            <Image
-              src={coolifyImageUrl(displayImageUrl)}
-              alt={t('coverAlt', { title: title || t('untitledBook') })}
-              fill
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 45vw, 25vw"
-              className="object-cover blur-sm scale-105"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800" />
-          )}
-          {/* Dark overlay */}
-          <div className="absolute inset-0 bg-black/40" />
+  const isCompleted = status === BookStatus.COMPLETED;
+  const isPartial = status === BookStatus.PARTIAL;
+  const isFailed = status === BookStatus.FAILED;
+  const isDraft = status === BookStatus.DRAFT;
+  const isStoryReady = status === BookStatus.STORY_READY;
+  const isWriting = status === BookStatus.GENERATING;
+  const isIllustrating = status === BookStatus.ILLUSTRATING;
+  const isWorking = isWriting || isIllustrating;
 
-          {/* Centered shimmer text and time estimate on image */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <TextShimmerWave
-              className="text-lg font-semibold font-playful [--base-color:#e2e8f0] [--base-gradient-color:var(--coral-primary)]"
-              duration={1}
-              spread={1}
-              zDistance={1}
-              scaleDistance={1.1}
-              rotateYDistance={20}
-            >
-              {qcRound > 0 ? t('polishingIllustrations') : t('creatingIllustrations')}
-            </TextShimmerWave>
-            <p className="text-sm text-white/70 mt-2">
-              {qcRound > 0 ? t('almostDone') : t('usuallyTakes')}
-            </p>
-          </div>
-        </div>
-
-        {/* Content below image - matches completed card structure */}
-        <CardHeader className="pb-2 pt-4 px-4">
-          <CardTitle className="text-lg truncate text-center">{title || t('untitledBook')}</CardTitle>
-        </CardHeader>
-
-        {/* Footer with disabled buttons */}
-        <CardFooter className="flex flex-col items-stretch pt-2 px-4 pb-3 gap-2">
-          <div className="flex justify-between items-center w-full">
-            <Button
-              disabled
-              size="sm"
-              className="flex-grow mr-2 bg-slate-300 hover:bg-slate-300 text-slate-500 cursor-not-allowed rounded-full font-playful"
-            >
-              <Eye className="h-4 w-4 mr-1.5" />
-              {t('viewPreview')}
-            </Button>
-            <Button variant="outline" size="icon" disabled className="cursor-not-allowed">
-              <MoreHorizontal className="h-4 w-4" />
-              <span className="sr-only">{t('bookActions')}</span>
-            </Button>
-          </div>
-          <p className="text-xs text-slate-400 text-center">
-            {t('availableWhenComplete')}
-          </p>
-        </CardFooter>
-      </Card>
-    );
-  }
-
-  // ERROR STATE - Consistent layout with completed cards
-  if (isError) {
-    return (
-      <Card className="flex flex-col hover:shadow-md transition-shadow overflow-hidden border-red-200 dark:border-red-900">
-        {/* Image */}
-        <div className="relative w-full aspect-video bg-muted overflow-hidden">
-          {displayImageUrl ? (
-            <Image
-              src={coolifyImageUrl(displayImageUrl)}
-              alt={t('coverAlt', { title: title || t('untitledBook') })}
-              fill
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 45vw, 25vw"
-              className="object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <span className="text-xs text-muted-foreground">{t('noPreview')}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Content below image */}
-        <CardHeader className="pb-2 pt-4 px-4">
-          <CardTitle className="text-lg truncate text-center">{title || t('untitledBook')}</CardTitle>
-          <div className="flex items-center justify-center gap-1.5 text-red-600 dark:text-red-400 mt-1">
-            <AlertTriangle className="h-4 w-4" />
-            <span className="text-sm">
-              {status === BookStatus.FAILED ? t('illustrationFailed') : t('someIllustrationsFailed')}
-            </span>
-          </div>
-        </CardHeader>
-
-        {/* Footer with retry and delete buttons - aligned with completed cards */}
-        <CardFooter className="flex justify-between items-center pt-2 px-4 pb-3">
-          <Button
-            onClick={status === BookStatus.PARTIAL ? () => router.push(`/book/${id}/resolve`) : onRetryClick}
-            size="sm"
-            className="flex-grow mr-2 bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
-            disabled={isRetrying}
-          >
-            {isRetrying ? (
-              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-1.5" />
-            )}
-            {isRetrying ? t('retrying') : (status === BookStatus.PARTIAL ? t('fixIssues') : t('retryIllustrations'))}
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={onDeleteClick}
-            disabled={isDeleting}
-            className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
-          >
-            {isDeleting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Trash2 className="h-4 w-4" />
-            )}
-            <span className="sr-only">{tc('delete')}</span>
-          </Button>
-        </CardFooter>
-      </Card>
-    );
-  }
+  // The cover tap is the one primary action; it goes where the book needs
+  // the parent next.
+  const coverHref = isCompleted || isPartial || isFailed
+    ? `/book/${id}/preview`
+    : isStoryReady
+      ? `/create/review?bookId=${id}`
+      : `/create/${id}/setup`;
 
   // Prepare book data for PrintOrderSheet
   const printOrderBook: PrintOrderBook = {
@@ -210,38 +90,140 @@ const BookCard: React.FC<BookCardProps> = ({
     pageCount: calculatePrintedPageCount(actualPageCount),
   };
 
-  // COMPLETED STATE - Simplified card without status badge
+  const caption = isDraft
+    ? t('continueMaking')
+    : isStoryReady
+      ? t('storyReady')
+      : isIllustrating
+        ? t('availableWhenComplete')
+        : null;
+
   return (
     <>
-      <Card className="flex flex-col hover:shadow-md transition-shadow overflow-hidden">
-        {/* Image */}
-        <div className="relative w-full aspect-video bg-muted overflow-hidden">
+      <Card className="flex flex-col gap-0 p-3 hover:shadow-md transition-shadow">
+        {/* Cover — square, page-stack edge, the whole thing is the tap target */}
+        <Link
+          href={coverHref}
+          aria-label={t('coverAlt', { title: displayTitle })}
+          className="group relative block w-full aspect-square rounded-md overflow-hidden bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2"
+          style={{ boxShadow: PAGE_STACK_SHADOW }}
+        >
           {displayImageUrl ? (
-            <Image
-              src={coolifyImageUrl(displayImageUrl)}
-              alt={t('coverAlt', { title: title || t('untitledBook') })}
-              fill
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 45vw, 25vw"
-              className="object-cover"
+            <BookArtImage
+              src={displayImageUrl}
+              alt=""
+              sizes={COVER_SIZES}
+              className={isWorking ? 'blur-sm scale-105' : 'transition-transform duration-200 group-hover:scale-[1.02]'}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
+            <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center">
               <span className="text-xs text-muted-foreground">{t('noPreview')}</span>
             </div>
           )}
+
+          {/* Working overlay: the shimmer names what's happening right now */}
+          {isWorking && (
+            <>
+              <div className="absolute inset-0 bg-black/40" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-2 text-center">
+                <TextShimmerWave
+                  className="text-base font-semibold font-playful [--base-color:#e2e8f0] [--base-gradient-color:var(--coral-primary)]"
+                  duration={1}
+                  spread={1}
+                  zDistance={1}
+                  scaleDistance={1.1}
+                  rotateYDistance={20}
+                >
+                  {isWriting
+                    ? t('writingStory')
+                    : qcRound > 0
+                      ? t('polishingIllustrations')
+                      : t('creatingIllustrations')}
+                </TextShimmerWave>
+                {isIllustrating && (
+                  <p className="text-xs text-white/70 mt-2">
+                    {qcRound > 0 ? t('almostDone') : t('usuallyTakes')}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+        </Link>
+
+        {/* Title row + the one kebab (all secondary actions live here) */}
+        <div className="mt-3 flex items-center justify-between gap-1">
+          <CardTitle className="text-base font-playful truncate min-w-0">{displayTitle}</CardTitle>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={isDeleting}
+                className="h-8 w-8 shrink-0 text-muted-foreground"
+              >
+                {isDeleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <MoreHorizontal className="h-4 w-4" />
+                )}
+                <span className="sr-only">{t('bookActions')}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {isCompleted && (
+                <>
+                  <DropdownMenuItem onClick={() => setShowPrintSheet(true)}>
+                    <Printer className="mr-2 h-4 w-4" /> {t('orderPrint')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowExportDialog(true)}>
+                    <Download className="mr-2 h-4 w-4" /> {t('savePdf')}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              {isPartial && (
+                <>
+                  <DropdownMenuItem onClick={() => router.push(`/book/${id}/resolve`)}>
+                    <RefreshCw className="mr-2 h-4 w-4" /> {t('fixIssues')}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              {isFailed && onRetryClick && (
+                <>
+                  <DropdownMenuItem onClick={onRetryClick} disabled={isRetrying}>
+                    <RefreshCw className="mr-2 h-4 w-4" /> {isRetrying ? t('retrying') : t('retryIllustrations')}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                onClick={onDeleteClick}
+                disabled={isDeleting}
+              >
+                <Trash2 className="mr-2 h-4 w-4" /> {tc('delete')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
-        {/* Content below image */}
-        <CardHeader className="pb-2 pt-4 px-4">
-          <CardTitle className="text-lg truncate text-center">{title || t('untitledBook')}</CardTitle>
-        </CardHeader>
+        {/* Status line, only where the book needs a word */}
+        {caption && (
+          <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{caption}</p>
+        )}
+        {(isPartial || isFailed) && (
+          <p className="mt-1 flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            {isFailed ? t('illustrationFailed') : t('someIllustrationsFailed')}
+          </p>
+        )}
 
-        {/* Footer with View, Order Print, and dropdown */}
-        <CardFooter className="flex flex-col gap-2 pt-2 px-4 pb-3">
-          {/* Primary actions row */}
-          <div className="flex justify-between items-center w-full gap-2">
+        {/* Footer buttons return at md+, where cards are wide enough for them */}
+        {isCompleted && (
+          <div className="mt-3 hidden md:flex items-center gap-2">
             <Button
-              onClick={handleViewClick}
+              onClick={() => router.push(`/book/${id}/preview`)}
               size="sm"
               variant="outline"
               className="flex-1 rounded-full font-playful"
@@ -258,54 +240,82 @@ const BookCard: React.FC<BookCardProps> = ({
               {t('orderPrint')}
             </Button>
           </div>
-
-          {/* Secondary actions row */}
-          <div className="flex justify-end w-full">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" disabled={isDeleting} className="text-muted-foreground">
-                  {isDeleting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <MoreHorizontal className="h-4 w-4" />
-                  )}
-                  <span className="sr-only">{t('bookActions')}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setShowExportDialog(true)}>
-                  <Download className="mr-2 h-4 w-4" /> {t('exportPdf')}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                  onClick={onDeleteClick}
-                  disabled={isDeleting}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" /> {tc('delete')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+        )}
+        {isPartial && (
+          <div className="mt-3 hidden md:flex">
+            <Button
+              onClick={() => router.push(`/book/${id}/resolve`)}
+              size="sm"
+              className="flex-1 bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
+            >
+              <RefreshCw className="h-4 w-4 mr-1.5" />
+              {t('fixIssues')}
+            </Button>
           </div>
-        </CardFooter>
+        )}
+        {isFailed && (
+          <div className="mt-3 hidden md:flex">
+            <Button
+              onClick={onRetryClick}
+              size="sm"
+              disabled={isRetrying}
+              className="flex-1 bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
+            >
+              {isRetrying ? (
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-1.5" />
+              )}
+              {isRetrying ? t('retrying') : t('retryIllustrations')}
+            </Button>
+          </div>
+        )}
+        {isDraft && (
+          <div className="mt-3 hidden md:flex">
+            <Button
+              onClick={() => router.push(`/create/${id}/setup`)}
+              size="sm"
+              className="flex-1 bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
+            >
+              <Pencil className="h-4 w-4 mr-1.5" />
+              {t('continueMaking')}
+            </Button>
+          </div>
+        )}
+        {isStoryReady && (
+          <div className="mt-3 hidden md:flex">
+            <Button
+              onClick={() => router.push(`/create/review?bookId=${id}`)}
+              size="sm"
+              className="flex-1 bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
+            >
+              <Eye className="h-4 w-4 mr-1.5" />
+              {t('takeALook')}
+            </Button>
+          </div>
+        )}
       </Card>
 
-      {/* Print Order Sheet */}
-      <PrintOrderSheet
-        book={printOrderBook}
-        isOpen={showPrintSheet}
-        onClose={() => setShowPrintSheet(false)}
-      />
+      {isCompleted && (
+        <>
+          {/* Print Order Sheet */}
+          <PrintOrderSheet
+            book={printOrderBook}
+            isOpen={showPrintSheet}
+            onClose={() => setShowPrintSheet(false)}
+          />
 
-      {/* PDF export: fetches, shows the wait, auto-saves when ready */}
-      <ExportPdfDialog
-        bookId={id}
-        bookTitle={title}
-        open={showExportDialog}
-        onOpenChange={setShowExportDialog}
-      />
+          {/* PDF export: fetches, shows the wait, auto-saves when ready */}
+          <ExportPdfDialog
+            bookId={id}
+            bookTitle={title}
+            open={showExportDialog}
+            onOpenChange={setShowExportDialog}
+          />
+        </>
+      )}
     </>
   );
 };
 
-export default BookCard; 
+export default BookCard;

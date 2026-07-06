@@ -142,11 +142,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Page not found in this book.' }, { status: 404 });
     }
 
-    // CONSTRAINT 1: Cannot delete cover page
+    // CONSTRAINT 1: Cannot delete cover page.
+    // `code` lets the client show its own localized, friendly copy; the
+    // `error` string stays for logs and older clients.
     if (pageToDelete.assetId === book.coverAssetId) {
       logger.warn({ clerkId, bookId, pageId }, 'API: Cannot delete cover page');
       return NextResponse.json(
-        { error: 'Cannot delete the cover photo. Please select a different cover first.' },
+        { code: 'COVER_LOCKED', error: 'Cannot delete the cover photo. Please select a different cover first.' },
         { status: 400 }
       );
     }
@@ -155,7 +157,7 @@ export async function DELETE(
     if (book.pages.length <= 2) {
       logger.warn({ clerkId, bookId, pageId, currentCount: book.pages.length }, 'API: Cannot delete - minimum pages required');
       return NextResponse.json(
-        { error: 'Cannot delete. Your book must have at least 2 photos.' },
+        { code: 'MIN_PAGES', error: 'Cannot delete. Your book must have at least 2 photos.' },
         { status: 400 }
       );
     }

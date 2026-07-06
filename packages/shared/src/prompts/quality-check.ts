@@ -10,11 +10,29 @@ import type { CharacterIdentity } from '../types.js';
 export const QC_SYSTEM_PROMPT =
   "You are a quality assurance specialist for children's picture books. Your task is to evaluate generated illustrations for consistency, quality, and adherence to character identity across all pages of a book.";
 
+export interface QCPromptOptions {
+  /**
+   * Number of validated character sheets prepended to the QC input (each
+   * labeled "REFERENCE SHEET" — a non-numeric label so it can never collide
+   * with a page ordinal). When > 0 the sheet is the ground truth for
+   * character consistency.
+   */
+  sheetCount?: number;
+  /**
+   * Present when the generated cover joins the QC call (labeled "COVER").
+   * The cover is scored with its own rubric variant: painted title text is
+   * EXPECTED and must match expectedTitle exactly.
+   */
+  cover?: { expectedTitle: string } | null;
+}
+
 export function createQCPrompt(
   characterIdentity: CharacterIdentity | null,
   pageCount: number,
-  language: string = 'en'
+  language: string = 'en',
+  options: QCPromptOptions = {}
 ): string {
+  const sheetCount = options.sheetCount ?? 0;
   const characterSection = characterIdentity
     ? `Expected characters (canonical reference):\n${characterIdentity.characters.map(c => {
         const traits = c.physicalTraits;
@@ -25,10 +43,23 @@ export function createQCPrompt(
       }).join('\n')}`
     : 'No character reference available — evaluate based on internal consistency only.';
 
+  const sheetSection = sheetCount > 0
+    ? `\nBefore the pages, ${sheetCount === 1 ? 'one image labeled "REFERENCE SHEET" is' : `${sheetCount} images labeled "REFERENCE SHEET" are`} provided: validated 2x2 turnaround grid(s) of the main character(s). These sheets are the GROUND TRUTH for character consistency — score each page's characters against the sheet (face, hair, skin tone, proportions), not merely against the other pages. Do NOT score the reference sheets themselves and do NOT include them in "pageResults".\n`
+    : '';
+
+  const coverSection = options.cover
+    ? `\nOne image labeled "COVER" is provided: the book's generated cover. Score it in "coverResult" (NOT in "pageResults") using this COVER RUBRIC VARIANT:
+- Painted title text on the cover is EXPECTED and correct — it must NOT count as stray text and must NOT cap the overall score.
+- The painted title must read EXACTLY "${options.cover.expectedTitle}". A garbled, misspelled, incomplete, or duplicated title is a FAILURE: set titleMatches=false and passed=false, and describe the defect in "suggestedPromptAdditions".
+- Any OTHER unintended text on the cover (beyond the title and the small logo mark) still caps OVERALL QUALITY at 4.
+- Character and style consistency are scored exactly like a page${sheetCount > 0 ? ', against the REFERENCE SHEET' : ''}.
+The cover PASSES only if titleMatches is true AND overall score >= 6 AND character consistency >= 5.\n`
+    : '';
+
   return `Evaluate these ${pageCount} children's book illustrations for quality and consistency.
 
-The images are provided in page order (page 1 through page ${pageCount}), and each image is immediately preceded by a text label "PAGE n". In every result, set "pageNumber" to the n from that image's label — never renumber or reorder.
-
+The page images are provided in page order (page 1 through page ${pageCount}), and each page image is immediately preceded by a text label "PAGE n". In every result, set "pageNumber" to the n from that image's label — never renumber or reorder.
+${sheetSection}${coverSection}
 ${characterSection}
 
 For each illustration, evaluate:
@@ -64,6 +95,21 @@ export const QC_RESPONSE_SCHEMA = {
   properties: {
     passed: { type: 'boolean' },
     summary: { type: 'string' },
+    // Scored only when an image labeled "COVER" is in the input; null otherwise.
+    coverResult: {
+      type: ['object', 'null'],
+      properties: {
+        passed: { type: 'boolean' },
+        titleMatches: { type: 'boolean' },
+        characterConsistencyScore: { type: 'number' },
+        styleConsistencyScore: { type: 'number' },
+        overallScore: { type: 'number' },
+        issues: { type: 'array', items: { type: 'string' } },
+        suggestedPromptAdditions: { type: ['string', 'null'] },
+      },
+      required: ['passed', 'titleMatches', 'characterConsistencyScore', 'styleConsistencyScore', 'overallScore', 'issues', 'suggestedPromptAdditions'],
+      additionalProperties: false,
+    },
     pageResults: {
       type: 'array',
       items: {
@@ -82,6 +128,6 @@ export const QC_RESPONSE_SCHEMA = {
       },
     },
   },
-  required: ['passed', 'summary', 'pageResults'],
+  required: ['passed', 'summary', 'coverResult', 'pageResults'],
   additionalProperties: false,
 } as const;

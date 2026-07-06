@@ -13,6 +13,15 @@ export interface IllustrationImageInput {
 export interface IllustrationInput {
   /** The user's source photo that becomes the illustration subject. */
   contentImage: IllustrationImageInput;
+  /**
+   * Character reference images (validated turnaround sheets; on cover calls
+   * also the approved interior render). Sent BETWEEN the content photo and
+   * the style refs — neither SDK has typed reference fields, so this
+   * role-labeled ordering (named by position in the prompt) IS the reference
+   * mechanism. The prompt builder must be told the counts so its role line
+   * matches this ordering.
+   */
+  characterRefs?: IllustrationImageInput[];
   /** Style reference images (1-2 per call, provider decides encoding). */
   styleRefs: IllustrationImageInput[];
   /** Fully constructed text prompt from createIllustrationPrompt(). */

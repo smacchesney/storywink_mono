@@ -8,6 +8,8 @@ export interface CaptureQuestion {
   id: string;
   question: string;
   options: string[];
+  /** Set on naming questions — links the question to a roster character. */
+  characterId?: string | null;
   answer?: string | null;
 }
 
@@ -19,17 +21,40 @@ interface CaptureChipsProps {
 
 const SKIP = '__skip__';
 
+/** Naming questions render first, capped at 2 of the 3 rows so a
+ * highlight/firsts question usually survives (mirrors the worker-side cap). */
+function orderQuestions(questions: CaptureQuestion[]): CaptureQuestion[] {
+  const naming = questions.filter((q) => q.characterId);
+  const other = questions.filter((q) => !q.characterId);
+  return [...naming.slice(0, 2), ...other, ...naming.slice(2)].slice(0, 3);
+}
+
 /**
  * Renders the AI's photo-derived micro-questions as tappable option chips
- * (at most 3 rows), each with a "skip" affordance. Answering a chip PATCHes
- * the answer back through the parent. Nothing renders until questions arrive.
+ * (at most 3 rows), each with a "skip" affordance. Naming questions sort
+ * first and add a "Someone else…" chip that expands into a one-line text
+ * input (commit on blur/enter). Answering PATCHes back through the parent.
+ * Nothing renders until questions arrive.
  */
 export function CaptureChips({ questions, onChange }: CaptureChipsProps) {
   const t = useTranslations('setup');
-  const rows = questions.slice(0, 3);
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const rows = orderQuestions(questions);
 
   const setAnswer = (id: string, answer: string | null) => {
     onChange(questions.map((q) => (q.id === id ? { ...q, answer } : q)));
+  };
+
+  // A typed name: answered, not skipped, and not one of the tappable options.
+  const customAnswer = (q: CaptureQuestion): string | null =>
+    q.answer && q.answer !== SKIP && !q.options.includes(q.answer)
+      ? q.answer
+      : null;
+
+  const commitCustom = (id: string, raw: string) => {
+    setEditingId(null);
+    const value = raw.trim().slice(0, 50);
+    if (value) setAnswer(id, value);
   };
 
   if (rows.length === 0) return null;
@@ -38,10 +63,11 @@ export function CaptureChips({ questions, onChange }: CaptureChipsProps) {
     <div className="flex flex-col gap-3">
       {rows.map((q) => {
         const skipped = q.answer === SKIP;
+        const typed = customAnswer(q);
         return (
           <div key={q.id} className="flex flex-col gap-1.5">
             <p className="text-sm text-gray-700">{q.question}</p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               {q.options.map((opt) => {
                 const active = q.answer === opt;
                 return (
@@ -60,6 +86,38 @@ export function CaptureChips({ questions, onChange }: CaptureChipsProps) {
                   </button>
                 );
               })}
+              {/* "Someone else…" — the free-text affordance, naming questions only. */}
+              {q.characterId &&
+                (editingId === q.id ? (
+                  <input
+                    autoFocus
+                    type="text"
+                    defaultValue={typed ?? ''}
+                    maxLength={50}
+                    placeholder={t('someoneElsePlaceholder')}
+                    onBlur={(e) => commitCustom(q.id, e.currentTarget.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        e.currentTarget.blur();
+                      }
+                    }}
+                    className="h-[30px] w-36 rounded-full border border-coral bg-white px-3 text-sm font-playful text-gray-800 focus:outline-none focus:ring-1 focus:ring-coral"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(q.id)}
+                    className={cn(
+                      'rounded-full border px-3 py-1 text-sm font-playful transition-colors',
+                      typed
+                        ? 'border-coral bg-coral text-white'
+                        : 'border-dashed border-black/20 bg-white text-gray-500 hover:border-coral/50 hover:text-gray-700'
+                    )}
+                  >
+                    {typed ?? t('someoneElse')}
+                  </button>
+                ))}
               <button
                 type="button"
                 onClick={() => setAnswer(q.id, skipped ? null : SKIP)}

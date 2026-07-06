@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useRef, useEffect, useMemo } from 'react';
-import Image from 'next/image';
 import { Page, BookStatus } from '@prisma/client';
 import { Loader2, AlertTriangle, Type, Heart, BookOpen, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { coolifyImageUrl } from '@storywink/shared';
-import { buildDisplayPages, type DisplayPage } from './FlipbookViewer';
+import BookArtImage from './BookArtImage';
+import { buildDisplayPages, type BookLayout, type DisplayPage } from './display-pages';
 
 interface BookPageGalleryProps {
   pages: Page[];
@@ -16,6 +15,8 @@ interface BookPageGalleryProps {
   childName?: string | null;
   bookTitle?: string;
   language?: string;
+  /** Must match the flipbook's active layout so indices line up. */
+  layout?: BookLayout;
 }
 
 const BookPageGallery: React.FC<BookPageGalleryProps> = ({
@@ -26,14 +27,15 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
   childName,
   bookTitle,
   language,
+  layout = 'spread',
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const activeThumbRef = useRef<HTMLButtonElement>(null);
 
   // Build interleaved display pages (same logic as FlipbookViewer)
   const displayPages = useMemo(
-    () => buildDisplayPages(pages, { childName, bookTitle, language }),
-    [pages, childName, bookTitle, language]
+    () => buildDisplayPages(pages, { childName, bookTitle, language, layout }),
+    [pages, childName, bookTitle, language, layout]
   );
 
   // Scroll active thumbnail into view when it changes
@@ -65,25 +67,27 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
   );
 
   /** Get the aria-label for a display page */
-  const getAriaLabel = (dp: DisplayPage, isActive: boolean): string => {
+  const getAriaLabel = (dp: DisplayPage<Page>, isActive: boolean): string => {
     if (dp.type === 'blank') return `Blank page${isActive ? ' (current)' : ''}`;
     if (dp.type === 'dedication') return `Dedication page${isActive ? ' (current)' : ''}`;
     if (dp.type === 'ending') return `Ending page${isActive ? ' (current)' : ''}`;
     if (dp.type === 'back-cover') return `Back cover${isActive ? ' (current)' : ''}`;
+    if (dp.type === 'story') return `Page ${dp.page.pageNumber}${isActive ? ' (current)' : ''}`;
     return `${dp.type === 'text' ? 'Text' : 'Illustration'} - Page ${dp.page.pageNumber}${isActive ? ' (current)' : ''}`;
   };
 
   /** Get the thumbnail label for a display page */
-  const getThumbLabel = (dp: DisplayPage): string => {
+  const getThumbLabel = (dp: DisplayPage<Page>): string => {
     if (dp.type === 'blank') return '';
-    if (dp.type === 'dedication') return '\u2764';
+    if (dp.type === 'dedication') return '❤';
     if (dp.type === 'ending') return 'End';
     if (dp.type === 'back-cover') return 'Back';
+    if (dp.type === 'story') return `${dp.page.pageNumber}`;
     return `${dp.page.pageNumber}${dp.type === 'text' ? 'T' : ''}`;
   };
 
   /** Get a unique key for each display page */
-  const getKey = (dp: DisplayPage, index: number): string => {
+  const getKey = (dp: DisplayPage<Page>, index: number): string => {
     if (dp.type === 'blank') return `blank-${index}`;
     if (dp.type === 'dedication') return `dedication-${index}`;
     if (dp.type === 'ending') return `ending-${index}`;
@@ -105,8 +109,9 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
           const displayIndex = originalIndex + 1; // 1-based, matches flipbook indexing
           const isActive = displayIndex === currentDisplayIndex;
 
-          // For text/illustration pages, check loading state
-          const hasPage = dp.type === 'text' || dp.type === 'illustration';
+          // For text/illustration/story pages, check loading state
+          const hasPage = dp.type === 'text' || dp.type === 'illustration' || dp.type === 'story';
+          const hasArt = dp.type === 'illustration' || dp.type === 'story';
           const hasImage = hasPage && !!dp.page.generatedImageUrl;
           const isPending = hasPage && !hasImage && bookStatus === BookStatus.ILLUSTRATING;
           const isFailed = hasPage && !hasImage && bookStatus === BookStatus.FAILED;
@@ -124,7 +129,7 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
                 ref={isActive ? activeThumbRef : null}
                 type="button"
                 onClick={() => onDisplayPageSelect(displayIndex)}
-                disabled={dp.type === 'illustration' && (isPending || isFailed)}
+                disabled={hasArt && (isPending || isFailed)}
                 className={cn(
                   'w-full h-full relative rounded-md overflow-hidden',
                   'focus:outline-none focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2',
@@ -132,7 +137,7 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
                   isActive
                     ? 'ring-2 ring-coral shadow-md transition-all duration-200 ease-in-out'
                     : 'ring-1 ring-muted/40 hover:ring-coral/50 transition-all duration-150',
-                  (dp.type === 'illustration' && (isPending || isFailed)) && 'cursor-default'
+                  (hasArt && (isPending || isFailed)) && 'cursor-default'
                 )}
                 aria-label={getAriaLabel(dp, isActive)}
                 aria-current={isActive}
@@ -162,13 +167,11 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
                     <Type className="h-5 w-5 text-[#1a1a1a]/60" />
                   </div>
                 ) : hasImage ? (
-                  <Image
-                    src={coolifyImageUrl(dp.page.generatedImageUrl!)}
+                  <BookArtImage
+                    src={dp.page.generatedImageUrl!}
                     alt={`Page ${dp.page.pageNumber}`}
-                    fill
                     sizes="(max-width: 768px) 64px, 80px"
                     className={cn(
-                      "object-cover",
                       !isActive && "hover:opacity-90 transition-opacity"
                     )}
                   />

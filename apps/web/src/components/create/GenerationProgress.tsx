@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { BookStatus } from '@prisma/client';
 import { TextShimmerWave } from '@/components/ui/text-shimmer-wave';
 import { useBookStatus } from '@/hooks/useBookStatus';
+import { resolveProgressHeadline } from '@/components/create/progress-headline';
 import BookIssueBanner from '@/components/create/BookIssueBanner';
 
 interface GenerationProgressProps {
@@ -85,8 +86,16 @@ export function GenerationProgress({ bookId, reviewFirst, onComplete }: Generati
   const t = useTranslations('progress');
   const router = useRouter();
 
-  const { status, totalPages, pagesWithText, pagesWithIllustrations, isTimedOut, restart } =
-    useBookStatus(bookId, { intervalMs: 5000, timeoutMs: TIMEOUT_MS });
+  const {
+    status,
+    generationPhase,
+    childName,
+    totalPages,
+    pagesWithText,
+    pagesWithIllustrations,
+    isTimedOut,
+    restart,
+  } = useBookStatus(bookId, { intervalMs: 5000, timeoutMs: TIMEOUT_MS });
 
   // Tab title: while we work, the tab strip says so; on completion it becomes
   // a free notification channel for a parent who switched tabs.
@@ -112,7 +121,10 @@ export function GenerationProgress({ bookId, reviewFirst, onComplete }: Generati
       if (onComplete) {
         onComplete(status);
       } else {
-        router.push(`/book/${bookId}/preview`);
+        // ?reveal=1 only bridges the preview's data-loading flash with a warm
+        // screen — the reveal itself is gated server-side on firstViewedAt.
+        const suffix = status === BookStatus.COMPLETED ? '?reveal=1' : '';
+        router.push(`/book/${bookId}/preview${suffix}`);
       }
     };
     if (document.hidden) {
@@ -150,20 +162,18 @@ export function GenerationProgress({ bookId, reviewFirst, onComplete }: Generati
   // Failure surface: swap the shimmer for the retry banner in place.
   const isFailed = status === BookStatus.FAILED;
 
-  const headline = (() => {
-    if (status === BookStatus.ILLUSTRATING) {
-      if (pagesWithIllustrations === 0 || totalPages === 0) {
-        return t('gettingCharacters');
-      }
-      return t('illustratingPage', {
-        current: Math.min(pagesWithIllustrations + 1, totalPages),
-        total: totalPages,
-      });
-    }
-    // GENERATING (default) — reading vs writing depends on whether text landed.
-    if (pagesWithText > 0) return t('writingStory');
-    return t('readingPhotos');
-  })();
+  // Honest narration: the workers write generationPhase at real transitions
+  // and the resolver maps it to a headline; a null/stale phase degrades to
+  // the status-only copy this screen shipped with.
+  const headlineSpec = resolveProgressHeadline({
+    status,
+    generationPhase,
+    totalPages,
+    pagesWithText,
+    pagesWithIllustrations,
+    childName,
+  });
+  const headline = t(headlineSpec.key, headlineSpec.values);
 
   // Monotone bar: finalize-QC nulls images on the pages it re-renders, which
   // would visibly yank the bar backwards right when we do extra quality work.

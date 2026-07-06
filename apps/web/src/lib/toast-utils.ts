@@ -1,4 +1,5 @@
 import { toast } from 'sonner';
+import logger from '@/lib/logger';
 
 /**
  * Get appropriate duration for a toast message based on word count
@@ -10,7 +11,8 @@ export const getToastDuration = (message: string): number => {
 };
 
 /**
- * Extract a user-friendly error message from various error types
+ * Extract a loggable message from various error types. This text is for the
+ * log only — it never reaches the parent (docs/voice.md, Rule 3).
  */
 export const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
@@ -26,39 +28,41 @@ export const getErrorMessage = (error: unknown): string => {
 };
 
 /**
- * Show a contextual error toast with actionable messages
+ * Show an error toast. The parent sees only the translated `message` (and
+ * optional translated `description`); the raw error goes to the log.
  */
-export const showError = (error: unknown, context?: string) => {
-  const message = getErrorMessage(error);
-  const isNetworkError = message.toLowerCase().includes('network') || 
-                        message.toLowerCase().includes('connection') ||
-                        message.toLowerCase().includes('fetch');
-  
-  const description = isNetworkError 
-    ? "Check your connection and try again"
-    : message;
+export const showError = (
+  error: unknown,
+  message: string,
+  description?: string
+) => {
+  logger.error({ err: getErrorMessage(error) }, `Error toast shown: ${message}`);
 
-  toast.error(context || "Something went wrong", {
+  toast.error(message, {
     description,
-    duration: getToastDuration(description),
+    duration: getToastDuration(message + (description || '')),
   });
 };
 
 /**
- * Show an error toast with a retry action
+ * Show an error toast with a retry action. Same rule: translated copy only,
+ * raw error to the log. `retryLabel` should come from the caller's catalog
+ * (e.g. common.retry).
  */
 export const showErrorWithRetry = (
-  error: unknown, 
-  context: string,
-  onRetry: () => void
+  error: unknown,
+  message: string,
+  onRetry: () => void,
+  retryLabel: string,
+  description?: string
 ) => {
-  const message = getErrorMessage(error);
-  
-  toast.error(context, {
-    description: message,
+  logger.error({ err: getErrorMessage(error) }, `Error toast shown: ${message}`);
+
+  toast.error(message, {
+    description,
     duration: 5000,
     action: {
-      label: "Retry",
+      label: retryLabel,
       onClick: onRetry
     }
   });

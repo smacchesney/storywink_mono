@@ -313,8 +313,10 @@ export default function SetupPage() {
 
       if (isMountedRef.current) setGenerating(true);
     } catch (err) {
+      // Raw error text goes to the log, never to the parent.
+      console.error('Setup submit failed:', err);
       if (isMountedRef.current) {
-        toast.error(err instanceof Error ? err.message : t('saveError'));
+        toast.error(t('saveError'));
         setIsSubmitting(false);
       }
     }

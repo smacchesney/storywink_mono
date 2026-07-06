@@ -24,15 +24,33 @@ import {
 } from '@storywink/shared/prompts/story-check';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
 import { trackEvent } from '@storywink/shared';
+import { buildConfirmedFacts } from '../lib/storyCast.js';
 import {
-  buildConfirmedFacts,
-  resolveCastForStory,
-  CaptureQuestionLike,
-  RawCastCharacter,
-} from '../lib/storyCast.js';
+  mergeCastNames,
+  resolveCastEntries,
+  checkCastNameCoverage,
+  MergedCastCharacter,
+  ResolvedCastEntry,
+  CastCoverageResult,
+} from '../lib/resolveCast.js';
 import { STORY_MODEL, ANALYSIS_MODEL } from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+
+/**
+ * Best-effort write of Book.generationPhase — the honest-progress signal the
+ * wait screen narrates from. A phase write must never fail a job.
+ */
+async function setGenerationPhase(bookId: string, phase: string | null): Promise<void> {
+  try {
+    await prisma.book.update({ where: { id: bookId }, data: { generationPhase: phase } });
+  } catch (error) {
+    logger.warn(
+      { bookId, phase, error: error instanceof Error ? error.message : 'Unknown error' },
+      'Failed to write generationPhase — continuing',
+    );
+  }
+}
 
 // Perception-pass output persisted on Page.analysis (all optional — the
 // pipeline degrades to photos-only behavior when the analysis job failed
@@ -44,6 +62,21 @@ interface StoredPageAnalysis {
   emotion: string;
   eventSignals: string[];
   narrativeRole: string;
+}
+
+// Capture questions as persisted on Book.captureQuestions (Json).
+interface StoredCaptureQuestion {
+  id: string;
+  question: string;
+  options?: string[];
+  characterId?: string | null;
+  answer?: string | null;
+}
+
+// Book.characterIdentity (Json) as this worker reads/writes it.
+interface StoredCharacterIdentity {
+  characters?: MergedCastCharacter[];
+  [key: string]: unknown;
 }
 
 // Regen only happens while the total job stays inside this budget, so QC can
@@ -136,6 +169,14 @@ async function evaluateStoryQuality(
     }
   }
 
+  // LOG-ONLY castNameCoverage: does every parent-confirmed name (namedVia
+  // chip/childName only) land within ±1 page of an appearance? Script-gated
+  // like the childName check. Feeds the log line, never `problems`.
+  const cast = (input.charactersInPhotos ?? []) as ResolvedCastEntry[];
+  const castCoverage: CastCoverageResult | null = cast.length
+    ? checkCastNameCoverage(cast, pageTexts, input.language || 'en')
+    : null;
+
   logger.info(
     {
       bookId,
@@ -147,6 +188,10 @@ async function evaluateStoryQuality(
       childNameCheck,
       childNameEchoes,
       childNameInLanding,
+      castNamesChecked: castCoverage?.checked ?? 0,
+      castNamesCovered: castCoverage?.covered ?? 0,
+      castNamesMissing: castCoverage?.missing ?? [],
+      castNamesSkippedScript: castCoverage?.skippedScript ?? 0,
       truthToEvent: qc.truthToEvent,
       hadEventSummary: !!input.eventSummary,
       confirmedFactCount: input.confirmedFacts?.length ?? 0,
@@ -214,10 +259,11 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       throw new Error(`Missing required job data: bookId=${bookId}, userId=${userId}`);
     }
 
-    // Update status to generating
+    // Update status to generating (phase rides the same write — it can only
+    // fail if the status write fails, which already fails the job)
     await prisma.book.update({
       where: { id: bookId },
-      data: { status: 'GENERATING' },
+      data: { status: 'GENERATING', generationPhase: 'story' },
     });
 
     // Get book with pages (excluding cover page)
@@ -282,19 +328,73 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
 
     // Perception-pass context (all optional — the pipeline degrades to
     // photos-only behavior when the analysis job failed or is stale).
-    const captureQuestions = (book.captureQuestions as CaptureQuestionLike[] | null) ?? [];
-    const confirmedFacts = buildConfirmedFacts(captureQuestions);
+    const captureQuestions = (book.captureQuestions as StoredCaptureQuestion[] | null) ?? [];
+
+    // resolveCast: merge the parent's naming signal (chip answers + the
+    // sheet's childName) into the roster and PERSIST it BEFORE
+    // character-extraction reads it — the extraction worker's reuse path then
+    // carries the confirmed names into every illustration prompt for free.
+    // Perception refreshes are DRAFT-gated, so the persisted merge is durable
+    // once the book leaves DRAFT (character-extraction re-applies the same
+    // merge to close the in-flight-refresh race).
+    const rawIdentity = book.characterIdentity as StoredCharacterIdentity | null;
+    let mergedCharacters: MergedCastCharacter[] = rawIdentity?.characters ?? [];
+    let consumedQuestionIds = new Set<string>();
+    if (mergedCharacters.length > 0) {
+      const merge = mergeCastNames({
+        characters: mergedCharacters,
+        captureQuestions,
+        childName: book.childName,
+      });
+      mergedCharacters = merge.characters;
+      consumedQuestionIds = new Set(merge.consumedQuestionIds);
+      if (merge.changed) {
+        try {
+          await prisma.book.update({
+            where: { id: bookId },
+            data: {
+              characterIdentity: {
+                ...rawIdentity,
+                characters: mergedCharacters,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              } as any, // Prisma Json column (same cast the extraction worker uses)
+            },
+          });
+          logger.info(
+            {
+              bookId,
+              namedCharacters: mergedCharacters.filter(c => c.name).length,
+              consumedAnswers: merge.consumedQuestionIds.length,
+            },
+            'resolveCast: merged capture answers + childName into character identity',
+          );
+        } catch (mergeError) {
+          // Persist failure is cosmetic for THIS story run (the in-memory
+          // merge still feeds the prompt); illustration falls back to the
+          // unnamed roster.
+          logger.warn(
+            { bookId, error: mergeError instanceof Error ? mergeError.message : 'Unknown error' },
+            'resolveCast persist failed — continuing with in-memory merged cast',
+          );
+        }
+      }
+    }
+
+    // A chip answer leaves confirmedFacts ONLY when the merge actually
+    // consumed it (its information now arrives structured through the cast).
+    // A failed join keeps the answer as a fact line — the parent's tap must
+    // never be silently dropped.
+    const confirmedFacts = buildConfirmedFacts(
+      captureQuestions.filter(q => !consumedQuestionIds.has(q.id)),
+    );
 
     // appearsOnPages is creation-order-positional; remap per character to the
     // CURRENT page order via the perception pass's assetId stamps. Characters
     // whose photos were all removed are dropped (never reintroduce removed
     // people); partially-resolvable characters stay in the cast page-less
     // rather than asserting wrong page numbers.
-    const rawIdentity = book.characterIdentity as
-      | { characters?: RawCastCharacter[] }
-      | null;
-    const charactersInPhotos = rawIdentity?.characters?.length
-      ? resolveCastForStory(rawIdentity.characters, storyPages.map(p => p.assetId))
+    const charactersInPhotos = mergedCharacters.length
+      ? resolveCastEntries(mergedCharacters, storyPages.map(p => p.assetId))
       : [];
 
     // Prepare story generation input using advanced prompt structure
@@ -396,6 +496,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
 
     // Story QC: verify the draft before any illustration money is spent on it.
     // One regen max; QC errors and blown time budgets accept the draft as-is.
+    await setGenerationPhase(bookId, 'story_check');
     let qcPassed = true;
     let regenerated = false;
     try {
@@ -405,6 +506,9 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
         if (Date.now() - jobStartedAt < STORY_QC_TIME_BUDGET_MS) {
           logger.warn({ bookId, feedback: verdict.feedback }, 'Story QC failed — regenerating once with corrections');
           regenerated = true;
+          // Back to 'story' so the story stage emits a mid-flight signal —
+          // this write is also what keeps the UI's stall clock honest.
+          await setGenerationPhase(bookId, 'story');
           storyResponse = await generateStory(verdict.feedback);
         } else {
           logger.warn({ bookId, feedback: verdict.feedback }, 'Story QC failed but time budget exhausted — accepting draft');
@@ -600,6 +704,9 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       where: { id: bookId },
       data: {
         status: 'STORY_READY',
+        // STORY_READY is terminal for this worker — clear the phase; the
+        // auto-chain (or the parent) decides what happens next.
+        generationPhase: null,
         ...(shouldAdoptTitle ? { title: suggestedTitle!.slice(0, 100) } : {}),
         updatedAt: new Date(),
       },
@@ -672,7 +779,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
     if (job?.data?.bookId) {
       await prisma.book.update({
         where: { id: job.data.bookId },
-        data: { status: 'FAILED' },
+        data: { status: 'FAILED', generationPhase: null },
       }).catch(() => {}); // Ignore errors when updating status
     }
 
@@ -738,18 +845,32 @@ async function processSinglePageTextGeneration(
   // Context parity with full generation: cast, eventSummary + confirmed
   // facts, and this page's fresh perception analysis. The perception roster
   // is durable here — both refresh enqueues are DRAFT-gated, so post-DRAFT
-  // perception never re-runs; only page remapping is needed.
-  const rawIdentity = book.characterIdentity as { characters?: RawCastCharacter[] } | null;
-  const cast = rawIdentity?.characters?.length
-    ? resolveCastForStory(rawIdentity.characters, storyPages.map(p => p.assetId))
-    : [];
+  // perception never re-runs; only page remapping is needed. The capture-
+  // answer merge is re-applied in memory (the full-generation pass already
+  // persisted it; this just guards odd orderings), and consumed answers stay
+  // out of the fact lines exactly like the first pass.
+  const captureQuestions = (book.captureQuestions as StoredCaptureQuestion[] | null) ?? [];
+  const rawIdentity = book.characterIdentity as StoredCharacterIdentity | null;
+  let cast: ResolvedCastEntry[] = [];
+  let consumedQuestionIds = new Set<string>();
+  if (rawIdentity?.characters?.length) {
+    const merge = mergeCastNames({
+      characters: rawIdentity.characters,
+      captureQuestions,
+      childName: book.childName,
+    });
+    consumedQuestionIds = new Set(merge.consumedQuestionIds);
+    cast = resolveCastEntries(merge.characters, storyPages.map(p => p.assetId));
+  }
   const castInfo = cast.length > 0
     ? `People in this book's photos: ${cast
         .map(c => `"${c.name}" (${c.role.replace(/_/g, ' ')})`)
-        .join(', ')}. NEVER invent a proper name — for unnamed people use the warm relationship word a toddler would say ("Grandma", "Daddy").`
+        .join(', ')}. NEVER invent a proper name — for unnamed people use the warm relationship word a toddler would say ("Grandma", "Daddy"); for unnamed pets use "the dog" / "the cat".`
     : '';
 
-  const confirmedFacts = buildConfirmedFacts(book.captureQuestions as CaptureQuestionLike[] | null);
+  const confirmedFacts = buildConfirmedFacts(
+    captureQuestions.filter(q => !consumedQuestionIds.has(q.id)),
+  );
   // Exactly ONE experience-context block, eventSummary superseding theme —
   // same condition as full generation.
   const eventContext = book.eventSummary

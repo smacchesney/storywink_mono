@@ -21,6 +21,7 @@ export const QUEUE_NAMES = {
   CHARACTER_EXTRACTION: 'character-extraction',
   PHOTO_ANALYSIS: 'photo-analysis',
   BOOK_REAPER: 'book-reaper',
+  LULU_STATUS_POLL: 'lulu-status-poll',
 } as const;
 
 // Book constraints
@@ -81,15 +82,4 @@ export const STORY_MOOD_LABELS: Record<StoryMood, { en: string; ja: string }> = 
   brave: { en: 'Brave & Bold', ja: 'ゆうかん' },
   dreamy: { en: 'Dreamy & Magical', ja: 'ゆめいっぱい' },
   curious: { en: 'Curious Explorer', ja: 'たんけん' },
-} as const;
-
-// Book status messages
-export const STATUS_MESSAGES = {
-  DRAFT: 'Setting up your storybook',
-  GENERATING: 'Writing your magical story',
-  STORY_READY: 'Story complete! Ready for illustrations',
-  ILLUSTRATING: 'Creating beautiful illustrations',
-  COMPLETED: 'Your storybook is ready!',
-  FAILED: 'Something went wrong',
-  PARTIAL: 'Partially completed',
 } as const;

@@ -75,8 +75,8 @@ async function failStuckBook(book: StuckBook): Promise<boolean> {
       userId: book.userId,
       bookId: book.id,
       type: 'BOOK_FAILED',
-      title: `"${book.title}" needs attention`,
-      message: `There was an issue creating your book "${book.title}". Please try again.`,
+      title: `"${book.title}" hit a snag`,
+      message: `Let's give it another try — tap to retry.`,
     },
   });
 

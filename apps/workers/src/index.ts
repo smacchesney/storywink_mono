@@ -91,6 +91,8 @@ import { processCharacterExtraction } from './workers/character-extraction.worke
 import { processPhotoAnalysis } from './workers/photo-analysis.worker.js';
 import { processBookReaper } from './workers/book-reaper.worker.js';
 import { REAPER_INTERVAL_MS } from './workers/book-reaper.helpers.js';
+import { processLuluStatusPoll } from './workers/lulu-status-poll.worker.js';
+import { LULU_POLL_INTERVAL_MS } from './workers/lulu-status-poll.helpers.js';
 import { getIllustrator } from './lib/illustrators/index.js';
 
 // CRITICAL: Pre-load and validate STYLE_LIBRARY before processing any jobs
@@ -180,7 +182,11 @@ const STORY_CONCURRENCY = parseInt(process.env.STORY_CONCURRENCY || '2', 10);
 const ILLUSTRATION_CONCURRENCY = parseInt(process.env.ILLUSTRATION_CONCURRENCY || '3', 10);
 const FINALIZE_CONCURRENCY = parseInt(process.env.FINALIZE_CONCURRENCY || '2', 10);
 const PRINT_FULFILLMENT_CONCURRENCY = parseInt(process.env.PRINT_FULFILLMENT_CONCURRENCY || '1', 10);
-const CHARACTER_EXTRACTION_CONCURRENCY = parseInt(process.env.CHARACTER_EXTRACTION_CONCURRENCY || '1', 10);
+// Default 2 (was 1): character sheet generation (CHARACTER_SHEETS_ENABLED)
+// can put up to ~60s of image-gen work into this stage, and a single lane
+// would head-of-line block book B's whole illustration pipeline behind
+// book A's sheets. Env-overridable like ILLUSTRATION_CONCURRENCY.
+const CHARACTER_EXTRACTION_CONCURRENCY = parseInt(process.env.CHARACTER_EXTRACTION_CONCURRENCY || '2', 10);
 
 console.log(`[Startup] Concurrency settings:`);
 console.log(`  - Story: ${STORY_CONCURRENCY}`);
@@ -259,6 +265,15 @@ const bookReaperWorker = new Worker(
   }
 );
 
+const luluStatusPollWorker = new Worker(
+  QUEUE_NAMES.LULU_STATUS_POLL,
+  processLuluStatusPoll,
+  {
+    connection: redis,
+    concurrency: 1, // sweeps must never overlap
+  }
+);
+
 // Repeatable schedule for the stuck-book reaper. upsertJobScheduler is
 // idempotent across restarts/redeploys (same scheduler id replaces the old
 // schedule), so every boot converges on one sweep per interval.
@@ -284,6 +299,32 @@ bookReaperQueue
     // Scheduling failure must not crash the other workers; the next deploy or
     // restart retries the upsert.
     logger.error({ error: err.message }, 'Failed to schedule book reaper sweep');
+  });
+
+// Repeatable schedule for the Lulu order-status poller (same idempotent
+// upsertJobScheduler pattern as the reaper above).
+const luluStatusPollQueue = new Queue(QUEUE_NAMES.LULU_STATUS_POLL, {
+  connection: createBullMQConnection(),
+});
+luluStatusPollQueue
+  .upsertJobScheduler(
+    'lulu-status-poll-sweep',
+    { every: LULU_POLL_INTERVAL_MS },
+    {
+      name: 'poll-lulu-status',
+      opts: {
+        removeOnComplete: { count: 24 },
+        removeOnFail: { count: 50 },
+      },
+    }
+  )
+  .then(() => {
+    logger.info({ everyMs: LULU_POLL_INTERVAL_MS }, 'Lulu status poll scheduled');
+  })
+  .catch((err: Error) => {
+    // Scheduling failure must not crash the other workers; the next deploy or
+    // restart retries the upsert.
+    logger.error({ error: err.message }, 'Failed to schedule Lulu status poll');
   });
 
 // Worker event handlers
@@ -568,6 +609,17 @@ bookReaperWorker.on('failed', (job, err) => {
   logger.error({ jobId: job?.id, error: err.message }, 'Book reaper sweep job failed');
 });
 
+// Lulu Status Poll Worker event handlers
+luluStatusPollWorker.on('completed', (job) => {
+  logger.info({ jobId: job.id, result: job.returnvalue }, 'Lulu status poll sweep completed');
+});
+
+luluStatusPollWorker.on('failed', (job, err) => {
+  // The processor swallows its own errors, so this only fires on infra-level
+  // failures (lost lock, Redis hiccup). The next scheduled sweep retries.
+  logger.error({ jobId: job?.id, error: err.message }, 'Lulu status poll sweep job failed');
+});
+
 // Graceful shutdown
 const shutdown = async () => {
   logger.info('Shutting down workers...');
@@ -580,6 +632,8 @@ const shutdown = async () => {
   await photoAnalysisWorker.close();
   await bookReaperWorker.close();
   await bookReaperQueue.close();
+  await luluStatusPollWorker.close();
+  await luluStatusPollQueue.close();
   await redis.quit();
 
   process.exit(0);

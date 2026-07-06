@@ -1,22 +1,41 @@
 import { Job, FlowProducer } from 'bullmq';
 import * as Sentry from '@sentry/node';
 import prisma from '../database/index.js';
-import { BookFinalizeJob, CharacterIdentity, BookQCResult } from '@storywink/shared/types';
+import { BookFinalizeJob, CharacterIdentity, BookQCResult, CharacterSheetRef, CoverQCResult } from '@storywink/shared/types';
 import { QUEUE_NAMES } from '@storywink/shared/constants';
 import { categorizePages, isTitlePage } from '@storywink/shared/utils';
 import { createBullMQConnection } from '@storywink/shared/redis';
 import OpenAI from 'openai';
-import { optimizeCloudinaryUrlForVision } from '@storywink/shared/utils';
+import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
 import { createQCPrompt, QC_SYSTEM_PROMPT, QC_RESPONSE_SCHEMA } from '@storywink/shared/prompts/quality-check';
+import { isValidStyle } from '@storywink/shared/prompts/styles';
 import { trackEvent } from '@storywink/shared';
 import { computeBookStatus } from '../lib/computeBookStatus.js';
 import { mapQcResultsToPages, RawQcPageResult } from '../lib/qc-mapping.js';
+import { characterSheetsEnabled, sheetRefsForStyle } from '../lib/character-sheets.js';
+import { generateAndStoreCover } from '../lib/cover-generation.js';
+import { fetchImageInput, resizeForReference } from '../lib/images.js';
 import { ANALYSIS_MODEL } from '../config/models.js';
 import pino from 'pino';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
 const MAX_QC_ROUNDS = 2;
+
+/**
+ * Best-effort write of Book.generationPhase — the honest-progress signal the
+ * wait screen narrates from. A phase write must never fail a job.
+ */
+async function setGenerationPhase(bookId: string, phase: string | null): Promise<void> {
+  try {
+    await prisma.book.update({ where: { id: bookId }, data: { generationPhase: phase } });
+  } catch (error) {
+    logger.warn(
+      { bookId, phase, error: error instanceof Error ? error.message : 'Unknown error' },
+      'Failed to write generationPhase — continuing',
+    );
+  }
+}
 
 /**
  * Run quality check on all generated illustrations using OpenAI vision.
@@ -27,6 +46,8 @@ async function runQualityCheck(
   pages: Array<{ pageNumber: number; pageId: string; generatedImageUrl: string | null }>,
   characterIdentity: CharacterIdentity | null,
   language: string = 'en',
+  sheets: CharacterSheetRef[] = [],
+  cover: { url: string; expectedTitle: string } | null = null,
 ): Promise<BookQCResult | null> {
   if (!process.env.OPENAI_API_KEY) {
     logger.warn({ bookId }, 'Skipping QC: OPENAI_API_KEY not configured');
@@ -39,7 +60,10 @@ async function runQualityCheck(
     return null;
   }
 
-  logger.info({ bookId, pageCount: illustratedPages.length }, 'Running quality check on illustrations');
+  logger.info(
+    { bookId, pageCount: illustratedPages.length, sheetCount: sheets.length, hasCover: !!cover },
+    'Running quality check on illustrations',
+  );
   console.log(`[BookFinalize/QC] Running QC on ${illustratedPages.length} illustrations for book ${bookId}`);
 
   // Build image content parts from URLs directly (no base64 fetching)
@@ -48,6 +72,32 @@ async function runQualityCheck(
     | { type: 'input_image'; image_url: string; detail: 'high' }
   > = [];
   const pageMapping: Array<{ pageNumber: number; pageId: string }> = [];
+
+  // Character sheets first — ground truth for character consistency. The
+  // label is deliberately NON-NUMERIC ("REFERENCE SHEET", not "PAGE n") so
+  // it can never collide with a page ordinal in the echoed results.
+  for (const sheet of sheets) {
+    contentParts.push({
+      type: 'input_text',
+      text: `REFERENCE SHEET — ${sheet.name || sheet.characterId}`,
+    });
+    contentParts.push({
+      type: 'input_image',
+      image_url: optimizeCloudinaryUrlForVision(sheet.url),
+      detail: 'high',
+    });
+  }
+
+  // The cover (non-numeric label too); scored via the coverResult schema
+  // field with its own rubric variant, never via pageResults.
+  if (cover) {
+    contentParts.push({ type: 'input_text', text: 'COVER' });
+    contentParts.push({
+      type: 'input_image',
+      image_url: optimizeCloudinaryUrlForVision(cover.url),
+      detail: 'high',
+    });
+  }
 
   for (const page of illustratedPages) {
     const url = optimizeCloudinaryUrlForVision(page.generatedImageUrl!);
@@ -65,7 +115,10 @@ async function runQualityCheck(
   }
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const promptText = createQCPrompt(characterIdentity, pageMapping.length, language);
+  const promptText = createQCPrompt(characterIdentity, pageMapping.length, language, {
+    sheetCount: sheets.length,
+    cover: cover ? { expectedTitle: cover.expectedTitle } : null,
+  });
 
   // Add the text prompt after all images
   contentParts.push({ type: 'input_text', text: promptText });
@@ -93,6 +146,7 @@ async function runQualityCheck(
   const qcResult = JSON.parse(rawResult) as {
     passed: boolean;
     summary: string;
+    coverResult?: CoverQCResult | null;
     pageResults: RawQcPageResult[];
   };
 
@@ -119,6 +173,9 @@ async function runQualityCheck(
     pageResults: mappedResults,
     failedPageIds,
     summary: qcResult.summary,
+    // Only meaningful when a cover was in the call; the schema makes the
+    // field required-nullable, so ignore any hallucinated value otherwise.
+    coverResult: cover ? (qcResult.coverResult ?? null) : null,
   };
 
   logger.info({
@@ -145,6 +202,121 @@ async function runQualityCheck(
   }
 
   return bookQCResult;
+}
+
+/**
+ * Cover QC's single regeneration round: re-render the cover in-process with
+ * the cover-targeted QC feedback, the character sheets, and the approved
+ * interior title-page render as references. Non-fatal by design — a failed
+ * regen keeps the existing cover (an imperfect cover beats none).
+ */
+async function regenerateCoverFromQc(
+  book: {
+    id: string;
+    title: string | null;
+    artStyle: string | null;
+    language: string | null;
+    coverAssetId: string | null;
+    characterIdentity: unknown;
+    pages: Array<{
+      assetId: string | null;
+      text: string | null;
+      illustrationNotes: string | null;
+      pageNumber: number;
+      generatedImageUrl: string | null;
+      [key: string]: unknown;
+    }>;
+  },
+  sheets: CharacterSheetRef[],
+  coverResult: CoverQCResult,
+): Promise<void> {
+  try {
+    logger.info(
+      { bookId: book.id, issues: coverResult.issues, titleMatches: coverResult.titleMatches },
+      'Cover failed QC — regenerating once with cover-targeted feedback',
+    );
+
+    if (!book.artStyle || !isValidStyle(book.artStyle)) {
+      logger.warn({ bookId: book.id, artStyle: book.artStyle }, 'Cover regen skipped: invalid art style');
+      return;
+    }
+
+    const titlePage = book.pages.find(p => isTitlePage(p.assetId, book.coverAssetId));
+    if (!titlePage?.text) {
+      logger.warn({ bookId: book.id }, 'Cover regen skipped: no title page with text');
+      return;
+    }
+
+    const asset = titlePage.assetId
+      ? await prisma.asset.findUnique({ where: { id: titlePage.assetId } })
+      : null;
+    const rawAnchorUrl = asset?.url || asset?.thumbnailUrl;
+    if (!rawAnchorUrl) {
+      logger.warn({ bookId: book.id }, 'Cover regen skipped: title page has no source photo');
+      return;
+    }
+
+    // Same vision-normalized anchor the original render used.
+    const contentImage = await fetchImageInput(
+      optimizeCloudinaryUrlForVision(convertHeicToJpeg(rawAnchorUrl)),
+    );
+
+    const sheetRefs = [];
+    for (const sheet of sheets) {
+      try {
+        sheetRefs.push(await fetchImageInput(optimizeCloudinaryUrlForVision(sheet.url)));
+      } catch (sheetError: any) {
+        logger.warn(
+          { bookId: book.id, characterId: sheet.characterId, error: sheetError.message },
+          'Cover regen: failed to fetch character sheet — continuing without it',
+        );
+      }
+    }
+
+    let interiorRenderRef = null;
+    if (titlePage.generatedImageUrl) {
+      try {
+        const interior = await fetchImageInput(
+          optimizeCloudinaryUrlForVision(titlePage.generatedImageUrl),
+        );
+        interiorRenderRef = await resizeForReference(interior.buffer);
+      } catch (interiorError: any) {
+        logger.warn(
+          { bookId: book.id, error: interiorError.message },
+          'Cover regen: failed to fetch interior title render — continuing without it',
+        );
+      }
+    }
+
+    const outcome = await generateAndStoreCover({
+      bookId: book.id,
+      styleKey: book.artStyle,
+      bookTitle: book.title,
+      pageText: titlePage.text,
+      illustrationNotes: titlePage.illustrationNotes ?? null,
+      language: book.language || 'en',
+      characterIdentity: book.characterIdentity as CharacterIdentity | null,
+      pageNumber: titlePage.pageNumber,
+      contentImage,
+      characterSheetRefs: sheetRefs,
+      interiorRenderRef,
+      // This is the one place cover feedback is allowed to flow: it was
+      // scored against the cover itself, under the cover rubric.
+      qcFeedback: coverResult.suggestedPromptAdditions,
+      logger,
+    });
+
+    if ('coverUrl' in outcome) {
+      logger.info({ bookId: book.id, coverUrl: outcome.coverUrl }, 'Cover regenerated after QC failure');
+    } else {
+      logger.warn({ bookId: book.id, reason: outcome.blockedReason }, 'Cover regen blocked — keeping existing cover');
+    }
+  } catch (error: any) {
+    logger.error(
+      { bookId: book.id, error: error.message },
+      'Cover regen failed (non-fatal) — keeping existing cover',
+    );
+  }
 }
 
 export async function processBookFinalize(job: Job<BookFinalizeJob>) {
@@ -244,7 +416,33 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
           generatedImageUrl: p.generatedImageUrl,
         }));
 
-        const qcResult = await runQualityCheck(bookId, qcPages, characterIdentity, book.language);
+        // CHARACTER_SHEETS_ENABLED: validated sheets become QC's ground
+        // truth, and the cover joins the QC pass with its own rubric
+        // variant (painted title expected, must match book.title exactly).
+        const sheetsEnabled = characterSheetsEnabled();
+        const sheets = sheetsEnabled
+          ? sheetRefsForStyle(book.characterReferences, book.artStyle, characterIdentity)
+          : [];
+        // Sheets are persisted before the illustration flow is enqueued and
+        // snapshotted into every render job of this run, so their presence
+        // here reflects what the renders actually received.
+        const hadSheet = sheets.length > 0;
+        const coverForQc =
+          sheetsEnabled && book.coverImageUrl && book.title
+            ? { url: book.coverImageUrl, expectedTitle: book.title }
+            : null;
+
+        // The endgame is real work — say so instead of sitting on a full bar.
+        await setGenerationPhase(bookId, 'finishing');
+
+        const qcResult = await runQualityCheck(
+          bookId,
+          qcPages,
+          characterIdentity,
+          book.language,
+          sheets,
+          coverForQc,
+        );
 
         // Persist every scored image (passes included — the pass distribution
         // is the drift baseline). Provider/model come from the render-time
@@ -257,21 +455,46 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
                 { provider: p.lastRenderProvider ?? null, model: p.lastRenderModel ?? null },
               ]),
             );
+            // The cover is rendered by the same job (and provider) as the
+            // interior title page, so its attribution comes from the title
+            // page's render-time stamps.
+            const titlePage = book.pages.find((p: any) => isTitlePage(p.assetId, book.coverAssetId));
             await prisma.illustrationQcResult.createMany({
-              data: qcResult.pageResults.map(r => ({
-                bookId,
-                pageId: r.pageId,
-                target: 'page',
-                qcRound,
-                charScore: r.characterConsistencyScore,
-                styleScore: r.styleConsistencyScore,
-                overallScore: r.overallScore,
-                passed: r.passed,
-                provider: renderMetaByPageId.get(r.pageId)?.provider ?? null,
-                model: renderMetaByPageId.get(r.pageId)?.model ?? null,
-                hadSheet: false, // character sheets not wired into renders yet
-                feedback: r.suggestedPromptAdditions,
-              })),
+              data: [
+                ...qcResult.pageResults.map(r => ({
+                  bookId,
+                  pageId: r.pageId,
+                  target: 'page',
+                  qcRound,
+                  charScore: r.characterConsistencyScore,
+                  styleScore: r.styleConsistencyScore,
+                  overallScore: r.overallScore,
+                  passed: r.passed,
+                  provider: renderMetaByPageId.get(r.pageId)?.provider ?? null,
+                  model: renderMetaByPageId.get(r.pageId)?.model ?? null,
+                  hadSheet,
+                  feedback: r.suggestedPromptAdditions,
+                })),
+                // target='cover' keeps cover rows out of page-drift stats.
+                ...(coverForQc && qcResult.coverResult
+                  ? [
+                      {
+                        bookId,
+                        pageId: null,
+                        target: 'cover',
+                        qcRound,
+                        charScore: qcResult.coverResult.characterConsistencyScore,
+                        styleScore: qcResult.coverResult.styleConsistencyScore,
+                        overallScore: qcResult.coverResult.overallScore,
+                        passed: qcResult.coverResult.passed,
+                        provider: (titlePage as any)?.lastRenderProvider ?? null,
+                        model: (titlePage as any)?.lastRenderModel ?? null,
+                        hadSheet,
+                        feedback: qcResult.coverResult.suggestedPromptAdditions,
+                      },
+                    ]
+                  : []),
+              ],
             });
           } catch (persistError: any) {
             logger.warn(
@@ -279,6 +502,14 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
               'Failed to persist IllustrationQcResult rows — continuing',
             );
           }
+        }
+
+        // Cover QC regen: exactly ONE round, taken only on the first QC pass
+        // (qcRound === 0) so a book run can never re-buy the cover twice.
+        // Inline (not re-queued): cover failure never blocks or requeues
+        // pages, and the finalize lock is long enough for one render.
+        if (coverForQc && qcResult?.coverResult && !qcResult.coverResult.passed && qcRound === 0) {
+          await regenerateCoverFromQc(book, sheets, qcResult.coverResult);
         }
 
         if (qcResult && !qcResult.passed && qcResult.failedPageIds.length > 0) {
@@ -318,10 +549,12 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
             });
           }
 
-          // Update book status back to ILLUSTRATING and persist qcRound
+          // Update book status back to ILLUSTRATING and persist qcRound.
+          // Phase 'polishing' keeps the wait screen honest: this is a
+          // quality re-render round, not the first pass starting over.
           await prisma.book.update({
             where: { id: bookId },
-            data: { status: 'ILLUSTRATING', qcRound: nextRound },
+            data: { status: 'ILLUSTRATING', qcRound: nextRound, generationPhase: 'polishing' },
           });
 
           // Create FlowProducer flow for re-illustration
@@ -340,6 +573,9 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
               illustrationNotes: page.illustrationNotes,
               originalImageUrl: page.originalImageUrl,
               characterIdentity,
+              // Re-renders must keep the same reference stack the original
+              // render had, or the QC round re-rolls sheetless.
+              ...(sheets.length ? { characterSheets: sheets } : {}),
               qcRound: nextRound,
               qcFeedback,
             },
@@ -407,29 +643,34 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
       console.log(`[BookFinalize/QC] Max QC rounds (${MAX_QC_ROUNDS}) reached for book ${bookId} — accepting current quality`);
     }
 
-    // Update book status (reset qcRound on completion so it's clean for future retries)
+    // Update book status (reset qcRound on completion so it's clean for
+    // future retries; clear the phase — the book is terminal now)
     await prisma.book.update({
       where: { id: bookId },
       data: {
         status: finalStatus,
         qcRound: 0,
+        generationPhase: null,
         updatedAt: new Date(),
       },
     });
 
-    // Create notification for book completion
+    // Create notification for book completion. These strings are the stored
+    // fallback (the bell renders localized copy from `type` client-side);
+    // keep them in the gentle librarian voice — the bell deep-links to the
+    // book, where retry/fix-up lives, so "tap" stays true.
     const notificationMessages = {
       COMPLETED: {
         title: `"${book.title}" is ready!`,
-        message: `Your book "${book.title}" has been illustrated and is ready to view.`,
+        message: `Every page of "${book.title}" is illustrated and waiting for you.`,
       },
       PARTIAL: {
-        title: `"${book.title}" is partially ready`,
-        message: `Your book "${book.title}" has been partially completed. Some pages may need attention.`,
+        title: `"${book.title}" is almost ready`,
+        message: `A couple of pages need a quick fix — tap to finish up.`,
       },
       FAILED: {
-        title: `"${book.title}" needs attention`,
-        message: `There was an issue creating your book "${book.title}". Please try again.`,
+        title: `"${book.title}" hit a snag`,
+        message: `Let's give it another try — tap to retry.`,
       },
     };
 
@@ -496,7 +737,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
     // Update book status to failed
     await prisma.book.update({
       where: { id: bookId },
-      data: { status: 'FAILED' },
+      data: { status: 'FAILED', generationPhase: null },
     }).catch(() => {}); // Ignore errors when updating status
 
     throw error;

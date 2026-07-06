@@ -45,3 +45,107 @@ Append-only. One line per key: `namespace.key` — why it needs a native check.
 - `bookCard.someIllustrationsFailed` — 失敗 removed.
 - `bookCard.fixIssues` — 問題を修正 → ページを直す; check consistency with issue.fixPages (ページを なおす).
 - `resolve.photoCouldntBeIllustrated` — content-policy jargon removed; check むずかしい写真もあるんです register.
+- `orders.title` — orders page heading (ご注文の一覧); check it reads as a warm page title, not admin UI.
+- `orders.subtitle` — "where your book is on its journey" line; check 見守れます warmth and whether いまどこにいるか is too anthropomorphic.
+- `orders.emptyTitle` — empty state; softness check.
+- `orders.emptyBody` — empty state invitation; check 道のり metaphor for a shipped book.
+- `orders.emptyCta` — button back to library; matches library.yourLibrary (マイライブラリ).
+- `orders.orderNumber` — "ご注文番号 {number}"; the number is a Latin order code, check spacing.
+- `orders.orderedOn` — "{date}にご注文"; date is Intl-formatted per locale, check the particle works with a full date.
+- `orders.quantityLabel` — 冊数 with full-width colon; counter-word check.
+- `orders.totalLabel` — 合計 with full-width colon; amount is preformatted (S$...).
+- `orders.stepConfirmed` — timeline step 1; check ご注文確定 vs ご注文完了.
+- `orders.stepPrinting` — timeline step 2 (印刷中).
+- `orders.stepShipped` — timeline step 3 (発送済み).
+- `orders.trackPackage` — external courier-tracking link label; check 配送状況 register.
+- `orders.attentionTitle` — failed-order panel title; check 手助け isn't odd for a service failure.
+- `orders.attentionBody` — failed-order reassurance; the support email renders as a separate link below, check the sentence stands alone.
+- `orders.helpPrompt` — footer help line; trailing-clause check before the support link.
+- `orders.contactSupport` — support mailto label.
+- `orders.trackYourOrder` — success-page link to /orders; check 注文の状況 matches stepConfirmed vocabulary.
+- `orders.myOrders` — Clerk user-menu item; length check for the dropdown.
+- `orders.coverAlt` — cover alt; mirrors bookCard.coverAlt.
+- `orders.untitledBook` — mirrors bookCard.untitledBook (無題の絵本).
+- `setup.someoneElse` — free-text chip on naming questions (そのほか…); needs to read naturally next to tappable name options for both people and pets.
+- `setup.someoneElsePlaceholder` — one-line input placeholder (よびかたを いれてね); check that よびかた is the natural word for "what your child calls them".
+- `progress.writingStoryFor` — "{name}の おはなしを かいています…"; name is parent-entered (often kanji) inside a hiragana line, check の attachment reads naturally.
+- `progress.checkingStory` — story-QC headline ("reading it back"); check よみかえしています warmth.
+- `progress.finishingTouches` — finalize-QC headline; check しあげ phrasing.
+- `progress.polishingPages` — QC re-render headline; check みがいています isn't odd for illustrations.
+- `preview.pageCooking` — placeholder on a page whose picture isn't ready; check いろを ぬっているところ metaphor.
+- `preview.partialNote` — amber strip on a partly-finished book ("#ページは もうひといき"); check もうひといき register and the counter.
+- `reveal.ready` — the first-open moment headline (できました！); exclamation register check.
+- `reveal.madeFor` — "{name}のための おはなしです"; name may be kanji, check ため phrasing warmth.
+- `reveal.readyPlain` — no-name fallback subline.
+- `reveal.open` — the single reveal CTA (えほんを ひらく).
+- `whatNow.readAgain` — end-of-book action; verb form check.
+- `whatNow.orderPrint` — print CTA (unused for ja today but catalog-complete); check プリント vs いんさつ.
+- `whatNow.savePdf` — primary end-of-book action for ja.
+- `whatNow.printSoon` — honest "printing comes to Japan soon — tell us" tap line; needs careful native check (register, タップで おしえてね casualness, no notification promise implied).
+- `whatNow.printThanks` — post-tap thanks; must not promise a follow-up notification.
+- `whatNow.dismiss` — aria-label for the card's close button.
+- `library.emptyTitle` — empty-shelf invitation line (絵本づくりは、1枚の写真から。); check the punchy noun-ending register fits the gentle voice.
+- `library.emptyCta` — coral CTA under it (はじめての絵本をつくる).
+- `bookCard.continueMaking` — DRAFT card resume line/button (この絵本のつづきをつくる); check つづきをつくる phrasing.
+- `bookCard.writingStory` — GENERATING shimmer on the library card (おはなしを書いています…); mixed kana/kanji register vs progress.writingStoryFor.
+- `bookCard.storyReady` — STORY_READY card line (おはなしができました。見てみてね); check 見てみてね casualness toward parents.
+- `bookCard.takeALook` — STORY_READY button (見てみる).
+- `bookCard.savePdf` — kebab item, mirrors whatNow.savePdf (PDFを保存).
+- `create.createFailedHint` — reassurance under a failed book start (しゃしんは ぶじですよ); softness check.
+- `create.photosLeftBehind` — toast when slow uploads are left behind after 60s; check さきに すすみました reads as gentle, not dismissive.
+- `create.tipsTitle` — photo-tips block heading on the upload screen.
+- `create.tipVariety` — tip line (places/faces/details); check ちいさな はっけん for "little details".
+- `create.tipArc` — beginning/middle/end tip; check はじまり・なか・おわり with interpuncts in the kid register.
+- `create.tipSkipDupes` — near-duplicates tip; check 1まいで じゅうぶん warmth.
+- `setup.coverLocked` — page-delete guard for the cover photo; check the two-step instruction flows naturally.
+- `setup.minPages` — page-delete guard (min 2 photos).
+- `issue.retryFailed` — retry-tap failure toast; register matches issue.failedMessage.
+- `review.coverBadge` — cover badge on the review card (ひょうし, mirrors setup.coverBadge).
+- `preview.opening` — flipbook loading line (えほんを ひらいています…).
+- `preview.loadError` — friendly load failure; mirrors review.errorLoadingReviewData phrasing.
+- `preview.signInToSee` — 401 mapping; check ログインしてくださいね softness for a checkout-adjacent surface.
+- `preview.notFound` — mirrors review.bookIdNotFound.
+- `preview.backToLibrary` — button + aria; matches progress.goToLibrary vocabulary (ライブラリー).
+- `preview.options` — options sheet title/aria (えほんの オプション).
+- `preview.prevPage` / `preview.nextPage` — flip-arrow aria labels.
+- `preview.enterFullscreen` — aria for entering immersive mode; pairs with exitFullscreen.
+- `preview.showGallery` / `preview.hideGallery` — landscape gallery toggle aria; check いちらん for the thumbnail strip.
+- `print.title` — print sheet heading (印刷を注文, mirrors bookCard.orderPrint).
+- `print.subtitle` — sheet subline (本棚に飾れる、ほんものの絵本です。); warmth + 飾れる check.
+- `print.noCover` — placeholder when no cover art yet (表紙はこれから); check the fragment reads naturally.
+- `print.untitledBook` — mirrors bookCard.untitledBook.
+- `print.pageCount` — {count}ページ counter.
+- `print.perBook` — unit price line (1冊 {price}); spacing check with S$ amounts.
+- `print.quantity` / `print.decreaseQuantity` / `print.increaseQuantity` — quantity label + stepper aria; counter word 冊.
+- `print.subtotal` — 小計 with plural-other 冊 counter.
+- `print.shipping` / `print.total` — money rows (送料 / 合計).
+- `print.arrives` — delivery window (お届けまで{min}〜{max}営業日ほどです); check ほど hedging.
+- `print.checkout` — pay button (お支払いへ · {price}); check the middot with a price.
+- `print.startingCheckout` — pre-redirect button state; check ご案内しています isn't overly formal.
+- `print.checkoutError` — money-step failure; "nothing was charged" rendered as 請求はされていません — legal-adjacent, careful check.
+- `print.shipsTo` — SG/MY shipping note.
+- `notifications.title` — bell header (おしらせ).
+- `notifications.bellUnread` — bell aria with unread count (未読{count}件).
+- `notifications.loading` — bell loading line.
+- `notifications.empty` — bell empty state; check ここに届きますよ warmth.
+- `notifications.bookCompleted` — bell title for a finished book (「{title}」ができあがりました！).
+- `notifications.bookPartial` — bell title for a partly-finished book (もうすぐ完成です).
+- `notifications.bookFailed` — bell title for a failed book (うまくいきませんでした); softness check, no blame.
+- `notifications.orderShipped` — bell title for a shipped order (発送されました！).
+- `notifications.orderIssue` — bell title for a failed/cancelled order; mirrors orders.attentionTitle 手助け phrasing.
+- `notifications.justNow` / `notifications.minutesAgo` / `notifications.hoursAgo` / `notifications.daysAgo` — relative timestamps; check 分前/時間前/日前 without spaces.
+- `orders.confirmedTitle` — success-page headline (ご注文ありがとうございます！); happy register check.
+- `orders.confirmedBody` — success-page subline (印刷じゅんびを進めています); mixed kana じゅんび choice needs a look.
+- `orders.orderNumberLabel` — bare label above the order code.
+- `orders.printingTitle` — next-steps card heading (印刷とお届け).
+- `orders.printingBody` — printer + delivery window line; mirrors print.arrives phrasing.
+- `orders.backToLibrary` — success-page primary button; mirrors orders.emptyCta.
+- `orders.loading` — success-page suspense line (ご注文内容を確認しています…).
+- `resolve.removeError` — page-remove failure; standard polite register like the rest of resolve.
+- `resolve.textStartError` — page-text start failure; check ぶんしょうづくり coinage.
+- `resolve.saveTextError` — save failure for a new page's text.
+- `resolve.illustrateStartError` — illustration start failure; mirrors review.errorStartingIllustration but in resolve's register.
+- `resolve.generateStory` — now おはなしをつくる (was ストーリーを生成); consistency with landing.createYourStorybook check.
+- `resolve.generatingTextCount` — rewritten without テキスト/生成 (あたらしい#ページのぶんしょうを書いています…); counter + plural-other check.
+- `resolve.reviewSubtitle` — Confirm tap removed; new line invites reading + optional editing (気になるところは編集してください).
+- `resolve.illustrateBook` — unified to イラストをつくる to match review.illustrateBook.

@@ -132,8 +132,8 @@ export function ExportPdfDialog({
       } catch (error) {
         if (cancelled || controller.signal.aborted) return;
         console.error('PDF export failed:', error);
-        // Gentle copy only — the raw failure stays in the console.
-        showError(new Error(tRef.current('errorBody')), tRef.current('errorTitle'));
+        // Gentle copy only — the raw failure stays in the log.
+        showError(error, tRef.current('errorTitle'), tRef.current('errorBody'));
         onOpenChangeRef.current(false);
       }
     };
@@ -165,7 +165,7 @@ export function ExportPdfDialog({
       // Backing out of the share sheet is not an error.
       if (error instanceof DOMException && error.name === 'AbortError') return;
       console.error('PDF share failed:', error);
-      showError(new Error(t('shareErrorBody')), t('errorTitle'));
+      showError(error, t('errorTitle'), t('shareErrorBody'));
     }
   };
 

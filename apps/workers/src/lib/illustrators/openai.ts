@@ -56,13 +56,21 @@ export class OpenAIProvider implements IllustrationProvider {
       return `ref-${index}.${ext}`;
     };
 
-    // Content photo MUST be first — mirrors Gemini ordering and prompt expectations.
+    // Content photo MUST be first, then character refs (sheets / interior
+    // render), then style refs — mirrors Gemini ordering and the prompt's
+    // role-by-position line.
+    const characterRefs = input.characterRefs ?? [];
     const imageFiles = await Promise.all([
       toFile(input.contentImage.buffer, filenameFor(input.contentImage.mimeType, 0), {
         type: input.contentImage.mimeType,
       }),
-      ...input.styleRefs.map((ref, idx) =>
+      ...characterRefs.map((ref, idx) =>
         toFile(ref.buffer, filenameFor(ref.mimeType, idx + 1), { type: ref.mimeType }),
+      ),
+      ...input.styleRefs.map((ref, idx) =>
+        toFile(ref.buffer, filenameFor(ref.mimeType, characterRefs.length + idx + 1), {
+          type: ref.mimeType,
+        }),
       ),
     ]);
 

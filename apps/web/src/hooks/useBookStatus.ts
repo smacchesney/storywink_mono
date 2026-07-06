@@ -15,6 +15,10 @@ import { BookStatus } from '@prisma/client';
 
 export interface BookStatusData {
   status: BookStatus | null;
+  /** Worker-written pipeline phase (finer than status); null falls back to status-only copy. */
+  generationPhase: string | null;
+  /** The child the book is for — lets the wait screen use their name. */
+  childName: string | null;
   totalPages: number;
   pagesWithText: number;
   pagesWithIllustrations: number;
@@ -69,6 +73,8 @@ export function useBookStatus(
 ): BookStatusResult {
   const [data, setData] = useState<BookStatusData>({
     status: null,
+    generationPhase: null,
+    childName: null,
     totalPages: 0,
     pagesWithText: 0,
     pagesWithIllustrations: 0,
@@ -105,8 +111,12 @@ export function useBookStatus(
       const json = await res.json();
       if (!isMountedRef.current) return null;
       const status = json.status as BookStatus;
+      // The phase is part of the snapshot: a QC-fail story regeneration
+      // writes 'story' again mid-stage, which resets the stall clock even
+      // though no page counts moved.
       const snapshot = [
         status,
+        json.generationPhase ?? '',
         json.totalPages ?? 0,
         json.pagesWithText ?? 0,
         json.pagesWithIllustrations ?? 0,
@@ -119,6 +129,8 @@ export function useBookStatus(
       setData((prev) => ({
         ...prev,
         status,
+        generationPhase: json.generationPhase ?? null,
+        childName: json.childName ?? null,
         totalPages: json.totalPages ?? 0,
         pagesWithText: json.pagesWithText ?? 0,
         pagesWithIllustrations: json.pagesWithIllustrations ?? 0,

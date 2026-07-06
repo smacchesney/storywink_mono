@@ -90,6 +90,7 @@ export interface StoryGenerationInput {
     name: string;
     role: string;
     appearsOnPages: number[]; // empty = present in the photos, but exact pages unknown (page-less prompt variant)
+    namedVia?: 'chip' | 'childName' | 'fallback'; // provenance of `name`; chip/childName = parent-confirmed, must appear verbatim
   }[]; // From the perception pass — who actually appears where
   storyPages: {
     pageId: string;
@@ -188,10 +189,18 @@ export function createStoryGenerationPrompt(
     if (supporting.length > 0) {
       characterInstruction += `\n  - SUPPORTING CAST (from the actual photos — weave them in, don't just mention them):`;
       for (const c of supporting) {
+        const isPet = c.role === 'pet';
+        const confirmedName =
+          c.namedVia === 'chip' || c.namedVia === 'childName'
+            ? ` The parent confirmed this ${isPet ? "pet's" : "person's"} name: call them "${c.name}" in the story text.`
+            : '';
+        const petNote = isPet
+          ? ` They are the family's animal companion — keep them a real animal (sounds, wags, nuzzles), never a talking character.`
+          : '';
         if (c.appearsOnPages.length > 0) {
-          characterInstruction += `\n    - ${c.name} (${c.role.replace(/_/g, ' ')}) appears on page(s) ${c.appearsOnPages.join(', ')}. Give them a real supporting role in the story: introduce them naturally when they first appear, involve them in at least one emotional beat (a shared laugh, a steadying hand, a discovery together), and if they are present near the end, include them in the landing.`;
+          characterInstruction += `\n    - ${c.name} (${c.role.replace(/_/g, ' ')}) appears on page(s) ${c.appearsOnPages.join(', ')}. Give them a real supporting role in the story: introduce them naturally when they first appear, involve them in at least one emotional beat (a shared laugh, a steadying hand, a discovery together), and if they are present near the end, include them in the landing.${confirmedName}${petNote}`;
         } else {
-          characterInstruction += `\n    - ${c.name} (${c.role.replace(/_/g, ' ')}) appears in several of the photos (exact pages unknown). Give them a real supporting role wherever you can SEE them in the storyboard images: introduce them naturally where they first appear, and involve them in at least one emotional beat.`;
+          characterInstruction += `\n    - ${c.name} (${c.role.replace(/_/g, ' ')}) appears in several of the photos (exact pages unknown). Give them a real supporting role wherever you can SEE them in the storyboard images: introduce them naturally where they first appear, and involve them in at least one emotional beat.${confirmedName}${petNote}`;
         }
       }
       characterInstruction += `\n    - Never invent appearances: a character speaks or acts on a page ONLY if they are actually on that page (or plausibly just off-frame on an adjacent one).`;
@@ -206,7 +215,7 @@ export function createStoryGenerationPrompt(
     ``,
     `  - NEVER invent a proper name for anyone. Use ONLY the names given above.`,
     `  - For unnamed people, use the warm relationship word a toddler would say — "Grandma", "Grandpa", "Daddy", "Mummy", "Auntie", "the little sister" — based on their listed role. If the relationship is unclear, use a neutral warm term like "a friend".`,
-    `  - For unnamed pets, use simple animal words ("the dog", "the cat"). Never name a pet the parent didn't name.`,
+    `  - For unnamed pets, use simple animal words ("the dog", "the cat"). Never name a pet the parent didn't name. A pet the parent DID name is a character too — use that name.`,
   ].join('\n');
 
   const baseInstructions = [

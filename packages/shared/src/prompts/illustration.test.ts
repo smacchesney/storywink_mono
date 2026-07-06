@@ -123,3 +123,49 @@ describe('isMainCharacterRole', () => {
     expect(isMainCharacterRole('pet')).toBe(false);
   });
 });
+
+describe('role-labeled reference ordering (character sheets)', () => {
+  it('keeps the legacy image-ordering line byte-identical when no sheets ride along', () => {
+    const prompt = createIllustrationPrompt({
+      style: 'vignette',
+      pageText: 'Aria spun in the sunshine.',
+      bookTitle: "Aria's Big Day",
+      isTitlePage: false,
+      referenceImageCount: 3,
+    });
+    expect(prompt).toContain(
+      'using the 4 images provided. The first image shows the scene/subjects, the following 3 image(s) show the artistic style to apply.',
+    );
+    expect(prompt).not.toContain('CHARACTER SHEET');
+  });
+
+  it('names each image role by position when sheets are present', () => {
+    const prompt = createIllustrationPrompt({
+      style: 'vignette',
+      pageText: 'Aria spun in the sunshine.',
+      bookTitle: "Aria's Big Day",
+      isTitlePage: false,
+      referenceImageCount: 2,
+      characterSheetCount: 2,
+    });
+    expect(prompt).toContain('using the 5 images provided, in this order:');
+    expect(prompt).toContain("image 1 shows the scene/subjects (this page's photo)");
+    expect(prompt).toContain('images 2-3 are CHARACTER SHEETS');
+    expect(prompt).toContain('the final 2 images show the artistic style to apply');
+  });
+
+  it('labels the interior render on cover calls', () => {
+    const prompt = createIllustrationPrompt({
+      style: 'vignette',
+      pageText: 'Aria spun in the sunshine.',
+      bookTitle: "Aria's Big Day",
+      isTitlePage: true,
+      referenceImageCount: 2,
+      characterSheetCount: 1,
+      interiorRenderCount: 1,
+    });
+    expect(prompt).toContain('using the 5 images provided, in this order:');
+    expect(prompt).toContain('image 2 is a CHARACTER SHEET');
+    expect(prompt).toContain("image 3 is the book's approved interior illustration of this same scene");
+  });
+});

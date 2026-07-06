@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo, useTransition, useEffect, useCallback, useRef } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import Image from "next/image";
 import BookCard from "@/components/book-card";
@@ -32,8 +31,17 @@ const POLLING_INTERVAL = 5000;
 // Define BookStatus inline (can't import from Prisma in client components)
 type BookStatus = "DRAFT" | "GENERATING" | "STORY_READY" | "ILLUSTRATING" | "COMPLETED" | "FAILED" | "PARTIAL";
 
-// Statuses that should be visible in the library
-const VISIBLE_STATUSES: BookStatus[] = ['ILLUSTRATING', 'COMPLETED', 'PARTIAL', 'FAILED'];
+// Every book the parent owns belongs on the shelf — an abandoned draft or a
+// book mid-generation is otherwise unreachable (no resume, no delete).
+const VISIBLE_STATUSES: BookStatus[] = [
+  'DRAFT',
+  'GENERATING',
+  'STORY_READY',
+  'ILLUSTRATING',
+  'COMPLETED',
+  'PARTIAL',
+  'FAILED',
+];
 
 type LibraryBook = {
   id: string;
@@ -56,6 +64,7 @@ type SortOption = 'updatedAt' | 'title';
 export function LibraryClientView() {
   const t = useTranslations('library');
   const tc = useTranslations('common');
+  const tIssue = useTranslations('issue');
   const { getToken, isLoaded } = useAuth();
   const [books, setBooks] = useState<LibraryBook[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -90,7 +99,7 @@ export function LibraryClientView() {
     } catch (error) {
       console.error('Error fetching books:', error);
       if (showLoadingState) {
-        showErrorWithRetry(error, t('unableToLoad'), () => window.location.reload());
+        showErrorWithRetry(error, t('unableToLoad'), () => window.location.reload(), tc('retry'));
       }
     } finally {
       if (showLoadingState) {
@@ -164,7 +173,7 @@ export function LibraryClientView() {
         }
       } catch (error) {
         console.error('Error deleting book:', error);
-        showErrorWithRetry(error, t('unableToDelete'), handleDeleteBook);
+        showErrorWithRetry(error, t('unableToDelete'), handleDeleteBook, tc('retry'));
       }
     });
   };
@@ -193,11 +202,11 @@ export function LibraryClientView() {
       } else if (response.ok) {
         await fetchBooks(false);
       } else {
-        showError(data.error || 'Failed to retry', 'Retry failed');
+        showError(data.error || 'retry rejected', tIssue('retryFailed'));
       }
     } catch (error) {
       console.error('Error retrying book:', error);
-      showError('Failed to retry', 'Retry failed');
+      showError(error, tIssue('retryFailed'));
     } finally {
       setIsRetrying(null);
     }
@@ -210,9 +219,9 @@ export function LibraryClientView() {
           <Skeleton className="h-8 w-32" />
           <Skeleton className="h-10 w-40" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Skeleton key={i} className="h-64 w-full" />
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+          {[...Array(8)].map((_, i) => (
+            <Skeleton key={i} className="aspect-square w-full rounded-md" />
           ))}
         </div>
       </div>
@@ -314,17 +323,29 @@ function BookGrid({
   const t = useTranslations('library');
 
   if (books.length === 0) {
+    // An invitation, not a dead end: the cats, one line, one coral CTA.
     return (
-      <Card className="p-8 text-center">
-        <CardContent>
-          <p className="text-slate-500 dark:text-slate-400">{t('noBooks')}</p>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Image
+          src="https://res.cloudinary.com/storywink/image/upload/v1772291378/Screenshot_2026-02-28_at_10.57.29_PM_qwoqr0.png"
+          alt={t('mascotAlt')}
+          width={160}
+          height={160}
+          className="h-28 w-auto"
+        />
+        <p className="mt-5 font-playful text-lg text-[#1a1a1a] dark:text-white">{t('emptyTitle')}</p>
+        <Button
+          asChild
+          className="mt-6 rounded-full bg-coral hover:bg-[#E55A4C] px-6 font-playful text-white"
+        >
+          <Link href="/create">{t('emptyCta')}</Link>
+        </Button>
+      </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
       {books.map((book) => (
         <BookCard
           key={book.id}

@@ -19,6 +19,8 @@ export async function GET(request: NextRequest) {
       },
       select: {
         status: true,
+        generationPhase: true,
+        childName: true,
         pages: {
           select: {
             id: true,
@@ -37,6 +39,10 @@ export async function GET(request: NextRequest) {
     // Calculate progress
     const progress = {
       status: book.status,
+      // Worker-written pipeline phase + the child's name, so the wait screen
+      // can narrate truthfully ("Writing Mika's story…").
+      generationPhase: book.generationPhase,
+      childName: book.childName,
       totalPages: book.pages.length,
       pagesWithText: book.pages.filter(p => p.text && p.text.trim().length > 0).length,
       pagesWithIllustrations: book.pages.filter(p => p.generatedImageUrl).length,

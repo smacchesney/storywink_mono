@@ -37,6 +37,9 @@ export const updateBookSchema = z.object({
         id: z.string(),
         question: z.string(),
         options: z.array(z.string()),
+        // Links a naming question to its roster character — must round-trip
+        // (zod strips unknown keys), or the answer can never merge back.
+        characterId: z.string().max(50).nullable().optional(),
         answer: z.string().nullable().optional(),
       }),
     )

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Bell } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
+import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 
 interface Notification {
@@ -23,22 +24,20 @@ interface NotificationsResponse {
   unreadCount: number;
 }
 
-function formatRelativeTime(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins} min ago`;
-  if (diffHours < 24) return `${diffHours} hr ago`;
-  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-  return date.toLocaleDateString();
-}
+// Notification copy renders client-side from the `type` field so it follows
+// the parent's locale; the worker-written strings stay as the fallback for
+// unknown types (and anything missing a book title).
+const TYPE_TITLE_KEYS: Record<string, string> = {
+  BOOK_COMPLETED: 'bookCompleted',
+  BOOK_PARTIAL: 'bookPartial',
+  BOOK_FAILED: 'bookFailed',
+  ORDER_SHIPPED: 'orderShipped',
+  ORDER_FAILED: 'orderIssue',
+  ORDER_CANCELLED: 'orderIssue',
+};
 
 export function NotificationBell() {
+  const t = useTranslations('notifications');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -47,6 +46,29 @@ export function NotificationBell() {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
   const { getToken, isSignedIn } = useAuth();
+
+  // Localized title from the type; the stored (worker-written) title is the
+  // fallback for unknown types or notifications without a book title.
+  const notificationTitle = (notification: Notification): string => {
+    const key = TYPE_TITLE_KEYS[notification.type];
+    if (!key || !notification.bookTitle) return notification.title;
+    return t(key, { title: notification.bookTitle });
+  };
+
+  const formatRelativeTime = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return t('justNow');
+    if (diffMins < 60) return t('minutesAgo', { count: diffMins });
+    if (diffHours < 24) return t('hoursAgo', { count: diffHours });
+    if (diffDays < 7) return t('daysAgo', { count: diffDays });
+    return date.toLocaleDateString();
+  };
 
   // Fetch notifications
   const fetchNotifications = async () => {
@@ -143,13 +165,16 @@ export function NotificationBell() {
       console.error('Failed to mark notification as read:', error);
     }
 
-    // Close dropdown and navigate. Book notifications land on the book
-    // itself; anything else keeps the library.
+    // Close dropdown and navigate. Order notifications land on the orders
+    // page, book notifications on the book itself; anything else keeps the
+    // library.
     setIsOpen(false);
     router.push(
-      notification.bookId && notification.type.startsWith('BOOK_')
-        ? `/book/${notification.bookId}/preview`
-        : '/library'
+      notification.type.startsWith('ORDER_')
+        ? '/orders'
+        : notification.bookId && notification.type.startsWith('BOOK_')
+          ? `/book/${notification.bookId}/preview`
+          : '/library'
     );
   };
 
@@ -163,7 +188,7 @@ export function NotificationBell() {
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className="relative flex items-center justify-center w-11 h-11 rounded-full hover:bg-[#B8E4DC]/30 dark:hover:bg-slate-800 transition-colors"
-        aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+        aria-label={unreadCount > 0 ? t('bellUnread', { count: unreadCount }) : t('title')}
       >
         <Bell className="h-5 w-5 text-slate-600 dark:text-slate-300" />
         {/* Badge */}
@@ -182,17 +207,17 @@ export function NotificationBell() {
         >
           {/* Header */}
           <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-            <h3 className="font-semibold text-slate-900 dark:text-white">Notifications</h3>
+            <h3 className="font-semibold text-slate-900 dark:text-white">{t('title')}</h3>
           </div>
 
           {/* Content */}
           <div className="max-h-[300px] overflow-y-auto">
             {isLoading ? (
-              <div className="px-4 py-8 text-center text-slate-500">Loading...</div>
+              <div className="px-4 py-8 text-center text-slate-500">{t('loading')}</div>
             ) : notifications.length === 0 ? (
               <div className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
                 <Bell className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                <p>No new notifications</p>
+                <p>{t('empty')}</p>
               </div>
             ) : (
               <ul>
@@ -222,7 +247,7 @@ export function NotificationBell() {
                       {/* Text content */}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
-                          {notification.title}
+                          {notificationTitle(notification)}
                         </p>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                           {formatRelativeTime(notification.createdAt)}

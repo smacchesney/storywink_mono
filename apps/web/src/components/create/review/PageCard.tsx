@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Pencil, Check, AlertTriangle } from 'lucide-react';
+import { Loader2, Pencil, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { coolifyImageUrl } from '@storywink/shared';
 
@@ -13,18 +13,18 @@ interface PageCardProps {
   text: string | null;
   pageNumber: number;
   isTitlePage: boolean;
-  isConfirmed: boolean;
   moderationStatus?: string;
   moderationReason?: string | null;
   isSaving: boolean;
   bookId: string;
   onTextChange: (newText: string) => void;
-  onConfirm: () => void;
+  /** Persists the page text (the old per-page Confirm tap is gone). */
+  onSave: (newText: string) => void;
 }
 
 /**
  * PageCard displays a single page with its image and text
- * Provides editing and confirmation functionality
+ * Provides editing functionality; "Save changes" writes the text through.
  */
 const PageCard = ({
   id: _id,
@@ -32,19 +32,18 @@ const PageCard = ({
   text,
   pageNumber,
   isTitlePage,
-  isConfirmed,
   moderationStatus,
   moderationReason: _moderationReason,
   isSaving,
   bookId: _bookId,
   onTextChange,
-  onConfirm
+  onSave
 }: PageCardProps) => {
   const t = useTranslations('review');
   const tc = useTranslations('common');
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(text || '');
-  
+
   // Update edited text when text prop changes
   useEffect(() => {
     setEditedText(text || '');
@@ -55,8 +54,9 @@ const PageCard = ({
       toast.error(t('textCannotBeEmpty'));
       return;
     }
-    
+
     onTextChange(editedText);
+    onSave(editedText);
     setIsEditing(false);
   };
 
@@ -108,39 +108,16 @@ const PageCard = ({
         )}
       </div>
       
-      {/* Action Buttons Row - Edit and Confirm buttons side by side */}
+      {/* Action Row — just Edit; the old Confirm tap is gone. */}
       {!isEditing && (
         <div className="flex gap-2 mb-3">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             onClick={() => setIsEditing(true)}
             disabled={isSaving || isEditing}
             className="px-3 text-gray-600 hover:bg-gray-100"
           >
             <Pencil className="h-4 w-4 mr-1" /> {t('edit')}
-          </Button>
-          <Button
-            className={`flex-1 text-white ${
-              isConfirmed 
-                ? 'bg-green-600 hover:bg-green-700' 
-                : 'bg-coral hover:bg-coral/90'
-            }`}
-            onClick={onConfirm}
-            disabled={isSaving}
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {tc('saving')}
-              </>
-            ) : isConfirmed ? (
-              <>
-                <Check className="h-4 w-4 mr-2" />
-                {t('confirmed')}
-              </>
-            ) : (
-              t('confirmText')
-            )}
           </Button>
         </div>
       )}
@@ -169,16 +146,22 @@ const PageCard = ({
               </Button>
               <Button
                 onClick={handleSaveText}
+                disabled={isSaving}
                 className="flex-1 bg-coral hover:bg-coral/90 text-white"
               >
-                {t('saveChanges')}
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {tc('saving')}
+                  </>
+                ) : (
+                  t('saveChanges')
+                )}
               </Button>
             </div>
           </>
         ) : (
-          <div className={`text-content p-3 max-h-[35vh] overflow-y-auto border rounded-md ${
-            isConfirmed ? 'bg-green-50 border-green-200' : 'bg-white'
-          }`}>
+          <div className="text-content p-3 max-h-[35vh] overflow-y-auto border rounded-md bg-white">
             {text || t('noTextYet')}
           </div>
         )}

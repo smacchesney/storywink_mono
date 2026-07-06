@@ -3,7 +3,12 @@ import { GeminiProvider } from './gemini.js';
 import { OpenAIProvider } from './openai.js';
 import type { IllustrationProvider, IllustrationProviderName } from './types.js';
 
-export type { IllustrationProvider, IllustrationInput, IllustrationOutput } from './types.js';
+export type {
+  IllustrationProvider,
+  IllustrationInput,
+  IllustrationImageInput,
+  IllustrationOutput,
+} from './types.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 

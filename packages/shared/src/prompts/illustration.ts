@@ -16,6 +16,10 @@ export interface IllustrationPromptOptions {
   pageNumber?: number;
   qcFeedback?: string | null;
   language?: string;
+  /** Character sheets sent with the request (between photo and style refs). */
+  characterSheetCount?: number;
+  /** 1 when the approved interior render rides along as a ref (cover calls). */
+  interiorRenderCount?: number;
 }
 
 // ----------------------------------
@@ -112,6 +116,8 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
     illustrationNotes: opts.illustrationNotes ?? null,
     referenceImageCount: opts.referenceImageCount || 1,
     language: opts.language,
+    characterSheetCount: opts.characterSheetCount ?? 0,
+    interiorRenderCount: opts.interiorRenderCount ?? 0,
   };
 
   // 1. Style-specific prompt (the bulk of the prompt)
