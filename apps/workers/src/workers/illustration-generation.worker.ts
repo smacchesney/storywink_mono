@@ -211,9 +211,10 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     // page). Three pipeline stages must look at the same version of the photo.
     let rawAnchorUrl = page.asset?.url || page.asset?.thumbnailUrl;
 
-    // A bridge page has no photo of its own — ALWAYS resolve the anchor
-    // (nearest preceding, else following, PHOTO page's asset) from the DB at
-    // execution time. Any anchor in job data would be at most a stale cache.
+    // A bridge page has no photo of its own — ALWAYS resolve the anchor from
+    // the DB at execution time (nearest preceding PHOTO page's asset, or the
+    // nearest following one when the authored scene says outfitFrom='next').
+    // Any anchor in job data would be at most a stale cache.
     if (isBridgePage) {
       const photoPages = await prisma.page.findMany({
         where: { bookId, source: 'PHOTO', assetId: { not: null } },
@@ -231,6 +232,10 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
           assetUrl: p.asset?.url || p.asset?.thumbnailUrl || null,
         })),
         page.pageNumber,
+        // The prompt tells the model "Outfits: exactly as worn in the photo
+        // (image 1)" — image 1 must therefore be the photo the story model
+        // authored the outfits to copy.
+        bridgeScene?.outfitFrom ?? 'previous',
       );
       rawAnchorUrl = anchor?.assetUrl ?? undefined;
       console.log(`[IllustrationWorker] Bridge page ${pageNumber}: anchoring to photo page ${anchor?.pageNumber ?? 'NONE'}`);
@@ -634,6 +639,11 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
                         // rows from these; it cannot infer provider/model.
                         lastRenderProvider: illustrator.name,
                         lastRenderModel: illustrator.modelId,
+                        // sheetRefs is what this render actually conditioned
+                        // on (truthful even when a sheet fetch degraded), so
+                        // QC ground truth can be derived per render, not from
+                        // Book.characterReferences at finalize time.
+                        lastRenderHadSheet: sheetRefs.length > 0,
                     }
                     : {}),
                 moderationStatus: moderationBlocked ? "FLAGGED" : "OK",

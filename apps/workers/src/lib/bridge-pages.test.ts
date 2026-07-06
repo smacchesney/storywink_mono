@@ -217,4 +217,25 @@ describe('resolveBridgeAnchor', () => {
   it('a trailing bridge anchors to the last photo', () => {
     expect(resolveBridgeAnchor(pages, 5)?.assetUrl).toBe('u4');
   });
+
+  describe("outfitFrom='next' (the authored outfits change AT this bridge)", () => {
+    it('prefers the nearest FOLLOWING photo page', () => {
+      expect(resolveBridgeAnchor(pages, 3, 'next')?.assetUrl).toBe('u4');
+    });
+
+    it('falls back to the nearest preceding photo when the bridge is after the last photo', () => {
+      expect(resolveBridgeAnchor(pages, 5, 'next')?.assetUrl).toBe('u4');
+    });
+
+    it('null when no photos exist, same as the default direction', () => {
+      const onlyBridges: AnchorCandidate[] = [
+        { pageNumber: 1, source: 'BRIDGE', assetUrl: null },
+      ];
+      expect(resolveBridgeAnchor(onlyBridges, 1, 'next')).toBeNull();
+    });
+  });
+
+  it("explicit outfitFrom='previous' matches the default behavior", () => {
+    expect(resolveBridgeAnchor(pages, 3, 'previous')?.assetUrl).toBe('u2');
+  });
 });

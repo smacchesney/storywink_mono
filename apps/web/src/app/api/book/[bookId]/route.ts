@@ -7,6 +7,7 @@ import {
   collectBookGeneratedPublicIds,
   excludeSharedAssetIds,
   bookGeneratedFolderPrefix,
+  ASSET_CLEANUP_PENDING_EVENT,
   type AssetCleanupJobPayload,
 } from '@storywink/shared';
 import { createBullMQConnection } from '@storywink/shared/redis';
@@ -295,6 +296,33 @@ export async function DELETE(
       return NextResponse.json({ error: message }, { status });
     }
 
+    // A paid print order still moving through fulfillment depends on this
+    // book's PrintOrder row (onDelete: Cascade would destroy it): the Lulu
+    // poller, the /orders page, and ship/failure notifications all read it.
+    // PENDING_PAYMENT stays deletable (abandoned checkouts are never reaped)
+    // and SHIPPED releases the guard (nothing advances SHIPPED → DELIVERED).
+    const activeOrder = await prisma.printOrder.findFirst({
+      where: {
+        bookId,
+        status: { in: ['PAYMENT_COMPLETED', 'SUBMITTED_TO_LULU', 'IN_PRODUCTION'] },
+      },
+      select: { id: true, status: true },
+    });
+    if (activeOrder) {
+      logger.info(
+        { clerkId, dbUserId: dbUser.id, bookId, printOrderId: activeOrder.id, orderStatus: activeOrder.status },
+        'API: Book delete blocked - print order in flight.',
+      );
+      return NextResponse.json(
+        {
+          error:
+            'A printed copy of this book is still being made. Once your order ships, you can delete the book and we will remove your photos.',
+          code: 'PRINT_ORDER_IN_FLIGHT',
+        },
+        { status: 409 },
+      );
+    }
+
     // Shared-asset guard: the create route accepts arbitrary owned assetIds,
     // so another book (page photo or cover) may reference the same upload.
     const candidateAssetIds = excludeSharedAssetIds(
@@ -325,6 +353,21 @@ export async function DELETE(
         ...collectBookGeneratedPublicIds(book),
       ]),
     );
+    const prefixes = [bookGeneratedFolderPrefix(bookId)];
+
+    // Durable pre-delete record: if the enqueue below fails (or the process
+    // dies in the delete→enqueue gap), the asset-cleanup worker's reconcile
+    // pass re-enqueues the deletion from these props. This write THROWS on
+    // failure — the request 500s WITHOUT deleting, so photos can never be
+    // orphaned silently.
+    await prisma.appEvent.create({
+      data: {
+        name: ASSET_CLEANUP_PENDING_EVENT,
+        userId: dbUser.id,
+        bookId,
+        props: { publicIds, prefixes, reason: 'book_deleted' },
+      },
+    });
 
     // Delete only if the authenticated user owns the book.
     // Relies on onDelete: Cascade to remove pages/related records.
@@ -336,6 +379,11 @@ export async function DELETE(
     });
 
     if (deleteResult.count === 0) {
+      // The book survived — remove the now-stale pending marker (best-effort;
+      // the reconcile pass would also drop it after seeing the book exists).
+      await prisma.appEvent
+        .deleteMany({ where: { name: ASSET_CLEANUP_PENDING_EVENT, bookId } })
+        .catch(() => {});
       logger.warn({ clerkId, dbUserId: dbUser.id, bookId }, 'API: Book delete failed - Book not found or user does not own it.');
       const bookExists = await prisma.book.findUnique({ where: { id: bookId }, select: { id: true } });
       const status = bookExists ? 403 : 404;
@@ -353,12 +401,14 @@ export async function DELETE(
         `cleanup-book-${bookId}`,
         {
           publicIds,
-          prefixes: [bookGeneratedFolderPrefix(bookId)],
+          prefixes,
           reason: 'book_deleted',
           userId: dbUser.id,
           bookId,
         } satisfies AssetCleanupJobPayload,
         {
+          // Deterministic id so the reconcile pass's re-enqueues dedupe.
+          jobId: `cleanup-book-${bookId}`,
           attempts: 3,
           backoff: { type: 'exponential', delay: 10000 },
           removeOnComplete: { count: 100 },
@@ -370,9 +420,11 @@ export async function DELETE(
         'API: Asset cleanup enqueued for deleted book.',
       );
     } catch (queueError) {
+      // Log the FULL target list (manual recovery needs it); the pending
+      // AppEvent written above lets the worker's reconcile pass re-enqueue.
       logger.error(
-        { clerkId, dbUserId: dbUser.id, bookId, publicIdCount: publicIds.length, error: queueError },
-        'API: FAILED to enqueue asset cleanup — Cloudinary assets for this deleted book were NOT removed.',
+        { clerkId, dbUserId: dbUser.id, bookId, publicIds, prefixes, error: queueError },
+        'API: FAILED to enqueue asset cleanup — reconcile pass will retry from the pending record.',
       );
     }
 

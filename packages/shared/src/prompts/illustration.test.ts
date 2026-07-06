@@ -214,8 +214,42 @@ describe('bridge prompt variant (source=BRIDGE pages)', () => {
     expect(bridgePrompt).toContain('red bucket');
   });
 
+  it('names the hierarchy it overrides, so the two absolutes can never fight', () => {
+    // PEOPLE - SOURCE HIERARCHY item 2 orders "follow the photo exactly" for
+    // pose/composition/people-present; the bridge section must explicitly
+    // supersede it (not just the scene-interpretation text) and settle the
+    // cast rule, or the model receives two conflicting non-negotiables.
+    expect(bridgePrompt).toContain('supersedes');
+    expect(bridgePrompt).toContain('item 2 of PEOPLE - SOURCE HIERARCHY');
+    expect(bridgePrompt).toContain("People in this scene come ONLY from this scene's cast");
+  });
+
   it('keeps the PEOPLE - SOURCE HIERARCHY block verbatim', () => {
     expect(bridgePrompt).toContain('PEOPLE - SOURCE HIERARCHY (non-negotiable)');
+  });
+
+  it('uses a bridge-aware identity arbitration trailer (pose follows the bridge, not the photo)', () => {
+    expect(bridgePrompt).toContain(
+      "Clothing follows this page's photo (image 1); pose and scene composition follow the BRIDGE PAGE instructions:",
+    );
+    expect(bridgePrompt).not.toContain(
+      "Pose, clothing, and scene composition follow this page's photo:",
+    );
+  });
+
+  it('keeps the photo-page identity trailer byte-identical on ordinary pages', () => {
+    const photoPrompt = createIllustrationPrompt({
+      style: 'vignette',
+      pageText: 'Aria spun in the sunshine.',
+      bookTitle: "Aria's Big Day",
+      isTitlePage: false,
+      referenceImageCount: 3,
+      characterIdentity,
+      pageNumber: 3,
+    });
+    expect(photoPrompt).toContain(
+      "Pose, clothing, and scene composition follow this page's photo:",
+    );
   });
 
   it('filters the identity section by scene.charactersPresent instead of appearsOnPages', () => {

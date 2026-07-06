@@ -226,6 +226,17 @@ export function isDraftSweepCandidate(
 export const ASSET_CLEANUP_REASONS = ['book_deleted', 'user_deleted', 'draft_expired'] as const;
 export type AssetCleanupReason = (typeof ASSET_CLEANUP_REASONS)[number];
 
+/**
+ * Durable pre-delete marker (AppEvent name): written BEFORE the Book row is
+ * deleted, carrying the full Cloudinary target list in props
+ * ({publicIds, prefixes, reason}). If the deletion-job enqueue fails (or the
+ * process dies in the delete->enqueue gap), the sweep's reconcile pass
+ * re-enqueues from this record — without it the photos would be orphaned in
+ * Cloudinary forever. A matching 'assets_deleted' / 'assets_delete_dry_run'
+ * event for the same book marks the record satisfied.
+ */
+export const ASSET_CLEANUP_PENDING_EVENT = 'asset_cleanup_pending';
+
 /** Payload contract between the enqueue points (web, sweep) and the worker. */
 export const assetCleanupJobSchema = z.object({
   /** Exact Cloudinary public ids to delete (originals + generated). */

@@ -195,7 +195,8 @@
     "emptyTitle": "Every book starts with a photo.",
     "emptyCta": "Make your first book",
     "unableToLoad": "Unable to load your library",
-    "unableToDelete": "Unable to delete book"
+    "unableToDelete": "Unable to delete book",
+    "printOrderInFlight": "A printed copy of this book is still being made. Once your order ships, you can delete the book and we will remove your photos."
   },
   "bookCard": {
     "creatingIllustrations": "Creating illustrations…",

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { isDraftSweepCandidate } from '@storywink/shared';
 import {
   resolveDraftRetentionDays,
   DEFAULT_DRAFT_RETENTION_DAYS,
@@ -6,6 +7,7 @@ import {
   summarizeDeletionResponse,
   addCounts,
 } from './asset-cleanup.helpers.js';
+import { computeLastActivity } from './book-reaper.helpers.js';
 
 describe('resolveDraftRetentionDays', () => {
   it('defaults to 90 when unset or blank', () => {
@@ -69,5 +71,37 @@ describe('addCounts', () => {
     expect(
       addCounts({ deleted: 1, notFound: 2, other: 0 }, { deleted: 3, notFound: 0, other: 4 }),
     ).toEqual({ deleted: 4, notFound: 2, other: 4 });
+  });
+});
+
+// The sweep's staleness anchor: max write across the book row AND its pages
+// (photo uploads, reorders, and page-text edits only touch Page rows). This
+// is the exact composition runDraftSweep uses.
+describe('draft sweep page-aware staleness anchor', () => {
+  const now = new Date('2026-07-05T12:00:00.000Z');
+  const days = (n: number) => n * 24 * 60 * 60 * 1000;
+  const ago = (n: number) => new Date(now.getTime() - days(n));
+  const retentionDays = 90;
+
+  const candidate = (bookUpdatedAt: Date, pageUpdatedAts: Date[]) =>
+    isDraftSweepCandidate(
+      { status: 'DRAFT', updatedAt: computeLastActivity(bookUpdatedAt, pageUpdatedAts) },
+      now,
+      retentionDays,
+    );
+
+  it('skips a draft whose Book row is stale but whose pages were edited recently', () => {
+    // Photo upload / reorder / text PATCH write Page rows only — the draft is
+    // under active edit and must never be swept.
+    expect(candidate(ago(200), [ago(200), ago(3)])).toBe(false);
+  });
+
+  it('still sweeps when book AND all pages are past retention', () => {
+    expect(candidate(ago(200), [ago(150), ago(120)])).toBe(true);
+  });
+
+  it('behaves like the book-only anchor for zero-page drafts', () => {
+    expect(candidate(ago(200), [])).toBe(true);
+    expect(candidate(ago(3), [])).toBe(false);
   });
 });

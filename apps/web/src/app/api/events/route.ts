@@ -1,35 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from '@/lib/db';
-import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
+import { checkRateLimit } from '@/lib/rateLimit';
+import { clientEventSchema, MAX_PROPS_BYTES } from '@/lib/client-events';
 import logger from '@/lib/logger';
-
-// Serialized props cap — telemetry payloads should be tiny.
-const MAX_PROPS_BYTES = 2048;
-
-const eventSchema = z
-  .object({
-    name: z
-      .string()
-      .min(1)
-      .max(64)
-      .regex(/^[a-z0-9_]+$/, 'Event names are snake_case identifiers'),
-    bookId: z.string().cuid().optional(),
-    props: z.record(z.unknown()).optional(),
-  })
-  .strict();
 
 /**
  * POST /api/events
  *
  * Funnel telemetry sink. The event is attributed to the authenticated user
  * (client-sent userId is never trusted). bookId is opaque telemetry context,
- * deliberately not ownership-checked.
+ * deliberately not ownership-checked. `name` is a closed enum of client
+ * funnel events (see client-events.ts) — AppEvent is also the workers'
+ * control-plane store, so worker-owned names must be unforgeable from here.
  */
 export async function POST(req: NextRequest) {
   try {
     const { dbUser } = await getAuthenticatedUser();
+
+    // Same pattern as the other write routes (book-create, generate/story,
+    // reillustrate): log-only until RATE_LIMIT_ENFORCE=true, so default
+    // behavior is unchanged when the flag is unset. 300/hr is ~5/min
+    // sustained — far above what the app's handful of track() call sites can
+    // produce in a legitimate session, but it caps floods and bulk forging.
+    const rl = await checkRateLimit(`events:${dbUser.id}`, 300, 3600);
+    if (!rl.allowed) {
+      logger.warn(
+        { dbUserId: dbUser.id, key: `events:${dbUser.id}`, remaining: rl.remaining },
+        'Rate limit exceeded: events',
+      );
+      if (process.env.RATE_LIMIT_ENFORCE === 'true') {
+        // track() is fire-and-forget and never reads the response; drop
+        // silently (204 keeps devtools quiet where a 429 would flag red).
+        return new NextResponse(null, { status: 204 });
+      }
+    }
 
     let body: unknown;
     try {
@@ -38,7 +44,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    const parsed = eventSchema.safeParse(body);
+    const parsed = clientEventSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Invalid request body', details: parsed.error.errors },

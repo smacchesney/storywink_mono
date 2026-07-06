@@ -195,7 +195,8 @@
     "emptyTitle": "絵本づくりは、1枚の写真から。",
     "emptyCta": "はじめての絵本をつくる",
     "unableToLoad": "ライブラリを読み込めませんでした",
-    "unableToDelete": "絵本を削除できませんでした"
+    "unableToDelete": "絵本を削除できませんでした",
+    "printOrderInFlight": "この絵本の印刷注文がまだ進行中です。発送が完了したら削除できます（お写真もその際に削除されます）。"
   },
   "bookCard": {
     "creatingIllustrations": "イラストを作成中…",

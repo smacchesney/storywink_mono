@@ -45,6 +45,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
     const { assets, bookId } = parsed.data;
+
+    // Ownership pin: /api/upload/signature signs every real upload into
+    // `user_<dbUser.id>/uploads`, so a legitimate publicId always lives in
+    // the caller's own folder. Anything else (another user's folder, shared
+    // mascot/demo ids) is a forgery — and since the deletion pipeline deletes
+    // Asset.publicId verbatim, a poisoned row here would become a
+    // cross-tenant Cloudinary deletion once ASSET_CLEANUP_ENFORCE is on.
+    const ownedPrefix = `user_${dbUser.id}/`;
+    const foreign = assets.find((a) => !a.publicId.startsWith(ownedPrefix));
+    if (foreign) {
+      logger.warn(
+        { dbUserId: dbUser.id, publicId: foreign.publicId },
+        'Cloudinary notify rejected: publicId outside caller folder',
+      );
+      return NextResponse.json({ error: 'Invalid asset ownership' }, { status: 400 });
+    }
+
     console.log(`>>> DEBUG: Cloudinary notify - dbUserId: ${dbUser.id}, assetCount: ${assets.length}, bookId: ${bookId || 'none'}`);
 
     const createdAssets = [];

@@ -168,6 +168,12 @@ export function LibraryClientView() {
           setBooks(books.filter(book => book.id !== bookToDelete.id));
           setIsDeleteDialogOpen(false);
           setBookToDelete(null);
+        } else if (response.code === 'PRINT_ORDER_IN_FLIGHT') {
+          // Coded error → localized copy (en/ja); the raw server string stays
+          // the fallback for any error without a known code.
+          showError(t('printOrderInFlight'), t('unableToDelete'));
+          setIsDeleteDialogOpen(false);
+          setBookToDelete(null);
         } else {
           showError(response.error || 'Failed to delete book', t('unableToDelete'));
         }

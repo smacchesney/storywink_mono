@@ -40,7 +40,13 @@ class ApiClient {
 
       if (!response.ok) {
         console.error('API response error:', { endpoint, status: response.status, data });
-        throw new Error(data.error || 'API request failed');
+        // Same shape the catch below produces, but keeps the server's
+        // machine-readable `code` so callers can localize coded errors.
+        return {
+          success: false,
+          error: data.error || 'API request failed',
+          ...(typeof data.code === 'string' ? { code: data.code } : {}),
+        };
       }
 
       return data;

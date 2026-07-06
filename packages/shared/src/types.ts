@@ -94,6 +94,8 @@ export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+  /** Machine-readable error code (e.g. 'PRINT_ORDER_IN_FLIGHT') so clients can localize. */
+  code?: string;
 }
 
 // Type for a Page including minimal Asset info needed for Storyboard AND Canvas
@@ -157,6 +159,13 @@ export interface CharacterExtractionJob {
   userId: string;
   artStyle: string;
   pageIds?: string[];
+  /**
+   * Set by whole-book recovery/retry paths (reaper, book-level retry route):
+   * pageIds still scope the render children (already-OK pages are not
+   * repainted), but the finalize parent must run the book-wide QC pass and
+   * palette normalization instead of treating the run as scoped.
+   */
+  recovery?: boolean;
 }
 
 /**

@@ -158,6 +158,10 @@ export async function POST(
         userId: dbUser.id,
         artStyle: book.artStyle || 'vignette',
         pageIds: retryablePages.map(p => p.id),
+        // Book-level retry: pageIds scope the render children (already-OK
+        // pages are not repainted) but finalize must still run the book-wide
+        // QC pass and palette normalization.
+        recovery: true,
       },
       {
         attempts: 3,

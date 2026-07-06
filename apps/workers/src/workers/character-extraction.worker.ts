@@ -37,7 +37,7 @@ async function setGenerationPhase(bookId: string, phase: string | null): Promise
 }
 
 export async function processCharacterExtraction(job: Job<CharacterExtractionJob>) {
-  const { bookId, userId, artStyle, pageIds } = job.data;
+  const { bookId, userId, artStyle, pageIds, recovery } = job.data;
 
   logger.info({ bookId, userId, artStyle }, 'Starting character identity extraction');
 
@@ -112,6 +112,25 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
       );
       characterIdentity = remappedIdentity;
 
+      // Persist the remapped numbers unconditionally: book-finalize's QC
+      // requeue reads Book.characterIdentity directly, and books whose
+      // extractedForStyle already matches (e.g. vignette) skip the
+      // style-refresh write below — without this write they would keep the
+      // stale pre-reorder/pre-bridge numbering. Non-fatal: the in-memory
+      // identity is already correct for this run.
+      try {
+        await prisma.book.update({
+          where: { id: bookId },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data: { characterIdentity: characterIdentity as any },
+        });
+      } catch (persistError) {
+        logger.warn(
+          { bookId, error: persistError instanceof Error ? persistError.message : 'Unknown error' },
+          'Remapped identity persist failed — continuing with in-memory identity',
+        );
+      }
+
       // The styleTranslation prose is style-specific: the perception pass runs
       // at create time when artStyle is still unset (it bakes in 'vignette'),
       // so on nearly every non-vignette book — and after any style switch —
@@ -145,7 +164,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         logger,
       });
 
-      await createIllustrationFlow(bookId, userId, characterIdentity, pageIds, characterSheets);
+      await createIllustrationFlow(bookId, userId, characterIdentity, pageIds, characterSheets, recovery);
       return { success: true, characterCount: characterIdentity.characters.length, reused: true };
     }
 
@@ -231,6 +250,17 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
           })),
         };
 
+        // The model's appearsOnPages are positional over the PHOTO pages sent
+        // above (bridges excluded); remap them into the full current page
+        // order so downstream consumers that filter by DB pageNumber
+        // (buildCharacterIdentitySection) land on the right pages on bridge
+        // books. Exact no-op when there are no bridges (photo order == page
+        // order), and null is impossible in practice here (every non-null
+        // stamp was just taken from photoPages ⊆ storyPages) — but degrade to
+        // the unmapped identity anyway.
+        characterIdentity =
+          remapCharacterPages(characterIdentity, storyPages.map(p => p.assetId)) ?? characterIdentity;
+
         // Fresh extractions mint new characterIds, so chip answers rarely
         // join here — but the merge still stamps main_child's name with its
         // childName provenance, and never guesses on failed joins.
@@ -303,7 +333,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
 
   // 9. Create the illustration FlowProducer flow
   // This runs regardless of whether extraction succeeded (graceful degradation)
-  await createIllustrationFlow(bookId, userId, characterIdentity, pageIds, characterSheets);
+  await createIllustrationFlow(bookId, userId, characterIdentity, pageIds, characterSheets, recovery);
 
   return { success: true, characterCount: characterIdentity?.characters?.length ?? 0 };
 }
@@ -398,6 +428,7 @@ async function createIllustrationFlow(
   characterIdentity: CharacterIdentity | null,
   pageIds?: string[],
   characterSheets?: CharacterSheetRef[],
+  recovery?: boolean,
 ): Promise<void> {
   // Re-fetch book to get latest page data
   const book = await prisma.book.findUnique({
@@ -518,8 +549,11 @@ async function createIllustrationFlow(
       queueName: QUEUE_NAMES.BOOK_FINALIZE,
       // scopedPageIds tells finalize this run was a targeted re-render (e.g.
       // single-page reillustrate) — QC must not cascade regenerations onto
-      // pages the user never asked to touch.
-      data: { bookId, userId, ...(pageIds?.length ? { scopedPageIds: pageIds } : {}) },
+      // pages the user never asked to touch. Whole-book recovery paths
+      // (reaper, book-level retry) set `recovery`: their pageIds only scope
+      // the render children, and finalize must still run the book-wide QC
+      // pass and palette normalization.
+      data: { bookId, userId, ...(pageIds?.length && !recovery ? { scopedPageIds: pageIds } : {}) },
       opts: {
         removeOnComplete: { count: 100 },
         removeOnFail: { count: 500 },

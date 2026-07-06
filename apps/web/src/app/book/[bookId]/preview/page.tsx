@@ -19,6 +19,7 @@ import WhatNowCard from '@/components/book/WhatNowCard';
 import { PrintOrderSheet, PrintOrderBook } from '@/components/print/PrintOrderSheet';
 import { calculatePrintedPageCount } from '@storywink/shared';
 import { bookContentFingerprint } from '@/lib/book-display';
+import { isPrintShippableLocale } from '@/lib/print-availability';
 import { track } from '@/lib/track';
 import { cn } from '@/lib/utils';
 
@@ -60,9 +61,10 @@ function BookPreviewContent() {
   const tWhatNow = useTranslations('whatNow');
   const router = useRouter();
   const locale = useLocale();
-  // Where print can actually ship today (Stripe allows SG/MY). The ja locale
-  // gets an honest "coming soon" instead of a dead-end checkout.
-  const printShippable = locale !== 'ja';
+  // Where print can actually ship today — derived from SHIPPING_TIERS via
+  // isPrintShippableLocale, the same gate book-card uses, so every surface
+  // lifts together the day a new tier lands.
+  const printShippable = isPrintShippableLocale(locale);
   // ?reveal=1 arrives from GenerationProgress on completion. It only bridges
   // the data-loading flash with a warm screen — the reveal itself is gated
   // on firstViewedAt below and the param can never force a repeat.

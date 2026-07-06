@@ -5,6 +5,7 @@ import { createBullMQConnection } from '@storywink/shared/redis';
 import pino from 'pino';
 import {
   STALE_AFTER_MS,
+  REAPER_ESCALATION_WINDOW_MS,
   computeLastActivity,
   isStale,
   decideReaperAction,
@@ -160,6 +161,10 @@ async function requeueStuckBook(book: StuckBook): Promise<'requeued' | 'failed' 
           userId: book.userId,
           artStyle: book.artStyle || 'vignette',
           pageIds: retryablePages.map((p) => p.id),
+          // Whole-book recovery: pageIds scope the render children (no
+          // repainting of already-OK pages) but finalize must still run the
+          // book-wide QC pass and palette normalization.
+          recovery: true,
         },
         {
           attempts: 3,
@@ -219,8 +224,15 @@ export async function processBookReaper(job: Job) {
           continue;
         }
 
+        // Bounded to the current stall episode: a lifetime count would turn
+        // one historical rescue into an instant FAILED on every later,
+        // unrelated stall of the same book.
         const priorRequeues = await prisma.appEvent.count({
-          where: { name: 'reaper_requeued', bookId: book.id },
+          where: {
+            name: 'reaper_requeued',
+            bookId: book.id,
+            createdAt: { gte: new Date(now.getTime() - REAPER_ESCALATION_WINDOW_MS) },
+          },
         });
 
         if (decideReaperAction(priorRequeues) === 'fail') {

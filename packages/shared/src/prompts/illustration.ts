@@ -80,6 +80,15 @@ function buildCharacterIdentitySection(
 
   if (relevantCharacters.length === 0) return null;
 
+  // On bridge pages (scene-authored cast applied) the arbitration trailer
+  // must agree with the BRIDGE PAGE section: pose/composition are released
+  // from the photo there, so claiming "pose ... follow[s] this page's photo"
+  // here would reintroduce the exact contradiction the bridge override
+  // settles. Photo pages keep the original wording byte-for-byte.
+  const arbitrationTrailer = bridgeFiltered.length
+    ? `Clothing follows this page's photo (image 1); pose and scene composition follow the BRIDGE PAGE instructions:`
+    : `Pose, clothing, and scene composition follow this page's photo:`;
+
   const charDescriptions = relevantCharacters
     .map(c => {
       const traits = c.physicalTraits;
@@ -104,7 +113,7 @@ function buildCharacterIdentitySection(
     `CHARACTER IDENTITY (canonical reference — wins on face, hair, and skin):\n` +
     `The following characters appear in this scene. Their face shape, hair, skin tone, and distinguishing features MUST match these descriptions on every page; ` +
     `when the photo is ambiguous or disagrees on those features (lighting, angle, shadow), these descriptions win. ` +
-    `Pose, clothing, and scene composition follow this page's photo:\n` +
+    `${arbitrationTrailer}\n` +
     charDescriptions
   );
 }
@@ -122,8 +131,8 @@ function buildBridgeSceneSection(bridgeScene: BridgeScene | null | undefined): s
 
   const props = bridgeScene.props.filter(p => p.trim());
   return [
-    `BRIDGE PAGE — THIS PAGE HAS NO PHOTO OF ITS OWN (overrides the scene-interpretation instructions above):`,
-    `Image 1 is a PHOTO of the SAME people taken moments around this scene — the same people moments later. Use it ONLY for identity, outfits, and setting continuity — do NOT copy its pose, its composition, or its moment.`,
+    `BRIDGE PAGE — THIS PAGE HAS NO PHOTO OF ITS OWN (this section supersedes the SCENE INTERPRETATION instructions above and item 2 of PEOPLE - SOURCE HIERARCHY):`,
+    `Image 1 is a PHOTO of the SAME people taken moments around this scene — the same people moments later. On this page it rules ONLY identity, outfits, and setting continuity — do NOT copy its pose, its composition, its moment, or which people are present. People in this scene come ONLY from this scene's cast (the characters described in the CHARACTER IDENTITY section below, when provided); never add other people from the photo.`,
     `DEPICT THIS NEW MOMENT INSTEAD: ${bridgeScene.action}`,
     `Location: ${bridgeScene.location}. Time of day: ${bridgeScene.timeOfDay}.`,
     props.length ? `Include these objects from the surrounding photos: ${props.join(', ')}.` : null,

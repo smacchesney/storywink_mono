@@ -46,7 +46,13 @@ async function setGenerationPhase(bookId: string, phase: string | null): Promise
  */
 async function runQualityCheck(
   bookId: string,
-  pages: Array<{ pageNumber: number; pageId: string; generatedImageUrl: string | null }>,
+  pages: Array<{
+    pageNumber: number;
+    pageId: string;
+    generatedImageUrl: string | null;
+    /** Page.source — 'BRIDGE' rows get the bridge-specific QC rubric. */
+    source?: string | null;
+  }>,
   characterIdentity: CharacterIdentity | null,
   language: string = 'en',
   sheets: CharacterSheetRef[] = [],
@@ -102,6 +108,11 @@ async function runQualityCheck(
     });
   }
 
+  // BRIDGE rows (DB is the single source of truth, same pattern as the
+  // illustration worker) get the bridge rubric: strict identity judging plus
+  // the near-duplicate-composition FAIL rule. Collected as the same 1-based
+  // presentation ordinals the "PAGE n" labels use — NOT DB pageNumbers.
+  const bridgePageOrdinals: number[] = [];
   for (const page of illustratedPages) {
     const url = optimizeCloudinaryUrlForVision(page.generatedImageUrl!);
     // Label each image with its 1-based presentation ordinal. The judge echoes
@@ -109,6 +120,7 @@ async function runQualityCheck(
     // pageNumber (they diverge when un-illustrated pages are skipped).
     contentParts.push({ type: 'input_text', text: `PAGE ${pageMapping.length + 1}` });
     contentParts.push({ type: 'input_image', image_url: url, detail: 'high' });
+    if (page.source === 'BRIDGE') bridgePageOrdinals.push(pageMapping.length + 1);
     pageMapping.push({ pageNumber: page.pageNumber, pageId: page.pageId });
   }
 
@@ -121,6 +133,9 @@ async function runQualityCheck(
   const promptText = createQCPrompt(characterIdentity, pageMapping.length, language, {
     sheetCount: sheets.length,
     cover: cover ? { expectedTitle: cover.expectedTitle } : null,
+    // Books without BRIDGE rows yield an empty list and a byte-identical
+    // prompt, so the flag-off default is untouched.
+    ...(bridgePageOrdinals.length ? { bridgePageOrdinals } : {}),
   });
 
   // Add the text prompt after all images
@@ -417,6 +432,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
           pageNumber: p.pageNumber,
           pageId: p.id,
           generatedImageUrl: p.generatedImageUrl,
+          source: p.source,
         }));
 
         // CHARACTER_SHEETS_ENABLED: validated sheets become QC's ground
@@ -426,10 +442,18 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
         const sheets = sheetsEnabled
           ? sheetRefsForStyle(book.characterReferences, book.artStyle, characterIdentity)
           : [];
-        // Sheets are persisted before the illustration flow is enqueued and
-        // snapshotted into every render job of this run, so their presence
-        // here reflects what the renders actually received.
-        const hadSheet = sheets.length > 0;
+        // Judge ground truth comes from the render-time lastRenderHadSheet
+        // stamps, NOT from Book.characterReferences at finalize time:
+        // ensureCharacterSheets' budget-expiry path persists sheets in the
+        // background AFTER a run was already enqueued sheetless, so the
+        // DB-derived refs can describe sheets the judged renders never
+        // received. Sheets still flow into the QC re-render jobs and the
+        // cover regen below — those subsequent renders DO receive them and
+        // stamp their own rows true.
+        const anyRenderHadSheet = book.pages.some(
+          (p: any) => p.generatedImageUrl && p.lastRenderHadSheet,
+        );
+        const sheetsForJudge = anyRenderHadSheet ? sheets : [];
         const coverForQc =
           sheetsEnabled && book.coverImageUrl && book.title
             ? { url: book.coverImageUrl, expectedTitle: book.title }
@@ -443,7 +467,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
           qcPages,
           characterIdentity,
           book.language,
-          sheets,
+          sheetsForJudge,
           coverForQc,
         );
 
@@ -455,7 +479,11 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
             const renderMetaByPageId = new Map(
               book.pages.map((p: any) => [
                 p.id,
-                { provider: p.lastRenderProvider ?? null, model: p.lastRenderModel ?? null },
+                {
+                  provider: p.lastRenderProvider ?? null,
+                  model: p.lastRenderModel ?? null,
+                  hadSheet: p.lastRenderHadSheet ?? false,
+                },
               ]),
             );
             // The cover is rendered by the same job (and provider) as the
@@ -475,7 +503,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
                   passed: r.passed,
                   provider: renderMetaByPageId.get(r.pageId)?.provider ?? null,
                   model: renderMetaByPageId.get(r.pageId)?.model ?? null,
-                  hadSheet,
+                  hadSheet: renderMetaByPageId.get(r.pageId)?.hadSheet ?? false,
                   feedback: r.suggestedPromptAdditions,
                 })),
                 // target='cover' keeps cover rows out of page-drift stats.
@@ -492,7 +520,10 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
                         passed: qcResult.coverResult.passed,
                         provider: (titlePage as any)?.lastRenderProvider ?? null,
                         model: (titlePage as any)?.lastRenderModel ?? null,
-                        hadSheet,
+                        // The cover is rendered by the same job as the interior
+                        // title page, so its sheet attribution follows the
+                        // title page's render-time stamp too.
+                        hadSheet: (titlePage as any)?.lastRenderHadSheet ?? false,
                         feedback: qcResult.coverResult.suggestedPromptAdditions,
                       },
                     ]
@@ -590,6 +621,10 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
               illustrationNotes: page.illustrationNotes,
               originalImageUrl: page.originalImageUrl,
               characterIdentity,
+              // Same language as the extraction-path flow: without it a ja
+              // book's QC re-render would build an 'en' prompt (Latin sound
+              // effects) that the ja QC rubric then fails again.
+              language: book.language,
               // Re-renders must keep the same reference stack the original
               // render had, or the QC round re-rolls sheetless.
               ...(sheets.length ? { characterSheets: sheets } : {}),

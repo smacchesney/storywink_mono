@@ -113,6 +113,7 @@ model Page {
   bridgeScene        Json?      // Structured scene for BRIDGE pages: {location, timeOfDay, action, charactersPresent, outfitFrom, props}
   lastRenderProvider String?    // Stamped at render time — finalize cannot infer which provider drew the page
   lastRenderModel    String?    // Exact model id used for the last successful render
+  lastRenderHadSheet Boolean?   // Stamped at render time — whether the render actually received character-sheet refs (null = predates the stamp)
 
   pageType         PageType
   moderationStatus String   @default("PENDING")

@@ -13,6 +13,7 @@ import {
   excludeSharedAssetIds,
   isDraftSweepCandidate,
   chunkPublicIds,
+  ASSET_CLEANUP_PENDING_EVENT,
 } from '@storywink/shared';
 import pino from 'pino';
 import {
@@ -20,12 +21,15 @@ import {
   DRAFT_SWEEP_BATCH_SIZE,
   CLOUDINARY_DELETE_CHUNK_SIZE,
   MAX_PREFIX_DELETE_ITERATIONS,
+  PENDING_RECONCILE_GRACE_MS,
+  PENDING_RECONCILE_BATCH_SIZE,
   resolveDraftRetentionDays,
   isCleanupEnforced,
   summarizeDeletionResponse,
   addCounts,
   type DeletionCounts,
 } from './asset-cleanup.helpers.js';
+import { computeLastActivity } from './book-reaper.helpers.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -175,7 +179,7 @@ type SweepCandidate = {
   coverAssetId: string | null;
   coverImageUrl: string | null;
   characterReferences: unknown;
-  pages: Array<{ assetId: string | null; generatedImageUrl: string | null }>;
+  pages: Array<{ assetId: string | null; generatedImageUrl: string | null; updatedAt: Date }>;
 };
 
 /**
@@ -222,6 +226,99 @@ async function collectBookCleanupTargets(book: SweepCandidate) {
 }
 
 /**
+ * Reconcile pass for the delete→enqueue gap: an 'asset_cleanup_pending'
+ * AppEvent is written (throwing, pre-delete) by every book-deletion path with
+ * the full Cloudinary target list in props. If the deletion job's terminal
+ * event ('assets_deleted' / 'assets_delete_dry_run') never appears — enqueue
+ * failure, crash, Redis eviction — this pass re-enqueues from the stored
+ * props. Safe because runAssetDeletion is idempotent (not_found tolerated,
+ * prefix deletes resumable). A pending record whose Book row still exists is
+ * stale (the delete itself never committed) and is removed instead.
+ */
+async function reconcilePendingCleanups(now: Date): Promise<number> {
+  let requeued = 0;
+  const graceCutoff = new Date(now.getTime() - PENDING_RECONCILE_GRACE_MS);
+
+  const pendingEvents = await prisma.appEvent.findMany({
+    where: { name: ASSET_CLEANUP_PENDING_EVENT, createdAt: { lt: graceCutoff } },
+    orderBy: { createdAt: 'asc' },
+    take: PENDING_RECONCILE_BATCH_SIZE,
+  });
+
+  for (const event of pendingEvents) {
+    try {
+      if (!event.bookId) continue;
+
+      const satisfied = await prisma.appEvent.count({
+        where: {
+          bookId: event.bookId,
+          name: { in: ['assets_deleted', 'assets_delete_dry_run'] },
+        },
+      });
+      if (satisfied > 0) continue;
+
+      // Book row still present: the delete never committed (crash between the
+      // pending write and the delete, or a conditional delete that matched
+      // nothing). Deleting these assets would strip a LIVE book — drop the
+      // stale marker instead; a future delete/sweep writes a fresh one.
+      const bookStillExists = await prisma.book.count({ where: { id: event.bookId } });
+      if (bookStillExists > 0) {
+        await prisma.appEvent.deleteMany({
+          where: { id: event.id, name: ASSET_CLEANUP_PENDING_EVENT },
+        });
+        logger.warn(
+          { bookId: event.bookId, eventId: event.id },
+          'Asset cleanup reconcile: pending record for a still-existing book — removed stale marker',
+        );
+        continue;
+      }
+
+      const props = (event.props ?? {}) as {
+        publicIds?: string[];
+        prefixes?: string[];
+        reason?: string;
+      };
+      const publicIds = Array.isArray(props.publicIds) ? props.publicIds : [];
+      const prefixes = Array.isArray(props.prefixes) ? props.prefixes : [];
+      if (publicIds.length === 0 && prefixes.length === 0) continue;
+      const reason = props.reason === 'book_deleted' ? 'book_deleted' : 'draft_expired';
+
+      await getAssetCleanupQueue().add(
+        `cleanup-reconcile-${event.bookId}`,
+        {
+          publicIds,
+          prefixes,
+          reason,
+          userId: event.userId ?? undefined,
+          bookId: event.bookId,
+        } satisfies AssetCleanupJobPayload,
+        {
+          // Deterministic id: repeated reconcile passes dedupe against the
+          // original enqueue (and each other) while the job is still around.
+          jobId: reason === 'book_deleted' ? `cleanup-book-${event.bookId}` : `cleanup-draft-${event.bookId}`,
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 10000 },
+          removeOnComplete: { count: 100 },
+          removeOnFail: { count: 500 },
+        },
+      );
+      requeued += 1;
+      logger.warn(
+        { bookId: event.bookId, publicIdCount: publicIds.length, prefixes, reason },
+        'Asset cleanup reconcile: re-enqueued lost deletion job from pending record',
+      );
+    } catch (error) {
+      logger.error(
+        { bookId: event.bookId, eventId: event.id, error: error instanceof Error ? error.message : String(error) },
+        'Asset cleanup reconcile: failed to process pending record',
+      );
+    }
+  }
+
+  return requeued;
+}
+
+/**
  * Weekly draft-retention sweep. DRY-RUN by default: candidates are logged and
  * recorded as 'draft_sweep_candidate' AppEvents (once per book) so the owner
  * can see exactly what a real sweep would remove. With ASSET_CLEANUP_ENFORCE
@@ -239,6 +336,17 @@ async function runDraftSweep(job: Job) {
   const cutoff = new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000);
 
   try {
+    // Reconcile first: recover any deletion job lost in a previous sweep's (or
+    // the web delete route's) delete→enqueue gap. Never fatal to the sweep.
+    try {
+      await reconcilePendingCleanups(now);
+    } catch (reconcileError) {
+      logger.error(
+        { error: reconcileError instanceof Error ? reconcileError.message : String(reconcileError) },
+        'Asset cleanup reconcile pass failed — continuing with sweep',
+      );
+    }
+
     const candidates: SweepCandidate[] = await prisma.book.findMany({
       where: { status: 'DRAFT', updatedAt: { lt: cutoff } },
       orderBy: { updatedAt: 'asc' },
@@ -251,20 +359,28 @@ async function runDraftSweep(job: Job) {
         coverAssetId: true,
         coverImageUrl: true,
         characterReferences: true,
-        pages: { select: { assetId: true, generatedImageUrl: true } },
+        pages: { select: { assetId: true, generatedImageUrl: true, updatedAt: true } },
       },
     });
     summary.scanned = candidates.length;
 
     for (const book of candidates) {
       try {
-        if (!isDraftSweepCandidate(book, now, retentionDays)) {
+        // Staleness anchors on the newest write across the book AND its pages
+        // (reaper pattern): photo uploads, reorders, and page-text edits only
+        // touch Page/Asset rows, so Book.updatedAt alone would sweep a draft
+        // the parent is actively editing.
+        const lastActivity = computeLastActivity(
+          book.updatedAt,
+          book.pages.map((p) => p.updatedAt),
+        );
+        if (!isDraftSweepCandidate({ status: book.status, updatedAt: lastActivity }, now, retentionDays)) {
           summary.skipped += 1;
           continue;
         }
 
         const ageDays = Math.floor(
-          (now.getTime() - book.updatedAt.getTime()) / (24 * 60 * 60 * 1000),
+          (now.getTime() - lastActivity.getTime()) / (24 * 60 * 60 * 1000),
         );
 
         if (!enforce) {
@@ -295,12 +411,41 @@ async function runDraftSweep(job: Job) {
         // Collect BEFORE the row disappears; enqueue AFTER the delete commits.
         const targets = await collectBookCleanupTargets(book);
 
-        // Conditional transition: if the parent touched the draft between the
-        // candidate query and now, count === 0 and nothing happens.
+        // Durable pre-delete record (direct create, NOT trackEvent — this one
+        // must THROW on failure): if the enqueue below is lost, the reconcile
+        // pass re-enqueues from these props. A failed write skips the book —
+        // it is still in the DB, so next week's sweep retries.
+        await prisma.appEvent.create({
+          data: {
+            name: ASSET_CLEANUP_PENDING_EVENT,
+            userId: book.userId,
+            bookId: book.id,
+            props: {
+              publicIds: targets.publicIds,
+              prefixes: targets.prefixes,
+              reason: 'draft_expired',
+            },
+          },
+        });
+
+        // Conditional transition: if the parent touched the draft (book row OR
+        // any page row) between the candidate query and now, count === 0 and
+        // nothing happens. The pages relation filter makes the page-activity
+        // check atomic with the delete itself.
         const deleted = await prisma.book.deleteMany({
-          where: { id: book.id, status: 'DRAFT', updatedAt: { lt: cutoff } },
+          where: {
+            id: book.id,
+            status: 'DRAFT',
+            updatedAt: { lt: cutoff },
+            pages: { none: { updatedAt: { gte: cutoff } } },
+          },
         });
         if (deleted.count === 0) {
+          // Best-effort: the book survived, so the pending marker is stale.
+          // (Reconcile would also drop it after noticing the book exists.)
+          await prisma.appEvent
+            .deleteMany({ where: { name: ASSET_CLEANUP_PENDING_EVENT, bookId: book.id } })
+            .catch(() => {});
           summary.skipped += 1;
           continue;
         }
@@ -316,22 +461,42 @@ async function runDraftSweep(job: Job) {
           logger,
         );
 
-        await getAssetCleanupQueue().add(
-          `cleanup-draft-${book.id}`,
-          {
-            publicIds: targets.publicIds,
-            prefixes: targets.prefixes,
-            reason: 'draft_expired',
-            userId: book.userId,
-            bookId: book.id,
-          } satisfies AssetCleanupJobPayload,
-          {
-            attempts: 3,
-            backoff: { type: 'exponential', delay: 10000 },
-            removeOnComplete: { count: 100 },
-            removeOnFail: { count: 500 },
-          },
-        );
+        try {
+          await getAssetCleanupQueue().add(
+            `cleanup-draft-${book.id}`,
+            {
+              publicIds: targets.publicIds,
+              prefixes: targets.prefixes,
+              reason: 'draft_expired',
+              userId: book.userId,
+              bookId: book.id,
+            } satisfies AssetCleanupJobPayload,
+            {
+              // Deterministic id so reconcile re-enqueues dedupe against this.
+              jobId: `cleanup-draft-${book.id}`,
+              attempts: 3,
+              backoff: { type: 'exponential', delay: 10000 },
+              removeOnComplete: { count: 100 },
+              removeOnFail: { count: 500 },
+            },
+          );
+        } catch (queueError) {
+          // The book row is already gone — log the FULL target list (manual
+          // recovery needs it) and rely on the pending record + reconcile
+          // pass to re-enqueue.
+          logger.error(
+            {
+              bookId: book.id,
+              userId: book.userId,
+              publicIds: targets.publicIds,
+              prefixes: targets.prefixes,
+              error: queueError instanceof Error ? queueError.message : String(queueError),
+            },
+            'Draft sweep: FAILED to enqueue asset cleanup — reconcile pass will retry from the pending record',
+          );
+          summary.swept += 1;
+          continue;
+        }
 
         logger.info(
           { bookId: book.id, userId: book.userId, ageDays, publicIdCount: targets.publicIds.length },

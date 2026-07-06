@@ -51,10 +51,14 @@ export function CaptureChips({ questions, onChange }: CaptureChipsProps) {
       ? q.answer
       : null;
 
-  const commitCustom = (id: string, raw: string) => {
+  const commitCustom = (q: CaptureQuestion, raw: string) => {
     setEditingId(null);
     const value = raw.trim().slice(0, 50);
-    if (value) setAnswer(id, value);
+    if (value) setAnswer(q.id, value);
+    // Emptying a previously-typed name deselects it. Gated on customAnswer so
+    // abandoning an empty "Someone else…" input while an option chip (e.g.
+    // "Grandma") is selected leaves that selection intact.
+    else if (customAnswer(q)) setAnswer(q.id, null);
   };
 
   if (rows.length === 0) return null;
@@ -95,7 +99,7 @@ export function CaptureChips({ questions, onChange }: CaptureChipsProps) {
                     defaultValue={typed ?? ''}
                     maxLength={50}
                     placeholder={t('someoneElsePlaceholder')}
-                    onBlur={(e) => commitCustom(q.id, e.currentTarget.value)}
+                    onBlur={(e) => commitCustom(q, e.currentTarget.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();

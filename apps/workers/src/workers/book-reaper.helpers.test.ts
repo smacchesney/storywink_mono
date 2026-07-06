@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   STALE_AFTER_MS,
+  REAPER_INTERVAL_MS,
+  REAPER_ESCALATION_WINDOW_MS,
   computeLastActivity,
   isStale,
   decideReaperAction,
@@ -57,6 +59,23 @@ describe('decideReaperAction', () => {
 
   it('fails when multiple prior requeues exist', () => {
     expect(decideReaperAction(3)).toBe('fail');
+  });
+});
+
+describe('REAPER_ESCALATION_WINDOW_MS', () => {
+  it('covers a genuine second offense: re-detection lands within staleness + one sweep of the requeue', () => {
+    // A requeue resets book.updatedAt; a zero-progress rescued run trips
+    // staleness again after STALE_AFTER_MS and the next sweep escalates it.
+    // The window must comfortably contain that, or escalation never fires.
+    const reDetectionMs = STALE_AFTER_MS + REAPER_INTERVAL_MS;
+    expect(REAPER_ESCALATION_WINDOW_MS).toBeGreaterThan(2 * reDetectionMs);
+  });
+
+  it('excludes requeues from earlier, resolved runs (episode scoping, not lifetime)', () => {
+    // A book rescued weeks ago and regenerated today must get its
+    // first-offense requeue, not an instant FAILED.
+    const weeks = (n: number) => n * 7 * 24 * 60 * 60 * 1000;
+    expect(REAPER_ESCALATION_WINDOW_MS).toBeLessThan(weeks(1));
   });
 });
 

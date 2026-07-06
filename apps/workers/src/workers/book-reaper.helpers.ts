@@ -10,6 +10,18 @@ export const STALE_AFTER_MS = 30 * 60 * 1000;
 export const REAPER_INTERVAL_MS = 10 * 60 * 1000;
 
 /**
+ * Only requeues recent enough to belong to the CURRENT stall episode count
+ * toward second-offense escalation. A rescued run that makes no progress is
+ * re-detected within STALE_AFTER_MS + one sweep interval of the requeue
+ * (the requeue resets book.updatedAt), so 24h comfortably covers a genuine
+ * second offense — even one that progressed for hours before dying — while
+ * ignoring requeues from earlier, resolved runs (e.g. a book rescued weeks
+ * ago and regenerated today, which must get its first-offense requeue, not
+ * an instant FAILED).
+ */
+export const REAPER_ESCALATION_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
  * Staleness anchor: the most recent write across the book row and its pages.
  * Illustration workers touch pages (not the book row) as they land, so the
  * book's own updatedAt alone would reap books that are actively progressing.

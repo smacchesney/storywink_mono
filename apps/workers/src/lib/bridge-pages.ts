@@ -158,8 +158,11 @@ export interface AnchorCandidate {
 
 /**
  * Resolve a bridge page's anchor photo: the nearest PRECEDING photo page
- * with an asset URL, else the nearest FOLLOWING one. Resolved from DB state
- * at render time — job data never carries more than a cache of this.
+ * with an asset URL by default, else the nearest FOLLOWING one. When the
+ * authored scene says outfitFrom='next' (the outfits change AT this bridge,
+ * e.g. "getting dressed for the beach"), the preference flips: nearest
+ * FOLLOWING photo, falling back to preceding. Resolved from DB state at
+ * render time — job data never carries more than a cache of this.
  * Returns null only when the book has no photo pages at all (cannot happen
  * through the app: create requires >= 1 photo and the delete route keeps a
  * 2-page floor).
@@ -167,6 +170,7 @@ export interface AnchorCandidate {
 export function resolveBridgeAnchor(
   pages: AnchorCandidate[],
   bridgePageNumber: number,
+  outfitFrom: 'previous' | 'next' = 'previous',
 ): AnchorCandidate | null {
   const photos = pages
     .filter(p => p.source === 'PHOTO' && !!p.assetUrl)
@@ -174,7 +178,10 @@ export function resolveBridgeAnchor(
   if (photos.length === 0) return null;
 
   const preceding = photos.filter(p => p.pageNumber < bridgePageNumber);
-  if (preceding.length > 0) return preceding[preceding.length - 1];
+  const following = photos.filter(p => p.pageNumber > bridgePageNumber);
 
-  return photos.find(p => p.pageNumber > bridgePageNumber) ?? null;
+  if (outfitFrom === 'next') {
+    return following[0] ?? preceding[preceding.length - 1] ?? null;
+  }
+  return preceding[preceding.length - 1] ?? following[0] ?? null;
 }

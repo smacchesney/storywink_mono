@@ -26,6 +26,17 @@ export const MAX_PREFIX_DELETE_ITERATIONS = 50;
 export const DEFAULT_DRAFT_RETENTION_DAYS = 90;
 
 /**
+ * How old an 'asset_cleanup_pending' record must be before the reconcile pass
+ * treats its deletion job as lost and re-enqueues it. Generous relative to the
+ * deletion job's own retry backoff, so normally-retried jobs finish (and write
+ * their 'assets_deleted'/'assets_delete_dry_run' event) well inside it.
+ */
+export const PENDING_RECONCILE_GRACE_MS = 60 * 60 * 1000;
+
+/** Max pending records examined per reconcile pass. */
+export const PENDING_RECONCILE_BATCH_SIZE = 200;
+
+/**
  * DRAFT_RETENTION_DAYS env parsing: positive integers only, everything else
  * falls back to the 90-day default so a typo can never make the sweep hungrier.
  */
