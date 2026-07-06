@@ -9,6 +9,7 @@ import {
   OPEN_ORDER_STATUSES,
   decideOrderTransition,
   extractTrackingUrl,
+  pollCutoffDate,
 } from './lulu-status-poll.helpers.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -30,6 +31,7 @@ export async function processLuluStatusPoll(job: Job) {
       where: {
         status: { in: [...OPEN_ORDER_STATUSES] },
         luluPrintJobId: { not: null },
+        createdAt: { gte: pollCutoffDate(new Date()) },
       },
       orderBy: { updatedAt: 'asc' },
       take: LULU_POLL_BATCH_SIZE,

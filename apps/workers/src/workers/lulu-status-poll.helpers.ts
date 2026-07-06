@@ -9,6 +9,16 @@ export const LULU_POLL_INTERVAL_MS = 6 * 60 * 60 * 1000;
 /** Max orders polled per sweep; the next sweep picks up the rest. */
 export const LULU_POLL_BATCH_SIZE = 50;
 
+/** Orders older than this stop being polled — pre-launch test orders point at
+ * Lulu jobs that no longer exist and would otherwise 404 every sweep forever.
+ * Env-tunable so a genuinely slow order can be re-included if it ever happens. */
+export const LULU_POLL_MAX_AGE_DAYS = Number(process.env.LULU_POLL_MAX_AGE_DAYS ?? 90);
+
+/** Cutoff date for pollable orders, computed per sweep. */
+export function pollCutoffDate(now: Date, maxAgeDays: number = LULU_POLL_MAX_AGE_DAYS): Date {
+  return new Date(now.getTime() - maxAgeDays * 24 * 60 * 60 * 1000);
+}
+
 /** The only PrintOrder statuses worth polling — everything else is terminal
  * (or pre-submission, where there is no Lulu job to ask about). */
 export const OPEN_ORDER_STATUSES = ['SUBMITTED_TO_LULU', 'IN_PRODUCTION'] as const;

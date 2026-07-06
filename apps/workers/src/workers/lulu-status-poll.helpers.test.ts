@@ -4,6 +4,8 @@ import {
   extractTrackingUrl,
   OPEN_ORDER_STATUSES,
   LULU_POLL_INTERVAL_MS,
+  LULU_POLL_MAX_AGE_DAYS,
+  pollCutoffDate,
 } from './lulu-status-poll.helpers.js';
 
 describe('decideOrderTransition', () => {
@@ -111,5 +113,18 @@ describe('extractTrackingUrl', () => {
 describe('poll cadence', () => {
   it('runs every 6 hours', () => {
     expect(LULU_POLL_INTERVAL_MS).toBe(6 * 60 * 60 * 1000);
+  });
+});
+
+describe('pollCutoffDate', () => {
+  it('cuts off at maxAgeDays before now', () => {
+    const now = new Date('2026-07-06T12:00:00Z');
+    expect(pollCutoffDate(now, 90).toISOString()).toBe('2026-04-07T12:00:00.000Z');
+  });
+
+  it('defaults to LULU_POLL_MAX_AGE_DAYS', () => {
+    const now = new Date('2026-07-06T12:00:00Z');
+    const cutoff = pollCutoffDate(now);
+    expect(now.getTime() - cutoff.getTime()).toBe(LULU_POLL_MAX_AGE_DAYS * 24 * 60 * 60 * 1000);
   });
 });
