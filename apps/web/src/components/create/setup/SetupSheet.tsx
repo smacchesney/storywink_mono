@@ -3,13 +3,18 @@
 import React from 'react';
 import { useTranslations } from 'next-intl';
 import { Loader2, Sparkles } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { StyleKey } from '@storywink/shared/prompts/styles';
+import type { StoryMood } from '@storywink/shared/constants';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { track } from '@/lib/track';
 import PhotoStrip, { StripPhoto } from '@/components/create/setup/PhotoStrip';
 import ArtStyleStrip from '@/components/create/setup/ArtStyleStrip';
+import LibrarianStrip from '@/components/create/setup/LibrarianStrip';
+import StoryFraming from '@/components/create/setup/StoryFraming';
+import type { StripPhase } from '@/components/create/setup/strip-phase';
 import CaptureChips, {
   CaptureQuestion,
 } from '@/components/create/setup/CaptureChips';
@@ -20,6 +25,7 @@ export interface SetupFormState {
   eventSummary: string;
   captureQuestions: CaptureQuestion[];
   artStyle: StyleKey;
+  tone: StoryMood | null;
   reviewFirst: boolean;
 }
 
@@ -34,8 +40,10 @@ interface SetupSheetProps {
   prefilledName?: string | null;
   /** True until perception fills the title — drives the shimmer. */
   titlePending: boolean;
-  /** True once eventSummary has arrived from perception. */
-  hasEventSummary: boolean;
+  /** Librarian-strip phase — 'hidden' keeps the strip unmounted. */
+  stripPhase: StripPhase;
+  /** True once the parent edited the summary (telemetry only). */
+  summaryEdited: boolean;
   isSubmitting: boolean;
   showNameError: boolean;
   /** Book id — enables the inline add/remove affordances in the photo strip. */
@@ -61,7 +69,8 @@ export function SetupSheet({
   form,
   prefilledName,
   titlePending,
-  hasEventSummary,
+  stripPhase,
+  summaryEdited,
   isSubmitting,
   showNameError,
   bookId,
@@ -71,6 +80,13 @@ export function SetupSheet({
   onSubmit,
 }: SetupSheetProps) {
   const t = useTranslations('setup');
+  const reducedMotion = useReducedMotion() ?? false;
+
+  const hasChips = form.captureQuestions.length > 0;
+  // Reserved chips space while the librarian is still reading — arrival then
+  // animates INSIDE this box, so nothing below it ever shifts. Collapses
+  // gently (transition on min-height) when reading ends with zero questions.
+  const reserveChipSpace = stripPhase === 'reading' && !hasChips;
 
   const handleSubmitClick = () => {
     // Funnel telemetry — fire only for taps that pass the one required field,
@@ -83,6 +99,9 @@ export function SetupSheet({
           chipsAnswered: form.captureQuestions.filter(
             (q) => q.answer && q.answer !== '__skip__',
           ).length,
+          ...(form.tone ? { tone: form.tone } : {}),
+          stripPhaseAtSubmit: stripPhase,
+          summaryEdited,
         },
       });
     }
@@ -103,6 +122,15 @@ export function SetupSheet({
           onPhotosChanged={onPhotosChanged}
         />
       </section>
+
+      {/* Librarian strip — narrates the perception pass; never mounts when
+          nothing is plausibly in flight, never collapses once mounted. */}
+      {stripPhase !== 'hidden' && (
+        <LibrarianStrip
+          phase={stripPhase}
+          questionCount={form.captureQuestions.length}
+        />
+      )}
 
       {/* Child name — the one required field */}
       <section className="flex flex-col gap-1.5">
@@ -161,35 +189,75 @@ export function SetupSheet({
         </div>
       </section>
 
-      {/* Story brief — the experience-capture centerpiece */}
-      {hasEventSummary && (
-        <section className="flex flex-col gap-1.5">
-          <label
-            htmlFor="eventSummary"
-            className="text-sm font-medium text-gray-600"
-          >
-            {t('whatWeSee')}
-          </label>
-          <textarea
-            id="eventSummary"
-            value={form.eventSummary}
-            onChange={(e) => onChange('eventSummary', e.target.value)}
-            placeholder={t('eventSummaryPlaceholder')}
-            rows={2}
-            className="w-full resize-none rounded-xl border border-black/10 bg-white px-3 py-2 font-playful text-sm text-gray-800 focus:border-coral focus:outline-none focus:ring-1 focus:ring-coral"
-          />
-        </section>
-      )}
+      {/* Story framing — always renders: the mood row needs zero analysis,
+          and a missing summary falls back to a quiet "add a note" button. */}
+      <StoryFraming
+        tone={form.tone}
+        eventSummary={form.eventSummary}
+        onToneChange={(v) => onChange('tone', v)}
+        onSummaryChange={(v) => onChange('eventSummary', v)}
+      />
 
-      {/* Capture chips — appear only when questions have arrived */}
-      {form.captureQuestions.length > 0 && (
-        <section>
-          <CaptureChips
-            questions={form.captureQuestions}
-            onChange={(qs) => onChange('captureQuestions', qs)}
-          />
-        </section>
-      )}
+      {/* Capture chips — space is reserved while the librarian reads, and the
+          rows rise into that same box on arrival (no layout shift below).
+          When reading ends with zero questions the box collapses gently. */}
+      <AnimatePresence initial={false}>
+        {(reserveChipSpace || hasChips) && (
+          <motion.section
+            exit={{ height: 0, opacity: 0, marginTop: -24 }}
+            transition={{
+              duration: reducedMotion ? 0 : 0.2,
+              ease: 'easeOut',
+            }}
+            className="overflow-hidden"
+            style={{ minHeight: reserveChipSpace ? 96 : undefined }}
+          >
+            {hasChips && (
+              <div className={stripPhase === 'hidden' ? undefined : 'chips-enter'}>
+                <CaptureChips
+                  questions={form.captureQuestions}
+                  onChange={(qs) => onChange('captureQuestions', qs)}
+                />
+              </div>
+            )}
+          </motion.section>
+        )}
+      </AnimatePresence>
+      <style jsx global>{`
+        .chips-enter > div > div {
+          animation: chip-rise 300ms ease-out both;
+        }
+        .chips-enter > div > div:nth-child(2) {
+          animation-delay: 60ms;
+        }
+        .chips-enter > div > div:nth-child(3) {
+          animation-delay: 120ms;
+        }
+        @keyframes chip-rise {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: none;
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .chips-enter > div > div {
+            animation-name: chip-fade;
+            animation-delay: 0ms;
+          }
+          @keyframes chip-fade {
+            from {
+              opacity: 0;
+            }
+            to {
+              opacity: 1;
+            }
+          }
+        }
+      `}</style>
 
       {/* Art style */}
       <section className="flex flex-col gap-2">

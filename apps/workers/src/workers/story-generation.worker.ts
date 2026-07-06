@@ -1031,6 +1031,11 @@ async function processSinglePageTextGeneration(
     : book.theme
       ? `## Story context from the parent:\n"${book.theme}"`
       : '';
+  // Mood parity with full generation: a regenerated page must stay in the
+  // same key the parent picked for the book.
+  const moodContext = book.tone
+    ? `## Story Mood (picked by the parent):\n- The parent asked for a "${book.tone}" telling. Keep this page's lines in that key.`
+    : '';
 
   const storedAnalysis = targetPage.analysis as StoredPageAnalysis | null;
   // Stale analysis (photo was swapped since the perception pass) is dropped.
@@ -1052,6 +1057,7 @@ async function processSinglePageTextGeneration(
     castInfo,
     languageInstruction,
     '',
+    ...(moodContext ? [moodContext, ''] : []),
     ...(eventContext ? [eventContext, ''] : []),
     prevContext ? `## Story so far (previous pages):\n${prevContext}` : '## This is near the beginning of the story.',
     '',

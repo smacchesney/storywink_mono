@@ -91,7 +91,6 @@
     "titleLabel": "えほんの タイトル",
     "titlePlaceholder": "タイトルを つけましょう",
     "titleThinking": "タイトルを かんがえています…",
-    "whatWeSee": "みえたこと",
     "eventSummaryPlaceholder": "なにが あったか おしえてください",
     "skip": "スキップ",
     "someoneElse": "そのほか…",
@@ -108,7 +107,17 @@
     "minPages": "えほんには しゃしんが 2まい いじょう ひつようです。",
     "styleVignette": "ペンと えんぴつ",
     "styleOrigami": "おりがみ",
-    "styleKawaii": "かわいい"
+    "styleKawaii": "かわいい",
+    "stripPeeking": "おしゃしんを ちらり…",
+    "stripFaces": "だれが いるかな…",
+    "stripReading": "えがおの おはなしを よんでいます…",
+    "stripQuestions": "ちいさな しつもんが いくつか みつかりました。",
+    "stripAllRead": "よみおわりました。おしゃしんが たくさん おしえてくれました。",
+    "stripRest": "ここからは おまかせしますね。",
+    "stripAlt": "おしゃしんを よんでいる マスコット",
+    "howToTellIt": "どんなふうに つたえましょう？",
+    "editSummary": "なおす",
+    "addNote": "そのひの メモを かく"
   },
   "progress": {
     "readingPhotos": "しゃしんを みています…",

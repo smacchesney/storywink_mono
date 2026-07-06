@@ -91,7 +91,6 @@
     "titleLabel": "Book title",
     "titlePlaceholder": "Give your book a title",
     "titleThinking": "Thinking of a title…",
-    "whatWeSee": "What we see",
     "eventSummaryPlaceholder": "Tell us what happened",
     "skip": "Skip",
     "someoneElse": "Someone else…",
@@ -108,7 +107,17 @@
     "minPages": "A book needs at least 2 photos.",
     "styleVignette": "Pen & Pencil",
     "styleOrigami": "Paper Origami",
-    "styleKawaii": "Kawaii"
+    "styleKawaii": "Kawaii",
+    "stripPeeking": "Peeking at your photos…",
+    "stripFaces": "Spotting the familiar faces…",
+    "stripReading": "Reading between the smiles…",
+    "stripQuestions": "Found a few little questions for you.",
+    "stripAllRead": "All read. Your photos told us plenty.",
+    "stripRest": "That's enough reading. Over to you.",
+    "stripAlt": "Our mascot, reading your photos",
+    "howToTellIt": "How should we tell it?",
+    "editSummary": "Fix this",
+    "addNote": "Add a note about the day"
   },
   "progress": {
     "readingPhotos": "Reading your photos…",

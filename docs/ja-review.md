@@ -161,3 +161,13 @@ Append-only. One line per key: `namespace.key` — why it needs a native check.
 - `email.readyPartialBody` — PARTIAL body (いくつかのページは、あとすこしで完成します。アプリからかんたんに仕上げられます。); check 仕上げられます isn't stiff and the line doesn't over-promise auto-fixing.
 - `email.readyButton` — the single coral button (えほんをひらく); mirrors reveal.open.
 - `email.readyFooter` — footer line (Storywink.ai より); check より reads as a warm sign-off, not a formal letter closing.
+- `setup.stripPeeking` — librarian-strip opening line (おしゃしんを ちらり…); check ちらり as a standalone playful fragment.
+- `setup.stripFaces` — librarian-strip second line (だれが いるかな…); wondering register check.
+- `setup.stripReading` — librarian-strip holding line (えがおの おはなしを よんでいます…); check the "reading between the smiles" metaphor survives as えがおの おはなし.
+- `setup.stripQuestions` — arrival line when capture questions exist (ちいさな しつもんが いくつか みつかりました。); softness check for "questions for you".
+- `setup.stripAllRead` — arrival line with zero questions (よみおわりました。おしゃしんが たくさん おしえてくれました。); check the photos-as-subject personification reads warm, not odd.
+- `setup.stripRest` — settled line after a slow or failed analysis (ここからは おまかせしますね。); must never hint at failure; check おまかせしますね register.
+- `setup.stripAlt` — mascot alt text (おしゃしんを よんでいる マスコット); plain descriptive alt.
+- `setup.howToTellIt` — story-framing section label (どんなふうに つたえましょう？); check つたえる vs かたる for "tell".
+- `setup.editSummary` — pencil-row aria/label for editing the AI summary (なおす); check it reads as "touch this up", not "repair an error".
+- `setup.addNote` — quiet button when no summary exists (そのひの メモを かく); check メモ register for a parent note about the day.

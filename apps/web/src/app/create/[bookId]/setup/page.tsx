@@ -7,11 +7,19 @@ import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { BookStatus } from '@prisma/client';
 import { isValidStyle, StyleKey } from '@storywink/shared/prompts/styles';
+import { STORY_MOODS, type StoryMood } from '@storywink/shared/constants';
 import SetupSheet, {
   SetupFormState,
 } from '@/components/create/setup/SetupSheet';
 import type { StripPhoto } from '@/components/create/setup/PhotoStrip';
 import type { CaptureQuestion } from '@/components/create/setup/CaptureChips';
+import {
+  allPagesAnalyzed,
+  arrivalStripPhase,
+  initialStripPhase,
+  isFreshBook,
+  type StripPhase,
+} from '@/components/create/setup/strip-phase';
 import GenerationProgress from '@/components/create/GenerationProgress';
 
 const DEFAULT_STYLE: StyleKey = 'vignette';
@@ -28,6 +36,8 @@ interface BookPage {
     url: string | null;
     thumbnailUrl: string | null;
   } | null;
+  /** Perception's per-page notes — presence marks the page as analyzed. */
+  analysis?: unknown;
 }
 
 interface BookData {
@@ -38,9 +48,11 @@ interface BookData {
   /** Server-derived from the parent's most recent book when this one is an unnamed draft. */
   childNameSuggestion?: string | null;
   artStyle: string | null;
+  tone: string | null;
   eventSummary: string | null;
   captureQuestions: CaptureQuestion[] | null;
   autoIllustrate: boolean;
+  createdAt: string;
   pages: BookPage[];
 }
 
@@ -66,6 +78,7 @@ export default function SetupPage() {
     eventSummary: '',
     captureQuestions: [],
     artStyle: DEFAULT_STYLE,
+    tone: null,
     reviewFirst: false,
   });
 
@@ -75,6 +88,7 @@ export default function SetupPage() {
     title: false,
     eventSummary: false,
     captureQuestions: false,
+    tone: false,
   });
   const isMountedRef = useRef(true);
 
@@ -82,10 +96,15 @@ export default function SetupPage() {
   // title, the shimmer must settle into a normal placeholder, not spin forever.
   const [perceptionSettled, setPerceptionSettled] = useState(false);
 
+  // LibrarianStrip phase machine. 'hidden' until the initial load decides
+  // whether a perception pass is plausibly in flight (see strip-phase.ts).
+  const [stripPhase, setStripPhase] = useState<StripPhase>('hidden');
+  // Freshness anchor + "perception provably finished" flag for the poll gate.
+  const [bookCreatedAt, setBookCreatedAt] = useState<string | null>(null);
+  const [analysisDone, setAnalysisDone] = useState(false);
+
   const titlePending =
     !form.title && !touched.current.title && !perceptionSettled;
-  const hasEventSummary =
-    form.eventSummary.trim().length > 0 || touched.current.eventSummary;
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -119,8 +138,29 @@ export default function SetupPage() {
       if (book.artStyle && isValidStyle(book.artStyle)) {
         next.artStyle = book.artStyle as StyleKey;
       }
+      // Only ever fills a resumed draft's own earlier choice — nothing but
+      // the parent's tap writes Book.tone, so untouched means unwritten.
+      if (
+        !touched.current.tone &&
+        book.tone &&
+        (STORY_MOODS as readonly string[]).includes(book.tone)
+      ) {
+        next.tone = book.tone as StoryMood;
+      }
       return next;
     });
+
+    const analyzed = allPagesAnalyzed(book.pages);
+    setAnalysisDone(analyzed);
+    // A strip that is narrating announces the arrival; every other phase is
+    // sticky, so refetches never re-announce.
+    setStripPhase((prev) =>
+      arrivalStripPhase(prev, {
+        captureQuestionCount: book.captureQuestions?.length ?? 0,
+        hasEventSummary: !!book.eventSummary,
+        allAnalyzed: analyzed,
+      }),
+    );
   }, []);
 
   // Initial load + childName prefill from the most recent other book.
@@ -155,6 +195,28 @@ export default function SetupPage() {
         }
 
         mergeBook(book);
+
+        // Decide whether the librarian strip mounts at all. A stale book or
+        // one whose analysis provably finished gets zero waiting theater —
+        // and when its perception fields are still missing they are never
+        // coming, so the title shimmer settles immediately too.
+        setBookCreatedAt(book.createdAt);
+        const fresh = isFreshBook(book.createdAt, Date.now());
+        const analyzed = allPagesAnalyzed(book.pages);
+        const needsTitle = !book.title?.trim();
+        const needsSummary = !book.eventSummary;
+        const needsQuestions = !book.captureQuestions?.length;
+        const phase = initialStripPhase({
+          fresh,
+          allAnalyzed: analyzed,
+          needsTitle,
+          needsSummary,
+          needsQuestions,
+        });
+        setStripPhase(phase);
+        if (phase === 'hidden' && (needsTitle || needsSummary || needsQuestions)) {
+          setPerceptionSettled(true);
+        }
 
         // Prefill child name from the parent's most recent other book —
         // server-derived (childNameSuggestion rides the same response), so
@@ -191,7 +253,15 @@ export default function SetupPage() {
     const needsSummary = !touched.current.eventSummary && !form.eventSummary;
     const needsQuestions =
       !touched.current.captureQuestions && form.captureQuestions.length === 0;
-    if (!needsTitle && !needsSummary && !needsQuestions) return;
+    // Keep polling while a fresh book's analysis is still in flight even if
+    // the parent already typed title + summary — otherwise an eager parent
+    // strands the strip mid-narration.
+    const needsAnalysis =
+      !analysisDone &&
+      bookCreatedAt !== null &&
+      isFreshBook(bookCreatedAt, Date.now());
+    if (!needsTitle && !needsSummary && !needsQuestions && !needsAnalysis)
+      return;
 
     let polls = 0;
     const MAX_POLLS = 40; // ~2 minutes at 3s
@@ -199,7 +269,12 @@ export default function SetupPage() {
       polls += 1;
       if (polls > MAX_POLLS) {
         clearInterval(intervalId);
-        if (isMountedRef.current) setPerceptionSettled(true);
+        if (isMountedRef.current) {
+          // Slow and failed are indistinguishable here and treated the same:
+          // the strip hands over, the sheet stays fully usable.
+          setPerceptionSettled(true);
+          setStripPhase((prev) => (prev === 'reading' ? 'settled' : prev));
+        }
         return;
       }
       try {
@@ -221,6 +296,10 @@ export default function SetupPage() {
     form.title,
     form.eventSummary,
     form.captureQuestions.length,
+    // Photo add/remove re-arms the poll while the refresh pass re-runs.
+    photos.length,
+    analysisDone,
+    bookCreatedAt,
     mergeBook,
   ]);
 
@@ -245,6 +324,16 @@ export default function SetupPage() {
       const book: BookData = await res.json();
       if (!isMountedRef.current) return;
       mergeBook(book);
+      // A photo add/remove enqueues a refresh pass, so un-analyzed pages on a
+      // fresh book mean reading has started over. Stale books stay quiet —
+      // their poll gate would never re-arm, so a strip would strand.
+      if (
+        !allPagesAnalyzed(book.pages) &&
+        isFreshBook(book.createdAt, Date.now())
+      ) {
+        setPerceptionSettled(false);
+        setStripPhase('reading');
+      }
     } catch {
       // Non-fatal — the strip keeps its optimistic state until the next fetch.
     }
@@ -285,6 +374,8 @@ export default function SetupPage() {
       if (form.title.trim()) patchBody.title = form.title.trim();
       if (form.eventSummary.trim())
         patchBody.eventSummary = form.eventSummary.trim();
+      // Only ever set by a tap on the mood row — provenance stays parental.
+      if (form.tone) patchBody.tone = form.tone;
       if (form.captureQuestions.length > 0)
         patchBody.captureQuestions = form.captureQuestions;
 
@@ -353,7 +444,8 @@ export default function SetupPage() {
       form={form}
       prefilledName={prefilledName}
       titlePending={titlePending}
-      hasEventSummary={hasEventSummary}
+      stripPhase={stripPhase}
+      summaryEdited={touched.current.eventSummary}
       isSubmitting={isSubmitting}
       showNameError={showNameError}
       bookId={bookId}

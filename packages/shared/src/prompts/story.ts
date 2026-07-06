@@ -381,8 +381,8 @@ export function createStoryGenerationPrompt(
       ``,
     ] : []),
     ...(input.tone ? [
-      `## Story Mood:`,
-      `- Write this story with a **"${input.tone}"** feel throughout. Let this mood guide word choice, pacing, and energy level.`,
+      `## Story Mood (picked by the parent):`,
+      `- The parent asked for a **"${input.tone}"** telling. Let it steer word choice, pacing, and the energy of the peak. The mood is a promise to the parent, not a garnish.`,
       ``,
     ] : []),
     // Exactly ONE experience-context block reaches the prompt: the confirmed

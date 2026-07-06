@@ -116,3 +116,28 @@ describe('createStoryGenerationPrompt — bridge pages (BRIDGE_PAGES_ENABLED)', 
     expect(text).toContain('(2 = after the last photo)');
   });
 });
+
+describe('createStoryGenerationPrompt — parent-picked mood', () => {
+  it('claims parental provenance and renders the mood block when tone is set', () => {
+    const text = promptText({ ...baseInput, tone: 'silly' });
+    expect(text).toContain('## Story Mood (picked by the parent):');
+    expect(text).toContain('The parent asked for a **"silly"** telling.');
+    expect(text).toContain('a promise to the parent, not a garnish');
+  });
+
+  it('omits the mood block entirely when tone is absent', () => {
+    const text = promptText(baseInput);
+    expect(text).not.toContain('Story Mood');
+    expect(text).not.toContain('picked by the parent');
+  });
+
+  it('keeps the mood block independent of the experience-context block', () => {
+    const text = promptText({
+      ...baseInput,
+      tone: 'dreamy',
+      eventSummary: 'A rainy-day trip to the aquarium.',
+    });
+    expect(text).toContain('## Story Mood (picked by the parent):');
+    expect(text).toContain('What actually happened');
+  });
+});
