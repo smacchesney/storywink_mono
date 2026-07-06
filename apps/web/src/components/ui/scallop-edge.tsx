@@ -36,6 +36,12 @@ export function ScallopEdge({
   // Valleys sit at y = PAD (near the flat body edge); peaks dip to y = PAD + H.
   // Vertical control handles at each valley give tangent continuity across tiles.
   const k = W * 0.36; // handle length — tuned for a soft, round bump
+
+  // Pattern ids are document-global in SVG: two edges with different fills on
+  // one page must not share an id or the first one wins. Deriving the id from
+  // flip + fill + stroke keeps it deterministic (SSR-safe) — identical ids
+  // always describe identical patterns.
+  const patternId = `scallop-${flip ? "up" : "down"}-${`${fill}-${stroke}`.replace(/[^a-zA-Z0-9]/g, "")}`;
   const top = PAD;
   const bot = PAD + H;
   // Fill path: flat top edge + one scallop bump, closed.
@@ -53,7 +59,7 @@ export function ScallopEdge({
     >
       <defs>
         <pattern
-          id={`scallop-${flip ? "up" : "down"}`}
+          id={patternId}
           x="0"
           y="0"
           width={W}
@@ -70,7 +76,7 @@ export function ScallopEdge({
           />
         </pattern>
       </defs>
-      <rect width="100%" height={height} fill={`url(#scallop-${flip ? "up" : "down"})`} />
+      <rect width="100%" height={height} fill={`url(#${patternId})`} />
     </svg>
   );
 }

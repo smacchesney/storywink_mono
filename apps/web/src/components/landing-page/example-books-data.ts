@@ -12,12 +12,18 @@ export interface ExampleBookPage {
   text: string | null;
 }
 
+/**
+ * Localizable style identifier — resolves to `landing.styleNames.{key}` in the
+ * message catalogs so chips and the overlay never hardcode a style name.
+ */
+export type ExampleBookStyleKey = 'kawaii' | 'paperOrigami' | 'penPencil';
+
 export interface ExampleBook {
   id: string;
   title: string;
   childName: string;
   coverAlt: string;
-  styleLabel: string;
+  styleKey: ExampleBookStyleKey;
   bookPages: ExampleBookPage[];
 }
 
@@ -347,7 +353,7 @@ export const EXAMPLE_BOOKS: ExampleBook[] = [
     title: 'Kai at Rottenest Island',
     childName: 'Kai',
     coverAlt: 'A personalized storybook about Kai exploring Rottenest Island with quokkas',
-    styleLabel: 'Kawaii',
+    styleKey: 'kawaii',
     bookPages: KAI_AT_ROTTENEST_ISLAND_PAGES,
   },
   {
@@ -355,7 +361,7 @@ export const EXAMPLE_BOOKS: ExampleBook[] = [
     title: 'Winter Wonderland!',
     childName: 'Kai',
     coverAlt: 'A personalized storybook about Kai at a Christmas wonderland in origami style',
-    styleLabel: 'Paper Origami',
+    styleKey: 'paperOrigami',
     bookPages: WINTER_WONDERLAND_PAGES,
   },
   {
@@ -363,7 +369,7 @@ export const EXAMPLE_BOOKS: ExampleBook[] = [
     title: 'Kai at Universal',
     childName: 'Kai',
     coverAlt: 'A personalized storybook about Kai at Universal Studios',
-    styleLabel: 'Pen & Pencil',
+    styleKey: 'penPencil',
     bookPages: KAI_AT_UNIVERSAL_PAGES,
   },
 ];
@@ -385,4 +391,23 @@ export function getAllImageUrls(book: ExampleBook): string[] {
   return book.bookPages
     .filter((p) => p.generatedImageUrl)
     .map((p) => optimizeCloudinaryUrl(p.generatedImageUrl!) || p.generatedImageUrl!);
+}
+
+/**
+ * Frames for the hero photo-to-book morph card's honest day-one fallback:
+ * the real cover crossfading into a real interior page of the same book.
+ * Only `generatedImageUrl` entries are ever used — no stand-in "original"
+ * photos exist in this file by design.
+ */
+export function getMorphFrameUrls(book: ExampleBook): string[] {
+  const cover = book.bookPages.find((p) => p.isTitlePage && p.generatedImageUrl);
+  const storyPages = book.bookPages.filter((p) => !p.isTitlePage && p.generatedImageUrl);
+  const interior = storyPages[Math.floor(storyPages.length / 2)];
+  return [cover, interior]
+    .filter((p): p is ExampleBookPage => Boolean(p?.generatedImageUrl))
+    .map(
+      (p) =>
+        optimizeCloudinaryUrl(p.generatedImageUrl!, { additionalTransforms: 'w_800' }) ||
+        p.generatedImageUrl!
+    );
 }

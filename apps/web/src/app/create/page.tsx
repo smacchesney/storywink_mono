@@ -3,7 +3,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Camera, Loader2 } from 'lucide-react';
+import { Camera } from 'lucide-react';
+import { Storydust } from '@/components/ui/storydust';
 import { useAuth } from '@clerk/nextjs';
 import { useTranslations, useLocale } from 'next-intl';
 import { apiClient } from '@/lib/api-client';
@@ -188,7 +189,7 @@ export default function CreateBookPage() {
           >
             {isCreating ? (
               <>
-                <Loader2 className="h-5 w-5 animate-spin" />
+                <Storydust variant="twinkle" size="inline" className="text-white" />
                 {t('creating')}
               </>
             ) : (

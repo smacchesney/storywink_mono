@@ -4,11 +4,12 @@ import React, { useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { coolifyImageUrl } from '@storywink/shared';
+import { STAR5 } from '@/components/ui/storydust';
+import { MASCOT_CATS_SITTING } from '@/lib/mascots';
 
 // Sitting cats — the ending mascot doubles as the stand-in face for older
 // books that never got a painted cover.
-const FALLBACK_MASCOT_URL =
-  'https://res.cloudinary.com/storywink/image/upload/v1772291378/Screenshot_2026-02-28_at_10.57.54_PM_sxcasb.png';
+const FALLBACK_MASCOT_URL = MASCOT_CATS_SITTING;
 
 interface RevealOverlayProps {
   /** The book's painted cover (Book.coverImageUrl); mascot fallback when missing. */
@@ -136,7 +137,7 @@ export function RevealOverlay({ coverImageUrl, childName, bookTitle, onOpen }: R
           }}
         >
           <svg viewBox="0 0 24 24" fill="var(--coral-primary)" className="w-full h-full">
-            <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7L12 17l-6.3 4 2.3-7-6-4.6h7.6L12 2z" />
+            <path d={STAR5} />
           </svg>
         </div>
       ))}

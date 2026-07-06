@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { useReducedMotion } from "framer-motion";
+import RoughUnderline from "@/components/ui/rough-underline";
 
 interface AnimatedHeroTextProps {
-  /** Sentence fragment before the rotating word (may be empty). */
+  /** Sentence fragment before the rotating word (carries its own spacing). */
   lead?: string;
-  /** Sentence fragment after the rotating word (may be empty). */
+  /** Sentence fragment after the rotating word, rendered flush against it. */
   trail?: string;
   /** Words that rotate in the coral slot. */
   rotatingWords?: string[];
@@ -16,119 +17,108 @@ interface AnimatedHeroTextProps {
 }
 
 /**
- * Cohesive hero headline with a single inline rotating word.
+ * Hero headline with a single inline rotating word.
  *
- * The slot hugs the CURRENT word and animates its width between words, so
- * the sentence reads naturally ("...your little Hero") with no dead gap —
- * while the animation still never overlaps neighbouring copy. Every word is
- * pre-measured from hidden sizers; widths re-measure on resize because the
- * headline's font size changes across breakpoints.
+ * The slot is an `inline-grid` stack: every word is always mounted in
+ * `grid-area: 1/1`, so the grid's intrinsic width is the widest word —
+ * resolved by the browser at first paint, SSR-safe, and recomputed for free
+ * on resize and font load. No sizers, no measurement, no width tween, so
+ * Excalifont's late load can never snap the layout. Rotation animates only
+ * opacity and translateY. Neighbouring copy (including a flush trail like
+ * the Japanese 「です。」) never moves.
+ *
+ * Spacing contract: `lead` and `trail` render verbatim with no injected
+ * spaces — the English catalog carries a trailing space in `lead`, Japanese
+ * carries none. Screen readers get one static sentence using word 1; the
+ * animated copy is `aria-hidden`.
  */
 function AnimatedHeroText({
-  lead = "Turn memories into a picturebook starring your little",
+  lead = "",
   trail = "",
   rotatingWords = ["Hero", "Princess", "Adventurer", "Explorer", "Firefighter"],
   interval = 2600,
   className = "",
 }: AnimatedHeroTextProps) {
+  const words = rotatingWords.length ? rotatingWords : ["Hero"];
   const [index, setIndex] = useState(0);
-  const [mounted, setMounted] = useState(false);
   const prefersReduced = useReducedMotion();
-  const sizerRefs = useRef<(HTMLSpanElement | null)[]>([]);
-  const [widths, setWidths] = useState<number[] | null>(null);
-
-  const words = useMemo(
-    () => (rotatingWords.length ? rotatingWords : ["Hero"]),
-    [rotatingWords],
-  );
+  const slotRef = useRef<HTMLSpanElement>(null);
+  // Width is observed ONLY to size the static underline; it never feeds back
+  // into the text layout.
+  const [slotWidth, setSlotWidth] = useState(0);
 
   useEffect(() => {
-    setMounted(true);
+    const el = slotRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => setSlotWidth(el.offsetWidth));
+    observer.observe(el);
+    setSlotWidth(el.offsetWidth);
+    return () => observer.disconnect();
   }, []);
 
-  // Measure every word (hidden sizers share the h1's font styles) and
-  // re-measure when the viewport resizes across font-size breakpoints.
   useEffect(() => {
-    const measure = () => {
-      const next = words.map((_, i) => sizerRefs.current[i]?.offsetWidth ?? 0);
-      if (next.every((w) => w > 0)) setWidths(next);
-    };
-    measure();
-    let raf = 0;
-    const onResize = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(measure);
-    };
-    window.addEventListener("resize", onResize);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("resize", onResize);
-    };
-  }, [words, mounted]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    const id = setTimeout(
+    if (prefersReduced || words.length < 2) return;
+    const id = setInterval(
       () => setIndex((i) => (i + 1) % words.length),
       interval,
     );
-    return () => clearTimeout(id);
-  }, [index, words.length, interval, mounted]);
+    return () => clearInterval(id);
+  }, [words.length, interval, prefersReduced]);
 
-  const current = words[index];
-  const currentWidth = widths?.[index];
+  // Rotation is strictly sequential, so the word leaving upward is always
+  // the previous index; every other hidden word waits below the baseline.
+  const prevIndex = (index - 1 + words.length) % words.length;
 
   return (
     <h1
       className={`text-balance text-3xl font-bold leading-[1.12] tracking-tight text-ink sm:text-4xl md:text-5xl lg:text-[3.4rem] ${className}`}
     >
-      {lead ? <span>{lead} </span> : null}
-      <motion.span
-        className="relative inline-flex justify-center overflow-visible align-baseline font-playful text-coral"
-        animate={
-          currentWidth !== undefined && !prefersReduced
-            ? { width: currentWidth }
-            : undefined
-        }
-        style={
-          currentWidth !== undefined && prefersReduced
-            ? { width: currentWidth }
-            : undefined
-        }
-        transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-      >
-        {/* Hidden sizers: one per word, inheriting the exact slot typography */}
-        <span aria-hidden className="pointer-events-none absolute left-0 top-0 -z-10 select-none opacity-0">
-          {words.map((word, i) => (
-            <span
-              key={word}
-              ref={(el) => {
-                sizerRefs.current[i] = el;
-              }}
-              className="inline-block whitespace-nowrap"
-            >
-              {word}
+      <span className="sr-only">
+        {lead}
+        {words[0]}
+        {trail}
+      </span>
+      <span aria-hidden="true">
+        {lead}
+        <span
+          ref={slotRef}
+          className="relative inline-grid justify-items-center whitespace-nowrap align-baseline font-playful text-coral"
+        >
+          {words.map((word, i) => {
+            const isCurrent = i === index;
+            const isLeaving = i === prevIndex && !isCurrent;
+            return (
+              <span
+                key={`${word}-${i}`}
+                className={`col-start-1 row-start-1 whitespace-nowrap transition-[opacity,transform] duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+                  isCurrent
+                    ? "opacity-100 translate-y-0"
+                    : `pointer-events-none opacity-0 ${
+                        isLeaving ? "-translate-y-[0.32em]" : "translate-y-[0.32em]"
+                      }`
+                }`}
+              >
+                {word}
+              </span>
+            );
+          })}
+          {/* Static coral underline spanning the full slot width — drawn at
+              the measured width, never transform-stretched, so the
+              hand-drawn stroke keeps its character. */}
+          {slotWidth > 0 && (
+            <span className="pointer-events-none absolute left-1/2 top-full -mt-[0.08em] -translate-x-1/2">
+              <RoughUnderline
+                width={slotWidth}
+                color="var(--coral-primary)"
+                strokeWidth={3}
+                roughness={1.8}
+                extensionFactor={1}
+              />
             </span>
-          ))}
+          )}
         </span>
-        {mounted && !prefersReduced ? (
-          <AnimatePresence mode="wait">
-            <motion.span
-              key={current}
-              className="whitespace-nowrap"
-              initial={{ opacity: 0, y: "0.32em" }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: "-0.32em" }}
-              transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-            >
-              {current}
-            </motion.span>
-          </AnimatePresence>
-        ) : (
-          <span className="whitespace-nowrap">{current}</span>
-        )}
-      </motion.span>
-      {trail ? <span> {trail}</span> : null}
+        {trail}
+      </span>
     </h1>
   );
 }

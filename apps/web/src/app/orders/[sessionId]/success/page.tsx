@@ -16,6 +16,8 @@ import { prisma } from '@/lib/prisma';
 import { coolifyImageUrl, PRINT_PRICING, SHIPPING_TIERS } from '@storywink/shared';
 import { formatMoney } from '@/lib/format';
 import { Button } from '@/components/ui/button';
+import { Storydust } from '@/components/ui/storydust';
+import { ScallopEdge } from '@/components/ui/scallop-edge';
 import { CheckCircle, ArrowRight, Package } from 'lucide-react';
 
 interface PageProps {
@@ -117,13 +119,7 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
   // Brand restyle: the just-paid moment stays in Storywink's coral-and-cream
   // world (matches the progress screen's warm radial background).
   return (
-    <div
-      className="min-h-screen py-12 px-4"
-      style={{
-        background:
-          'radial-gradient(ellipse at 50% 30%, #FFF9F5 0%, #FFFBF5 50%, #FFF5F0 100%)',
-      }}
-    >
+    <div className="min-h-screen py-12 px-4 bg-waiting">
       <div className="max-w-lg mx-auto">
         {/* Success Icon */}
         <div className="text-center mb-8">
@@ -138,8 +134,9 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
           </p>
         </div>
 
-        {/* Order Details Card */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+        {/* Order Details Card — cream keepsake card with a scalloped top edge */}
+        <div className="relative overflow-hidden bg-cream rounded-xl shadow-lg p-6 pt-8 mb-6">
+          <ScallopEdge className="absolute inset-x-0 top-0 opacity-40" />
           {/* Book Info */}
           <div className="flex gap-4 mb-6">
             {coverImageUrl && (
@@ -154,7 +151,7 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
               </div>
             )}
             <div className="flex-grow">
-              <h2 className="font-semibold text-lg text-[#1a1a1a] mb-1">
+              <h2 className="font-playful font-semibold text-lg text-ink mb-1">
                 {bookTitle}
               </h2>
               <p className="text-sm text-gray-500 mb-1">
@@ -236,14 +233,9 @@ export default async function OrderSuccessPage({ params }: PageProps) {
   return (
     <Suspense
       fallback={
-        <div
-          className="min-h-screen py-12 px-4 flex items-center justify-center"
-          style={{
-            background:
-              'radial-gradient(ellipse at 50% 30%, #FFF9F5 0%, #FFFBF5 50%, #FFF5F0 100%)',
-          }}
-        >
-          <div className="animate-pulse text-gray-500">{tOrders('loading')}</div>
+        <div className="min-h-screen py-12 px-4 flex flex-col items-center justify-center gap-4 bg-waiting">
+          <Storydust variant="twinkle" size="card" />
+          <p className="font-playful text-[var(--ink-soft)]">{tOrders('settingUp')}</p>
         </div>
       }
     >

@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Trash2, Eye, Loader2, AlertTriangle, RefreshCw, Download, Printer, Pencil } from 'lucide-react';
+import { MoreHorizontal, Trash2, Eye, AlertTriangle, RefreshCw, Download, Printer, Pencil } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { calculatePrintedPageCount } from '@storywink/shared';
@@ -20,6 +20,7 @@ import { isPrintShippableLocale } from '@/lib/print-availability';
 import { track } from '@/lib/track';
 import { cn } from '@/lib/utils';
 import { TextShimmerWave } from '@/components/ui/text-shimmer-wave';
+import { Storydust } from '@/components/ui/storydust';
 import { PrintOrderSheet, PrintOrderBook } from '@/components/print/PrintOrderSheet';
 import { ExportPdfDialog } from '@/components/book/ExportPdfDialog';
 import BookArtImage from '@/components/book/BookArtImage';
@@ -116,7 +117,7 @@ const BookCard: React.FC<BookCardProps> = ({
 
   return (
     <>
-      <Card className="flex flex-col gap-0 p-3 hover:shadow-md transition-shadow">
+      <Card className="flex h-full flex-col gap-0 p-3 hover:shadow-md transition-shadow">
         {/* Cover — square, page-stack edge, the whole thing is the tap target */}
         <Link
           href={coverHref}
@@ -141,9 +142,10 @@ const BookCard: React.FC<BookCardProps> = ({
           {isWorking && (
             <>
               <div className="absolute inset-0 bg-black/40" />
-              <div className="absolute inset-0 flex flex-col items-center justify-center px-2 text-center">
+              <div className="absolute inset-0 flex flex-col items-center justify-center space-y-1 px-3 text-center">
+                <Storydust variant="twinkle" size="inline" className="text-white" />
                 <TextShimmerWave
-                  className="text-base font-semibold font-playful [--base-color:#e2e8f0] [--base-gradient-color:var(--coral-primary)]"
+                  className="text-sm font-semibold font-playful [--base-color:#e2e8f0] [--base-gradient-color:var(--coral-primary)]"
                   duration={1}
                   spread={1}
                   zDistance={1}
@@ -157,7 +159,7 @@ const BookCard: React.FC<BookCardProps> = ({
                       : t('creatingIllustrations')}
                 </TextShimmerWave>
                 {isIllustrating && (
-                  <p className="text-xs text-white/70 mt-2">
+                  <p className="text-xs text-white/90">
                     {qcRound > 0 ? t('almostDone') : t('usuallyTakes')}
                   </p>
                 )}
@@ -168,7 +170,7 @@ const BookCard: React.FC<BookCardProps> = ({
 
         {/* Title row + the one kebab (all secondary actions live here) */}
         <div className="mt-3 flex items-center justify-between gap-1">
-          <CardTitle className="text-base font-playful truncate min-w-0">{displayTitle}</CardTitle>
+          <CardTitle className="text-base font-playful min-w-0 break-words leading-snug">{displayTitle}</CardTitle>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -178,7 +180,7 @@ const BookCard: React.FC<BookCardProps> = ({
                 className="h-8 w-8 shrink-0 text-muted-foreground"
               >
                 {isDeleting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Storydust variant="twinkle" size="inline" />
                 ) : (
                   <MoreHorizontal className="h-4 w-4" />
                 )}
@@ -246,18 +248,20 @@ const BookCard: React.FC<BookCardProps> = ({
 
         {/* Status line, only where the book needs a word */}
         {caption && (
-          <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{caption}</p>
+          <p className="mt-1 text-sm font-playful text-[var(--ink-soft)] line-clamp-2">{caption}</p>
         )}
         {(isPartial || isFailed) && (
-          <p className="mt-1 flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+          <p className="mt-1 flex items-center gap-1 text-xs text-coral">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
             {isFailed ? t('illustrationFailed') : t('someIllustrationsFailed')}
           </p>
         )}
 
-        {/* Footer buttons return at md+, where cards are wide enough for them */}
+        {/* Footer buttons return at tall md+ viewports, where cards are wide
+            enough for them; `mt-auto` keeps every card's buttons on a shared
+            baseline whatever the title/status above them did. */}
         {isCompleted && (
-          <div className="mt-3 hidden md:flex items-center gap-2">
+          <div className="mt-auto pt-3 hidden tall:md:flex items-center gap-2">
             <Button
               onClick={() => router.push(`/book/${id}/preview`)}
               size="sm"
@@ -290,7 +294,7 @@ const BookCard: React.FC<BookCardProps> = ({
           </div>
         )}
         {isPartial && (
-          <div className="mt-3 hidden md:flex">
+          <div className="mt-auto pt-3 hidden tall:md:flex">
             <Button
               onClick={() => router.push(`/book/${id}/resolve`)}
               size="sm"
@@ -302,7 +306,7 @@ const BookCard: React.FC<BookCardProps> = ({
           </div>
         )}
         {isFailed && (
-          <div className="mt-3 hidden md:flex">
+          <div className="mt-auto pt-3 hidden tall:md:flex">
             <Button
               onClick={onRetryClick}
               size="sm"
@@ -310,7 +314,7 @@ const BookCard: React.FC<BookCardProps> = ({
               className="flex-1 bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
             >
               {isRetrying ? (
-                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                <Storydust variant="twinkle" size="inline" className="mr-1.5 text-white" />
               ) : (
                 <RefreshCw className="h-4 w-4 mr-1.5" />
               )}
@@ -319,7 +323,7 @@ const BookCard: React.FC<BookCardProps> = ({
           </div>
         )}
         {isDraft && (
-          <div className="mt-3 hidden md:flex">
+          <div className="mt-auto pt-3 hidden tall:md:flex">
             <Button
               onClick={() => router.push(`/create/${id}/setup`)}
               size="sm"
@@ -331,7 +335,7 @@ const BookCard: React.FC<BookCardProps> = ({
           </div>
         )}
         {isStoryReady && (
-          <div className="mt-3 hidden md:flex">
+          <div className="mt-auto pt-3 hidden tall:md:flex">
             <Button
               onClick={() => router.push(`/create/review?bookId=${id}`)}
               size="sm"

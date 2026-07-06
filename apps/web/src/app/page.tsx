@@ -1,16 +1,21 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import React, { useEffect, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useTranslations } from 'next-intl';
 import { AnimatedHeroText } from "@/components/ui/animated-hero-text";
 import PlayfulBackground from "@/components/ui/playful-background";
+import { ScallopEdge } from "@/components/ui/scallop-edge";
 import { EXAMPLE_BOOKS, ExampleBook } from "@/components/landing-page/example-books-data";
+import { LandingCta } from "@/components/landing-page/landing-cta";
+import PhotoToBookMorph from "@/components/landing-page/photo-to-book-morph";
+import KeepsakeSection from "@/components/landing-page/keepsake-section";
+import LandingStickyCta from "@/components/landing-page/landing-sticky-cta";
+import { cn } from "@/lib/utils";
 
 // Lazy load components
 const ExampleBookSelector = dynamic(() => import("@/components/landing-page/example-book-selector"), {
@@ -28,31 +33,38 @@ const ExampleBookOverlay = dynamic(() => import("@/components/landing-page/examp
   ssr: false,
 });
 
+// The mascot duo (cream cat + black-and-tan dog) — the same asset the site
+// header uses, at final-band size.
+const MASCOT_DUO_SRC =
+  'https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto,w_480/v1772291379/Screenshot_2026-02-28_at_10.55.32_PM_copy_xxjms6.png';
+
+// How-it-works vignettes. Honest interim art: the existing mascot sprite
+// crops (+ the painting cat) until the owner uploads the four dedicated
+// pieces at storywink/landing/howitworks-step{1..4}.png — swap the URLs the
+// day they exist, nothing else changes.
+const HOW_IT_WORKS_IMAGES = [
+  'https://res.cloudinary.com/storywink/image/upload/c_crop,x_100,y_540,w_880,h_700/f_auto,q_auto,w_520/v1774702929/use-this-how-to_vq0hey.png',
+  'https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto,w_520/v1772291377/Screenshot_2026-02-28_at_10.57.58_PM_mijhwv.png',
+  'https://res.cloudinary.com/storywink/image/upload/c_crop,x_1060,y_530,w_900,h_740/f_auto,q_auto,w_520/v1774702929/use-this-how-to_vq0hey.png',
+  'https://res.cloudinary.com/storywink/image/upload/c_crop,x_2075,y_540,w_900,h_720/f_auto,q_auto,w_520/v1774702929/use-this-how-to_vq0hey.png',
+];
+
 export default function Home() {
   const { isLoaded, isSignedIn } = useAuth();
   const router = useRouter();
   const t = useTranslations('landing');
-  const tc = useTranslations('common');
-  const [isButtonLoading, setIsButtonLoading] = useState(true);
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
   const [selectedBook, setSelectedBook] = useState<ExampleBook | null>(null);
+  const heroCtaRef = useRef<HTMLDivElement>(null);
+  const finalBandRef = useRef<HTMLElement>(null);
 
-  // Handle loading state for the button
-  useEffect(() => {
-    if (isLoaded) {
-      setIsButtonLoading(false);
-    }
-  }, [isLoaded]);
-
+  // Always live — route optimistically to /create; middleware bounces to
+  // sign-in when the session turns out to be missing.
   const handleCreateStorybookClick = () => {
-    if (!isLoaded) {
-      return;
-    }
-
-    if (isSignedIn) {
-      router.push("/create");
-    } else {
+    if (isLoaded && !isSignedIn) {
       router.push(`/sign-in?redirect_url=${encodeURIComponent('/create')}`);
+    } else {
+      router.push("/create");
     }
   };
 
@@ -66,106 +78,105 @@ export default function Home() {
     { question: t('faq3Q'), answer: t('faq3A') },
     { question: t('faq4Q'), answer: t('faq4A') },
     { question: t('faq5Q'), answer: t('faq5A') },
+    { question: t('faq6Q'), answer: t('faq6A') },
   ];
+
+  const howItWorksSteps = [1, 2, 3, 4].map((n) => ({
+    n,
+    img: HOW_IT_WORKS_IMAGES[n - 1],
+    title: t(`step${n}Title`),
+    caption: t(`step${n}Caption`),
+  }));
 
   return (
     <div className="relative">
       <PlayfulBackground variant="landing" />
       <div className="relative z-10">
-        {/* Hero Section */}
-        <section className="text-center px-4 py-8 md:py-14 relative overflow-x-clip">
-          <div className="max-w-4xl mx-auto">
-            <AnimatedHeroText
-              lead={t('heroLead')}
-              trail={t('heroTrail')}
-              rotatingWords={[
-                t('heroWord1'),
-                t('heroWord2'),
-                t('heroWord3'),
-                t('heroWord4'),
-                t('heroWord5'),
-              ]}
-            />
+        {/* 1. Hero */}
+        <section className="relative overflow-x-clip px-4 pt-8 pb-16 md:pt-14 md:pb-24">
+          <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-14">
+            <div className="text-center lg:text-left">
+              <AnimatedHeroText
+                lead={t('heroLead')}
+                trail={t('heroTrail')}
+                rotatingWords={[
+                  t('heroWord1'),
+                  t('heroWord2'),
+                  t('heroWord3'),
+                  t('heroWord4'),
+                  t('heroWord5'),
+                ]}
+              />
 
-            <p className="mt-5 mb-6 max-w-xl mx-auto text-base sm:text-lg text-ink-soft dark:text-slate-300">
-              {t('heroSubtitle')}
-            </p>
+              <p className="mx-auto mt-5 max-w-xl text-base text-ink-soft sm:text-lg lg:mx-0">
+                {t('heroSubtitle')}
+              </p>
 
-            <div className="flex flex-col sm:flex-row justify-center items-center gap-3 mb-6">
-              <Button
-                size="lg"
-                variant="default"
-                className="group w-full sm:w-auto px-9 py-4 text-lg md:text-xl font-playful shadow-md shadow-coral/25"
-                onClick={handleCreateStorybookClick}
-                disabled={!isLoaded}
-              >
-                {isButtonLoading ? tc('loading') : (
-                  <>
-                    <svg
-                      className="mr-1 h-5 w-5 transition-transform group-hover:scale-125 group-hover:rotate-12"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                    >
-                      <path d="M12 0L14.59 8.41L23 11L14.59 13.59L12 22L9.41 13.59L1 11L9.41 8.41L12 0Z" />
-                    </svg>
-                    {t('createYourStorybook')}
-                  </>
-                )}
-              </Button>
+              <div ref={heroCtaRef} className="mt-6">
+                <LandingCta
+                  onClick={handleCreateStorybookClick}
+                  className="lg:items-start"
+                />
+              </div>
             </div>
 
-            <div className="mt-22 md:mt-24 mb-8 md:mb-12">
+            <PhotoToBookMorph
+              book={EXAMPLE_BOOKS[0]}
+              onOpen={() => setSelectedBook(EXAMPLE_BOOKS[0])}
+            />
+          </div>
+        </section>
+
+        {/* 2. Proof: example-book fan + likeness line */}
+        <section className="px-4 py-16 md:py-24">
+          <div className="mx-auto max-w-4xl text-center">
+            <h2 className="text-2xl font-bold sm:text-3xl md:text-4xl">
+              <span className="font-playful text-ink">{t('proofPrefix')}</span>{' '}
+              <span className="font-playful text-coral">{t('proofSuffix')}</span>
+            </h2>
+            <p className="mx-auto mt-3 max-w-xl text-ink-soft">{t('proofSub')}</p>
+
+            <div className="mt-10 md:mt-14">
               <ExampleBookSelector
                 books={EXAMPLE_BOOKS}
                 onSelectBook={setSelectedBook}
               />
             </div>
+
+            <p className="mx-auto mt-10 max-w-2xl text-ink-soft">{t('likenessLine')}</p>
+
+            <div className="mt-8">
+              <LandingCta variant="ghost" onClick={handleCreateStorybookClick} />
+            </div>
           </div>
         </section>
 
-        {/* How It Works Section — responsive 3-column, real localized text */}
-        <section className="py-8 md:py-14 px-4">
-          <div className="max-w-5xl mx-auto">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-ink dark:text-white text-center mb-10 md:mb-14">
+        {/* 3. How it works + CTA block */}
+        <section className="px-4 py-16 md:py-24">
+          <div className="mx-auto max-w-5xl">
+            <h2 className="mb-10 text-center text-2xl font-bold text-ink sm:text-3xl md:mb-14 md:text-4xl">
               <span className="font-playful">{t('howItWorksPrefix')}</span>{' '}
               <span className="font-playful text-coral">{t('howItWorksSuffix')}</span>
             </h2>
 
-            <ol className="relative grid grid-cols-1 gap-10 sm:grid-cols-3 sm:gap-6">
-              {/* Dotted connector across the three steps (desktop only) */}
+            <ol className="relative grid grid-cols-1 gap-10 md:grid-cols-2 md:gap-8 lg:grid-cols-4 lg:gap-6">
+              {/* Dotted connector across the four steps (wide desktop only —
+                  on the md 2×2 grid it would cut between rows) */}
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute left-0 right-0 top-6 hidden border-t-2 border-dashed border-coral/30 sm:block"
-                style={{ marginLeft: '16.6%', marginRight: '16.6%' }}
+                className="pointer-events-none absolute left-0 right-0 top-6 hidden border-t-2 border-dashed border-coral/30 lg:block"
+                style={{ marginLeft: '12.5%', marginRight: '12.5%' }}
               />
 
-              {[
-                {
-                  n: 1,
-                  img: 'https://res.cloudinary.com/storywink/image/upload/c_crop,x_100,y_540,w_880,h_700/f_auto,q_auto,w_520/v1774702929/use-this-how-to_vq0hey.png',
-                  title: t('step1Title'),
-                  caption: t('step1Caption'),
-                },
-                {
-                  n: 2,
-                  img: 'https://res.cloudinary.com/storywink/image/upload/c_crop,x_1060,y_530,w_900,h_740/f_auto,q_auto,w_520/v1774702929/use-this-how-to_vq0hey.png',
-                  title: t('step2Title'),
-                  caption: t('step2Caption'),
-                },
-                {
-                  n: 3,
-                  img: 'https://res.cloudinary.com/storywink/image/upload/c_crop,x_2075,y_540,w_900,h_720/f_auto,q_auto,w_520/v1774702929/use-this-how-to_vq0hey.png',
-                  title: t('step3Title'),
-                  caption: t('step3Caption'),
-                },
-              ].map((step) => (
+              {howItWorksSteps.map((step) => (
                 <li key={step.n} className="relative flex flex-col items-center text-center">
                   {/* Number badge */}
                   <span className="relative z-10 mb-4 flex h-12 w-12 items-center justify-center rounded-full border-2 border-coral bg-white font-playful text-xl font-bold text-coral shadow-sm">
                     {step.n}
                   </span>
-                  {/* Mascot vignette */}
-                  <div className="mb-4 flex h-40 w-full items-end justify-center sm:h-44">
+                  {/* Mascot vignette — transparent art straight on the playful
+                      background, over a soft coral radial blob */}
+                  <div className="mb-4 flex h-40 w-full items-end justify-center bg-[radial-gradient(closest-side,rgba(247,108,94,0.08),transparent)] sm:h-44">
                     <Image
                       src={step.img}
                       alt={step.title}
@@ -174,22 +185,34 @@ export default function Home() {
                       className="h-full w-auto object-contain"
                     />
                   </div>
-                  <h3 className="mb-1 font-playful text-xl text-ink dark:text-white">
+                  <h3 className="mb-1 font-playful text-xl text-ink">
                     {step.title}
                   </h3>
-                  <p className="max-w-[15rem] text-sm text-ink-soft dark:text-slate-300">
+                  <p className="max-w-[15rem] text-sm text-ink-soft">
                     {step.caption}
                   </p>
                 </li>
               ))}
             </ol>
+
+            <div className="mt-12 md:mt-16">
+              <LandingCta onClick={handleCreateStorybookClick} />
+              <p className="mt-3 text-center text-sm text-ink-soft">{t('hiwReassurance')}</p>
+            </div>
           </div>
         </section>
 
-        {/* FAQ Section */}
-        <section className="py-6 md:py-12 px-4">
-          <div className="text-center mb-8 md:mb-12">
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-4">
+        {/* 4. Keepsake ladder (print USP) — carries its own scallop dividers */}
+        <KeepsakeSection onCtaClick={handleCreateStorybookClick} />
+
+        {/* 5. Safety line + FAQ */}
+        <section className="px-4 py-16 md:py-24">
+          <p className="mx-auto mb-8 max-w-xl text-center text-ink-soft md:mb-10">
+            {t('safetyLine')}
+          </p>
+
+          <div className="mb-8 text-center md:mb-12">
+            <div className="mb-4 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
               <Image
                 src="https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto,h_240/v1772291623/Screenshot_2026-02-28_at_11.12.00_PM_df2xpk.png"
                 alt={t('faqMascotAlt')}
@@ -197,42 +220,88 @@ export default function Home() {
                 height={240}
                 className="h-24 w-24 md:h-[120px] md:w-[120px]"
               />
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-ink dark:text-white">
-                {t('faq')}
+              <h2 className="text-2xl font-bold text-ink sm:text-3xl md:text-4xl">
+                <span className="font-playful">{t('faqPrefix')}</span>{' '}
+                <span className="font-playful text-coral">{t('faqSuffix')}</span>
               </h2>
             </div>
           </div>
 
-          <div className="max-w-3xl mx-auto space-y-4">
-            {faqItems.map((item, index) => (
-              <div
-                key={index}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border-l-4 border-coral overflow-hidden"
-              >
-                <button
-                  onClick={() => toggleFAQ(index)}
-                  className="w-full p-5 md:p-6 text-left flex items-center justify-between hover:bg-coral-soft/60 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <h3 className="text-base md:text-lg font-semibold text-ink dark:text-white pr-4">
-                    {item.question}
-                  </h3>
-                  {expandedFAQ === index ? (
-                    <ChevronUp className="h-5 w-5 flex-shrink-0 text-coral transition-transform" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5 flex-shrink-0 text-slate-400 transition-transform" />
+          <div className="mx-auto max-w-3xl space-y-3">
+            {faqItems.map((item, index) => {
+              const isOpen = expandedFAQ === index;
+              return (
+                <div
+                  key={index}
+                  className={cn(
+                    'overflow-hidden rounded-2xl border bg-white shadow-sm transition-colors',
+                    isOpen ? 'border-coral/40' : 'border-ink/10'
                   )}
-                </button>
-                {expandedFAQ === index && (
-                  <div className="px-5 md:px-6 pb-5 md:pb-6">
-                    <p className="text-ink-soft dark:text-slate-300 leading-relaxed">
-                      {item.answer}
-                    </p>
+                >
+                  <button
+                    onClick={() => toggleFAQ(index)}
+                    aria-expanded={isOpen}
+                    aria-controls={`faq-answer-${index}`}
+                    className="flex min-h-[44px] w-full cursor-pointer items-center justify-between p-4 text-left transition-colors hover:bg-coral-soft/40 md:p-5"
+                  >
+                    <h3 className="pr-4 font-playful text-base text-ink md:text-lg">
+                      {item.question}
+                    </h3>
+                    <ChevronDown
+                      className={cn(
+                        'h-5 w-5 flex-shrink-0 transition-transform motion-reduce:transition-none',
+                        isOpen ? 'rotate-180 text-coral' : 'text-ink-soft/60'
+                      )}
+                    />
+                  </button>
+                  {/* Always rendered (SEO); eases open via the grid-rows trick */}
+                  <div
+                    id={`faq-answer-${index}`}
+                    className={cn(
+                      'grid transition-[grid-template-rows] duration-300 motion-reduce:transition-none',
+                      isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                    )}
+                  >
+                    <div className="min-h-0 overflow-hidden">
+                      <p className="px-4 pb-4 pt-0 text-[15px] leading-relaxed text-ink-soft md:px-5 md:text-base">
+                        {item.answer}
+                      </p>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         </section>
+
+        {/* 6. Final ask band — peach, abuts the footer (its -mb cancels the
+            footer's top margin so no cream gap remains) */}
+        <section ref={finalBandRef} className="relative -mb-20">
+          <ScallopEdge flip fill="#FBE7D6" className="relative z-10 block" />
+          <div className="-mt-px bg-[#FBE7D6] px-4 py-16 text-center md:py-24">
+            <Image
+              src={MASCOT_DUO_SRC}
+              alt={t('faqMascotAlt')}
+              width={240}
+              height={192}
+              className="mx-auto h-auto w-40 md:w-56"
+            />
+            <h2 className="mt-6 font-playful text-2xl font-bold text-ink sm:text-3xl md:text-4xl">
+              {t('finalTitle')}
+            </h2>
+            <div className="mt-8">
+              <LandingCta onClick={handleCreateStorybookClick} />
+            </div>
+          </div>
+        </section>
+
+        <LandingStickyCta
+          heroCtaRef={heroCtaRef}
+          finalBandRef={finalBandRef}
+          suppressed={selectedBook !== null}
+          onCtaClick={handleCreateStorybookClick}
+        />
+
         <ExampleBookOverlay
           book={selectedBook}
           onClose={() => setSelectedBook(null)}

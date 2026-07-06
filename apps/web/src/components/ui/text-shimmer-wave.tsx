@@ -1,6 +1,6 @@
 'use client';
 import { type JSX } from 'react';
-import { motion, Transition } from 'framer-motion';
+import { motion, Transition, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 type TextShimmerWave = {
@@ -30,6 +30,26 @@ export function TextShimmerWave({
   rotateYDistance = 10,
   transition,
 }: TextShimmerWave) {
+  const prefersReducedMotion = useReducedMotion() ?? false;
+
+  // Reduced motion: a plain static line in the base color — no per-character
+  // wave, no color sweep. Callers keep control via the --base-color variable.
+  if (prefersReducedMotion) {
+    return (
+      <Component
+        className={cn(
+          'relative inline-block',
+          '[--base-color:#a1a1aa] [--base-gradient-color:#000]',
+          'dark:[--base-color:#71717a] dark:[--base-gradient-color:#ffffff]',
+          className
+        )}
+        style={{ color: 'var(--base-color)' }}
+      >
+        {children}
+      </Component>
+    );
+  }
+
   const MotionComponent = motion.create(
     Component as keyof JSX.IntrinsicElements
   );

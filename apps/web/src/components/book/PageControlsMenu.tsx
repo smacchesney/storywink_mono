@@ -3,8 +3,10 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { MoreVertical, Pencil, Sparkles, ImageIcon, Loader2, Trash2 } from 'lucide-react';
+import { MoreVertical, Pencil, Sparkles, ImageIcon, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Storydust } from '@/components/ui/storydust';
+import { showWorking } from '@/lib/toast-utils';
 import type { Page } from '@prisma/client';
 import { Button } from '@/components/ui/button';
 import {
@@ -108,7 +110,9 @@ export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: Pa
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'reillustrate failed');
       }
-      toast.info(t('reillustrateStarted'));
+      // Working toast: the twinkle keeps winking until the gallery tile's
+      // own painting state takes over on the next poll.
+      showWorking(t('reillustrateStarted'));
       onMutated();
     } catch {
       toast.error(t('reillustrateError'));
@@ -128,13 +132,13 @@ export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: Pa
             className="h-9 w-9 rounded-full bg-background/70 shadow"
           >
             {isReillustrating ? (
-              <Loader2 className="h-5 w-5 animate-spin text-coral" />
+              <Storydust variant="twinkle" size="inline" />
             ) : (
               <MoreVertical className="h-5 w-5 text-coral" />
             )}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="font-playful">
+        <DropdownMenuContent align="end" className="z-[70] font-playful">
           <DropdownMenuItem onClick={() => setEditOpen(true)}>
             <Pencil className="mr-2 h-4 w-4" />
             {t('editText')}
@@ -164,7 +168,7 @@ export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: Pa
       </DropdownMenu>
 
       <Dialog open={removeOpen} onOpenChange={setRemoveOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="z-[70] max-w-md">
           <DialogHeader>
             <DialogTitle className="font-playful">{t('removePageTitle')}</DialogTitle>
           </DialogHeader>
@@ -178,7 +182,7 @@ export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: Pa
               disabled={isRemoving}
               className="bg-red-600 font-playful text-white hover:bg-red-700"
             >
-              {isRemoving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isRemoving ? <Storydust variant="twinkle" size="inline" className="mr-2 text-white" /> : null}
               {t('removeConfirm')}
             </Button>
           </DialogFooter>
@@ -186,7 +190,7 @@ export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: Pa
       </Dialog>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="z-[70] max-w-md">
           <DialogHeader>
             <DialogTitle className="font-playful">{t('editText')}</DialogTitle>
           </DialogHeader>
@@ -205,7 +209,7 @@ export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: Pa
               disabled={isSavingText}
               className="bg-coral font-playful text-white hover:bg-coral/90"
             >
-              {isSavingText ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isSavingText ? <Storydust variant="twinkle" size="inline" className="mr-2 text-white" /> : null}
               {t('save')}
             </Button>
           </DialogFooter>

@@ -3,9 +3,11 @@ import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Pencil, AlertTriangle } from 'lucide-react';
+import { Pencil, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { coolifyImageUrl } from '@storywink/shared';
+import { Storydust } from '@/components/ui/storydust';
+import { MASCOT_CATS_SLEEPING } from '@/lib/mascots';
 
 interface PageCardProps {
   id: string | undefined;
@@ -32,9 +34,6 @@ interface PageCardProps {
  * PageCard displays a single page with its image and text
  * Provides editing functionality; "Save changes" writes the text through.
  */
-const MASCOT_URL =
-  'https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.58.09_PM_gnknk5.png';
-
 const PageCard = ({
   id: _id,
   imageUrl,
@@ -106,7 +105,7 @@ const PageCard = ({
           // fallback explains the page the app added instead of showing a
           // blank "Page N" card.
           <div className="w-full h-full flex flex-col items-center justify-center gap-3 rounded-md border-2 border-dashed border-coral/40 bg-coral/5 px-6 text-center">
-            <Image src={MASCOT_URL} alt="" width={56} height={56} className="h-14 w-14" />
+            <Image src={MASCOT_CATS_SLEEPING} alt="" width={56} height={56} className="h-14 w-14" />
             <span className="font-playful text-sm text-gray-700">
               {t('bridgePlaceholder')}
             </span>
@@ -121,7 +120,7 @@ const PageCard = ({
         
         {/* Moderation Warning */}
         {moderationStatus === 'FLAGGED' && (
-          <div className="absolute bottom-2 left-2 bg-amber-100 text-amber-800 px-2 py-1 rounded-md text-xs flex items-center">
+          <div className="absolute bottom-2 left-2 bg-warn-soft text-coral-ink px-2 py-1 rounded-md text-xs flex items-center">
             <AlertTriangle className="h-3 w-3 mr-1" />
             <span>{t('contentFlagged')}</span>
           </div>
@@ -171,7 +170,7 @@ const PageCard = ({
               >
                 {isSaving ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Storydust variant="twinkle" size="inline" className="mr-2 text-white" />
                     {tc('saving')}
                   </>
                 ) : (

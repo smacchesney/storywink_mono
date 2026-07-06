@@ -465,7 +465,15 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
       return (
         <div key={pageKey} className="bg-white rounded-lg overflow-hidden border border-black/15">
           <div className="absolute inset-0 flex flex-col">
-            <div className="relative w-full aspect-square shrink-0 overflow-hidden">
+            {/* The art shrinks before the text clips: the square is capped
+                at pageHeight minus 7rem (~4 lines at the 12px floor plus
+                padding), so it letterboxes down instead of squeezing the
+                text strip out. Sized in px from the same measurements the
+                page itself uses — no aspect-ratio/max-height ambiguity. */}
+            <div
+              className="relative flex-none mx-auto aspect-square overflow-hidden"
+              style={{ width: Math.max(48, Math.min(pageWidth, pageHeight - 112)) }}
+            >
               {imageUrl ? (
                 <>
                   {renderBlurBackdrop(imageUrl)}
@@ -484,7 +492,10 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
                 renderCookingPlaceholder()
               )}
             </div>
-            <div className="flex-1 min-h-0 flex items-center justify-center px-[8%]">
+            {/* Last-resort guard: a pathological long page scrolls inside
+                its strip instead of clipping. Never engages at the normal
+                12-22px range. */}
+            <div className="flex-1 min-h-0 flex items-center justify-center px-[8%] overflow-y-auto [touch-action:pan-y] [overscroll-behavior:contain]">
               {dp.page.text && dp.page.text.trim() && (
                 <p className={`${storyFontClass} text-[#1a1a1a] text-center leading-snug`}
                    style={{ fontSize: `${bodySize}px` }}>
@@ -601,14 +612,18 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
           useMouseEvents={true}
           swipeDistance={30}
           showPageCorners={true}
-          disableFlipByClick={false}
+          // Tap-to-flip stays with the reader's own edge-tap handler (the
+          // preview page): the engine keeps only its corner squares.
+          disableFlipByClick={true}
 
           // Real settings
           drawShadow
           maxShadowOpacity={0.7}
           flippingTime={prefersReducedMotion ? 150 : 700}
           usePortrait={isPortrait}
-          mobileScrollSupport={false}
+          // Vertical pans pass through to native scroll (a no-op under the
+          // reader's body scroll lock); a fold only engages once |dx| > 10.
+          mobileScrollSupport={true}
           clickEventForward
 
           // Event handlers

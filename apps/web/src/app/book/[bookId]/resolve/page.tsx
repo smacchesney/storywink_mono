@@ -21,11 +21,12 @@ import {
   AlertTriangle,
   Trash2,
   ImagePlus,
-  Loader2,
   ChevronLeft,
   ChevronRight,
   Sparkles,
 } from 'lucide-react';
+import { Storydust } from '@/components/ui/storydust';
+import { MASCOT_CATS_SLEEPING } from '@/lib/mascots';
 import { toast } from 'sonner';
 import { useAuth } from '@clerk/nextjs';
 import { uploadSinglePhoto, validateFile } from '@/lib/uploadPhotos';
@@ -57,9 +58,6 @@ interface BookData {
 }
 
 type ResolvePhase = 'fix-photos' | 'generating-text' | 'review-text';
-
-const MASCOT_URL =
-  'https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.58.09_PM_gnknk5.png';
 
 /** Determine if a page needs work based on its DB state */
 function pageNeedsWork(p: PageData): boolean {
@@ -549,9 +547,9 @@ export default function BookResolvePage() {
   // --- Loading state ---
   if (isLoading) {
     return (
-      <div className="flex flex-col justify-center items-center min-h-screen gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-coral" />
-        <p className="text-muted-foreground font-playful">{t('loading')}</p>
+      <div className="flex flex-col justify-center items-center min-h-screen gap-3 bg-waiting">
+        <Storydust variant="twinkle" size="card" />
+        <p className="text-[var(--ink-soft)] font-playful">{t('loading')}</p>
       </div>
     );
   }
@@ -567,7 +565,7 @@ export default function BookResolvePage() {
             setIsLoading(true);
             fetchBook();
           }}
-          className="bg-coral hover:bg-[#E55A4C] text-white rounded-full font-playful"
+          className="bg-coral hover:bg-coral-hover text-white rounded-full font-playful"
         >
           {t('retry')}
         </Button>
@@ -593,13 +591,13 @@ export default function BookResolvePage() {
       {/* Header with mascot */}
       <div className="text-center mb-6">
         <Image
-          src={MASCOT_URL}
+          src={MASCOT_CATS_SLEEPING}
           alt=""
           width={120}
           height={120}
           className="mx-auto mb-3 h-16 w-16 md:h-20 md:w-20"
         />
-        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 font-playful">
+        <h1 className="text-2xl sm:text-3xl font-bold text-ink font-playful">
           {t('title')}
         </h1>
         <p className="text-muted-foreground mt-2">
@@ -631,7 +629,7 @@ export default function BookResolvePage() {
                     onClick={() => goToFixPage(indexInActionable)}
                     aria-label={`Page ${page.pageNumber} - needs attention`}
                     className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all cursor-pointer
-                      ${isSelected ? 'border-coral ring-2 ring-coral/30' : 'border-amber-400 hover:border-amber-500'}`}
+                      ${isSelected ? 'border-coral ring-2 ring-coral/30' : 'border-peach hover:border-coral'}`}
                   >
                     {page.originalImageUrl ? (
                       <Image
@@ -644,8 +642,8 @@ export default function BookResolvePage() {
                     ) : (
                       <div className="w-full h-full bg-gray-100" />
                     )}
-                    <div className="absolute inset-0 flex items-center justify-center bg-amber-500/20">
-                      <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-warn-soft/40">
+                      <AlertTriangle className="h-4 w-4 text-coral-ink" />
                     </div>
                     <span className="absolute bottom-0 left-0 right-0 text-[10px] text-center bg-black/40 text-white">
                       {page.pageNumber}
@@ -720,7 +718,7 @@ export default function BookResolvePage() {
 
           {/* Action Card — choose Replace or Remove */}
           {selectedFixPage && (
-            <Card className="border-amber-200 bg-amber-50/50 overflow-hidden">
+            <Card className="border-peach/60 bg-warn-soft/50 overflow-hidden">
               <CardContent className="pt-6 px-4 sm:px-6">
                 <div className="flex items-start gap-3 sm:gap-4">
                   <div className="relative w-20 h-20 rounded-lg overflow-hidden shrink-0 border">
@@ -754,10 +752,10 @@ export default function BookResolvePage() {
                         <Button
                           onClick={handleRedrawBridge}
                           disabled={isRedrawing}
-                          className="w-full sm:flex-1 bg-coral hover:bg-[#E55A4C] text-white rounded-full font-playful disabled:opacity-70"
+                          className="w-full sm:flex-1 bg-coral hover:bg-coral-hover text-white rounded-full font-playful disabled:opacity-70"
                         >
                           {isRedrawing ? (
-                            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                            <Storydust variant="twinkle" size="inline" className="mr-1.5 text-white" />
                           ) : (
                             <Sparkles className="h-4 w-4 mr-1.5" />
                           )}
@@ -767,10 +765,10 @@ export default function BookResolvePage() {
                         <Button
                           onClick={handleReplaceClick}
                           disabled={isReplacing}
-                          className="w-full sm:flex-1 bg-coral hover:bg-[#E55A4C] text-white rounded-full font-playful disabled:opacity-70"
+                          className="w-full sm:flex-1 bg-coral hover:bg-coral-hover text-white rounded-full font-playful disabled:opacity-70"
                         >
                           {isReplacing ? (
-                            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                            <Storydust variant="twinkle" size="inline" className="mr-1.5 text-white" />
                           ) : (
                             <ImagePlus className="h-4 w-4 mr-1.5" />
                           )}
@@ -815,7 +813,7 @@ export default function BookResolvePage() {
               </p>
               <Button
                 onClick={handleGenerateStory}
-                className="w-full bg-coral hover:bg-[#E55A4C] text-white rounded-full font-playful text-lg py-6"
+                className="w-full bg-coral hover:bg-coral-hover text-white rounded-full font-playful text-lg py-6"
               >
                 {t('generateStory')}
               </Button>
@@ -826,23 +824,26 @@ export default function BookResolvePage() {
 
       {/* ===== Phase 2: Generating Text ===== */}
       {phase === 'generating-text' && (
-        <Card>
+        <Card className="border-coral/15 bg-coral-soft/50">
           <CardContent className="pt-6">
             {isGeneratingText ? (
-              <div className="flex flex-col items-center gap-3 py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-coral" />
-                <p className="text-muted-foreground font-playful">
+              <div className="flex flex-col items-center gap-4 py-8">
+                <Storydust variant="pencil" size="card" />
+                <p className="text-[var(--ink-soft)] font-playful">
+                  {t('fixingPage')}
+                </p>
+                <p className="text-xs text-[var(--ink-soft)]/70">
                   {t('generatingTextCount', { count: replacedPageIds.length })}
                 </p>
               </div>
             ) : textGenTimedOut ? (
               <div className="flex flex-col items-center gap-3 py-8">
-                <p className="text-amber-600 font-playful">
+                <p className="text-coral-ink font-playful">
                   {t('textGenerationTimeout')}
                 </p>
                 <Button
                   onClick={handleRetryTextGen}
-                  className="bg-coral hover:bg-[#E55A4C] text-white rounded-full font-playful"
+                  className="bg-coral hover:bg-coral-hover text-white rounded-full font-playful"
                 >
                   {t('retry')}
                 </Button>
@@ -887,10 +888,10 @@ export default function BookResolvePage() {
             <Button
               onClick={handleIllustrate}
               disabled={!allConfirmed || isSubmitting}
-              className="w-full bg-coral hover:bg-[#E55A4C] text-white rounded-full font-playful text-lg py-6 disabled:opacity-50"
+              className="w-full bg-coral hover:bg-coral-hover text-white rounded-full font-playful text-lg py-6 disabled:opacity-50"
             >
               {isSubmitting && (
-                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                <Storydust variant="twinkle" size="inline" className="mr-2 text-white" />
               )}
               {t('illustrateBook')}
             </Button>
@@ -917,7 +918,7 @@ export default function BookResolvePage() {
               className="bg-red-600 hover:bg-red-700"
             >
               {isDeleting && (
-                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                <Storydust variant="twinkle" size="inline" className="mr-1.5 text-white" />
               )}
               {t('removeConfirm')}
             </AlertDialogAction>

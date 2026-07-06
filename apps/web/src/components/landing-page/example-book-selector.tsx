@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { ExampleBook, getCoverUrl, getAllImageUrls } from './example-books-data';
 
@@ -18,11 +19,17 @@ const fanConfigs = [
   { rotate: 8, translateX: -24, zIndex: 1 },
 ];
 
+// Gentle ±3° tilts for the flat mobile row.
+const mobileTilts = ['-rotate-3', 'rotate-0', 'rotate-3'];
+
 const ExampleBookSelector: React.FC<ExampleBookSelectorProps> = ({
   books,
   onSelectBook,
   className,
 }) => {
+  const t = useTranslations('landing');
+  const prefersReduced = useReducedMotion();
+
   // Preload cover images immediately, then all page images after a short delay
   useEffect(() => {
     books.forEach((book) => {
@@ -43,15 +50,65 @@ const ExampleBookSelector: React.FC<ExampleBookSelectorProps> = ({
     return () => clearTimeout(timer);
   }, [books]);
 
+  // Style + page count read from the data at build — never hardcoded.
+  const chip = (book: ExampleBook) => (
+    <span className="inline-flex max-w-full items-center justify-center whitespace-normal rounded-full border-2 border-coral/30 bg-white px-2.5 py-0.5 text-center font-playful text-[11px] leading-snug text-ink shadow-sm md:text-xs">
+      {t('chipLabel', {
+        style: t(`styleNames.${book.styleKey}`),
+        count: book.bookPages.length,
+      })}
+    </span>
+  );
+
+  const tapToRead = (
+    <motion.p
+      className="relative z-10 mt-3 text-center font-playful text-lg font-bold text-coral md:text-xl"
+      animate={prefersReduced ? undefined : { y: [0, 3, 0] }}
+      transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+      style={{ transform: 'rotate(-2deg)' }}
+    >
+      {t('tapToRead')}
+    </motion.p>
+  );
+
   return (
     <div className={cn('flex flex-col items-center', className)}>
-      {/* Book stack with accent lines and "Peek inside!" below */}
-      <div className="relative overflow-visible">
+      {/* Mobile (<md): flat row of three fully tappable covers, no overlap */}
+      <div className="w-full md:hidden">
+        <div className="flex items-start justify-center gap-3 px-2">
+          {books.map((book, index) => (
+            <button
+              key={book.id}
+              onClick={() => onSelectBook(book)}
+              aria-label={t('readBookAria', { title: book.title })}
+              className={cn(
+                'flex w-[30vw] max-w-[140px] cursor-pointer flex-col items-center gap-2 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--coral-primary)] focus-visible:ring-offset-2',
+                mobileTilts[index] || 'rotate-0'
+              )}
+            >
+              <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-[var(--cream-yellow)] shadow-lg">
+                <Image
+                  src={getCoverUrl(book)}
+                  alt={book.coverAlt}
+                  fill
+                  sizes="30vw"
+                  className="object-cover"
+                />
+              </div>
+              {chip(book)}
+            </button>
+          ))}
+        </div>
+        {tapToRead}
+      </div>
+
+      {/* md+: overlapping fan with accent rays */}
+      <div className="relative hidden overflow-visible md:block">
         {/* Accent lines radiating from book stack */}
         <motion.div
           className="absolute z-0 pointer-events-none overflow-visible"
           style={{ inset: -40 }}
-          initial={{ opacity: 0, scale: 0.85 }}
+          initial={prefersReduced ? false : { opacity: 0, scale: 0.85 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.3 }}
         >
@@ -85,86 +142,66 @@ const ExampleBookSelector: React.FC<ExampleBookSelectorProps> = ({
           <span className="absolute block rounded-full" style={{ width: 3, height: 26, bottom: 8, right: '10%', transform: 'rotate(-48deg)', background: 'var(--coral-primary)', opacity: 0.5 }} />
         </motion.div>
 
-        <div className="relative z-10 flex items-end justify-center">
-        {books.map((book, index) => {
-          const config = fanConfigs[index] || fanConfigs[1];
+        <div className="relative z-10 flex items-start justify-center">
+          {books.map((book, index) => {
+            const config = fanConfigs[index] || fanConfigs[1];
 
-          return (
-            <motion.button
-              key={book.id}
-              onClick={() => onSelectBook(book)}
-              className="relative cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--coral-primary)] focus-visible:ring-offset-2 rounded-xl"
-              style={{ zIndex: config.zIndex }}
-              initial={{
-                rotate: config.rotate,
-                x: config.translateX,
-                opacity: 0,
-                y: 20,
-              }}
-              animate={{
-                rotate: config.rotate,
-                x: config.translateX,
-                opacity: 1,
-                y: 0,
-              }}
-              whileHover={{
-                scale: 1.1,
-                y: -14,
-                rotate: 0,
-                zIndex: 10,
-                transition: { type: 'spring', stiffness: 300, damping: 20 },
-              }}
-              whileTap={{ scale: 0.97 }}
-              transition={{
-                type: 'spring',
-                stiffness: 200,
-                damping: 20,
-                delay: index * 0.08,
-              }}
-              aria-label={`Read ${book.title}`}
-            >
-              {/* Desktop cover */}
-              <div
-                className="hidden md:block relative rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 bg-[var(--cream-yellow)] border-2 border-transparent hover:border-[var(--coral-primary)]/30"
-                style={{ width: 180, height: 180 }}
+            return (
+              <motion.button
+                key={book.id}
+                onClick={() => onSelectBook(book)}
+                className="relative flex cursor-pointer flex-col items-center gap-2 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--coral-primary)] focus-visible:ring-offset-2"
+                style={{ zIndex: config.zIndex }}
+                initial={
+                  prefersReduced
+                    ? false
+                    : { rotate: config.rotate, x: config.translateX, opacity: 0, y: 20 }
+                }
+                animate={{
+                  rotate: config.rotate,
+                  x: config.translateX,
+                  opacity: 1,
+                  y: 0,
+                }}
+                whileHover={
+                  prefersReduced
+                    ? undefined
+                    : {
+                        scale: 1.1,
+                        y: -14,
+                        rotate: 0,
+                        zIndex: 10,
+                        transition: { type: 'spring', stiffness: 300, damping: 20 },
+                      }
+                }
+                whileTap={{ scale: 0.97 }}
+                transition={{
+                  type: 'spring',
+                  stiffness: 200,
+                  damping: 20,
+                  delay: prefersReduced ? 0 : index * 0.08,
+                }}
+                aria-label={t('readBookAria', { title: book.title })}
               >
-                <Image
-                  src={getCoverUrl(book)}
-                  alt={book.coverAlt}
-                  fill
-                  sizes="180px"
-                  className="object-cover"
-                />
-              </div>
-
-              {/* Mobile cover — larger to fill screen */}
-              <div
-                className="md:hidden relative rounded-lg overflow-hidden shadow-lg bg-[var(--cream-yellow)]"
-                style={{ width: 140, height: 140 }}
-              >
-                <Image
-                  src={getCoverUrl(book)}
-                  alt={book.coverAlt}
-                  fill
-                  sizes="140px"
-                  className="object-cover"
-                />
-              </div>
-
-            </motion.button>
-          );
-        })}
+                <div
+                  className="relative rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 bg-[var(--cream-yellow)] border-2 border-transparent hover:border-[var(--coral-primary)]/30"
+                  style={{ width: 180, height: 180 }}
+                >
+                  <Image
+                    src={getCoverUrl(book)}
+                    alt={book.coverAlt}
+                    fill
+                    sizes="180px"
+                    className="object-cover"
+                  />
+                </div>
+                {chip(book)}
+              </motion.button>
+            );
+          })}
         </div>
 
-        {/* "Peek inside!" below the book stack */}
-        <motion.p
-          className="relative z-10 text-center font-playful font-bold text-coral text-lg md:text-xl mt-3"
-          animate={{ y: [0, 3, 0] }}
-          transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ transform: 'rotate(-2deg)' }}
-        >
-          Peek inside!
-        </motion.p>
+        {tapToRead}
       </div>
     </div>
   );

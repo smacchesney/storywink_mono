@@ -22,9 +22,7 @@ import {
 } from '@/lib/uploadPhotos';
 import { track } from '@/lib/track';
 import logger from '@/lib/logger';
-
-const KAI_MASCOT_URL =
-  'https://res.cloudinary.com/storywink/image/upload/v1772291379/Screenshot_2026-02-28_at_10.55.51_PM_iznwx3.png';
+import { MASCOT_CAT_PHOTOS } from '@/lib/mascots';
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif';
 
@@ -375,7 +373,7 @@ function AddTile({
         className="group col-span-3 flex flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-coral/40 bg-coral/[0.04] px-6 py-10 transition-colors hover:border-coral hover:bg-coral/[0.08] sm:col-span-4 md:col-span-5"
       >
         <Image
-          src={KAI_MASCOT_URL}
+          src={MASCOT_CAT_PHOTOS}
           alt=""
           width={160}
           height={160}
@@ -447,10 +445,10 @@ function PhotoTile({
         </button>
       )}
 
-      {/* Done: subtle checkmark badge */}
+      {/* Done: subtle checkmark badge — brand coral, never traffic-light green */}
       {tile.status === 'done' && (
-        <div className="absolute bottom-1.5 left-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-white/90 shadow-sm">
-          <Check className="h-3.5 w-3.5 text-[#20B832]" strokeWidth={3} />
+        <div className="absolute bottom-1.5 left-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-coral shadow-sm">
+          <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
         </div>
       )}
 

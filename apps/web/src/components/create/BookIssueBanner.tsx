@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { AlertTriangle, RefreshCw, Loader2, Wrench } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Wrench } from 'lucide-react';
+import { Storydust } from '@/components/ui/storydust';
 import { BookStatus } from '@prisma/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -68,8 +69,8 @@ export function BookIssueBanner({
 
   if (status === BookStatus.PARTIAL) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-center">
-        <AlertTriangle className="h-7 w-7 text-amber-500" />
+      <div className="flex flex-col items-center gap-3 rounded-2xl border border-peach/60 bg-warn-soft p-5 text-center">
+        <AlertTriangle className="h-7 w-7 text-coral-ink" />
         <p className="font-playful text-base text-gray-800">
           {t('pagesNeedAttention', { count: failedCount ?? 1 })}
         </p>
@@ -96,7 +97,7 @@ export function BookIssueBanner({
         className="rounded-full bg-coral px-6 font-playful text-white hover:bg-coral/90"
       >
         {isRetrying ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          <Storydust variant="twinkle" size="inline" className="mr-2 text-white" />
         ) : (
           <RefreshCw className="mr-2 h-4 w-4" />
         )}

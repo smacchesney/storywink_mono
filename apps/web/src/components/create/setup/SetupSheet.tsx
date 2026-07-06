@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { useTranslations } from 'next-intl';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
+import { Storydust } from '@/components/ui/storydust';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { StyleKey } from '@storywink/shared/prompts/styles';
 import type { StoryMood } from '@storywink/shared/constants';
@@ -180,8 +181,8 @@ export function SetupSheet({
           />
           {titlePending && !form.title && (
             <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center gap-2 text-gray-400">
-              <Sparkles className="h-3.5 w-3.5 animate-pulse text-coral" />
-              <span className="animate-pulse font-playful text-sm">
+              <Storydust variant="twinkle" size="inline" />
+              <span className="font-playful text-sm">
                 {t('titleThinking')}
               </span>
             </div>
@@ -291,7 +292,7 @@ export function SetupSheet({
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Storydust variant="twinkle" size="inline" className="text-white" />
               {t('saving')}
             </>
           ) : (

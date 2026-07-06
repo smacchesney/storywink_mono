@@ -26,10 +26,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://storywink.ai'),
   title: {
-    default: "Storywink - AI Storybooks from Your Photos",
+    default: "Storywink: Your Child, the Star of Their Own Storybook",
     template: "%s | Storywink"
   },
-  description: "Transform your photos into personalized, illustrated children's storybooks with AI. Your child becomes the hero of their own tale — the finished book is usually ready in 10-15 minutes.",
+  description: "Turn your photos into a personalized picture book starring your child. Free to make and read, usually ready in about 15 minutes, printable as a real keepsake.",
   keywords: ["AI storybooks", "personalized children's books", "photo to illustration", "custom storybooks", "AI children's stories"],
   authors: [{ name: "Storywink" }],
   creator: "Storywink",
@@ -50,8 +50,8 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: '/',
     siteName: 'Storywink',
-    title: 'Storywink - AI Storybooks from Your Photos',
-    description: 'Transform your photos into personalized, illustrated children\'s storybooks with AI.',
+    title: 'Storywink: Your Child, the Star of Their Own Storybook',
+    description: 'Turn your photos into a personalized picture book starring your child. Free to make and read, usually ready in about 15 minutes, printable as a real keepsake.',
     images: [{
       url: '/og-image.jpg',
       width: 1200,
@@ -61,8 +61,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Storywink - AI Storybooks from Your Photos',
-    description: 'Transform your photos into personalized, illustrated children\'s storybooks with AI.',
+    title: 'Storywink: Your Child, the Star of Their Own Storybook',
+    description: 'Turn your photos into a personalized picture book starring your child. Free to make and read, usually ready in about 15 minutes, printable as a real keepsake.',
     images: ['/og-image.jpg'],
     creator: '@storywink',
   },

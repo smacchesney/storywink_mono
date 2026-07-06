@@ -23,7 +23,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@clerk/nextjs';
 import { toast } from 'sonner';
-import { ImagePlus, Loader2, X } from 'lucide-react';
+import { ImagePlus, X } from 'lucide-react';
+import { Storydust, SPARK4 } from '@/components/ui/storydust';
 import { optimizeCloudinaryUrl, BOOK_CONSTRAINTS } from '@storywink/shared';
 import { makeFileKey, uploadPhotos, validateFile } from '@/lib/uploadPhotos';
 import logger from '@/lib/logger';
@@ -126,7 +127,18 @@ function SortableThumb({
           className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/75 disabled:opacity-60"
         >
           {removing ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
+            // A single winking spark — the full three-star twinkle can't fit
+            // inside this 20px disc.
+            <svg
+              viewBox="0 0 24 24"
+              width={12}
+              height={12}
+              fill="currentColor"
+              aria-hidden="true"
+              className="wink-twinkle-star"
+            >
+              <path d={SPARK4} />
+            </svg>
           ) : (
             <X className="h-3 w-3" strokeWidth={2.5} />
           )}
@@ -155,7 +167,7 @@ function AddTile({
       className="group flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-coral/40 bg-coral/[0.04] transition-colors hover:border-coral hover:bg-coral/[0.08] disabled:opacity-60"
     >
       {busy ? (
-        <Loader2 className="h-5 w-5 animate-spin text-coral" />
+        <Storydust variant="twinkle" size="inline" />
       ) : (
         <ImagePlus className="h-5 w-5 text-coral transition-transform group-hover:scale-110" />
       )}

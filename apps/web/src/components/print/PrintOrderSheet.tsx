@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
-import { Loader2 } from 'lucide-react';
+import { Storydust } from '@/components/ui/storydust';
 import { Button } from '@/components/ui/button';
 import useMediaQuery from '@/hooks/useMediaQuery';
 import logger from '@/lib/logger';
@@ -186,7 +186,7 @@ function PanelContent({
         >
           {isLoading ? (
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Storydust variant="twinkle" size="inline" className="mr-2 text-white" />
               {t('startingCheckout')}
             </>
           ) : (
@@ -226,7 +226,7 @@ export function PrintOrderSheet({ book, isOpen, onClose }: PrintOrderSheetProps)
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="bottom" className="h-[85vh] flex flex-col p-0">
+      <SheetContent side="bottom" className="z-[70] h-[85vh] flex flex-col p-0">
         <SheetHeader className="px-4 pt-4 pb-2">
           <SheetTitle>{t('title')}</SheetTitle>
           <SheetDescription>{t('subtitle')}</SheetDescription>

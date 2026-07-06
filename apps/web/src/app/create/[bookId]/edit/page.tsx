@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { Storydust } from '@/components/ui/storydust';
 import { BookStatus } from '@prisma/client';
 
 /**
@@ -51,8 +51,8 @@ export default function LegacyEditRedirect() {
   }, [bookId, router]);
 
   return (
-    <div className="flex min-h-[70vh] items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-coral" />
+    <div className="flex min-h-[70vh] items-center justify-center bg-waiting">
+      <Storydust variant="twinkle" size="card" />
     </div>
   );
 }

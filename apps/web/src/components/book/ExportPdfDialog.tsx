@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Download, Loader2, Share2 } from 'lucide-react';
+import { Download, Share2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+import { Storydust } from '@/components/ui/storydust';
 import { showError } from '@/lib/toast-utils';
 import { track } from '@/lib/track';
 import { pdfDownloadFileName } from '@/lib/pdf-download';
@@ -171,7 +171,8 @@ export function ExportPdfDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      {/* z-[70]: this dialog opens from the z-[60] reading overlay */}
+      <DialogContent className="z-[70] sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-playful">
             {phase === 'ready'
@@ -187,10 +188,12 @@ export function ExportPdfDialog({
 
         {phase !== 'ready' && (
           <div className="flex justify-center py-4" aria-live="polite">
+            {/* The pencil draws the wait: looping while the server renders,
+                then tracking real byte progress once the download streams. */}
             {progress !== null ? (
-              <Progress value={progress} className="w-full [&>[data-slot=progress-indicator]]:bg-coral" />
+              <Storydust variant="pencil" size="card" progress={progress / 100} />
             ) : (
-              <Loader2 className="h-8 w-8 animate-spin text-coral" />
+              <Storydust variant="pencil" size="card" />
             )}
           </div>
         )}
@@ -216,7 +219,7 @@ export function ExportPdfDialog({
             )}
             <Button
               onClick={handleSave}
-              className="bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
+              className="bg-coral hover:bg-coral-hover rounded-full font-playful"
             >
               <Download className="h-4 w-4 mr-1.5" />
               {t('save')}

@@ -24,6 +24,14 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { SortDesc } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ScallopEdge } from '@/components/ui/scallop-edge';
+import { STAR5 } from '@/components/ui/storydust';
+
+// One grid, everywhere: single column on portrait phones, two on landscape
+// phones and short windows (`short:`), three/four only where there's height
+// for footers (`tall:` gates md/lg so the variants never fight `sm:`).
+const LIBRARY_GRID_CLASSES =
+  'grid grid-cols-1 sm:grid-cols-2 short:grid-cols-2 tall:md:grid-cols-3 tall:lg:grid-cols-4 gap-4 sm:gap-6';
 
 // Polling interval for checking illustration status (5 seconds)
 const POLLING_INTERVAL = 5000;
@@ -225,9 +233,25 @@ export function LibraryClientView() {
           <Skeleton className="h-8 w-32" />
           <Skeleton className="h-10 w-40" />
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className={LIBRARY_GRID_CLASSES}>
+          {/* Cream book-shaped placeholders — same proportions as a loaded
+              card (square cover + title row), a cloud edge on top, one still
+              star waiting for the books to arrive. */}
           {[...Array(8)].map((_, i) => (
-            <Skeleton key={i} className="aspect-square w-full rounded-md" />
+            <div key={i} className="flex flex-col rounded-xl border bg-cream p-3 shadow-sm">
+              <Skeleton className="relative aspect-square w-full overflow-hidden rounded-md bg-cream-deep">
+                <ScallopEdge className="absolute inset-x-0 top-0 opacity-40" />
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden="true"
+                  className="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-coral opacity-15"
+                >
+                  <path d={STAR5} />
+                </svg>
+              </Skeleton>
+              <Skeleton className="mt-3 h-5 w-3/4 bg-cream-deep" />
+            </div>
           ))}
         </div>
       </div>
@@ -246,7 +270,7 @@ export function LibraryClientView() {
             height={60}
             className="h-12 w-12 md:h-15 md:w-15"
           />
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('yourLibrary')}</h1>
+          <h1 className="text-2xl font-bold font-playful text-ink">{t('yourLibrary')}</h1>
         </div>
         
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
@@ -351,7 +375,7 @@ function BookGrid({
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+    <div className={LIBRARY_GRID_CLASSES}>
       {books.map((book) => (
         <BookCard
           key={book.id}

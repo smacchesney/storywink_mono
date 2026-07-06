@@ -171,3 +171,43 @@ Append-only. One line per key: `namespace.key` — why it needs a native check.
 - `setup.howToTellIt` — story-framing section label (どんなふうに つたえましょう？); check つたえる vs かたる for "tell".
 - `setup.editSummary` — pencil-row aria/label for editing the AI summary (なおす); check it reads as "touch this up", not "repair an error".
 - `setup.addNote` — quiet button when no summary exists (そのひの メモを かく); check メモ register for a parent note about the day.
+- `landing.heroLead` / `heroTrail` — rebuilt hero sentence 「今夜の絵本の主役は、あなたの小さな◯◯です。」; the rotating word sits mid-sentence, check the 、 placement and that every rotating word (ヒーロー〜しょうぼうし) reads naturally before です。.
+- `landing.heroSubtitle` — three-beat subhead ending 「あの顔を見てください。」; check the fragment rhythm isn't too clipped and 「あの顔」 lands as warm, not vague.
+- `landing.createYourStorybook` — THE sitewide CTA, now 「わが子の絵本をつくる」; check わが子 register (intimate vs slightly formal) against the app's お子さま voice.
+- `landing.ctaMicrocopy` — 「作成も読むのも無料・通常15分ほどで完成・カード登録不要」; nakaguro-separated microline, check it scans in one glance on mobile.
+- `landing.morphCaption` / `morphCaptionFallback` — morph-card captions; fallback 「実際につくられた絵本です」 must read as proof, not disclaimer.
+- `landing.morphPageAlt` / `readBookAria` — alt/aria with 「{title}」; titles are English book names inside kagi brackets, check that mix.
+- `landing.proofPrefix` / `proofSuffix` — split heading 「まずは、」+「一冊読んでみて」 (suffix in coral); check the split point survives the color break.
+- `landing.proofSub` — 「実際の家族写真からつくられた3冊です。…」; counter 3冊 + invitation register.
+- `landing.tapToRead` — replaces "Peek inside!"; 「タップして読んでみて」 friendliness check.
+- `landing.chipLabel` / `styleNames.*` — chips like 「かわいい・16ページ」; check nakaguro + counter, and style names かわいい／おりがみ／ペンとえんぴつ as art-style labels (おりがみ for "Paper Origami", ペンとえんぴつ coinage).
+- `landing.likenessLine` — the "will it look like my kid" reassurance; check 「本当にうちの子に似るの？」 colloquial opener against the surrounding polite register.
+- `landing.step1Title`〜`step4Caption` — four rebuilt how-it-works steps; step2 「その子だけの一冊に」/「…エピソードを添えて」 future-proof phrasing; step4 caption deliberately omits print (JP can't order yet) — must stay in sync with print availability.
+- `landing.hiwReassurance` — 「作成中はアプリを閉じても大丈夫。できあがったらすぐ読めます。」; check 大丈夫 softness.
+- `landing.keepsakeTitle` / `keepsakeSub` — 「ひとつの物語、3つの残しかた」/「…気に入ったら、かたちに残せます。」; sub avoids promising print orders in JP — check かたちに残せます isn't read as a print promise.
+- `landing.keepsakeCard1Label`〜`keepsakeCard3Body` — ladder cards 今夜／今週／準備ができたら; card2 mentions grandparents (おじいちゃんおばあちゃん) — register check; card3Body is the SG/MY-shippable variant (not shown in ja today).
+- `landing.keepsakeCard3SoonBody` — the variant ja users actually see: 「…お住まいの地域でもまもなくご注文いただけるようになります。」; must promise nothing concrete — check まもなく isn't over-committal.
+- `landing.keepsakeRibbon` — featured-card ribbon 「記念の一冊」; three-word badge, check it works rotated on a small pill.
+- `landing.keepsakeShipping` — honesty line 「印刷の配送は現在シンガポール・マレーシアのみ。…」; legal-adjacent, keep blunt.
+- `landing.safetyLine` — 「お写真は絵本づくりだけに使います。販売や共有は一切しません。」; check 一切しません firmness reads trustworthy, not defensive.
+- `landing.faqPrefix` / `faqSuffix` — split FAQ heading 「よくある」+「ご質問…」; suffix carries the coral + ellipsis.
+- `landing.faq1A` — rewritten pipeline answer (photos → name/style → episodes → story → illustrations); check エピソードも添えられます matches the setup screen's framing vocabulary.
+- `landing.faq3A` — new timing answer 「作りはじめてから15分ほどで完成します。…進みぐあいはいつでも見られて…」; check 進みぐあい (vs 進捗) register.
+- `landing.faq6Q` / `faq6A` — new print/keep entry; states SG/MY-only shipping plainly; PDF described as きれいなPDF (not 印刷品質) on purpose.
+- `landing.finalTitle` — closing band 「今夜の主役は、あなたのお子さまかもしれません。」; check かもしれません lands as an invitation, not uncertainty.
+- `landing.readAgain` — overlay restart 「もういちど読む」; hiragana もういちど matches the reader's kid-register.
+- `landing.overlayStyle` — label 「スタイル：」 before a localized style name; full-width colon check.
+- `landing.closePreview` / `prevPage` / `nextPage` — overlay aria labels; plain descriptive register.
+- `landing.howItWorksAlt` — four-step alt text; comma-separated step list naturalness.
+
+## Storydust motif adoption (2026-07-07)
+
+- `review.writingWait` — full-screen write-wait line 「{name}のおはなしを、いっページずつ書いています…」; {name} is the child's given name with no honorific — check whether ちゃん/くん-less address reads warm here, and the いっページずつ counter (vs 1ページずつ).
+- `review.writingWaitNoName` — same line before the book loads (おはなしを、いっページずつ書いています…); must read complete without a subject.
+- `resolve.fixingPage` — resolve-flow working panel 「そのページを なおしています…」; check なおす reads as "tidying up", never "repairing your mistake".
+- `orders.settingUp` — post-checkout fallback 「ご注文を じゅんびしています…」; keigo register check against the surrounding orders copy (ご注文内容を確認しています…).
+- `notifications.justAMoment` — bell dropdown working line 「しょうしょう おまちください…」; hiragana しょうしょう chosen for the kid-register — check it doesn't read as baby-talk in a utility dropdown.
+- `errorPages.errorTitle` — route error headline 「あら！このページが えほんから すべりおちてしまいました。」; storybook metaphor check — must stay reassuring when real work was interrupted.
+- `errorPages.errorRetry` — 「もういちど ためす」; matches the reader-overlay's もういちど register.
+- `errorPages.notFoundTitle` — 404 headline 「そのページは みつかりませんでした。」; plain and calm on purpose.
+- `errorPages.goHome` — 「ホームへ もどる」; check ホーム vs トップ for the landing page.

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
+import { Storydust } from '@/components/ui/storydust';
 
 interface Notification {
   id: string;
@@ -187,10 +188,10 @@ export function NotificationBell() {
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="relative flex items-center justify-center w-11 h-11 rounded-full hover:bg-[#B8E4DC]/30 dark:hover:bg-slate-800 transition-colors"
+        className="relative flex items-center justify-center w-11 h-11 rounded-full hover:bg-mint/30 transition-colors"
         aria-label={unreadCount > 0 ? t('bellUnread', { count: unreadCount }) : t('title')}
       >
-        <Bell className="h-5 w-5 text-slate-600 dark:text-slate-300" />
+        <Bell className="h-5 w-5 text-ink-soft" />
         {/* Badge */}
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[11px] font-bold text-white bg-coral rounded-sm">
@@ -203,19 +204,22 @@ export function NotificationBell() {
       {isOpen && (
         <div
           ref={dropdownRef}
-          className="absolute right-0 top-full mt-2 w-[280px] sm:w-[320px] max-w-[90vw] bg-white dark:bg-slate-900 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden z-50"
+          className="absolute right-0 top-full mt-2 w-[280px] sm:w-[320px] max-w-[90vw] bg-white rounded-lg shadow-lg border border-coral/15 overflow-hidden z-50"
         >
           {/* Header */}
-          <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-            <h3 className="font-semibold text-slate-900 dark:text-white">{t('title')}</h3>
+          <div className="px-4 py-3 border-b border-coral/15">
+            <h3 className="font-playful font-semibold text-ink">{t('title')}</h3>
           </div>
 
           {/* Content */}
           <div className="max-h-[300px] overflow-y-auto">
             {isLoading ? (
-              <div className="px-4 py-8 text-center text-slate-500">{t('loading')}</div>
+              <div className="flex flex-col items-center gap-2 px-4 py-8 text-center text-ink-soft">
+                <Storydust variant="twinkle" size="inline" />
+                <p className="font-playful text-sm">{t('justAMoment')}</p>
+              </div>
             ) : notifications.length === 0 ? (
-              <div className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+              <div className="px-4 py-8 text-center text-ink-soft">
                 <Bell className="h-8 w-8 mx-auto mb-2 opacity-40" />
                 <p>{t('empty')}</p>
               </div>
@@ -225,10 +229,10 @@ export function NotificationBell() {
                   <li key={notification.id}>
                     <button
                       onClick={() => handleNotificationClick(notification)}
-                      className="w-full px-4 py-3 flex items-start gap-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left"
+                      className="w-full px-4 py-3 flex items-start gap-3 hover:bg-coral-soft/40 transition-colors text-left"
                     >
                       {/* Book thumbnail */}
-                      <div className="flex-shrink-0 w-10 h-10 rounded bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                      <div className="flex-shrink-0 w-10 h-10 rounded bg-cream-deep overflow-hidden">
                         {notification.coverImageUrl ? (
                           <Image
                             src={notification.coverImageUrl}
@@ -238,7 +242,7 @@ export function NotificationBell() {
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-400">
+                          <div className="w-full h-full flex items-center justify-center text-ink-soft/50">
                             <span className="text-lg">📖</span>
                           </div>
                         )}
@@ -246,10 +250,10 @@ export function NotificationBell() {
 
                       {/* Text content */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                        <p className="text-sm font-medium text-ink truncate">
                           {notificationTitle(notification)}
                         </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        <p className="text-xs text-ink-soft mt-0.5">
                           {formatRelativeTime(notification.createdAt)}
                         </p>
                       </div>

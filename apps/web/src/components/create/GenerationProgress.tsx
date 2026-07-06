@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { BookStatus } from '@prisma/client';
 import { TextShimmerWave } from '@/components/ui/text-shimmer-wave';
+import { Storydust, CLOUD, CLOUD_VIEWBOX } from '@/components/ui/storydust';
+import { MASCOT_CAT_FLOATING } from '@/lib/mascots';
 import { useBookStatus } from '@/hooks/useBookStatus';
 import { resolveProgressHeadline } from '@/components/create/progress-headline';
 import BookIssueBanner from '@/components/create/BookIssueBanner';
@@ -22,59 +24,11 @@ interface GenerationProgressProps {
   onComplete?: (status: BookStatus) => void;
 }
 
-const MASCOT_SRC =
-  'https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.57.58_PM_mijhwv.png';
-
 // Gentle stall timeout — not an error, just "check back later". Measured
 // from the last observed progress change, never from mount: the story stage
 // writes in one batch and can legitimately sit quiet through QC + a regen,
 // so an absolute timer would fire inside a healthy run.
 const TIMEOUT_MS = 8 * 60 * 1000;
-
-const Sparkle = ({
-  size,
-  top,
-  left,
-  delay,
-  duration,
-}: {
-  size: number;
-  top: string;
-  left: string;
-  delay: number;
-  duration: number;
-}) => (
-  <div
-    className="absolute pointer-events-none"
-    style={{
-      top,
-      left,
-      width: size,
-      height: size,
-      opacity: 0.12,
-      animation: `sparkle-drift ${duration}s ease-in-out ${delay}s infinite`,
-    }}
-  >
-    <svg viewBox="0 0 24 24" fill="var(--coral-primary)" className="w-full h-full">
-      <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7L12 17l-6.3 4 2.3-7-6-4.6h7.6L12 2z" />
-    </svg>
-  </div>
-);
-
-const ProgressDots = () => (
-  <div className="flex gap-1.5 mt-4">
-    {[0, 1, 2].map((i) => (
-      <div
-        key={i}
-        className="w-1.5 h-1.5 rounded-full bg-coral"
-        style={{
-          opacity: 0.4,
-          animation: `pulse-dot 1.4s ease-in-out ${i * 0.2}s infinite`,
-        }}
-      />
-    ))}
-  </div>
-);
 
 /**
  * The full-screen "we're making your book" state that follows the setup tap.
@@ -189,89 +143,37 @@ export function GenerationProgress({ bookId, reviewFirst, onComplete }: Generati
   const illustrationFraction = rawFraction != null ? maxFractionRef.current : null;
 
   return (
-    <div
-      className="fixed inset-0 flex flex-col items-center justify-center z-50 overflow-hidden px-6"
-      style={{
-        background:
-          'radial-gradient(ellipse at 50% 30%, #FFF9F5 0%, #FFFBF5 50%, #FFF5F0 100%)',
-      }}
-    >
-      <style jsx>{`
-        @keyframes sparkle-drift {
-          0%,
-          100% {
-            transform: translateY(0) rotate(0deg);
-            opacity: 0.08;
-          }
-          50% {
-            transform: translateY(-12px) rotate(15deg);
-            opacity: 0.15;
-          }
-        }
-        @keyframes float {
-          0%,
-          100% {
-            transform: translateY(0);
-          }
-          50% {
-            transform: translateY(-6px);
-          }
-        }
-        @keyframes pulse-dot {
-          0%,
-          100% {
-            opacity: 0.3;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.8;
-            transform: scale(1.2);
-          }
-        }
-        @keyframes bar-fill {
-          from {
-            width: 0%;
-          }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          @keyframes sparkle-drift {
-            0%,
-            100% {
-              transform: none;
-              opacity: 0.1;
-            }
-          }
-          @keyframes float {
-            0%,
-            100% {
-              transform: none;
-            }
-          }
-          @keyframes pulse-dot {
-            0%,
-            100% {
-              opacity: 0.5;
-              transform: none;
-            }
-          }
-        }
-      `}</style>
-
-      <Sparkle size={16} top="12%" left="8%" delay={0} duration={25} />
-      <Sparkle size={12} top="18%" left="85%" delay={3} duration={28} />
-      <Sparkle size={14} top="72%" left="12%" delay={6} duration={22} />
-      <Sparkle size={10} top="65%" left="88%" delay={9} duration={30} />
-      <Sparkle size={13} top="85%" left="25%" delay={4} duration={26} />
+    <div className="fixed inset-0 flex flex-col items-center justify-center z-50 overflow-hidden px-6 bg-waiting">
+      {/* Scenery: two clouds in the top corners + drifting star dust. */}
+      <svg
+        viewBox={CLOUD_VIEWBOX}
+        fill="currentColor"
+        aria-hidden="true"
+        className="cloud-drift-slow pointer-events-none absolute -top-4 -left-10 w-48 text-white/50 md:w-64"
+        style={{ willChange: 'transform' }}
+      >
+        <path d={CLOUD} />
+      </svg>
+      <svg
+        viewBox={CLOUD_VIEWBOX}
+        fill="currentColor"
+        aria-hidden="true"
+        className="cloud-drift-slower pointer-events-none absolute -top-2 -right-12 w-40 text-white/50 md:w-56"
+        style={{ willChange: 'transform' }}
+      >
+        <path d={CLOUD} />
+      </svg>
+      <Storydust variant="dust" />
 
       <div
-        className="mb-10"
+        className="wink-float mb-10"
         style={{
-          animation: 'float 3s ease-in-out infinite',
+          willChange: 'transform',
           filter: 'drop-shadow(0 8px 16px rgba(247, 108, 94, 0.15))',
         }}
       >
         <Image
-          src={MASCOT_SRC}
+          src={MASCOT_CAT_FLOATING}
           alt={t('mascotAlt')}
           width={200}
           height={200}
@@ -313,16 +215,13 @@ export function GenerationProgress({ bookId, reviewFirst, onComplete }: Generati
             </TextShimmerWave>
           </div>
 
-          {illustrationFraction != null ? (
-            <div className="w-48 h-1.5 rounded-full bg-coral/15 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-coral transition-[width] duration-700 ease-out"
-                style={{ width: `${Math.round(illustrationFraction * 100)}%` }}
-              />
-            </div>
-          ) : (
-            <ProgressDots />
-          )}
+          {/* The pencil draws the wait: looping while the story is written,
+              then tracking real page progress once illustration starts. */}
+          <Storydust
+            variant="pencil"
+            size="hero"
+            progress={illustrationFraction ?? undefined}
+          />
 
           <p className="text-xs text-gray-500 font-playful mt-8 text-center max-w-xs">
             {t('usuallyReady')}

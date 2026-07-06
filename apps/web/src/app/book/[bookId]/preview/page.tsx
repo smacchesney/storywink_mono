@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { Book, Page, BookStatus } from '@prisma/client'; // Assuming prisma client types are available
-import { Loader2, AlertTriangle, ChevronLeft, ChevronRight, Library, Download, Printer, ArrowLeft, Maximize2, Minimize2, Eye, EyeOff } from 'lucide-react'; // Added fullscreen icons
+import { AlertTriangle, ChevronLeft, ChevronRight, Library, Download, Printer, ArrowLeft, Maximize2, Minimize2, Eye, EyeOff } from 'lucide-react'; // Added fullscreen icons
 import { Button } from "@/components/ui/button";
+import { Storydust } from '@/components/ui/storydust';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import BookPageGallery from '@/components/book/BookPageGallery'; // Import the new component
 import FlipbookViewer, { FlipbookActions, buildDisplayPages, type BookLayout } from '@/components/book/FlipbookViewer'; // Import FlipbookViewer, FlipbookActions type, and buildDisplayPages
@@ -19,9 +21,16 @@ import WhatNowCard from '@/components/book/WhatNowCard';
 import { PrintOrderSheet, PrintOrderBook } from '@/components/print/PrintOrderSheet';
 import { calculatePrintedPageCount } from '@storywink/shared';
 import { bookContentFingerprint } from '@/lib/book-display';
+import {
+  TAP_TRAVEL_PX,
+  edgeTapZone,
+  galleryDefaultVisible,
+  isOnEngineCorner,
+  isPhonePortraitViewport,
+  isVerticalScrollGesture,
+} from '@/components/book/reader-gestures';
 import { isPrintShippableLocale } from '@/lib/print-availability';
 import { track } from '@/lib/track';
-import { cn } from '@/lib/utils';
 
 // Define a type for the book data we expect, including pages
 type BookWithPages = Book & { pages: Page[] };
@@ -83,12 +92,22 @@ function BookPreviewContent() {
   const [showReveal, setShowReveal] = useState(false);
   const [isWhatNowDismissed, setIsWhatNowDismissed] = useState(false);
   const [isPrintSheetOpen, setIsPrintSheetOpen] = useState(false);
-  // Add state for fullscreen mode
+  // Native fullscreen only — the fixed overlay already IS the immersive
+  // mode, so this button appears solely where the Fullscreen API exists
+  // (desktop/Android). iPhone Safari simply never sees it.
   const [isFullscreen, setIsFullscreen] = useState(false);
-  // Add state for gallery visibility
+  const [canFullscreen, setCanFullscreen] = useState(false);
+  // Gallery visibility: collapsed by default on phone portrait, visible on
+  // wider viewports. The default only recomputes until the reader's first
+  // manual toggle — an explicit choice wins over rotation.
   const [isGalleryVisible, setIsGalleryVisible] = useState(true);
-  // Add state for detecting landscape mode
-  const [isLandscape, setIsLandscape] = useState(false);
+  const galleryToggledRef = useRef(false);
+  // Phone portrait is the layout where the gallery opens as an overlay over
+  // the book instead of reflowing it.
+  const [isPhonePortrait, setIsPhonePortrait] = useState(false);
+  // The flipbook area — tap semantics and the touch guards hang off it.
+  const flipAreaRef = useRef<HTMLDivElement>(null);
+  const tapStartRef = useRef<{ x: number; y: number } | null>(null);
   // The flipbook auto-detects its layout (combined portrait pages on phones,
   // print-faithful spreads elsewhere) and reports it here so the gallery and
   // footer count stay in lockstep. The initial guess only covers the moment
@@ -181,6 +200,10 @@ function BookPreviewContent() {
        const pageIndex = Math.max(0, Math.min(displayIndex - 1, totalDisplayPages - 1));
        flipbookRef.current.pageFlip().turnToPage(pageIndex);
     }
+    // The phone-portrait gallery is an overlay; picking a page dismisses it.
+    if (isPhonePortrait) {
+      setIsGalleryVisible(false);
+    }
   };
 
   // Handler for when the page changes within the Flipbook component (receives 1-based display index)
@@ -213,54 +236,69 @@ function BookPreviewContent() {
     setIsExportDialogOpen(true);
   };
 
-  // Detect orientation changes and landscape mode
+  // Track viewport shape: phone-portrait drives the gallery overlay mode,
+  // and the gallery's default visibility follows rotation until the reader
+  // toggles it by hand.
   useEffect(() => {
-    const checkOrientation = () => {
-      const aspectRatio = window.innerWidth / window.innerHeight;
-      const isLandscapeMode = window.innerWidth > window.innerHeight && window.innerHeight < 500;
-      setIsLandscape(isLandscapeMode);
-      
-      // Auto-hide gallery in extreme landscape
-      if (isLandscapeMode && aspectRatio > 2) {
-        setIsGalleryVisible(false);
+    const checkViewport = () => {
+      setIsPhonePortrait(isPhonePortraitViewport(window.innerWidth, window.innerHeight));
+      if (!galleryToggledRef.current) {
+        setIsGalleryVisible(galleryDefaultVisible(window.innerWidth, window.innerHeight));
       }
     };
 
-    checkOrientation();
-    window.addEventListener('resize', checkOrientation);
-    window.addEventListener('orientationchange', checkOrientation);
+    checkViewport();
+    window.addEventListener('resize', checkViewport);
+    window.addEventListener('orientationchange', checkViewport);
 
     return () => {
-      window.removeEventListener('resize', checkOrientation);
-      window.removeEventListener('orientationchange', checkOrientation);
+      window.removeEventListener('resize', checkViewport);
+      window.removeEventListener('orientationchange', checkViewport);
     };
   }, []);
 
-  // Fullscreen toggle handler
-  const toggleFullscreen = useCallback(() => {
+  const isReadable = isReadableStatus(book?.status);
+
+  // Body scroll lock while the reading overlay is up: nothing behind it can
+  // rubber-band into view, and vertical pans that page-flip lets through
+  // become no-ops instead of scrolling the page underneath.
+  useEffect(() => {
+    if (!isReadable) return;
     const docEl = document.documentElement;
-    // iPhone Safari has no Fullscreen API — fall back to a CSS-only
-    // immersive mode; all the chrome already keys off this state.
-    if (typeof docEl.requestFullscreen !== 'function') {
-      setIsFullscreen((prev) => !prev);
-      return;
-    }
+    const prevOverflow = docEl.style.overflow;
+    const prevOverscroll = docEl.style.overscrollBehavior;
+    docEl.style.overflow = 'hidden';
+    docEl.style.overscrollBehavior = 'none';
+    return () => {
+      docEl.style.overflow = prevOverflow;
+      docEl.style.overscrollBehavior = prevOverscroll;
+    };
+  }, [isReadable]);
+
+  // Native fullscreen only where the API exists (desktop/Android). The
+  // fullscreen target is the document, not the overlay element, so portaled
+  // sheets and dialogs (which live on <body>) stay visible in fullscreen.
+  useEffect(() => {
+    setCanFullscreen(
+      typeof document !== 'undefined' &&
+        document.fullscreenEnabled === true &&
+        typeof document.documentElement.requestFullscreen === 'function'
+    );
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
-      docEl.requestFullscreen().then(() => {
-        setIsFullscreen(true);
-      }).catch((err) => {
-        console.error("Error entering fullscreen:", err);
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error('Error entering fullscreen:', err);
       });
     } else {
-      document.exitFullscreen().then(() => {
-        setIsFullscreen(false);
-      }).catch((err) => {
-        console.error("Error exiting fullscreen:", err);
+      document.exitFullscreen().catch((err) => {
+        console.error('Error exiting fullscreen:', err);
       });
     }
   }, []);
 
-  // Listen for fullscreen changes
+  // Listen for fullscreen changes (covers Esc and system exits)
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -272,10 +310,10 @@ function BookPreviewContent() {
     };
   }, []);
 
-  // Keyboard navigation for the readable book: arrows/space flip, Escape
-  // leaves fullscreen (including the CSS fallback, which has no system exit).
+  // Keyboard navigation for the readable book: arrows/space flip. Native
+  // fullscreen handles its own Escape.
   useEffect(() => {
-    if (!isReadableStatus(book?.status)) return;
+    if (!isReadable) return;
     const handleKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName;
@@ -286,19 +324,93 @@ function BookPreviewContent() {
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
         flipbookRef.current?.pageFlip()?.flipPrev();
-      } else if (e.key === 'Escape') {
-        // Native fullscreen exits itself and fires fullscreenchange; only
-        // the CSS fallback needs a hand here.
-        if (document.fullscreenElement) {
-          document.exitFullscreen().catch(() => {});
-        } else if (isFullscreen) {
-          setIsFullscreen(false);
-        }
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [book?.status, isFullscreen]);
+  }, [isReadable]);
+
+  // Vertical-scroll guard (capture phase, before page-flip's window-level
+  // touchend): a drag that was clearly a scroll attempt clears the engine's
+  // touch state via the public userStop(pos, true) so its corner exception
+  // can't turn the page on release. See reader-gestures.ts for the trace.
+  useEffect(() => {
+    if (!isReadable) return;
+    const el = flipAreaRef.current;
+    if (!el) return;
+    let start: { x: number; y: number } | null = null;
+    const onTouchStart = (e: TouchEvent) => {
+      const t = e.changedTouches[0];
+      start = t ? { x: t.clientX, y: t.clientY } : null;
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      const t = e.changedTouches[0];
+      if (!start || !t) return;
+      const dx = t.clientX - start.x;
+      const dy = t.clientY - start.y;
+      start = null;
+      if (isVerticalScrollGesture(dx, dy)) {
+        try {
+          flipbookRef.current?.pageFlip()?.userStop({ x: 0, y: 0 }, true);
+        } catch {
+          // The engine may not be live mid-remount; nothing to suppress then.
+        }
+      }
+    };
+    el.addEventListener('touchstart', onTouchStart, { capture: true, passive: true });
+    el.addEventListener('touchend', onTouchEnd, { capture: true, passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart, { capture: true });
+      el.removeEventListener('touchend', onTouchEnd, { capture: true });
+    };
+  }, [isReadable]);
+
+  // Our own tap semantics (the engine's tap-to-flip is off): a still tap on
+  // the left/right third turns the page, the middle third belongs to
+  // reading. Buttons, links, and the engine's own corner squares are left
+  // alone — corners still fold-and-flip via page-flip itself.
+  const handleTapPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    tapStartRef.current = { x: e.clientX, y: e.clientY };
+  }, []);
+
+  const handleTapClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const start = tapStartRef.current;
+    tapStartRef.current = null;
+    if (!start) return;
+    if (Math.hypot(e.clientX - start.x, e.clientY - start.y) >= TAP_TRAVEL_PX) return;
+    if ((e.target as Element).closest('button, a')) return;
+    const container = flipAreaRef.current;
+    if (!container) return;
+    // Stay out of page-flip's corner squares — it flips those itself.
+    const block = container.querySelector('.stf__block');
+    if (block) {
+      const rect = block.getBoundingClientRect();
+      const pageWidth = layout === 'portrait' ? rect.width : rect.width / 2;
+      if (
+        isOnEngineCorner(
+          e.clientX - rect.left,
+          e.clientY - rect.top,
+          rect.width,
+          rect.height,
+          pageWidth
+        )
+      ) {
+        return;
+      }
+    }
+    const areaRect = container.getBoundingClientRect();
+    const zone = edgeTapZone((e.clientX - areaRect.left) / areaRect.width);
+    if (zone === 'prev') {
+      flipbookRef.current?.pageFlip()?.flipPrev();
+    } else if (zone === 'next') {
+      flipbookRef.current?.pageFlip()?.flipNext();
+    }
+  }, [layout]);
+
+  const handleGalleryToggle = useCallback(() => {
+    galleryToggledRef.current = true;
+    setIsGalleryVisible((prev) => !prev);
+  }, []);
 
   // --- Render Logic --- //
 
@@ -308,21 +420,14 @@ function BookPreviewContent() {
     // "Making your book…" and the reveal.
     if (cameFromCompletion) {
       return (
-        <div
-          className="flex justify-center items-center min-h-screen"
-          style={{
-            background:
-              'radial-gradient(ellipse at 50% 30%, #FFF9F5 0%, #FFFBF5 50%, #FFF5F0 100%)',
-          }}
-        >
-          <Loader2 className="h-8 w-8 animate-spin text-coral" />
+        <div className="flex justify-center items-center min-h-screen bg-waiting">
+          <Storydust variant="twinkle" size="card" label={t('opening')} />
         </div>
       );
     }
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-coral" />
-        <p className="ml-2 text-muted-foreground">{t('opening')}</p>
+      <div className="flex justify-center items-center min-h-screen bg-waiting">
+        <Storydust variant="twinkle" size="card" label={t('opening')} showLabel />
       </div>
     );
   }
@@ -423,36 +528,34 @@ function BookPreviewContent() {
         : null;
     const menuPage = currentSourcePage && !currentSourcePage.isTitlePage ? currentSourcePage : null;
 
-    return (
-      <div className="flex flex-col h-[100dvh] bg-background">
-        {/* Mobile-optimized header - hide in fullscreen */}
-        {!isFullscreen && (
-          <div className={cn(
-            "flex items-center justify-between border-b bg-white transition-all",
-            isLandscape ? "p-2" : "p-3"
-          )}>
-            <Button variant="ghost" size="icon" asChild>
-              <Link href="/library" aria-label={t('backToLibrary')}>
-                <ArrowLeft className="h-5 w-5 text-coral" />
-              </Link>
+    // The reader escapes the site chrome entirely: a fixed, portaled overlay
+    // above the sticky header (which sits in <main>'s z-10 stacking context,
+    // so the portal to <body> is what actually clears it). 100vh first as
+    // the iOS <15.4 fallback; dvh takes over wherever it exists.
+    const reader = (
+      <div className="fixed inset-x-0 top-0 z-[60] flex flex-col bg-background h-[100vh] supports-[height:100dvh]:h-[100dvh] pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+        {/* Slim reader header — static, calm, always there */}
+        <div className="flex h-12 shrink-0 items-center justify-between border-b bg-white px-1">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/library" aria-label={t('backToLibrary')}>
+              <ArrowLeft className="h-5 w-5 text-coral" />
+            </Link>
+          </Button>
+          <h1 className="font-playful text-base font-semibold truncate max-w-[60%]">{book.title}</h1>
+          <div className="flex items-center gap-1">
+            {/* Gallery toggle — always rendered; on phones it opens the
+                overlay strip, elsewhere it collapses the in-flow one */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleGalleryToggle}
+              aria-label={isGalleryVisible ? t('hideGallery') : t('showGallery')}
+            >
+              {isGalleryVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </Button>
-            <h1 className={cn(
-              "font-semibold truncate max-w-[60%]",
-              isLandscape ? "text-base" : "text-lg"
-            )}>{book.title}</h1>
-            <div className="flex items-center gap-1">
-              {/* Gallery toggle button for landscape mode */}
-              {isLandscape && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsGalleryVisible(!isGalleryVisible)}
-                  aria-label={isGalleryVisible ? t('hideGallery') : t('showGallery')}
-                >
-                  {isGalleryVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              )}
-              {/* Fullscreen toggle */}
+            {/* Native fullscreen only — the overlay is already immersive, so
+                iPhone Safari (no Fullscreen API) simply has no button */}
+            {canFullscreen && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -461,6 +564,7 @@ function BookPreviewContent() {
               >
                 {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
               </Button>
+            )}
               <Sheet open={isOptionsSheetOpen} onOpenChange={setIsOptionsSheetOpen}>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon" aria-label={t('options')}>
@@ -469,9 +573,10 @@ function BookPreviewContent() {
                     </svg>
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="bottom" className="rounded-t-xl h-auto">
+                {/* z-[70]: portaled surfaces must clear the z-[60] reader */}
+                <SheetContent side="bottom" className="z-[70] rounded-t-xl h-auto">
                   <SheetTitle className="sr-only">{t('options')}</SheetTitle>
-                  <div className="py-4 space-y-4">
+                  <div className="pt-4 space-y-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                     <Link href="/library" className="flex items-center gap-2 p-2 hover:bg-muted rounded-md w-full">
                       <Library className="h-5 w-5 text-coral" />
                       <span>{t('backToLibrary')}</span>
@@ -502,14 +607,13 @@ function BookPreviewContent() {
                   </div>
                 </SheetContent>
               </Sheet>
-            </div>
           </div>
-        )}
-        
+        </div>
+
         {/* PARTIAL: slim, warm strip — the rest of the book is readable now */}
-        {isPartial && !isFullscreen && (
-          <div className="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-3 py-2">
-            <p className="text-sm text-amber-900 font-playful">
+        {isPartial && (
+          <div className="flex items-center justify-between gap-3 border-b border-peach bg-[var(--cream-yellow)] px-3 py-2">
+            <p className="text-sm text-coral-ink font-playful">
               {t('partialNote', { count: pagesNeedingLook })}
             </p>
             <Button
@@ -522,12 +626,9 @@ function BookPreviewContent() {
           </div>
         )}
 
-        {/* Gallery View - Collapsible in landscape, hidden in fullscreen */}
-        {!isFullscreen && isGalleryVisible && (
-          <div className={cn(
-            "bg-muted/20 border-b shrink-0 transition-all",
-            isLandscape ? "px-1 py-1" : "px-2 pt-2 pb-1"
-          )}>
+        {/* Gallery strip, in-flow — tablets and desktop, where there's room */}
+        {!isPhonePortrait && isGalleryVisible && (
+          <div className="bg-muted/20 border-b shrink-0 px-2 pt-2 pb-1">
             <BookPageGallery
               pages={book.pages}
               bookStatus={book.status}
@@ -541,8 +642,14 @@ function BookPreviewContent() {
           </div>
         )}
 
-        {/* Flipbook View - Takes remaining space */}
-        <div className="flex-1 relative overflow-hidden min-h-0">
+        {/* Flipbook View - Takes remaining space. The container owns tap
+            semantics: edge thirds turn pages, the middle third does nothing. */}
+        <div
+          ref={flipAreaRef}
+          className="flex-1 relative overflow-hidden min-h-0"
+          onPointerDown={handleTapPointerDown}
+          onClick={handleTapClick}
+        >
           <FlipbookViewer
             ref={flipbookRef}
             pages={book.pages}
@@ -560,20 +667,6 @@ function BookPreviewContent() {
           <div aria-live="polite" className="sr-only">
             {t('pageOf', { current: currentDisplayIndex, total: totalDisplayPages })}
           </div>
-
-          {/* Exit button for immersive mode — the only way out on iPhone,
-              where the CSS fallback has no system gesture or Esc key */}
-          {isFullscreen && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleFullscreen}
-              aria-label={t('exitFullscreen')}
-              className="absolute top-3 right-3 z-10 h-10 w-10 rounded-full bg-background/70 shadow"
-            >
-              <Minimize2 className="h-5 w-5 text-coral" />
-            </Button>
-          )}
 
           {/* Floating Navigation Buttons */}
           <div className="absolute inset-y-0 left-0 flex items-center">
@@ -617,30 +710,57 @@ function BookPreviewContent() {
               onDismiss={() => setIsWhatNowDismissed(true)}
             />
           )}
-        </div>
 
-        {/* Footer with Page Number + per-page menu - Hide in fullscreen */}
-        {!isFullscreen && (
-          <div className={cn(
-            "flex justify-center items-center gap-2 bg-white border-t shrink-0 transition-all relative",
-            isLandscape ? "py-1" : "py-2"
-          )}>
-            <div className="flex items-center bg-muted/20 rounded-full px-4 py-1">
-              <span className="text-sm font-medium">
-                {t('pageOf', { current: currentDisplayIndex, total: totalDisplayPages })}
-              </span>
-            </div>
-            {menuPage && (
-              <div className="absolute right-3">
-                <PageControlsMenu
-                  bookId={bookId}
-                  page={menuPage}
-                  onMutated={loadBook}
+          {/* Phone-portrait gallery: an overlay over the book, never a
+              reflow. A transparent scrim closes it on tap and swallows the
+              event so the book underneath doesn't flip. */}
+          {isPhonePortrait && isGalleryVisible && (
+            <>
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 z-10"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsGalleryVisible(false);
+                }}
+              />
+              <div
+                className="absolute bottom-0 inset-x-0 z-20 border-t bg-background/95 backdrop-blur animate-in fade-in-0 motion-safe:slide-in-from-bottom-4 duration-200"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <BookPageGallery
+                  pages={book.pages}
+                  bookStatus={book.status}
+                  currentDisplayIndex={currentDisplayIndex}
+                  onDisplayPageSelect={handleDisplayPageSelect}
+                  childName={book.childName}
+                  bookTitle={book.title}
+                  language={book.language}
+                  layout={layout}
                 />
               </div>
-            )}
+            </>
+          )}
+        </div>
+
+        {/* Footer with Page Number + per-page menu — padded past the home
+            indicator so the pill stays tappable in every bar state */}
+        <div className="flex justify-center items-center gap-2 bg-white border-t shrink-0 relative pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          <div className="flex items-center bg-muted/20 rounded-full px-4 py-1">
+            <span className="text-sm font-medium">
+              {t('pageOf', { current: currentDisplayIndex, total: totalDisplayPages })}
+            </span>
           </div>
-        )}
+          {menuPage && (
+            <div className="absolute right-3">
+              <PageControlsMenu
+                bookId={bookId}
+                page={menuPage}
+                onMutated={loadBook}
+              />
+            </div>
+          )}
+        </div>
 
         {/* PDF export: fetches, shows the wait, auto-saves when ready */}
         <ExportPdfDialog
@@ -670,6 +790,12 @@ function BookPreviewContent() {
         )}
       </div>
     );
+
+    // Portal to <body>: the overlay must escape <main>'s z-10 stacking
+    // context or the sticky site header (z-50) paints over the reader.
+    // This branch only renders client-side (after the fetch), so document
+    // is always available here.
+    return createPortal(reader, document.body);
   }
 
   // Fallback for any other status (DRAFT, mostly): a gentle nudge back into
@@ -694,8 +820,8 @@ export default function BookPreviewPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex justify-center items-center min-h-screen">
-          <Loader2 className="h-8 w-8 animate-spin text-coral" />
+        <div className="flex justify-center items-center min-h-screen bg-waiting">
+          <Storydust variant="twinkle" size="card" />
         </div>
       }
     >

@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
 import { BookStatus, Page, Book } from '@prisma/client';
+import { Storydust } from '@/components/ui/storydust';
+import { MASCOT_CAT_FLOATING } from '@/lib/mascots';
 
 // Import the new components
 import PageTracker from '@/components/create/review/PageTracker';
@@ -30,6 +32,33 @@ type FullBookData = Book & { pages: Page[] }; // Type for the full fetched book
 
 const POLLING_INTERVAL = 5000; // Check every 5 seconds
 
+/**
+ * The full-screen "the story is being written" wait — warm wash, the floating
+ * cat, a winking twinkle, and one shimmering line instead of a gray spinner.
+ */
+function WriteWait({ line }: { line: string }) {
+  return (
+    <div className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-6 bg-waiting px-6">
+      <Image
+        src={MASCOT_CAT_FLOATING}
+        alt=""
+        width={160}
+        height={160}
+        className="h-24 w-24 object-contain md:h-28 md:w-28"
+        priority
+      />
+      <Storydust variant="twinkle" size="card" />
+      <p
+        className="text-working-shimmer max-w-xs text-center font-playful text-lg"
+        role="status"
+        aria-live="polite"
+      >
+        {line}
+      </p>
+    </div>
+  );
+}
+
 // Define the inner component containing the main logic
 function ReviewPageContent() {
   const router = useRouter();
@@ -41,6 +70,7 @@ function ReviewPageContent() {
 
   // State hooks
   const [pages, setPages] = useState<PageData[]>([]); // Holds ALL pages (cover at index 0)
+  const [childName, setChildName] = useState<string | null>(null);
   const [isFetchingInitialData, setIsFetchingInitialData] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0); // Index in the FULL pages array
   const [confirmed, setConfirmed] = useState<boolean[]>([]);
@@ -110,6 +140,8 @@ function ReviewPageContent() {
           router.replace(`/book/${bookIdToFetch}/preview`);
           return;
         }
+
+        setChildName(fetchedBook.childName || null);
 
         const sortedPages = [...fetchedBook.pages].sort((a, b) => a.index - b.index);
 
@@ -443,11 +475,25 @@ function ReviewPageContent() {
 
   // Handle loading/redirect state before rendering main UI
   if (isFetchingInitialData) {
-      return <div className="p-6 flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin mr-2" /> {t('loadingReviewData')}</div>;
+      return <WriteWait line={t('writingWaitNoName')} />;
   }
 
   if (pages.length === 0 && !isFetchingInitialData) {
       return <div className="p-6 text-red-600">{t('errorLoadingPages')}</div>;
+  }
+
+  // The story is still being written — hold the branded wait instead of a
+  // grid of empty cards. Polling flips isLoadingText once the words land.
+  if (isLoadingText) {
+      return (
+        <WriteWait
+          line={
+            childName
+              ? t('writingWait', { name: childName })
+              : t('writingWaitNoName')
+          }
+        />
+      );
   }
 
   const currentPageData = pages[currentIndex];
@@ -504,7 +550,7 @@ function ReviewPageContent() {
 export default function ReviewPage() {
   const t = useTranslations('review');
   return (
-    <Suspense fallback={<div className="p-6 flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin mr-2" /> {t('loadingReviewData')}</div>}>
+    <Suspense fallback={<WriteWait line={t('writingWaitNoName')} />}>
       <ReviewPageContent />
     </Suspense>
   );

@@ -2,8 +2,10 @@
 
 import React, { useRef, useEffect, useMemo } from 'react';
 import { Page, BookStatus } from '@prisma/client';
-import { Loader2, AlertTriangle, Type, Heart, BookOpen, Star } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { AlertTriangle, Type, Heart, BookOpen, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Storydust } from '@/components/ui/storydust';
 import BookArtImage from './BookArtImage';
 import { buildDisplayPages, type BookLayout, type DisplayPage } from './display-pages';
 
@@ -29,6 +31,7 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
   language,
   layout = 'spread',
 }) => {
+  const t = useTranslations('preview');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const activeThumbRef = useRef<HTMLButtonElement>(null);
 
@@ -176,8 +179,8 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
                     )}
                   />
                 ) : isPending ? (
-                   <div className="w-full h-full bg-muted flex items-center justify-center" title="Illustration pending">
-                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                   <div className="w-full h-full bg-coral-soft/50 flex items-center justify-center">
+                     <Storydust variant="twinkle" size="inline" label={t('pageCooking')} />
                    </div>
                 ) : isFailed ? (
                    <div className="w-full h-full bg-destructive/10 flex items-center justify-center" title="Illustration failed">

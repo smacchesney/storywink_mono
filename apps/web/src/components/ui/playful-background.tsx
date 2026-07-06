@@ -2,6 +2,7 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
+import { CLOUD, CLOUD_VIEWBOX, STAR5 } from "@/components/ui/storydust";
 
 interface PlayfulBackgroundProps {
   /** `landing` gets corner clouds + margin doodles; `auth` is a calmer wash. */
@@ -19,18 +20,18 @@ function Cloud({
 }) {
   return (
     <svg
-      viewBox="0 0 120 60"
+      viewBox={CLOUD_VIEWBOX}
       className={className}
       style={style}
       fill="currentColor"
       aria-hidden="true"
     >
-      <path d="M30 52c-11 0-20-9-20-20 0-10 7-18 17-20 3-8 11-12 19-12 9 0 17 6 20 14 2-1 4-1 6-1 9 0 16 7 16 16 0 1 0 3-1 4 6 2 10 7 10 13 0 4-3 6-7 6H30z" />
+      <path d={CLOUD} />
     </svg>
   );
 }
 
-/** A single hand-drawn star doodle. */
+/** A single hand-drawn star doodle (the app's one canonical star). */
 function Star({
   className,
   style,
@@ -40,7 +41,7 @@ function Star({
 }) {
   return (
     <svg viewBox="0 0 24 24" className={className} style={style} fill="currentColor" aria-hidden="true">
-      <path d="M12 2l2.6 6.3L21 9l-4.8 4.4L17.5 20 12 16.6 6.5 20l1.3-6.6L3 9l6.4-.7L12 2z" />
+      <path d={STAR5} />
     </svg>
   );
 }

@@ -5,7 +5,10 @@ import { ScallopEdge } from "@/components/ui/scallop-edge";
 export function SiteFooter() {
   const t = useTranslations("footer");
   return (
-    <footer className="relative mt-20">
+    // z-10 keeps the footer above PlayfulBackground's fixed viewport wash,
+    // which lives inside <main>'s z-10 stacking context and would otherwise
+    // paint over a z-auto footer.
+    <footer className="relative z-10 mt-20">
       {/* Scalloped cloud edge mirrored above the footer, book-ending the page */}
       <ScallopEdge flip fill="#FBE7D6" className="relative z-10 block" />
       <div className="-mt-px bg-[#FBE7D6]">

@@ -1,5 +1,20 @@
+import { createElement } from 'react';
 import { toast } from 'sonner';
 import logger from '@/lib/logger';
+import { Storydust } from '@/components/ui/storydust';
+
+/**
+ * The working toast — a winking twinkle beside the message. Use for
+ * fire-and-forget jobs (re-illustration, background saves) so the parent sees
+ * the brand "we're on it" mark until the surface itself takes over. Sticks
+ * around a little longer than a normal toast for exactly that handoff.
+ */
+export const showWorking = (message: string) => {
+  toast(message, {
+    icon: createElement(Storydust, { variant: 'twinkle', size: 'inline' }),
+    duration: 8000,
+  });
+};
 
 /**
  * Get appropriate duration for a toast message based on word count

@@ -1,4 +1,5 @@
 import { Check } from 'lucide-react';
+import { SPARK4 } from '@/components/ui/storydust-geometry';
 
 export type OrderTimelineStep = 1 | 2 | 3;
 
@@ -56,7 +57,18 @@ export function OrderTimeline({ currentStep, labels }: OrderTimelineProps) {
               {done ? (
                 <Check className="w-4 h-4" strokeWidth={3} />
               ) : inProgress ? (
-                <span className="w-2.5 h-2.5 rounded-full bg-coral animate-pulse" />
+                // The printing step is live work — it gets the brand twinkle,
+                // not a generic pulsing dot. Reduced motion stills it globally.
+                <svg
+                  viewBox="0 0 24 24"
+                  width={14}
+                  height={14}
+                  fill="var(--coral-primary)"
+                  aria-hidden="true"
+                  className="wink-twinkle-star"
+                >
+                  <path d={SPARK4} />
+                </svg>
               ) : null}
             </span>
             <span
