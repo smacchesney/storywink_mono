@@ -1,0 +1,27 @@
+# Dependencies — each stage installs its own
+node_modules
+**/node_modules
+
+# Build outputs — built inside the image
+**/dist
+**/.next
+.turbo
+**/.turbo
+
+# Secrets — never bake env files into images
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Local tooling and artifacts
+.git
+.github
+.claude
+.screenshots
+.playwright-mcp
+**/*.test.ts
+coverage
+*.log
+.DS_Store
+**/.DS_Store

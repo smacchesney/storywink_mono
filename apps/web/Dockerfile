@@ -12,10 +12,10 @@ COPY turbo.json ./
 
 # Copy workspace package files
 COPY apps/web/package.json ./apps/web/
-COPY apps/api/package.json ./apps/api/
 COPY apps/workers/package.json ./apps/workers/
 COPY packages/database/package.json ./packages/database/
 COPY packages/shared/package.json ./packages/shared/
+COPY packages/pdf/package.json ./packages/pdf/
 
 # Copy Prisma schema BEFORE npm ci (postinstall hook needs it)
 COPY packages/database/prisma ./packages/database/prisma
