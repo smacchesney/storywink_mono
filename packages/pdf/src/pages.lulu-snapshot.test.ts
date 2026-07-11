@@ -13,7 +13,7 @@ import { DEDICATION_MASCOT_URL, ENDING_MASCOT_URL } from './constants.js';
  * Fixture URLs are deliberately Cloudinary-shaped: optimizeForPrint only
  * rewrites URLs containing `/image/upload/`, so an example.com fixture would
  * bypass it and the frozen HTML would never contain the
- * `/upload/f_auto,q_auto:best/` transform this snapshot exists to guard.
+ * `/upload/f_jpg,q_auto:best/` transform this snapshot exists to guard.
  */
 function makeLuluBook(n: number): BookWithPages {
   const pages: Page[] = [];
@@ -68,7 +68,7 @@ describe('Lulu interior HTML — frozen rendering inputs (default path)', () => 
     const html = luluInteriorHtml(10);
     for (let i = 1; i <= 10; i++) {
       expect(html).toContain(
-        `https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto:best/v1/page-${i}.png`
+        `https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:best/v1/page-${i}.png`
       );
     }
     // Raw mascot URLs are NOT substrings of their transformed forms, so

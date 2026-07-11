@@ -77,7 +77,7 @@ describe('generateCoverHtml', () => {
     expect(html).toContain('Storywin');
     expect(html).toContain('k.ai');
     // Print optimization applied to Cloudinary URLs.
-    expect(html).toContain('/upload/f_auto,q_auto:best/');
+    expect(html).toContain('/upload/f_jpg,q_auto:best/');
     expect(html).toContain('alt="Front Cover"');
   });
 

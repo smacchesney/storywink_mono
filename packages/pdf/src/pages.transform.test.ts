@@ -48,10 +48,10 @@ function makeBook(n: number): BookWithPages {
 }
 
 describe('generateIllustrationPageHtml — imageUrlTransform', () => {
-  it('default applies optimizeForPrint (f_auto,q_auto:best)', () => {
+  it('default applies optimizeForPrint (f_jpg,q_auto:best)', () => {
     const html = generateIllustrationPageHtml(makePage(1));
     expect(html).toContain(
-      'https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto:best/v1/page-1.png'
+      'https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:best/v1/page-1.png'
     );
   });
 
@@ -60,7 +60,7 @@ describe('generateIllustrationPageHtml — imageUrlTransform', () => {
     expect(html).toContain(
       'https://res.cloudinary.com/storywink/image/upload/v1/page-1.png#t'
     );
-    expect(html).not.toContain('f_auto');
+    expect(html).not.toContain('f_jpg');
   });
 });
 
@@ -107,7 +107,7 @@ describe('assembleInteriorPages — imageUrlTransform threading', () => {
     expect(html).toContain(`${ENDING_MASCOT_URL}#t`);
     expect(html).toContain(`${BACK_COVER_MASCOT_URL}#t`);
     // Nothing slipped through on the default transform.
-    expect(html).not.toContain('f_auto');
+    expect(html).not.toContain('f_jpg');
   });
 
   it('omitted transform produces HTML strict-equal to the pre-option call', () => {

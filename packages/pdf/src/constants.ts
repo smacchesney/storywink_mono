@@ -35,12 +35,14 @@ export const BACK_COVER_MASCOT_URL =
 
 /**
  * Optimizes a Cloudinary image URL for print quality.
- * Uses q_auto:best for higher quality compression suitable for print.
+ * f_jpg (not f_auto): Chromium embeds JPEG bytes into the PDF verbatim, but
+ * losslessly re-encodes WebP/AVIF into huge flate streams. q_auto:best keeps
+ * print-grade quality.
  */
 export function optimizeForPrint(url: string | null | undefined): string {
   if (!url) return '';
   if (!url.includes('/image/upload/')) return url;
-  return url.replace('/upload/', '/upload/f_auto,q_auto:best/');
+  return url.replace('/upload/', '/upload/f_jpg,q_auto:best/');
 }
 
 /** Returns the CSS font-family for story text based on language. */

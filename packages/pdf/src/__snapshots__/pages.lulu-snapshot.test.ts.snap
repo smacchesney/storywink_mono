@@ -69,7 +69,7 @@ exports[`Lulu interior HTML — frozen rendering inputs (default path) > N=3: as
     page-break-after: always;
     background-color: white;
   ">
-      <img src="https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto:best/v1/page-1.png" alt="Page 1 Illustration" style="
+      <img src="https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:best/v1/page-1.png" alt="Page 1 Illustration" style="
     display: block;
     width: 100%;
     height: 100%;
@@ -111,7 +111,7 @@ exports[`Lulu interior HTML — frozen rendering inputs (default path) > N=3: as
     page-break-after: always;
     background-color: white;
   ">
-      <img src="https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto:best/v1/page-2.png" alt="Page 2 Illustration" style="
+      <img src="https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:best/v1/page-2.png" alt="Page 2 Illustration" style="
     display: block;
     width: 100%;
     height: 100%;
@@ -153,7 +153,7 @@ exports[`Lulu interior HTML — frozen rendering inputs (default path) > N=3: as
     page-break-after: always;
     background-color: white;
   ">
-      <img src="https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto:best/v1/page-3.png" alt="Page 3 Illustration" style="
+      <img src="https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:best/v1/page-3.png" alt="Page 3 Illustration" style="
     display: block;
     width: 100%;
     height: 100%;
@@ -283,7 +283,7 @@ exports[`Lulu interior HTML — frozen rendering inputs (default path) > N=10: a
     page-break-after: always;
     background-color: white;
   ">
-      <img src="https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto:best/v1/page-1.png" alt="Page 1 Illustration" style="
+      <img src="https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:best/v1/page-1.png" alt="Page 1 Illustration" style="
     display: block;
     width: 100%;
     height: 100%;
@@ -325,7 +325,7 @@ exports[`Lulu interior HTML — frozen rendering inputs (default path) > N=10: a
     page-break-after: always;
     background-color: white;
   ">
-      <img src="https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto:best/v1/page-2.png" alt="Page 2 Illustration" style="
+      <img src="https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:best/v1/page-2.png" alt="Page 2 Illustration" style="
     display: block;
     width: 100%;
     height: 100%;
@@ -367,7 +367,7 @@ exports[`Lulu interior HTML — frozen rendering inputs (default path) > N=10: a
     page-break-after: always;
     background-color: white;
   ">
-      <img src="https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto:best/v1/page-3.png" alt="Page 3 Illustration" style="
+      <img src="https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:best/v1/page-3.png" alt="Page 3 Illustration" style="
     display: block;
     width: 100%;
     height: 100%;
@@ -409,7 +409,7 @@ exports[`Lulu interior HTML — frozen rendering inputs (default path) > N=10: a
     page-break-after: always;
     background-color: white;
   ">
-      <img src="https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto:best/v1/page-4.png" alt="Page 4 Illustration" style="
+      <img src="https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:best/v1/page-4.png" alt="Page 4 Illustration" style="
     display: block;
     width: 100%;
     height: 100%;
@@ -451,7 +451,7 @@ exports[`Lulu interior HTML — frozen rendering inputs (default path) > N=10: a
     page-break-after: always;
     background-color: white;
   ">
-      <img src="https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto:best/v1/page-5.png" alt="Page 5 Illustration" style="
+      <img src="https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:best/v1/page-5.png" alt="Page 5 Illustration" style="
     display: block;
     width: 100%;
     height: 100%;
@@ -493,7 +493,7 @@ exports[`Lulu interior HTML — frozen rendering inputs (default path) > N=10: a
     page-break-after: always;
     background-color: white;
   ">
-      <img src="https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto:best/v1/page-6.png" alt="Page 6 Illustration" style="
+      <img src="https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:best/v1/page-6.png" alt="Page 6 Illustration" style="
     display: block;
     width: 100%;
     height: 100%;
@@ -535,7 +535,7 @@ exports[`Lulu interior HTML — frozen rendering inputs (default path) > N=10: a
     page-break-after: always;
     background-color: white;
   ">
-      <img src="https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto:best/v1/page-7.png" alt="Page 7 Illustration" style="
+      <img src="https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:best/v1/page-7.png" alt="Page 7 Illustration" style="
     display: block;
     width: 100%;
     height: 100%;
@@ -577,7 +577,7 @@ exports[`Lulu interior HTML — frozen rendering inputs (default path) > N=10: a
     page-break-after: always;
     background-color: white;
   ">
-      <img src="https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto:best/v1/page-8.png" alt="Page 8 Illustration" style="
+      <img src="https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:best/v1/page-8.png" alt="Page 8 Illustration" style="
     display: block;
     width: 100%;
     height: 100%;
@@ -619,7 +619,7 @@ exports[`Lulu interior HTML — frozen rendering inputs (default path) > N=10: a
     page-break-after: always;
     background-color: white;
   ">
-      <img src="https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto:best/v1/page-9.png" alt="Page 9 Illustration" style="
+      <img src="https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:best/v1/page-9.png" alt="Page 9 Illustration" style="
     display: block;
     width: 100%;
     height: 100%;
@@ -661,7 +661,7 @@ exports[`Lulu interior HTML — frozen rendering inputs (default path) > N=10: a
     page-break-after: always;
     background-color: white;
   ">
-      <img src="https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto:best/v1/page-10.png" alt="Page 10 Illustration" style="
+      <img src="https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:best/v1/page-10.png" alt="Page 10 Illustration" style="
     display: block;
     width: 100%;
     height: 100%;
