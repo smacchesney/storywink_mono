@@ -1,0 +1,125 @@
+'use client';
+
+import React from 'react';
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { Plus } from 'lucide-react';
+import AvatarCard, { type AvatarSummary } from '@/components/characters/AvatarCard';
+import AvatarStudioDialog from '@/components/characters/AvatarStudioDialog';
+import { MASCOT_CATS_WAVING } from '@/lib/mascots';
+import Image from 'next/image';
+
+const POLL_MS = 4000;
+
+/**
+ * My Characters: the account's cast on one shelf. Cards twinkle while their
+ * rendition draws; the shelf polls while anything is pending. Empty state
+ * invites making a book (promotion seeds the shelf) as well as the studio.
+ */
+export default function CharactersPage() {
+  if (process.env.NEXT_PUBLIC_AVATARS_ENABLED !== 'true') notFound();
+  return <CharactersShelf />;
+}
+
+function CharactersShelf() {
+  const t = useTranslations('characters');
+  const [avatars, setAvatars] = React.useState<AvatarSummary[] | null>(null);
+  const [studioOpen, setStudioOpen] = React.useState(false);
+
+  const load = React.useCallback(async () => {
+    const res = await fetch('/api/avatars');
+    if (res.ok) {
+      const data = (await res.json()) as { avatars: AvatarSummary[] };
+      setAvatars(data.avatars);
+      return data.avatars;
+    }
+    return null;
+  }, []);
+
+  React.useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Poll while any rendition is drawing.
+  React.useEffect(() => {
+    if (!avatars?.some((a) => a.renditions.some((r) => r.status === 'PENDING'))) return;
+    const id = setInterval(() => void load(), POLL_MS);
+    return () => clearInterval(id);
+  }, [avatars, load]);
+
+  const rename = async (avatar: AvatarSummary) => {
+    const name = window.prompt(t('renamePrompt'), avatar.displayName)?.trim();
+    if (!name || name === avatar.displayName) return;
+    await fetch(`/api/avatar/${avatar.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ displayName: name.slice(0, 50) }),
+    });
+    void load();
+  };
+
+  const drawAgain = async (avatar: AvatarSummary) => {
+    const artStyle = avatar.renditions[0]?.artStyle ?? 'vignette';
+    await fetch(`/api/avatar/${avatar.id}/rendition`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ artStyle }),
+    });
+    void load();
+  };
+
+  const remove = async (avatar: AvatarSummary) => {
+    if (!window.confirm(t('deleteConfirm', { name: avatar.displayName }))) return;
+    await fetch(`/api/avatar/${avatar.id}`, { method: 'DELETE' });
+    void load();
+  };
+
+  return (
+    <div className="mx-auto w-full max-w-3xl px-4 pb-16 pt-6">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h1 className="font-playful text-2xl text-[#1a1a1a]">{t('title')}</h1>
+          <Link
+            href="/library"
+            className="rounded-full border border-black/10 px-3 py-1 font-playful text-sm text-gray-500 hover:border-coral/50 hover:text-gray-700"
+          >
+            {t('booksTab')}
+          </Link>
+        </div>
+        <button
+          type="button"
+          onClick={() => setStudioOpen(true)}
+          className="flex min-h-[44px] items-center gap-1.5 rounded-full bg-coral px-4 font-playful text-white hover:bg-coral/90"
+        >
+          <Plus className="h-4 w-4" />
+          {t('addSomeone')}
+        </button>
+      </div>
+
+      {avatars && avatars.length === 0 && (
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-black/15 bg-white/60 px-6 py-12 text-center">
+          <Image src={MASCOT_CATS_WAVING} alt="" width={120} height={120} className="h-auto w-24" />
+          <p className="font-playful text-lg text-[#1a1a1a]">{t('emptyTitle')}</p>
+          <p className="max-w-xs font-playful text-sm text-gray-500">{t('emptyBody')}</p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+        {avatars?.map((avatar) => (
+          <AvatarCard
+            key={avatar.id}
+            avatar={avatar}
+            onRename={rename}
+            onDrawAgain={drawAgain}
+            onDelete={remove}
+          />
+        ))}
+      </div>
+
+      {studioOpen && (
+        <AvatarStudioDialog onClose={() => setStudioOpen(false)} onCreated={() => void load()} />
+      )}
+    </div>
+  );
+}

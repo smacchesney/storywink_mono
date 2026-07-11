@@ -253,7 +253,8 @@
     "emptyCta": "Make your first book",
     "unableToLoad": "Unable to load your library",
     "unableToDelete": "Unable to delete book",
-    "printOrderInFlight": "A printed copy of this book is still being made. Once your order ships, you can delete the book and we will remove your photos."
+    "printOrderInFlight": "A printed copy of this book is still being made. Once your order ships, you can delete the book and we will remove your photos.",
+    "charactersTab": "Characters"
   },
   "bookCard": {
     "creatingIllustrations": "Creating illustrations…",
@@ -440,5 +441,42 @@
     "errorRetry": "Try that again",
     "notFoundTitle": "We couldn't find that page.",
     "goHome": "Take me home"
+  },
+  "characters": {
+    "title": "My characters",
+    "booksTab": "Books",
+    "addSomeone": "Add someone",
+    "emptyTitle": "No characters yet",
+    "emptyBody": "Make a book, and we'll offer to keep its star. Or add someone from photos right here.",
+    "portraitAlt": "{name}, drawn as a storybook character",
+    "drawing": "Drawing {name}…",
+    "drawAgain": "Draw again",
+    "rename": "Rename",
+    "delete": "Delete",
+    "deleteConfirm": "Remove {name} from your characters? Their drawings go too.",
+    "renamePrompt": "What should we call them?",
+    "cardMenu": "Options for {name}",
+    "studioTitle": "Who are we adding?",
+    "kindChild": "A child",
+    "kindAdult": "A grown-up",
+    "kindPet": "A pet",
+    "kindToy": "Toys & things",
+    "photosHint": "Pick 1-5 clear photos of them. We only use these to draw the character, then let the photos go.",
+    "photosPicked": "{count} photo(s) ready",
+    "namePlaceholder": "Their name",
+    "back": "Back",
+    "next": "Next",
+    "create": "Draw {name}",
+    "meeting": "Meeting {name}…",
+    "createError": "That didn't work. Give it another go.",
+    "close": "Close",
+    "keepTitle": "Keep {name} as a character?",
+    "keepBody": "They can star in more stories, looking just like this.",
+    "keepYes": "Keep {name}",
+    "keepNotNow": "Not now",
+    "keepSaving": "Keeping…",
+    "keptTitle": "{name} joined your characters.",
+    "keptSee": "See them",
+    "keptClose": "Close"
   }
 }

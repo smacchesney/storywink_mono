@@ -17,6 +17,7 @@ import GenerationProgress from '@/components/create/GenerationProgress';
 import PageControlsMenu from '@/components/book/PageControlsMenu';
 import { ExportPdfDialog } from '@/components/book/ExportPdfDialog';
 import RevealOverlay from '@/components/book/RevealOverlay';
+import KeepCharacterCard from '@/components/book/KeepCharacterCard';
 import WhatNowCard from '@/components/book/WhatNowCard';
 import { PrintOrderSheet, PrintOrderBook } from '@/components/print/PrintOrderSheet';
 import { printPageCounts } from '@storywink/shared/collage';
@@ -192,6 +193,45 @@ function BookPreviewContent() {
     if (book.status === BookStatus.COMPLETED && book.firstViewedAt == null) {
       setShowReveal(true);
     }
+  }, [book]);
+
+  // X6a promotion: after the reveal, offer to keep the book's star as an
+  // account character. Once per book (decline persists locally), never when
+  // an avatar was already promoted from this book.
+  const [keepCharacter, setKeepCharacter] = useState<{ characterId: string; name: string } | null>(
+    null,
+  );
+  const [showKeepCharacter, setShowKeepCharacter] = useState(false);
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_AVATARS_ENABLED !== 'true' || !book) return;
+    if (book.status !== BookStatus.COMPLETED) return;
+    try {
+      if (localStorage.getItem(`keep-character-declined-${book.id}`)) return;
+    } catch {
+      /* storage unavailable — offer anyway */
+    }
+    const identity = book.characterIdentity as {
+      characters?: Array<{ characterId: string; role: string; name?: string | null }>;
+    } | null;
+    const star = identity?.characters?.find((c) => c.role === 'main_child');
+    if (!star) return;
+    let cancelled = false;
+    void (async () => {
+      const res = await fetch('/api/avatars').catch(() => null);
+      if (!res?.ok) return;
+      const data = (await res.json()) as {
+        avatars: Array<{ promotedFromBookId?: string | null }>;
+      };
+      if (cancelled) return;
+      if (data.avatars.some((a) => a.promotedFromBookId === book.id)) return;
+      setKeepCharacter({
+        characterId: star.characterId,
+        name: (star.name ?? book.childName ?? book.title) || 'your star',
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [book]);
 
   // Real-moments collage (flag-gated): original photos for the flipbook's
@@ -807,7 +847,25 @@ function BookPreviewContent() {
             coverImageUrl={book.coverImageUrl}
             childName={book.childName}
             bookTitle={book.title}
-            onOpen={() => setShowReveal(false)}
+            onOpen={() => {
+              setShowReveal(false);
+              if (keepCharacter) setShowKeepCharacter(true);
+            }}
+          />
+        )}
+        {showKeepCharacter && keepCharacter && book && (
+          <KeepCharacterCard
+            bookId={book.id}
+            characterId={keepCharacter.characterId}
+            childName={keepCharacter.name}
+            onDismiss={() => {
+              setShowKeepCharacter(false);
+              try {
+                localStorage.setItem(`keep-character-declined-${book.id}`, '1');
+              } catch {
+                /* fine */
+              }
+            }}
           />
         )}
       </div>

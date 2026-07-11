@@ -253,7 +253,8 @@
     "emptyCta": "はじめての絵本をつくる",
     "unableToLoad": "ライブラリを読み込めませんでした",
     "unableToDelete": "絵本を削除できませんでした",
-    "printOrderInFlight": "この絵本の印刷注文がまだ進行中です。発送が完了したら削除できます（お写真もその際に削除されます）。"
+    "printOrderInFlight": "この絵本の印刷注文がまだ進行中です。発送が完了したら削除できます（お写真もその際に削除されます）。",
+    "charactersTab": "キャラクター"
   },
   "bookCard": {
     "creatingIllustrations": "イラストを作成中…",
@@ -440,5 +441,42 @@
     "errorRetry": "もういちど ためす",
     "notFoundTitle": "そのページは みつかりませんでした。",
     "goHome": "ホームへ もどる"
+  },
+  "characters": {
+    "title": "うちのキャラクター",
+    "booksTab": "えほん",
+    "addSomeone": "だれかを ついか",
+    "emptyTitle": "まだ キャラクターが いません",
+    "emptyBody": "えほんを つくると、しゅじんこうを キャラクターとして のこせます。ここから しゃしんで つくることも できます。",
+    "portraitAlt": "えほんの キャラクターになった {name}",
+    "drawing": "{name} を かいています…",
+    "drawAgain": "もういちど かく",
+    "rename": "なまえを かえる",
+    "delete": "けす",
+    "deleteConfirm": "{name} を キャラクターから けしますか？ えも いっしょに きえます。",
+    "renamePrompt": "なんて よびますか？",
+    "cardMenu": "{name} のメニュー",
+    "studioTitle": "だれを ついかしますか？",
+    "kindChild": "こども",
+    "kindAdult": "おとな",
+    "kindPet": "ペット",
+    "kindToy": "おもちゃ・たいせつなもの",
+    "photosHint": "その子が はっきり うつった しゃしんを 1〜5まい えらんでください。えを かくためだけに つかい、そのあと しゃしんは けします。",
+    "photosPicked": "{count}まい えらびました",
+    "namePlaceholder": "なまえ",
+    "back": "もどる",
+    "next": "つぎへ",
+    "create": "{name} を かく",
+    "meeting": "{name} に あっています…",
+    "createError": "うまくいきませんでした。もういちど どうぞ。",
+    "close": "とじる",
+    "keepTitle": "{name} を キャラクターとして のこしますか？",
+    "keepBody": "このすがたのまま、つぎの おはなしにも とうじょうできます。",
+    "keepYes": "{name} を のこす",
+    "keepNotNow": "また こんど",
+    "keepSaving": "のこしています…",
+    "keptTitle": "{name} が キャラクターに なりました。",
+    "keptSee": "みてみる",
+    "keptClose": "とじる"
   }
 }

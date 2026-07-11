@@ -286,6 +286,15 @@ export function LibraryClientView() {
             </SelectContent>
           </Select>
 
+          {/* My characters (X6, flag-gated) */}
+          {process.env.NEXT_PUBLIC_AVATARS_ENABLED === 'true' && (
+            <Link
+              href="/characters"
+              className="flex min-h-[36px] items-center rounded-full border border-black/10 px-3 font-playful text-sm text-gray-600 hover:border-coral/50 hover:text-gray-800"
+            >
+              {t('charactersTab')}
+            </Link>
+          )}
           {/* Create new book button */}
           <Link href="/create">
             <Button size="sm" className="w-full sm:w-auto bg-coral hover:bg-[#E55A4C] text-white rounded-full font-playful group">

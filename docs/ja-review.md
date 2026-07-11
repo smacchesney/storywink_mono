@@ -222,3 +222,8 @@ Append-only. One line per key: `namespace.key` — why it needs a native check.
 - `setup.learningWordsAdd` — collapsed affordance in the framing block 「いま おきにいりの ことばは ありますか？」; curiosity register, must not read as a study feature.
 - `setup.learningWordsPlaceholder` — chip input placeholder 「ことばを いれてね」.
 - `setup.learningWordRemove` — aria-label for removing a word chip 「{word} を けす」; check けす vs 削除 for the register.
+
+## 2026-07-12 — X6 character library (expansion/x6-avatars)
+
+- Whole new `characters.*` namespace (36 keys): the shelf, the studio steps, the keep-this-character card. Register aims child-adjacent but parent-facing; check けす vs 削除 across delete strings and のこす for "keep as a character".
+- `library.charactersTab` — 「キャラクター」 tab chip next to Books.
