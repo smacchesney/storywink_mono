@@ -48,48 +48,15 @@ Three styles live in `STYLE_LIBRARY` (`packages/shared/src/prompts/styles.ts`):
 
 Each style provides interior and cover prompt builders plus `referenceImageUrls[]` for multi-image style transfer.
 
-## Text Overlay System
+## Story Text Rendering
 
-Story page text is rendered programmatically; title pages use AI-generated artistic text.
+Story text renders on its own pages, never composited onto illustrations. Title pages use AI-generated artistic text; the only image compositing left is the title-page logo stamp (opentype.js + sharp) in `apps/workers/src/utils/image-processing.ts`.
 
-### Layout
-```
-┌─────────────────────────────────┐
-│                                 │
-│      ILLUSTRATION AREA          │  ~82% of height
-│      (soft vignette edges)      │
-│                                 │
-│         ↓ fades to white ↓      │
-├ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┤  (no hard line)
-│                                 │
-│   "Story text rendered here"    │  ~18% of height
-│   "with Excalifont at 80px"     │  (pure white space)
-│                                 │
-└─────────────────────────────────┘
-```
+### Where text renders
+- **Print + PDF export**: `generateTextPageHtml` in `packages/pdf/src/pages.ts` — a white page with centered story text (Andika for en, Zen Maru Gothic for ja), verso text / recto illustration pairs. User strings are HTML-escaped via `packages/pdf/src/escape.ts`.
+- **On-screen flipbook**: `buildDisplayPages` in `apps/web/src/components/book/display-pages.ts` — spread layout mirrors print (text page + illustration page); portrait layout combines square art + a text strip on one page.
 
-### Implementation
-- **Utility File**: `apps/workers/src/utils/text-overlay.ts`
-- **Font Rendering**: opentype.js converts text to SVG paths (avoids fontconfig dependency)
-- **Image Compositing**: Sharp overlays SVG onto the image
-- **Brand Font**: Excalifont at `apps/workers/assets/fonts/Excalifont.ttf`
-
-### Configuration
-```typescript
-const DEFAULT_OPTIONS = {
-  fontSize: 80,
-  color: '#1a1a1a',
-  yPosition: 0.88,
-  lineHeight: 1.3,
-  maxWidth: 0.90,
-  maxLines: 3,
-};
-```
-
-### Technical Notes
-- Font Loading: Uses `new Uint8Array(buffer)` pattern for proper ArrayBuffer conversion
-- SVG Path Conversion: Text converted to `<path>` elements (bypasses fontconfig)
-- Dynamic Font Sizing: Reduces to 65% of base if text doesn't fit
+The old text-overlay system (story text composited onto the illustration at yPosition 0.88) is gone; do not build against it.
 
 ## Illustration Failure Handling
 
