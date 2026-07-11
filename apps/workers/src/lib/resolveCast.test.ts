@@ -246,3 +246,31 @@ describe('checkCastNameCoverage', () => {
     expect(result.missing).toEqual(['Sam']);
   });
 });
+
+describe('mergeCastNames — companion objects', () => {
+  const bunny = character({ characterId: 'object_1', role: 'companion_object' });
+
+  it('a typed special name lands on the object entry and is consumed', () => {
+    const result = mergeCastNames({
+      characters: [mainChild, bunny],
+      captureQuestions: [{ id: 'q2', characterId: 'object_1', answer: 'Mr. Hoppy' }],
+      childName: 'Mia',
+    });
+    const obj = result.characters.find(c => c.characterId === 'object_1')!;
+    expect(obj.name).toBe('Mr. Hoppy');
+    expect(obj.namedVia).toBe('chip');
+    expect(result.consumedQuestionIds).toEqual(['q2']);
+  });
+
+  it('a generic-category word on an object question becomes its NAME, never a role rewrite', () => {
+    const result = mergeCastNames({
+      characters: [bunny],
+      captureQuestions: [{ id: 'q1', characterId: 'object_1', answer: 'Teacher' }],
+      childName: null,
+    });
+    const obj = result.characters.find(c => c.characterId === 'object_1')!;
+    expect(obj.role).toBe('companion_object');
+    expect(obj.name).toBe('Teacher');
+    expect(obj.namedVia).toBe('chip');
+  });
+});

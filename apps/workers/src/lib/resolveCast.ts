@@ -125,7 +125,10 @@ export function mergeCastNames<T extends MergeableCharacter>(input: {
 
   const applyAnswer = (target: T, rawAnswer: string): void => {
     const answer = rawAnswer.trim();
-    if (isGenericCategoryAnswer(answer)) {
+    // Generic-category answers ("Family friend") refine a PERSON's role. For a
+    // companion object every typed answer IS the name — a toy can be called
+    // anything, and objects have no relationship role to refine.
+    if (target.role !== 'companion_object' && isGenericCategoryAnswer(answer)) {
       const refinedRole = /[a-z]/i.test(answer) ? answer.toLowerCase() : answer;
       if (target.role !== refinedRole) {
         target.role = refinedRole;
