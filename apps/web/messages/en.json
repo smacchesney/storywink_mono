@@ -477,6 +477,10 @@
     "keepSaving": "Keeping…",
     "keptTitle": "{name} joined your characters.",
     "keptSee": "See them",
-    "keptClose": "Close"
+    "keptClose": "Close",
+    "matchQuestion": "Is this {name}?",
+    "matchYes": "Yes, it's them",
+    "matchNo": "Not them",
+    "matchLinked": "{name} will look just like their character."
   }
 }

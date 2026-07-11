@@ -298,7 +298,12 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     // Fetch failures degrade gracefully — a page render must never fail
     // because a reference sheet went missing.
     const sheetRefs: IllustrationImageInput[] = [];
-    if (characterSheetsEnabled() && job.data.characterSheets?.length) {
+    // Book sheets ride CHARACTER_SHEETS_ENABLED; account-avatar sheets ride
+    // AVATARS_ENABLED — either gate admits the snapshot the flow built.
+    if (
+      (characterSheetsEnabled() || process.env.AVATARS_ENABLED === 'true') &&
+      job.data.characterSheets?.length
+    ) {
       for (const sheet of job.data.characterSheets) {
         try {
           sheetRefs.push(await fetchImageInput(optimizeCloudinaryUrlForVision(sheet.url)));

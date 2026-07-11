@@ -477,6 +477,10 @@
     "keepSaving": "のこしています…",
     "keptTitle": "{name} が キャラクターに なりました。",
     "keptSee": "みてみる",
-    "keptClose": "とじる"
+    "keptClose": "とじる",
+    "matchQuestion": "この子は {name} ですか？",
+    "matchYes": "はい、そうです",
+    "matchNo": "ちがいます",
+    "matchLinked": "{name} は キャラクターと おなじ すがたで とうじょうします。"
   }
 }

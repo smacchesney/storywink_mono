@@ -16,6 +16,7 @@ import ArtStyleStrip from '@/components/create/setup/ArtStyleStrip';
 import LibrarianStrip from '@/components/create/setup/LibrarianStrip';
 import StoryFraming from '@/components/create/setup/StoryFraming';
 import type { StripPhase } from '@/components/create/setup/strip-phase';
+import AvatarMatchChip from '@/components/create/setup/AvatarMatchChip';
 import CaptureChips, {
   CaptureQuestion,
 } from '@/components/create/setup/CaptureChips';
@@ -50,6 +51,8 @@ interface SetupSheetProps {
   showNameError: boolean;
   /** Book id — enables the inline add/remove affordances in the photo strip. */
   bookId?: string;
+  /** Perception roster id of this book's star, for the avatar confirm row. */
+  mainCharacterId?: string | null;
   onReorder: (photos: StripPhoto[]) => void;
   /** Refetch trigger after photos are added/removed inline. */
   onPhotosChanged?: () => void | Promise<void>;
@@ -76,6 +79,7 @@ export function SetupSheet({
   isSubmitting,
   showNameError,
   bookId,
+  mainCharacterId,
   onReorder,
   onPhotosChanged,
   onChange,
@@ -218,6 +222,9 @@ export function SetupSheet({
           >
             {hasChips && (
               <div className={stripPhase === 'hidden' ? undefined : 'chips-enter'}>
+                {bookId && mainCharacterId && (
+                  <AvatarMatchChip bookId={bookId} mainCharacterId={mainCharacterId} />
+                )}
                 <CaptureChips
                   questions={form.captureQuestions}
                   onChange={(qs) => onChange('captureQuestions', qs)}

@@ -51,6 +51,7 @@ interface BookData {
   tone: string | null;
   eventSummary: string | null;
   learningWords: { word?: string }[] | null;
+  characterIdentity?: { characters?: { characterId: string; role: string }[] } | null;
   captureQuestions: CaptureQuestion[] | null;
   autoIllustrate: boolean;
   createdAt: string;
@@ -104,6 +105,8 @@ export default function SetupPage() {
   const [stripPhase, setStripPhase] = useState<StripPhase>('hidden');
   // Freshness anchor + "perception provably finished" flag for the poll gate.
   const [bookCreatedAt, setBookCreatedAt] = useState<string | null>(null);
+  // Perception roster id of the star, for the X6c avatar confirm row.
+  const [mainCharacterId, setMainCharacterId] = useState<string | null>(null);
   const [analysisDone, setAnalysisDone] = useState(false);
 
   const titlePending =
@@ -127,6 +130,9 @@ export default function SetupPage() {
           url: p.asset?.url ?? null,
         })),
     );
+
+    const star = book.characterIdentity?.characters?.find((c) => c.role === 'main_child');
+    if (star) setMainCharacterId(star.characterId);
 
     setForm((prev) => {
       const next = { ...prev };
@@ -453,6 +459,7 @@ export default function SetupPage() {
 
   return (
     <SetupSheet
+        mainCharacterId={mainCharacterId}
       photos={photos}
       form={form}
       prefilledName={prefilledName}

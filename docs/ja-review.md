@@ -227,3 +227,4 @@ Append-only. One line per key: `namespace.key` — why it needs a native check.
 
 - Whole new `characters.*` namespace (36 keys): the shelf, the studio steps, the keep-this-character card. Register aims child-adjacent but parent-facing; check けす vs 削除 across delete strings and のこす for "keep as a character".
 - `library.charactersTab` — 「キャラクター」 tab chip next to Books.
+- `characters.matchQuestion/matchYes/matchNo/matchLinked` — the setup confirm row linking an account character to a new book; register check on ちがいます (soft decline).

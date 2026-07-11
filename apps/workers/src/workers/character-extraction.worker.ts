@@ -430,6 +430,55 @@ async function createIllustrationFlow(
   characterSheets?: CharacterSheetRef[],
   recovery?: boolean,
 ): Promise<void> {
+  // X6c: account avatars the parent linked to this book override the
+  // per-book sheet for the same roster characterId — the cross-book anchor
+  // beats the one-book sheet, and works even while book sheets are flagged
+  // off. Only READY renditions in the book's own art style join the stack.
+  if (process.env.AVATARS_ENABLED === 'true') {
+    try {
+      const bookForStyle = await prisma.book.findUnique({
+        where: { id: bookId },
+        select: { artStyle: true },
+      });
+      const links = await prisma.bookAvatar.findMany({
+        where: { bookId, avatar: { userId } },
+        include: {
+          avatar: {
+            include: {
+              renditions: {
+                where: { status: 'READY', artStyle: bookForStyle?.artStyle ?? 'vignette' },
+              },
+            },
+          },
+        },
+      });
+      const avatarRefs: CharacterSheetRef[] = [];
+      for (const link of links) {
+        const sheetUrl = link.avatar.renditions[0]?.turnaroundSheetUrl;
+        if (!link.characterId || !sheetUrl) continue;
+        avatarRefs.push({
+          characterId: link.characterId,
+          name: link.avatar.displayName,
+          url: sheetUrl,
+        });
+      }
+      if (avatarRefs.length > 0) {
+        const overridden = new Set(avatarRefs.map((r) => r.characterId));
+        characterSheets = [
+          ...avatarRefs,
+          ...(characterSheets ?? []).filter((r) => !overridden.has(r.characterId)),
+        ];
+        logger.info(
+          { bookId, avatarSheets: avatarRefs.length },
+          'Linked account-avatar sheets joined the reference stack',
+        );
+      }
+    } catch (error) {
+      // Avatar reuse must never block illustration — degrade to book sheets.
+      logger.warn({ bookId, error }, 'Avatar sheet lookup failed; continuing without');
+    }
+  }
+
   // Re-fetch book to get latest page data
   const book = await prisma.book.findUnique({
     where: { id: bookId },
