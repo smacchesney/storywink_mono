@@ -56,12 +56,14 @@ export const PAGE_TEXT = {
     dedicationLine2: 'especially for',
     endingTitle: 'The End',
     endingLine: 'Until next time,',
+    collageTitle: 'The real adventure',
   },
   ja: {
     dedicationLine1: 'この えほんは',
     dedicationLine2: 'のために つくりました',
     endingTitle: 'おしまい',
     endingLine: 'またね、',
+    collageTitle: 'ほんとうの ぼうけんは ここから',
   },
 } as const;
 

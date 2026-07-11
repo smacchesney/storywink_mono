@@ -129,14 +129,16 @@ export const coolifyImageUrl = optimizeCloudinaryUrl;
  *
  * @param totalDbPages - Total page rows in the database
  * @param options.padToMultipleOf4 - Pad to multiple of 4 for Lulu saddle stitch (default false)
+ * @param options.collagePages - Real-moments collage pages appended after the ending (default 0)
  * @returns The number of printed interior pages
  */
 export function calculatePrintedPageCount(
   totalDbPages: number,
-  options?: { padToMultipleOf4?: boolean }
+  options?: { padToMultipleOf4?: boolean; collagePages?: number }
 ): number {
   const storyPhotos = Math.max(0, totalDbPages); // all photos are story pages
-  const rawCount = 2 + storyPhotos * 2; // dedication + ending + (text + illustration) per photo
+  const rawCount =
+    2 + storyPhotos * 2 + Math.max(0, options?.collagePages ?? 0); // dedication + ending + pairs + collage
 
   if (options?.padToMultipleOf4) {
     return Math.ceil(rawCount / 4) * 4;

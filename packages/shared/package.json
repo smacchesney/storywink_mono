@@ -22,6 +22,10 @@
       "types": "./dist/utils.d.ts",
       "import": "./dist/utils.js"
     },
+    "./collage": {
+      "types": "./dist/collage.d.ts",
+      "import": "./dist/collage.js"
+    },
     "./types": {
       "types": "./dist/types.d.ts",
       "import": "./dist/types.js"
