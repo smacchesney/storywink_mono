@@ -21,6 +21,7 @@ import {
   STORY_QC_THRESHOLDS,
   StoryQCResponse,
   countRefrainEchoes,
+  countLearningWordEchoes,
   isChildNameCheckable,
   countChildNameEchoes,
 } from '@storywink/shared/prompts/story-check';
@@ -144,6 +145,19 @@ async function evaluateStoryQuality(
 
   const refrain = storyResponse.storyArc?.refrain || '';
   const echoes = countRefrainEchoes(refrain, readingOrderTexts, input.language);
+
+  // LOG-ONLY: learning-word dose. Every enforcing check risks a silent extra
+  // generation during the parent's wait, so this ships as telemetry first.
+  if (input.learningWords?.length) {
+    const wordCounts = input.learningWords.map(word => ({
+      word,
+      pages: countLearningWordEchoes(word, readingOrderTexts, input.language),
+    }));
+    logger.info(
+      { bookId, wordCounts, target: '3-4 pages per word' },
+      'Learning-word echo counts (log-only)',
+    );
+  }
   if (echoes < STORY_QC_THRESHOLDS.minRefrainEchoes) {
     problems.push(
       `The refrain "${refrain}" is only recognizable on ${echoes} page(s). It must echo (with variation) on at least ${STORY_QC_THRESHOLDS.minRefrainEchoes} pages.`,
@@ -479,6 +493,14 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       theme: book.theme || undefined,
       eventSummary: book.eventSummary || undefined,
       confirmedFacts: confirmedFacts.length > 0 ? confirmedFacts : undefined,
+      learningWords: (() => {
+        const raw = book.learningWords as { word?: string }[] | null;
+        const words = (raw ?? [])
+          .map(w => (typeof w?.word === 'string' ? w.word.trim() : ''))
+          .filter(Boolean)
+          .slice(0, 4);
+        return words.length > 0 ? words : undefined;
+      })(),
       charactersInPhotos: charactersInPhotos.length > 0 ? charactersInPhotos : undefined,
       bridgeCap: bridgeCap > 0 ? bridgeCap : undefined,
       language: book.language || 'en',
@@ -629,6 +651,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       text: string;
       illustrationNotes: string | null;
       textConfirmed: boolean;
+      learningWordsUsed: string[];
     }
     let pageUpdates: PageUpdateData[] = [];
 
@@ -688,6 +711,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
           text: finalText,
           illustrationNotes: notes,
           textConfirmed: trimmedText.length > 0,
+          learningWordsUsed: content?.learningWordsUsed ?? [],
         };
       });
     } catch (mappingError) {
@@ -718,6 +742,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
               text: update.text,
               illustrationNotes: update.illustrationNotes,
               textConfirmed: update.textConfirmed,
+              learningWordsUsed: update.learningWordsUsed,
             },
           });
           updateResults.push(result);
@@ -746,6 +771,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
                   // Born with text — the review illustrate-gate must pass.
                   textConfirmed: true,
                   illustrationNotes: entry.bridge!.illustrationNotes,
+                  learningWordsUsed: entry.bridge!.learningWordsUsed ?? [],
                   source: 'BRIDGE',
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   bridgeScene: entry.bridge!.scene as any, // Prisma Json column
