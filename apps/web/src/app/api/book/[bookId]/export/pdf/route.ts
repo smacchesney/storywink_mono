@@ -9,7 +9,7 @@ import { loadWebPdfFonts } from '../pdfFonts';
 import { optimizeForScreen, pdfContentDisposition } from '@/lib/pdf-export';
 
 // Define the expected Book type with Pages for the PDF generator
-type BookWithPages = Book & { pages: Page[] };
+type BookWithPages = Book & { pages: (Page & { asset?: { url: string } | null })[] };
 
 export async function GET(
   _request: Request,
@@ -52,6 +52,7 @@ export async function GET(
             moderationStatus: true,
             moderationReason: true,
             illustrationNotes: true,
+            asset: { select: { url: true } },
           }
         },
       },
@@ -83,6 +84,7 @@ export async function GET(
         titlePage: titlePageForPdf as Page | undefined,
         includeBackCover: true,
         padToFour: false,
+        includeCollage: process.env.COLLAGE_PAGES_ENABLED === 'true',
         imageUrlTransform: optimizeForScreen,
         logger,
       }

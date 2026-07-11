@@ -5,11 +5,11 @@ import logger from '@/lib/logger';
 import { generateBookPdf } from '@storywink/pdf';
 import { uploadPdfToDropbox } from '@/lib/dropbox';
 import { Book, Page } from '@prisma/client';
-import { calculatePrintedPageCount } from '@storywink/shared/utils';
+import { printPageCounts } from '@storywink/shared/collage';
 import { loadWebPdfFonts } from '../pdfFonts';
 
 // Define the expected Book type with Pages for the PDF generator
-type BookWithPages = Book & { pages: Page[] };
+type BookWithPages = Book & { pages: (Page & { asset?: { url: string } | null })[] };
 
 /**
  * Generates interior PDF for Lulu print-on-demand and uploads to Dropbox.
@@ -58,6 +58,7 @@ export async function POST(
             moderationStatus: true,
             moderationReason: true,
             illustrationNotes: true,
+            asset: { select: { url: true } },
           }
         },
       },
@@ -96,8 +97,14 @@ export async function POST(
 
     // Calculate interleaved page count: dedication + ending + each story page becomes 2 PDF pages (text + illustration)
     // The PDF generator handles padding to multiple of 4 for Lulu saddle stitch
-    const interiorPdfPageCount = calculatePrintedPageCount(bookData.pages.length);
-    const paddedPageCount = calculatePrintedPageCount(bookData.pages.length, { padToMultipleOf4: true });
+    // Collage-aware counts: printPageCounts returns 0 collage pages when the
+    // flag is off or the 48-page cap would be exceeded (N=23).
+    const counts = printPageCounts(
+      bookData.pages.length,
+      process.env.COLLAGE_PAGES_ENABLED === 'true'
+    );
+    const interiorPdfPageCount = counts.interiorPages;
+    const paddedPageCount = counts.paddedPages;
 
     logger.info({
       bookId,
@@ -121,7 +128,7 @@ export async function POST(
         ...bookData,
         pages: storyPages,
       } as BookWithPages,
-      { fonts: loadWebPdfFonts(), logger }
+      { fonts: loadWebPdfFonts(), includeCollage: counts.collagePages > 0, logger }
     );
 
     // Upload to Dropbox with public shared link (avoids Cloudinary 10MB limit)

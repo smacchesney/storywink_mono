@@ -13,6 +13,7 @@ import { Job } from 'bullmq';
 import * as Sentry from '@sentry/node';
 import prisma from '../database/client.js';
 import { PrintFulfillmentJob, getLuluLevelByTierKey } from '@storywink/shared';
+import { collagePagesForPrint } from '@storywink/shared/collage';
 import { generateBookPdf, generateLuluCover } from '@storywink/pdf';
 import { loadWorkerPdfFonts } from '../utils/pdf-fonts.js';
 import { uploadPdfToDropbox } from '../utils/dropbox.js';
@@ -67,6 +68,7 @@ export async function processPrintFulfillment(job: Job<PrintFulfillmentJob>): Pr
       include: {
         pages: {
           orderBy: { pageNumber: 'asc' },
+          include: { asset: { select: { url: true } } },
         },
       },
     });
@@ -91,7 +93,15 @@ export async function processPrintFulfillment(job: Job<PrintFulfillmentJob>): Pr
     // 3. Generate interior PDF (all pages including cover photo).
     // Lulu path uses generator defaults: no title page, no back cover, padded to 4.
     console.log(`[PrintFulfillment] Generating interior PDF (${book.pages.length} pages)...`);
-    const interiorPdfBuffer = await generateBookPdf(book, { fonts: pdfFonts });
+    // Same collage rule as checkout + the interior route: flag on AND under
+    // the 48-page saddle-stitch cap, so the shipped PDF matches the priced count.
+    const includeCollage =
+      process.env.COLLAGE_PAGES_ENABLED === 'true' &&
+      collagePagesForPrint(book.pages.length) > 0;
+    const interiorPdfBuffer = await generateBookPdf(book, {
+      fonts: pdfFonts,
+      includeCollage,
+    });
     console.log(`[PrintFulfillment] Interior PDF generated: ${interiorPdfBuffer.length} bytes`);
 
     await job.updateProgress({ stage: 'interior_pdf_complete', percent: 30 });
