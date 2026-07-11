@@ -19,7 +19,7 @@ import { ExportPdfDialog } from '@/components/book/ExportPdfDialog';
 import RevealOverlay from '@/components/book/RevealOverlay';
 import WhatNowCard from '@/components/book/WhatNowCard';
 import { PrintOrderSheet, PrintOrderBook } from '@/components/print/PrintOrderSheet';
-import { calculatePrintedPageCount } from '@storywink/shared';
+import { printPageCounts } from '@storywink/shared/collage';
 import { bookContentFingerprint } from '@/lib/book-display';
 import {
   TAP_TRAVEL_PX,
@@ -515,7 +515,10 @@ function BookPreviewContent() {
       id: book.id,
       title: book.title,
       coverImageUrl: book.coverImageUrl ?? null,
-      pageCount: calculatePrintedPageCount(book.pages.length),
+      pageCount: printPageCounts(
+        book.pages.length,
+        process.env.NEXT_PUBLIC_COLLAGE_PAGES_ENABLED === 'true'
+      ).interiorPages,
     };
 
     // Resolve the current display page back to its source Page so the per-page

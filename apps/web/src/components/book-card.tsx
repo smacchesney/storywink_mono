@@ -15,7 +15,7 @@ import {
 import { MoreHorizontal, Trash2, Eye, AlertTriangle, RefreshCw, Download, Printer, Pencil } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { calculatePrintedPageCount } from '@storywink/shared';
+import { printPageCounts } from '@storywink/shared/collage';
 import { isPrintShippableLocale } from '@/lib/print-availability';
 import { track } from '@/lib/track';
 import { cn } from '@/lib/utils';
@@ -104,7 +104,10 @@ const BookCard: React.FC<BookCardProps> = ({
     id,
     title,
     coverImageUrl: coverImageUrl ?? null,
-    pageCount: calculatePrintedPageCount(actualPageCount),
+    pageCount: printPageCounts(
+      actualPageCount,
+      process.env.NEXT_PUBLIC_COLLAGE_PAGES_ENABLED === 'true'
+    ).interiorPages,
   };
 
   const caption = isDraft

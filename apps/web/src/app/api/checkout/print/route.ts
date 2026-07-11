@@ -7,6 +7,7 @@
  * Phase 1: Singapore & Malaysia only.
  */
 
+import { printPageCounts } from '@storywink/shared/collage';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
@@ -18,7 +19,6 @@ import {
   coolifyImageUrl,
   getAllowedCountries,
   buildStripeShippingOptions,
-  calculatePrintedPageCount,
   trackEvent,
   PRINT_PRICING,
 } from '@storywink/shared';
@@ -100,8 +100,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Pricing
-    const printedPageCount = calculatePrintedPageCount(book._count.pages);
+    // Pricing. Collage-aware page count so PrintOrder metadata matches the
+    // PDF the worker will actually ship.
+    const printedPageCount = printPageCounts(
+      book._count.pages,
+      process.env.COLLAGE_PAGES_ENABLED === 'true'
+    ).interiorPages;
     const printCostCents = PRINT_PRICING.RETAIL_PRICE_CENTS;
 
     // Get cover image URL (prefer dedicated cover illustration)

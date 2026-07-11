@@ -3,6 +3,7 @@ import {
   collageSlots,
   planCollage,
   collagePagesForPrint,
+  printPageCounts,
   MAX_COLLAGE_PHOTOS_PER_PAGE,
   CollageSlot,
 } from './collage.js';
@@ -91,5 +92,31 @@ describe('collagePagesForPrint (Lulu 48-page cap)', () => {
 
   it('small books get one page', () => {
     expect(collagePagesForPrint(3)).toBe(1);
+  });
+});
+
+describe('printPageCounts', () => {
+  it('disabled flag reproduces the legacy counts exactly', () => {
+    expect(printPageCounts(10, false)).toEqual({
+      collagePages: 0,
+      interiorPages: 22,
+      paddedPages: 24,
+    });
+  });
+
+  it('enabled flag on an even book changes nothing but the collage count', () => {
+    expect(printPageCounts(10, true)).toEqual({
+      collagePages: 2,
+      interiorPages: 24,
+      paddedPages: 24,
+    });
+  });
+
+  it('enabled flag at N=23 falls back to legacy counts (cap)', () => {
+    expect(printPageCounts(23, true)).toEqual({
+      collagePages: 0,
+      interiorPages: 48,
+      paddedPages: 48,
+    });
   });
 });

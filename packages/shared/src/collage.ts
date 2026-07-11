@@ -117,3 +117,31 @@ export function collagePagesForPrint(photoCount: number): number {
   });
   return padded <= 48 ? pages : 0;
 }
+
+/** Page counts for the printed book, collage-aware. One call site truth. */
+export interface PrintPageCounts {
+  /** Collage pages actually included (0 when disabled or over the cap). */
+  collagePages: number;
+  /** Interior pages before saddle-stitch padding. */
+  interiorPages: number;
+  /** Final padded page count (the number Lulu binds and PrintOrder stores). */
+  paddedPages: number;
+}
+
+/**
+ * The one way every surface computes printed page counts. `collageEnabled`
+ * is the caller's flag (COLLAGE_PAGES_ENABLED server-side,
+ * NEXT_PUBLIC_COLLAGE_PAGES_ENABLED in client components) so the priced,
+ * displayed, and shipped counts can never disagree.
+ */
+export function printPageCounts(photoCount: number, collageEnabled: boolean): PrintPageCounts {
+  const collagePages = collageEnabled ? collagePagesForPrint(photoCount) : 0;
+  return {
+    collagePages,
+    interiorPages: calculatePrintedPageCount(photoCount, { collagePages }),
+    paddedPages: calculatePrintedPageCount(photoCount, {
+      padToMultipleOf4: true,
+      collagePages,
+    }),
+  };
+}
