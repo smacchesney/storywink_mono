@@ -44,6 +44,8 @@ const captureQuestionSchema = z.object({
   // unknown keys, so without this the id would silently vanish on PATCH and
   // the parent's answer could never merge back into the cast.
   characterId: z.string().max(50).nullable().optional(),
+  // Same strip risk: 'object' drives the free-text-first chip presentation.
+  kind: z.enum(['naming', 'object', 'other']).nullish(),
   answer: z.string().max(500).nullable().optional(),
 });
 

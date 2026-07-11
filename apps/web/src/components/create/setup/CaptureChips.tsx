@@ -10,6 +10,8 @@ export interface CaptureQuestion {
   options: string[];
   /** Set on naming questions — links the question to a roster character. */
   characterId?: string | null;
+  /** 'object' renders free-text-first; absent on older stored questions. */
+  kind?: 'naming' | 'object' | 'other';
   answer?: string | null;
 }
 
@@ -68,6 +70,9 @@ export function CaptureChips({ questions, onChange }: CaptureChipsProps) {
       {rows.map((q) => {
         const skipped = q.answer === SKIP;
         const typed = customAnswer(q);
+        // Object questions ("does the bunny have a name?") are free-text-first:
+        // they arrive with empty options, so the type-a-name affordance IS the answer.
+        const isObject = (q.kind ?? (q.characterId ? 'naming' : 'other')) === 'object';
         return (
           <div key={q.id} className="flex flex-col gap-1.5">
             <p className="text-sm text-gray-700">{q.question}</p>
@@ -90,15 +95,16 @@ export function CaptureChips({ questions, onChange }: CaptureChipsProps) {
                   </button>
                 );
               })}
-              {/* "Someone else…" — the free-text affordance, naming questions only. */}
-              {q.characterId &&
+              {/* Free-text affordance: "Someone else…" on naming questions,
+                  "It has a name…" on object questions. */}
+              {(q.characterId || isObject) &&
                 (editingId === q.id ? (
                   <input
                     autoFocus
                     type="text"
                     defaultValue={typed ?? ''}
                     maxLength={50}
-                    placeholder={t('someoneElsePlaceholder')}
+                    placeholder={t(isObject ? 'objectNamePlaceholder' : 'someoneElsePlaceholder')}
                     onBlur={(e) => commitCustom(q, e.currentTarget.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -119,7 +125,7 @@ export function CaptureChips({ questions, onChange }: CaptureChipsProps) {
                         : 'border-dashed border-black/20 bg-white text-gray-500 hover:border-coral/50 hover:text-gray-700'
                     )}
                   >
-                    {typed ?? t('someoneElse')}
+                    {typed ?? t(isObject ? 'itsCalled' : 'someoneElse')}
                   </button>
                 ))}
               <button

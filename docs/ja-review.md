@@ -211,3 +211,8 @@ Append-only. One line per key: `namespace.key` — why it needs a native check.
 - `errorPages.errorRetry` — 「もういちど ためす」; matches the reader-overlay's もういちど register.
 - `errorPages.notFoundTitle` — 404 headline 「そのページは みつかりませんでした。」; plain and calm on purpose.
 - `errorPages.goHome` — 「ホームへ もどる」; check ホーム vs トップ for the landing page.
+
+## 2026-07-12 — X1 object naming chip (expansion/x0-x1)
+
+- `setup.itsCalled` — the free-text affordance on the companion-object naming chip 「なまえが あるよ…」; should invite the parent to type the toy's pet name — check register against `setup.someoneElse` (「だれか ほかのひと…」 pattern).
+- `setup.objectNamePlaceholder` — input placeholder 「なんて よんでいますか？」; the subject is the child's beloved toy/object ("what do you [as a family] call it?") — confirm it can't read as asking the reader's own name.

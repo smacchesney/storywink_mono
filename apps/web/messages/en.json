@@ -136,6 +136,8 @@
     "skip": "Skip",
     "someoneElse": "Someone else…",
     "someoneElsePlaceholder": "Type a name",
+    "itsCalled": "It has a name…",
+    "objectNamePlaceholder": "What do you call it?",
     "artStyleLabel": "Pick a style",
     "reviewFirstLabel": "Review the story before illustrating",
     "makeMyBook": "Make my book",
