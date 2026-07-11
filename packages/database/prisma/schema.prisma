@@ -134,6 +134,8 @@ model Asset {
   publicId     String   @unique
   fileType     String
   size         Int
+  width        Int?
+  height       Int?
   createdAt    DateTime @default(now())
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   pages        Page[] // Add relation back to Page model

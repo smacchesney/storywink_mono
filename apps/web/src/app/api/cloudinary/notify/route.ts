@@ -107,6 +107,8 @@ export async function POST(request: NextRequest) {
               thumbnailUrl: storedThumbnailUrl,
               fileType: storedFileType, // JPEG for HEIC uploads (delivered as JPEG)
               size: asset.bytes,
+              width: asset.width ?? null,
+              height: asset.height ?? null,
             },
           });
 

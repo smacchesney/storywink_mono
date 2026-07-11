@@ -151,8 +151,10 @@ export async function POST(request: Request) {
                             thumbnailUrl: cloudinary.url(cloudinaryResult.public_id, {
                                 width: 200, height: 200, crop: 'fill', quality: 'auto', fetch_format: 'auto'
                             }),
-                            fileType: file.type,                   
+                            fileType: file.type,
                             size: file.size,
+                            width: cloudinaryResult.width ?? null,
+                            height: cloudinaryResult.height ?? null,
                         },
                     });
                     console.log(`>>> DEBUG: Asset created with ID: ${newAsset.id}`);
