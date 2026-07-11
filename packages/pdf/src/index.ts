@@ -24,6 +24,13 @@ export type { InteriorPage, InteriorPageKind, AssembleInteriorOptions } from './
 
 export { generateCoverHtml, resolveCoverImageUrl } from './cover.js';
 export { escapeHtml } from './escape.js';
+export {
+  collectCollagePhotos,
+  collageCellUrl,
+  collageSubline,
+  generateCollagePageHtml,
+  generateCollagePagesHtml,
+} from './collage-page.js';
 
 export type {
   BookWithPages,

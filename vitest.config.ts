@@ -12,6 +12,7 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: '@storywink/shared/utils', replacement: sharedSrc('utils.ts') },
+      { find: '@storywink/shared/collage', replacement: sharedSrc('collage.ts') },
       { find: '@storywink/shared/schemas', replacement: sharedSrc('schemas.ts') },
       { find: '@storywink/shared/constants', replacement: sharedSrc('constants.ts') },
       { find: '@storywink/shared/types', replacement: sharedSrc('types.ts') },

@@ -1,7 +1,12 @@
 import type { Book, Page } from '@storywink/database';
 
-/** Book with its pages, the input every generator expects. */
-export type BookWithPages = Book & { pages: Page[] };
+/** Book with its pages, the input every generator expects. The optional
+ * asset relation carries the full-resolution original photo URL — loaded by
+ * print/export callers so the real-moments collage never sources from the
+ * (sometimes 200px) originalImageUrl. */
+export type BookWithPages = Book & {
+  pages: (Page & { asset?: { url: string } | null })[];
+};
 
 export type { Page };
 
@@ -51,6 +56,13 @@ export interface GenerateBookPdfOptions {
   includeBackCover?: boolean;
   /** Pad to multiple of 4 for Lulu saddle stitch (default: true). */
   padToFour?: boolean;
+  /**
+   * Append the real-moments collage page(s) after the ending (default:
+   * false — the frozen Lulu default path stays byte-identical). Callers gate
+   * this on COLLAGE_PAGES_ENABLED and, for print, the 48-page cap via
+   * collagePagesForPrint.
+   */
+  includeCollage?: boolean;
   /**
    * Optional rewrite applied to every image URL embedded in interior HTML
    * (illustrations and mascots). Omitted (Lulu path): illustrations get

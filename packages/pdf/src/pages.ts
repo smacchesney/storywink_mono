@@ -1,5 +1,6 @@
 import { PAGE_TEXT } from '@storywink/shared/constants';
 import { escapeHtml } from './escape.js';
+import { generateCollagePagesHtml } from './collage-page.js';
 import type { BookWithPages, ImageUrlTransform, Page } from './types.js';
 import {
   PAGE_WIDTH_WITH_BLEED_IN,
@@ -23,6 +24,7 @@ export type InteriorPageKind =
   | 'text'
   | 'illustration'
   | 'ending'
+  | 'collage'
   | 'backCover'
   | 'blank';
 
@@ -302,6 +304,8 @@ export interface AssembleInteriorOptions {
   titlePage?: Page;
   includeBackCover?: boolean;
   padToFour?: boolean;
+  /** Append real-moments collage page(s) after the ending (default false). */
+  includeCollage?: boolean;
   /**
    * Applied to every illustration and mascot URL. Omitted: illustrations get
    * optimizeForPrint, mascots stay raw (the Lulu path, frozen by
@@ -328,7 +332,13 @@ export function assembleInteriorPages(
   bookData: BookWithPages,
   options?: AssembleInteriorOptions
 ): InteriorPage[] {
-  const { titlePage, includeBackCover = false, padToFour = true, imageUrlTransform } = options ?? {};
+  const {
+    titlePage,
+    includeBackCover = false,
+    padToFour = true,
+    includeCollage = false,
+    imageUrlTransform,
+  } = options ?? {};
   const language = bookData.language || 'en';
 
   const sortedPages = [...bookData.pages].sort((a, b) => a.pageNumber - b.pageNumber);
@@ -364,6 +374,15 @@ export function assembleInteriorPages(
     kind: 'ending',
     html: generateEndingPageHtml(bookData.childName, bookData.title, language, imageUrlTransform),
   });
+
+  // Real-moments collage (flag-gated by the caller). Sits after the ending so
+  // on the Lulu path it occupies the blank pad slots that even photo counts
+  // already create (zero page-count cost there).
+  if (includeCollage) {
+    for (const html of generateCollagePagesHtml(bookData, imageUrlTransform)) {
+      pages.push({ kind: 'collage', html });
+    }
+  }
 
   // Back cover (user PDF only).
   if (includeBackCover) {
