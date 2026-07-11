@@ -40,6 +40,8 @@ export const updateBookSchema = z.object({
         // Links a naming question to its roster character — must round-trip
         // (zod strips unknown keys), or the answer can never merge back.
         characterId: z.string().max(50).nullable().optional(),
+        // Same strip risk: 'object' drives the free-text-first chip.
+        kind: z.enum(['naming', 'object', 'other']).nullish(),
         answer: z.string().nullable().optional(),
       }),
     )
