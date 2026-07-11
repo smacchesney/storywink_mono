@@ -140,3 +140,61 @@ describe('scopeCaptureQuestions', () => {
     expect(result.map(x => x.id)).toEqual(['other']);
   });
 });
+
+describe('scopeCaptureQuestions — companion objects', () => {
+  const bunny = character({
+    characterId: 'object_1',
+    role: 'companion_object',
+    appearsOnPages: [1, 2],
+  });
+
+  it('keeps an object question when its roster entry qualifies', () => {
+    const result = scopeCaptureQuestions(
+      [
+        q({ id: 'q1', characterId: 'adult_1', kind: 'naming' }),
+        q({ id: 'q2', characterId: 'object_1', kind: 'object', options: [] }),
+        q({ id: 'q3', kind: 'other' }),
+      ],
+      [mainChild, character({}), bunny],
+    );
+    expect(result.map(x => x.id)).toEqual(['q1', 'q2', 'q3']);
+  });
+
+  it('people naming outranks the object question inside the naming cap', () => {
+    const result = scopeCaptureQuestions(
+      [
+        q({ id: 'q1', characterId: 'object_1', kind: 'object', options: [] }),
+        q({ id: 'q2', characterId: 'adult_1', kind: 'naming' }),
+        q({ id: 'q3', characterId: 'adult_2', kind: 'naming' }),
+        q({ id: 'q4', kind: 'other' }),
+      ],
+      [
+        mainChild,
+        character({}),
+        character({ characterId: 'adult_2', role: 'aunt', appearsOnPages: [2, 3] }),
+        bunny,
+      ],
+    );
+    // 2 people-naming take both naming slots; object question drops; other survives.
+    expect(result.map(x => x.id)).toEqual(['q2', 'q3', 'q4']);
+  });
+
+  it('drops an object question for a one-photo object', () => {
+    const result = scopeCaptureQuestions(
+      [q({ id: 'q1', characterId: 'object_1', kind: 'object', options: [] })],
+      [mainChild, character({ ...bunny, appearsOnPages: [2] })],
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('drops an object question when the object never shares a photo with the child', () => {
+    const result = scopeCaptureQuestions(
+      [q({ id: 'q1', characterId: 'object_1', kind: 'object', options: [] })],
+      [
+        character({ characterId: 'child_1', role: 'main_child', appearsOnPages: [1, 2] }),
+        character({ ...bunny, appearsOnPages: [7, 8] }),
+      ],
+    );
+    expect(result).toEqual([]);
+  });
+});

@@ -58,6 +58,13 @@ export interface CaptureQuestion {
    * Null for every other question kind.
    */
   characterId?: string | null;
+  /**
+   * 'naming' = person/pet naming; 'object' = companion-object special name
+   * (free-text-first, empty options); 'other' = firsts/highlight. Optional in
+   * TS because pre-existing stored questions lack it; the response schema
+   * requires it on new generations.
+   */
+  kind?: 'naming' | 'object' | 'other';
   answer?: string | null; // set by the parent in the UI
 }
 
@@ -103,6 +110,7 @@ Produce ALL of the following:
 ## 2. Character identity ("characters" + "sceneContext")
 For EACH distinct person across the photos, AND each animal companion (pet) that appears in 2+ photos or is clearly central to a moment: characterId (child_1, adult_1, pet_1, ...), role (main_child, parent, grandparent, sibling, friend, pet...), name (from the context above if identifiable, else null), physicalTraits (apparentAge; hairColor as an exact shade; hairStyle with length/texture/parting/accessories; skinTone with warm/cool specificity; bodyBuild; distinguishingFeatures[]), typicalClothing, styleTranslation (how to render them in "${input.artStyle}" while staying instantly recognizable — materials, construction, colors, proportions), appearsOnPages (photo numbers 1-${input.storyPages.length}).
 For pets, reuse the same trait fields naturally: hairColor = fur/coat color, hairStyle = coat length and texture, distinguishingFeatures = collar, markings, ear shape, size; typicalClothing = collar/harness or "none".
+Also include AT MOST ONE companion object: a toy, plush, blanket, or clearly beloved object that appears in 2+ photos or is central to a peak moment (being hugged, carried, presented). Give it characterId object_1 and role "companion_object", and reuse the trait fields naturally: hairColor = material and color, hairStyle = texture and wear ("well-loved, slightly flattened fur"), distinguishingFeatures = ears/patches/tags/size relative to the child; typicalClothing = "none". Pick the most-photographed candidate; if nothing qualifies, include no object.
 Be ruthlessly specific — an illustrator will use this as the canonical reference on every page. "Brown hair" is insufficient; "medium-length wavy dark brown hair parted slightly left, small red clip on the right" is the standard. Also give sceneContext: the overall environment pattern across photos.
 
 ## 3. The story brief ("eventSummary")
@@ -119,11 +127,13 @@ Emit ONE naming question for EVERY character above whose name you do not know, w
 - Anchor the question visually so the parent knows who you mean: "Who is the woman with the silver hair who's in several photos?" — for a pet: "Who is the fluffy grey cat?"
 - Options must be the words the child would actually say: "Grandma" / "Grandpa" / "Auntie" / "Mummy" (for a pet: "Our dog" / "Grandma's dog"). A generic category like "Family friend" may appear as ONE option at most — it describes the relationship, it is not what a toddler calls someone.
 
-THEN — other question kinds ("characterId": null), up to 3 questions total:
+NEXT — the companion-object question (kind "object", at most ONE, only when a companion object is in your roster and unnamed): ask if it has a special family name, anchored visually so the parent knows which object you mean: "That well-loved grey bunny is in lots of photos — does it have a name?" Set "characterId" to the object's roster id and "options" to an EMPTY array — the UI supplies a type-a-name affordance and a skip; never offer generic options like "Just a bunny".
+
+THEN — other question kinds ("characterId": null, kind "other"), up to 3 questions total:
 - Firsts/meaning: "Was this a special first?" with options like "First beach trip" / "First swim" / "Just a fun day"
 - The moment that mattered: "What was the highlight?" with options drawn from the actual photos ("The huge splash" / "Ice cream after" / "Building the sandcastle")
 
-Naming questions always come FIRST in the array. Give each an id like "q1", "q2". Never ask what you already know, never ask more than 3.`;
+Set "kind" on every question: "naming" for person/pet naming, "object" for the companion-object question, "other" for the rest. Naming questions come FIRST in the array (people and pets before the object question). Give each an id like "q1", "q2". Never ask what you already know, never ask more than 3.`;
 }
 
 export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
@@ -187,8 +197,9 @@ export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
           question: { type: 'string' },
           options: { type: 'array', items: { type: 'string' } },
           characterId: { type: ['string', 'null'] },
+          kind: { type: 'string', enum: ['naming', 'object', 'other'] },
         },
-        required: ['id', 'question', 'options', 'characterId'],
+        required: ['id', 'question', 'options', 'characterId', 'kind'],
         additionalProperties: false,
       },
     },
@@ -233,7 +244,8 @@ export function scopeCaptureQuestions(
   const byId = new Map(characters.map(c => [c.characterId, c]));
 
   const seenCharacterIds = new Set<string>();
-  const naming: CaptureQuestion[] = [];
+  const peopleNaming: CaptureQuestion[] = [];
+  const objectNaming: CaptureQuestion[] = [];
   const other: CaptureQuestion[] = [];
 
   for (const q of questions) {
@@ -246,12 +258,15 @@ export function scopeCaptureQuestions(
     if (character.role === 'main_child') continue; // the child is named on the sheet, never via a chip
     if (seenCharacterIds.has(q.characterId)) continue;
     const pages = character.appearsOnPages ?? [];
-    if (pages.length < 2) continue; // one-photo passerby
+    if (pages.length < 2) continue; // one-photo passerby (or one-photo object)
     if (!pages.some(p => mainPages.has(p))) continue; // background stranger — never sharing a photo with the child
     seenCharacterIds.add(q.characterId);
-    naming.push(q);
+    if (character.role === 'companion_object') objectNaming.push(q);
+    else peopleNaming.push(q);
   }
 
+  // People and pets outrank the object question inside the shared naming cap.
+  const naming = [...peopleNaming, ...objectNaming.slice(0, 1)];
   return [
     ...naming.slice(0, MAX_NAMING_QUESTIONS),
     ...other,
