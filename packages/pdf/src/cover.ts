@@ -1,4 +1,5 @@
 import type { BookWithPages } from './types.js';
+import { escapeHtml } from './escape.js';
 import {
   COVER_WIDTH_IN,
   COVER_HEIGHT_IN,
@@ -88,7 +89,7 @@ export function generateCoverHtml(
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>${bookTitle} - Cover</title>
+      <title>${escapeHtml(bookTitle)} - Cover</title>
       <style>
         ${fontFace}
         /* Page size handled by Puppeteer pdf() options - single source of truth */

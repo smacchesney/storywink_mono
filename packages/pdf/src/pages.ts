@@ -1,4 +1,5 @@
 import { PAGE_TEXT } from '@storywink/shared/constants';
+import { escapeHtml } from './escape.js';
 import type { BookWithPages, ImageUrlTransform, Page } from './types.js';
 import {
   PAGE_WIDTH_WITH_BLEED_IN,
@@ -94,7 +95,7 @@ export function generateTextPageHtml(page: Page, language: string): string {
     word-break: ${language === 'ja' ? 'auto-phrase' : 'normal'};
   `;
 
-  const text = page.text || '';
+  const text = escapeHtml(page.text || '');
 
   return `
     <div class="page" style="${pageStyle}">
@@ -113,7 +114,7 @@ export function generateDedicationPageHtml(
   language: string,
   imageUrlTransform?: ImageUrlTransform
 ): string {
-  const displayName = childName || bookTitle || 'You';
+  const displayName = escapeHtml(childName || bookTitle || 'You');
   const texts = PAGE_TEXT[language as keyof typeof PAGE_TEXT] || PAGE_TEXT.en;
   const fontFamily = brandingFontFamily(language);
 
@@ -178,7 +179,7 @@ export function generateEndingPageHtml(
   language: string,
   imageUrlTransform?: ImageUrlTransform
 ): string {
-  const displayName = childName || bookTitle || 'You';
+  const displayName = escapeHtml(childName || bookTitle || 'You');
   const texts = PAGE_TEXT[language as keyof typeof PAGE_TEXT] || PAGE_TEXT.en;
   const fontFamily = brandingFontFamily(language);
 

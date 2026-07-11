@@ -23,6 +23,7 @@ export {
 export type { InteriorPage, InteriorPageKind, AssembleInteriorOptions } from './pages.js';
 
 export { generateCoverHtml, resolveCoverImageUrl } from './cover.js';
+export { escapeHtml } from './escape.js';
 
 export type {
   BookWithPages,
