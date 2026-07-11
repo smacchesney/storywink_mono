@@ -34,3 +34,24 @@ describe('PDF page HTML escaping', () => {
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
   });
 });
+
+describe('generateTextPageHtml learning-word emphasis', () => {
+  it('wraps learning words in coral strong tags, escaping everything', () => {
+    const page = {
+      text: 'Splash! Mia & the umbrella dance.',
+      pageNumber: 3,
+      learningWordsUsed: ['umbrella', 'splash'],
+    } as unknown as Page;
+    const html = generateTextPageHtml(page, 'en');
+    expect(html).toContain('<strong style="color: #F76C5E; font-weight: 700;">Splash</strong>');
+    expect(html).toContain('<strong style="color: #F76C5E; font-weight: 700;">umbrella</strong>');
+    expect(html).toContain('Mia &amp; the');
+  });
+
+  it('renders byte-identically to plain escaping when no words are set', () => {
+    const page = { text: 'Just a page.', pageNumber: 1 } as unknown as Page;
+    const html = generateTextPageHtml(page, 'en');
+    expect(html).toContain('>Just a page.</p>');
+    expect(html).not.toContain('<strong');
+  });
+});

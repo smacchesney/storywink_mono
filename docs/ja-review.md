@@ -216,3 +216,9 @@ Append-only. One line per key: `namespace.key` — why it needs a native check.
 
 - `setup.itsCalled` — the free-text affordance on the companion-object naming chip 「なまえが あるよ…」; should invite the parent to type the toy's pet name — check register against `setup.someoneElse` (「だれか ほかのひと…」 pattern).
 - `setup.objectNamePlaceholder` — input placeholder 「なんて よんでいますか？」; the subject is the child's beloved toy/object ("what do you [as a family] call it?") — confirm it can't read as asking the reader's own name.
+
+## 2026-07-12 — X3 learning words (expansion/x3-learning-words)
+
+- `setup.learningWordsAdd` — collapsed affordance in the framing block 「いま おきにいりの ことばは ありますか？」; curiosity register, must not read as a study feature.
+- `setup.learningWordsPlaceholder` — chip input placeholder 「ことばを いれてね」.
+- `setup.learningWordRemove` — aria-label for removing a word chip 「{word} を けす」; check けす vs 削除 for the register.

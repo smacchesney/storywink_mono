@@ -27,6 +27,7 @@ export interface SetupFormState {
   captureQuestions: CaptureQuestion[];
   artStyle: StyleKey;
   tone: StoryMood | null;
+  learningWords: string[];
   reviewFirst: boolean;
 }
 
@@ -195,8 +196,10 @@ export function SetupSheet({
       <StoryFraming
         tone={form.tone}
         eventSummary={form.eventSummary}
+        learningWords={form.learningWords}
         onToneChange={(v) => onChange('tone', v)}
         onSummaryChange={(v) => onChange('eventSummary', v)}
+        onLearningWordsChange={(v) => onChange('learningWords', v)}
       />
 
       {/* Capture chips — space is reserved while the librarian reads, and the

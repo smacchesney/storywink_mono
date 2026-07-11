@@ -50,6 +50,7 @@ interface BookData {
   artStyle: string | null;
   tone: string | null;
   eventSummary: string | null;
+  learningWords: { word?: string }[] | null;
   captureQuestions: CaptureQuestion[] | null;
   autoIllustrate: boolean;
   createdAt: string;
@@ -79,6 +80,7 @@ export default function SetupPage() {
     captureQuestions: [],
     artStyle: DEFAULT_STYLE,
     tone: null,
+    learningWords: [],
     reviewFirst: false,
   });
 
@@ -89,6 +91,7 @@ export default function SetupPage() {
     eventSummary: false,
     captureQuestions: false,
     tone: false,
+    learningWords: false,
   });
   const isMountedRef = useRef(true);
 
@@ -146,6 +149,14 @@ export default function SetupPage() {
         (STORY_MOODS as readonly string[]).includes(book.tone)
       ) {
         next.tone = book.tone as StoryMood;
+      }
+      // Resumed drafts show their earlier learning words; parent edits win.
+      if (!touched.current.learningWords && Array.isArray(book.learningWords)) {
+        const words = (book.learningWords as { word?: string }[])
+          .map((w) => (typeof w?.word === 'string' ? w.word : ''))
+          .filter(Boolean)
+          .slice(0, 4);
+        if (words.length > 0) next.learningWords = words;
       }
       return next;
     });
@@ -376,6 +387,8 @@ export default function SetupPage() {
         patchBody.eventSummary = form.eventSummary.trim();
       // Only ever set by a tap on the mood row — provenance stays parental.
       if (form.tone) patchBody.tone = form.tone;
+      if (form.learningWords.length > 0)
+        patchBody.learningWords = form.learningWords.map((word) => ({ word }));
       if (form.captureQuestions.length > 0)
         patchBody.captureQuestions = form.captureQuestions;
 

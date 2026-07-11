@@ -160,7 +160,10 @@
     "stripAlt": "おしゃしんを よんでいる マスコット",
     "howToTellIt": "どんなふうに つたえましょう？",
     "editSummary": "なおす",
-    "addNote": "そのひの メモを かく"
+    "addNote": "そのひの メモを かく",
+    "learningWordsAdd": "いま おきにいりの ことばは ありますか？",
+    "learningWordRemove": "{word} を けす",
+    "learningWordsPlaceholder": "ことばを いれてね"
   },
   "progress": {
     "readingPhotos": "しゃしんを みています…",

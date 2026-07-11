@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { PAGE_TEXT } from '@storywink/shared/constants';
 import { collageSlots } from '@storywink/shared/collage';
+import { splitEmphasisSegments } from '@storywink/shared/text-emphasis';
 import { MASCOT_CATS_SITTING } from '@/lib/mascots';
 import { tinyThumbUrl } from '@/lib/cloudinary-loader';
 import BookArtImage from './BookArtImage';
@@ -319,6 +320,18 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     />
   );
 
+  /** Story text with learning words emphasized (bold + coral, same size). */
+  const renderStoryText = (page: Page) =>
+    splitEmphasisSegments(page.text || '', page.learningWordsUsed ?? []).map((seg, i) =>
+      seg.emphasized ? (
+        <strong key={i} className="text-coral" style={{ fontWeight: 700 }}>
+          {seg.text}
+        </strong>
+      ) : (
+        <React.Fragment key={i}>{seg.text}</React.Fragment>
+      )
+    );
+
   /** Render a single display page */
   const renderDisplayPage = (dp: DisplayPage<Page>, index: number) => {
     // Container-relative font sizes (scale with page width, not viewport)
@@ -611,7 +624,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
               {dp.page.text && dp.page.text.trim() && (
                 <p className={`${storyFontClass} text-[#1a1a1a] text-center leading-snug`}
                    style={{ fontSize: `${bodySize}px` }}>
-                  {dp.page.text}
+                  {renderStoryText(dp.page)}
                 </p>
               )}
             </div>
@@ -665,7 +678,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
           <div className="absolute inset-0 flex items-center justify-center p-[10%]">
             <p className={`${textFontClass} text-[#1a1a1a] text-center leading-relaxed`}
                style={{ fontSize: `${bodySize}px` }}>
-              {dp.page.text}
+              {renderStoryText(dp.page)}
             </p>
           </div>
         ) : imageUrl ? (

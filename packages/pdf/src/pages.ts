@@ -1,5 +1,6 @@
 import { PAGE_TEXT } from '@storywink/shared/constants';
 import { escapeHtml } from './escape.js';
+import { splitEmphasisSegments } from '@storywink/shared/text-emphasis';
 import { generateCollagePagesHtml } from './collage-page.js';
 import type { BookWithPages, ImageUrlTransform, Page } from './types.js';
 import {
@@ -97,7 +98,15 @@ export function generateTextPageHtml(page: Page, language: string): string {
     word-break: ${language === 'ja' ? 'auto-phrase' : 'normal'};
   `;
 
-  const text = escapeHtml(page.text || '');
+  // Learning words render bold + coral — same face, same size, one treatment.
+  // Books without them hit the single-plain-segment path: byte-identical HTML.
+  const text = splitEmphasisSegments(page.text || '', page.learningWordsUsed ?? [])
+    .map((seg) =>
+      seg.emphasized
+        ? `<strong style="color: #F76C5E; font-weight: 700;">${escapeHtml(seg.text)}</strong>`
+        : escapeHtml(seg.text)
+    )
+    .join('');
 
   return `
     <div class="page" style="${pageStyle}">

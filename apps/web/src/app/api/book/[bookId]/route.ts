@@ -61,6 +61,11 @@ const updateBookSchema = z.object({
   theme: z.string().max(100).nullable().optional(),
   // The experience-capture fields the setup surface fills before generation.
   eventSummary: z.string().max(500).nullable().optional(),
+  learningWords: z
+    .array(z.object({ word: z.string().min(1).max(30) }))
+    .max(4)
+    .nullable()
+    .optional(),
   captureQuestions: z.array(captureQuestionSchema).max(10).nullable().optional(),
   autoIllustrate: z.boolean().optional(),
 }).strict(); // Ensure no extra fields are passed

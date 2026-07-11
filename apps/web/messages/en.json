@@ -160,7 +160,10 @@
     "stripAlt": "Our mascot, reading your photos",
     "howToTellIt": "How should we tell it?",
     "editSummary": "Fix this",
-    "addNote": "Add a note about the day"
+    "addNote": "Add a note about the day",
+    "learningWordsAdd": "Any words they're loving right now?",
+    "learningWordRemove": "Remove {word}",
+    "learningWordsPlaceholder": "Type a word"
   },
   "progress": {
     "readingPhotos": "Reading your photos…",

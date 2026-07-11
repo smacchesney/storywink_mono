@@ -13,8 +13,11 @@ import { cn } from '@/lib/utils';
 interface StoryFramingProps {
   tone: StoryMood | null;
   eventSummary: string;
+  /** Words the child is loving right now (max 4) — woven into the story. */
+  learningWords: string[];
   onToneChange: (tone: StoryMood | null) => void;
   onSummaryChange: (summary: string) => void;
+  onLearningWordsChange: (words: string[]) => void;
 }
 
 /**
@@ -27,14 +30,24 @@ interface StoryFramingProps {
 export function StoryFraming({
   tone,
   eventSummary,
+  learningWords,
   onToneChange,
   onSummaryChange,
+  onLearningWordsChange,
 }: StoryFramingProps) {
   const t = useTranslations('setup');
   const locale = useLocale() === 'ja' ? 'ja' : 'en';
   // Once the parent opens the textarea it stays open for the session — the
   // second tap into it is what opts into the keyboard (never autofocused).
   const [expanded, setExpanded] = React.useState(false);
+  const [wordsExpanded, setWordsExpanded] = React.useState(false);
+
+  const commitWord = (raw: string, input: HTMLInputElement) => {
+    const word = raw.trim().slice(0, 30);
+    input.value = '';
+    if (!word || learningWords.includes(word) || learningWords.length >= 4) return;
+    onLearningWordsChange([...learningWords, word]);
+  };
 
   const hasSummary = eventSummary.trim().length > 0;
 
@@ -100,6 +113,47 @@ export function StoryFraming({
           className="min-h-[44px] self-start px-1 text-left font-playful text-sm text-gray-500 underline decoration-black/20 decoration-dashed underline-offset-4 transition-colors hover:text-gray-700"
         >
           {t('addNote')}
+        </button>
+      )}
+
+      {/* Learning words — curiosity, never curriculum. Collapsed to one quiet
+          line; expanding shows removable word chips plus a small input. */}
+      {wordsExpanded || learningWords.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {learningWords.map((word) => (
+            <button
+              key={word}
+              type="button"
+              aria-label={t('learningWordRemove', { word })}
+              onClick={() => onLearningWordsChange(learningWords.filter((w) => w !== word))}
+              className="rounded-full border border-coral bg-coral px-3 py-1 text-sm font-playful text-white"
+            >
+              {word} ×
+            </button>
+          ))}
+          {learningWords.length < 4 && (
+            <input
+              type="text"
+              maxLength={30}
+              placeholder={t('learningWordsPlaceholder')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  commitWord(e.currentTarget.value, e.currentTarget);
+                }
+              }}
+              onBlur={(e) => commitWord(e.currentTarget.value, e.currentTarget)}
+              className="h-[30px] w-40 rounded-full border border-black/10 bg-white px-3 text-sm font-playful text-gray-800 focus:border-coral focus:outline-none focus:ring-1 focus:ring-coral"
+            />
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setWordsExpanded(true)}
+          className="min-h-[44px] self-start px-1 text-left font-playful text-sm text-gray-500 underline decoration-black/20 decoration-dashed underline-offset-4 transition-colors hover:text-gray-700"
+        >
+          {t('learningWordsAdd')}
         </button>
       )}
     </section>
