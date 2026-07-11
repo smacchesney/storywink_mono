@@ -75,6 +75,7 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
     if (dp.type === 'dedication') return `Dedication page${isActive ? ' (current)' : ''}`;
     if (dp.type === 'ending') return `Ending page${isActive ? ' (current)' : ''}`;
     if (dp.type === 'back-cover') return `Back cover${isActive ? ' (current)' : ''}`;
+    if (dp.type === 'collage') return `Photo collage${isActive ? ' (current)' : ''}`;
     if (dp.type === 'story') return `Page ${dp.page.pageNumber}${isActive ? ' (current)' : ''}`;
     return `${dp.type === 'text' ? 'Text' : 'Illustration'} - Page ${dp.page.pageNumber}${isActive ? ' (current)' : ''}`;
   };
@@ -85,6 +86,7 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
     if (dp.type === 'dedication') return '❤';
     if (dp.type === 'ending') return 'End';
     if (dp.type === 'back-cover') return 'Back';
+    if (dp.type === 'collage') return '📷';
     if (dp.type === 'story') return `${dp.page.pageNumber}`;
     return `${dp.page.pageNumber}${dp.type === 'text' ? 'T' : ''}`;
   };
@@ -95,6 +97,7 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
     if (dp.type === 'dedication') return `dedication-${index}`;
     if (dp.type === 'ending') return `ending-${index}`;
     if (dp.type === 'back-cover') return `back-cover-${index}`;
+    if (dp.type === 'collage') return `collage-${dp.seq}-${index}`;
     return `${dp.page.id}-${dp.type}-${index}`;
   };
 

@@ -14,6 +14,8 @@
  * unit-testable.
  */
 
+import { planCollage, collageSubline, MAX_COLLAGE_PHOTOS } from '@storywink/shared/collage';
+
 export type BookLayout = 'spread' | 'portrait';
 
 /** The slice of a Page the display layout needs. Prisma's Page satisfies it. */
@@ -33,6 +35,15 @@ export type DisplayPage<P extends DisplaySourcePage = DisplaySourcePage> =
   | { type: 'story'; page: P; language: string }
   | { type: 'dedication'; childName: string | null; bookTitle: string; language: string }
   | { type: 'ending'; childName: string | null; bookTitle: string; language: string }
+  | {
+      type: 'collage';
+      photos: { id: string; url: string }[];
+      withHeading: boolean;
+      withMascot: boolean;
+      language: string;
+      subline: string;
+      seq: number;
+    }
   | { type: 'back-cover' }
   | { type: 'blank' };
 
@@ -42,6 +53,41 @@ export interface BuildDisplayPagesOptions {
   language?: string;
   /** Defaults to 'spread' — the print-faithful layout existing callers get. */
   layout?: BookLayout;
+  /**
+   * Original photos for the real-moments collage (flag-gated by the caller).
+   * Omitted/empty = no collage entries, byte-identical to the legacy layout.
+   */
+  collagePhotos?: { id: string; url: string }[];
+  /** Book creation date for the collage subline ("July 2026"). */
+  collageCreatedAt?: Date | string | null;
+}
+
+/** Collage display entries chunked per the shared plan (same as print). */
+function buildCollageEntries<P extends DisplaySourcePage>(
+  options: BuildDisplayPagesOptions | undefined,
+  language: string,
+): DisplayPage<P>[] {
+  const photos = (options?.collagePhotos ?? []).slice(0, MAX_COLLAGE_PHOTOS);
+  const plan = planCollage(photos.length);
+  if (plan.perPage.length === 0) return [];
+  const subline = options?.collageCreatedAt
+    ? collageSubline(options.collageCreatedAt, language)
+    : '';
+  const entries: DisplayPage<P>[] = [];
+  let offset = 0;
+  plan.perPage.forEach((count, i) => {
+    entries.push({
+      type: 'collage',
+      photos: photos.slice(offset, offset + count),
+      withHeading: i === 0,
+      withMascot: i === plan.perPage.length - 1,
+      language,
+      subline,
+      seq: i,
+    });
+    offset += count;
+  });
+  return entries;
 }
 
 /**
@@ -95,6 +141,7 @@ export function buildDisplayPages<P extends DisplaySourcePage>(
       bookTitle: options?.bookTitle ?? 'You',
       language,
     });
+    displayPages.push(...buildCollageEntries<P>(options, language));
     displayPages.push({ type: 'back-cover' });
     return displayPages;
   }
@@ -127,8 +174,14 @@ export function buildDisplayPages<P extends DisplaySourcePage>(
     bookTitle: options?.bookTitle ?? 'You',
     language,
   });
-  // Blank padding (right side, keeps middle page count even)
-  displayPages.push({ type: 'blank' });
+  // Real-moments collage pages follow the ending (mirrors print order).
+  const collageEntries = buildCollageEntries<P>(options, language);
+  displayPages.push(...collageEntries);
+  // Blank padding keeps the middle page count even so the back cover sits
+  // solo-left. An odd number of collage pages fills that slot itself.
+  if (collageEntries.length % 2 === 0) {
+    displayPages.push({ type: 'blank' });
+  }
   // Back cover (solo left with showCover)
   displayPages.push({ type: 'back-cover' });
   return displayPages;
@@ -148,6 +201,8 @@ function displayKey<P extends DisplaySourcePage>(dp: DisplayPage<P>, index: numb
       return 'ending';
     case 'back-cover':
       return 'back-cover';
+    case 'collage':
+      return `collage:${dp.seq}`;
     case 'blank':
       return null;
     case 'story':

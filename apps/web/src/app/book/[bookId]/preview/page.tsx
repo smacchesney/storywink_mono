@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -33,7 +33,9 @@ import { isPrintShippableLocale } from '@/lib/print-availability';
 import { track } from '@/lib/track';
 
 // Define a type for the book data we expect, including pages
-type BookWithPages = Book & { pages: Page[] };
+type BookWithPages = Book & {
+  pages: (Page & { asset?: { id: string; url: string; thumbnailUrl: string | null } | null })[];
+};
 
 // Placeholder for a server action or API route call
 async function fetchBookData(bookId: string): Promise<BookWithPages | null> {
@@ -192,11 +194,26 @@ function BookPreviewContent() {
     }
   }, [book]);
 
+  // Real-moments collage (flag-gated): original photos for the flipbook's
+  // scatter page(s). Uses the Asset relation the GET route already includes.
+  const collagePhotos = useMemo(
+    () =>
+      process.env.NEXT_PUBLIC_COLLAGE_PAGES_ENABLED === 'true' && book
+        ? book.pages
+            .filter((p) => p.asset?.url)
+            .map((p) => ({ id: p.id, url: p.asset!.url }))
+        : undefined,
+    [book]
+  );
+  const collageOptions = collagePhotos
+    ? { collagePhotos, collageCreatedAt: book?.createdAt ?? null }
+    : {};
+
   // Handler for selecting a display page from the gallery (1-based index)
   const handleDisplayPageSelect = (displayIndex: number) => {
     setCurrentDisplayIndex(displayIndex);
     if (flipbookRef.current?.pageFlip) {
-       const totalDisplayPages = book ? buildDisplayPages(book.pages, { childName: book.childName, bookTitle: book.title, language: book.language, layout }).length : 1;
+       const totalDisplayPages = book ? buildDisplayPages(book.pages, { childName: book.childName, bookTitle: book.title, language: book.language, layout, ...collageOptions }).length : 1;
        const pageIndex = Math.max(0, Math.min(displayIndex - 1, totalDisplayPages - 1));
        flipbookRef.current.pageFlip().turnToPage(pageIndex);
     }
@@ -490,7 +507,7 @@ function BookPreviewContent() {
   }
 
   if (isReadableStatus(book.status)) {
-    const displayPages = buildDisplayPages(book.pages, { childName: book.childName, bookTitle: book.title, language: book.language, layout });
+    const displayPages = buildDisplayPages(book.pages, { childName: book.childName, bookTitle: book.title, language: book.language, layout, ...collageOptions });
     const totalDisplayPages = displayPages.length;
     // Disable prev/next based on current display index
     const canFlipPrev = currentDisplayIndex > 1;
@@ -664,6 +681,8 @@ function BookPreviewContent() {
             childName={book.childName}
             bookTitle={book.title}
             language={book.language}
+            collagePhotos={collagePhotos}
+            collageCreatedAt={book.createdAt}
           />
 
           {/* Screen-reader page announcement */}

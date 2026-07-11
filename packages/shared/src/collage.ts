@@ -56,13 +56,13 @@ const SLOT_TABLES: Record<number, CollageSlot[]> = {
   5: [
     { xIn: 2.5, yIn: 2.95, windowIn: 2.4, rotationDeg: -5 },
     { xIn: 6.15, yIn: 2.85, windowIn: 2.3, rotationDeg: 4 },
-    { xIn: 4.35, yIn: 4.7, windowIn: 2.5, rotationDeg: -2 },
+    { xIn: 4.35, yIn: 4.65, windowIn: 2.35, rotationDeg: -2 },
     { xIn: 2.55, yIn: 6.15, windowIn: 2.3, rotationDeg: 3 },
     { xIn: 6.2, yIn: 6.1, windowIn: 2.4, rotationDeg: -4 },
   ],
   6: [
     { xIn: 2.35, yIn: 2.85, windowIn: 2.2, rotationDeg: -4 },
-    { xIn: 4.4, yIn: 2.6, windowIn: 2.1, rotationDeg: 3 },
+    { xIn: 4.4, yIn: 3.0, windowIn: 2.1, rotationDeg: 3 },
     { xIn: 6.45, yIn: 2.95, windowIn: 2.2, rotationDeg: -2 },
     { xIn: 2.45, yIn: 6.2, windowIn: 2.2, rotationDeg: 2 },
     { xIn: 4.5, yIn: 6.15, windowIn: 2.3, rotationDeg: -5 },
@@ -144,4 +144,15 @@ export function printPageCounts(photoCount: number, collageEnabled: boolean): Pr
       collagePages,
     }),
   };
+}
+
+/** "July 2026" / "2026年7月" subline under the collage heading. */
+export function collageSubline(createdAt: Date | string, language: string): string {
+  const d = new Date(createdAt);
+  if (language === 'ja') return `${d.getFullYear()}年${d.getMonth() + 1}月`;
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  return `${months[d.getMonth()]} ${d.getFullYear()}`;
 }

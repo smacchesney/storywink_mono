@@ -207,3 +207,65 @@ describe('remapDisplayIndex — rotation keeps the reader on the same beat', () 
     expect(remapDisplayIndex(fromPortrait, story2Idx, target)).toBe(endingIdx);
   });
 });
+
+describe('collage display entries', () => {
+  const photos = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ id: `p${i + 1}`, url: `https://x/${i + 1}.jpg` }));
+
+  it('spread: collage follows the ending; odd collage count replaces the parity blank', () => {
+    const pages = buildDisplayPages(makeBook(3), {
+      layout: 'spread',
+      collagePhotos: photos(4),
+      collageCreatedAt: new Date('2026-07-05T00:00:00Z'),
+    });
+    const types = pages.map((p) => p.type);
+    const endingIdx = types.indexOf('ending');
+    expect(types.slice(endingIdx)).toEqual(['ending', 'collage', 'back-cover']);
+  });
+
+  it('spread: two collage pages keep the parity blank', () => {
+    const pages = buildDisplayPages(makeBook(3), {
+      layout: 'spread',
+      collagePhotos: photos(10),
+    });
+    const types = pages.map((p) => p.type);
+    const endingIdx = types.indexOf('ending');
+    expect(types.slice(endingIdx)).toEqual(['ending', 'collage', 'collage', 'blank', 'back-cover']);
+  });
+
+  it('no collagePhotos = legacy layout byte-for-byte', () => {
+    expect(buildDisplayPages(makeBook(3), { layout: 'spread' })).toEqual(
+      buildDisplayPages(makeBook(3), { layout: 'spread', collagePhotos: [] })
+    );
+  });
+
+  it('portrait: collage sits between ending and back cover', () => {
+    const pages = buildDisplayPages(makeBook(3), {
+      layout: 'portrait',
+      collagePhotos: photos(5),
+    });
+    const types = pages.map((p) => p.type);
+    expect(types.slice(-3)).toEqual(['ending', 'collage', 'back-cover']);
+  });
+
+  it('collage carries heading on first page, mascot on last, subline from createdAt', () => {
+    const pages = buildDisplayPages(makeBook(3), {
+      layout: 'spread',
+      collagePhotos: photos(10),
+      collageCreatedAt: new Date('2026-07-05T00:00:00Z'),
+    });
+    const collages = pages.filter((p) => p.type === 'collage');
+    expect(collages).toHaveLength(2);
+    expect(collages[0]).toMatchObject({ withHeading: true, withMascot: false, subline: 'July 2026', seq: 0 });
+    expect(collages[1]).toMatchObject({ withHeading: false, withMascot: true, seq: 1 });
+  });
+
+  it('remap lands on the same collage page across layouts', () => {
+    const opts = { collagePhotos: photos(10) };
+    const spread = buildDisplayPages(makeBook(3), { ...opts, layout: 'spread' as const });
+    const portrait = buildDisplayPages(makeBook(3), { ...opts, layout: 'portrait' as const });
+    const spreadIdx = spread.findIndex((p) => p.type === 'collage' && p.seq === 1);
+    const target = remapDisplayIndex(spread, spreadIdx, portrait);
+    expect(portrait[target]).toMatchObject({ type: 'collage', seq: 1 });
+  });
+});

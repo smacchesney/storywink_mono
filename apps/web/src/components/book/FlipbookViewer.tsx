@@ -7,6 +7,8 @@ import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { PAGE_TEXT } from '@storywink/shared/constants';
+import { collageSlots } from '@storywink/shared/collage';
+import { MASCOT_CATS_SITTING } from '@/lib/mascots';
 import { tinyThumbUrl } from '@/lib/cloudinary-loader';
 import BookArtImage from './BookArtImage';
 import {
@@ -47,6 +49,10 @@ interface FlipbookViewerProps {
   childName?: string | null;
   bookTitle?: string;
   language?: string;
+  /** Original photos for the real-moments collage (flag-gated by the caller). */
+  collagePhotos?: { id: string; url: string }[];
+  /** Book creation date for the collage subline. */
+  collageCreatedAt?: Date | string | null;
 }
 
 // Define the type for the imperative handle
@@ -58,6 +64,8 @@ export interface FlipbookActions {
 const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
   {
     pages,
+    collagePhotos,
+    collageCreatedAt,
     coverImageUrl,
     initialPageNumber = 1,
     onPageChange,
@@ -175,8 +183,16 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
 
   // Build interleaved display pages for the active layout
   const displayPages = useMemo(
-    () => buildDisplayPages(pages, { childName, bookTitle, language, layout }),
-    [pages, childName, bookTitle, language, layout]
+    () =>
+      buildDisplayPages(pages, {
+        childName,
+        bookTitle,
+        language,
+        layout,
+        collagePhotos,
+        collageCreatedAt,
+      }),
+    [pages, childName, bookTitle, language, layout, collagePhotos, collageCreatedAt]
   );
 
   // Warm-window image mounting: pages near the reader (current ± 3) mount
@@ -454,6 +470,102 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
         </p>
       </div>
     );
+
+    // Real-moments collage: the same slot geometry print uses, scaled from
+    // the 8.75in page to this container's pixels.
+    if (dp.type === 'collage') {
+      const scale = pageWidth / 8.75;
+      const texts = PAGE_TEXT[dp.language as keyof typeof PAGE_TEXT] || PAGE_TEXT.en;
+      const collageTitle =
+        (texts as { collageTitle?: string }).collageTitle ?? PAGE_TEXT.en.collageTitle;
+      const collageFontClass = dp.language === 'ja' ? 'font-japanese' : 'font-playful';
+      const slots = collageSlots(dp.photos.length);
+      // Screen cells: square face-centered crop when the URL carries no prior
+      // transform; thumbnails (originalImageUrl can be a 200px derivative)
+      // pass through untouched rather than upscaling.
+      const cellUrl = (url: string) =>
+        /\/image\/upload\/v\d/.test(url)
+          ? url.replace('/upload/', '/upload/f_auto,q_auto,c_lfill,w_480,h_480,g_auto:faces/')
+          : url;
+      return (
+        <div
+          key={`collage-${dp.seq}-${index}`}
+          className="rounded-lg overflow-hidden border border-black/15"
+          style={{ backgroundColor: '#FFFDF8' }}
+        >
+          <div className="absolute inset-0">
+            {dp.withHeading && (
+              <div
+                className="absolute left-0 w-full text-center"
+                style={{ top: 0.55 * scale }}
+              >
+                <p
+                  className={`${collageFontClass} font-bold text-[#1a1a1a]`}
+                  style={{ fontSize: `${titleSize}px`, margin: 0 }}
+                >
+                  {collageTitle} <span style={{ color: '#F76C5E' }}>♥</span>
+                </p>
+                {dp.subline && (
+                  <p
+                    className={`${collageFontClass} text-[#8a8a8a]`}
+                    style={{ fontSize: `${smallBodySize}px`, margin: 0 }}
+                  >
+                    {dp.subline}
+                  </p>
+                )}
+              </div>
+            )}
+            {dp.photos.map((photo, i) => {
+              const slot = slots[i];
+              const outerW = (slot.windowIn + 0.3) * scale;
+              const outerH = (slot.windowIn + 0.7) * scale;
+              const left = slot.xIn * scale - outerW / 2;
+              const top = (slot.yIn - slot.windowIn / 2 - 0.15) * scale;
+              const win = slot.windowIn * scale;
+              return (
+                <div
+                  key={photo.id}
+                  className="absolute bg-white shadow-md"
+                  style={{
+                    left,
+                    top,
+                    width: outerW,
+                    height: outerH,
+                    padding: 0.15 * scale,
+                    boxSizing: 'border-box',
+                    transform: `rotate(${slot.rotationDeg}deg)`,
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={cellUrl(photo.url)}
+                    alt=""
+                    className="block object-cover"
+                    style={{ width: win, height: win }}
+                    loading="lazy"
+                  />
+                </div>
+              );
+            })}
+            {dp.withMascot && (
+              <Image
+                src={MASCOT_CATS_SITTING}
+                alt="Storywink mascot"
+                width={200}
+                height={200}
+                className="absolute object-contain"
+                style={{
+                  bottom: 0.45 * scale,
+                  right: 0.5 * scale,
+                  height: '9%',
+                  width: 'auto',
+                }}
+              />
+            )}
+          </div>
+        </div>
+      );
+    }
 
     // Portrait-only combined page: square art on top, text strip below —
     // the words stay on screen with their picture.

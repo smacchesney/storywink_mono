@@ -7,7 +7,12 @@
  * Page.originalImageUrl can be a 200px thumbnail and must never reach print.
  */
 import { PAGE_TEXT } from '@storywink/shared/constants';
-import { collageSlots, planCollage, MAX_COLLAGE_PHOTOS } from '@storywink/shared/collage';
+import {
+  collageSlots,
+  planCollage,
+  collageSubline,
+  MAX_COLLAGE_PHOTOS,
+} from '@storywink/shared/collage';
 import type { CollageSlot } from '@storywink/shared/collage';
 import type { BookWithPages, ImageUrlTransform } from './types.js';
 import {
@@ -18,6 +23,8 @@ import {
   brandingFontFamily,
 } from './constants.js';
 import { escapeHtml } from './escape.js';
+
+export { collageSubline } from '@storywink/shared/collage';
 
 export interface CollagePhoto {
   url: string;
@@ -52,16 +59,6 @@ export function collageCellUrl(url: string, windowIn: number): string {
   );
 }
 
-/** "July 2026" / "2026年7月" subline under the heading. */
-export function collageSubline(createdAt: Date, language: string): string {
-  const d = new Date(createdAt);
-  if (language === 'ja') return `${d.getFullYear()}年${d.getMonth() + 1}月`;
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-  return `${months[d.getMonth()]} ${d.getFullYear()}`;
-}
 
 /** A small hand-drawn coral heart — the page's single brand accent. */
 const CORAL_HEART_SVG = `<svg width="26" height="24" viewBox="0 0 26 24" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-left: 0.12in;"><path d="M13 21C9 17 2.5 12.5 2.5 7.5 2.5 4.4 5 2.5 7.6 2.5 9.7 2.5 11.9 3.8 13 6 14.1 3.8 16.3 2.5 18.4 2.5 21 2.5 23.5 4.4 23.5 7.5 23.5 12.5 17 17 13 21Z" fill="${CORAL_COLOR}" opacity="0.9"/></svg>`;
