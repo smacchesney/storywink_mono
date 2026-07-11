@@ -71,6 +71,7 @@ model Book {
   qcRound           Int            @default(0) // Current QC iteration (0 = first pass, 1+ = re-illustration)
   autoIllustrate    Boolean        @default(false) // Chain straight into illustration after story success (DB default false keeps pre-existing books on the manual flow; create route sets true for new books)
   eventSummary      String?   // One-line "what actually happened" brief — AI-drafted from photos, parent-editable, feeds the story prompt (supersedes theme when present)
+  learningWords      Json?
   captureQuestions  Json?     // Photo-derived micro-questions + parent's tapped answers: [{id, question, options[], answer|null}]
   generationPhase   String?   // Fine-grained pipeline phase for progress UI (finer than BookStatus)
   firstViewedAt     DateTime? // First time the owner opened a readable preview — gates the one-time reveal
@@ -105,6 +106,7 @@ model Page {
   text              String?
   textConfirmed     Boolean? @default(false)
   illustrationNotes String?
+  learningWordsUsed String[]  @default([])
   analysis          Json?    // Photo perception: {assetId, setting, action, emotion, eventSignals[], narrativeRole} — assetId marks freshness (stale when the photo was swapped)
 
   isTitlePage Boolean @default(false)

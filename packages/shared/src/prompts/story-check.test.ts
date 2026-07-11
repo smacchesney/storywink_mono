@@ -4,6 +4,7 @@ import {
   isChildNameCheckable,
   countChildNameEchoes,
   createStoryQCPrompt,
+  countLearningWordEchoes,
 } from './story-check.js';
 import type { StoryArc } from './story.js';
 
@@ -180,5 +181,18 @@ describe('createStoryQCPrompt context block', () => {
     // Facts render only under the eventSummary-present condition, mirroring generation.
     expect(prompt).not.toContain('Parent confirmed');
     expect(prompt).toContain('No event summary was provided — return null.');
+  });
+});
+
+describe('countLearningWordEchoes', () => {
+  it('counts pages containing the word on boundaries (en)', () => {
+    const pages = ['Splash! goes Mia.', 'The catalog page.', 'One more splash.'];
+    expect(countLearningWordEchoes('splash', pages, 'en')).toBe(2);
+    expect(countLearningWordEchoes('cat', pages, 'en')).toBe(0);
+  });
+
+  it('counts CJK words as substrings (ja)', () => {
+    const pages = ['かさを さして', 'あめが ざあざあ', 'かさは まほう'];
+    expect(countLearningWordEchoes('かさ', pages, 'ja')).toBe(2);
   });
 });

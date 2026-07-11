@@ -235,3 +235,24 @@ export function countChildNameEchoes(childName: string, pageTexts: string[]): Ch
     nameInLanding: flags.slice(pageTexts.length - landingSize).some(Boolean),
   };
 }
+
+/**
+ * LOG-ONLY: occurrences of one parent-supplied learning word across page
+ * texts (page-level presence count, mirroring countRefrainEchoes semantics).
+ * Latin words match on normalized word boundaries; CJK on compact substrings.
+ */
+export function countLearningWordEchoes(
+  word: string,
+  pageTexts: string[],
+  language: string = 'en',
+): number {
+  const clean = normalize(word);
+  if (!clean) return 0;
+  const latin = /[A-Za-zÀ-ɏ]/.test(clean);
+  return pageTexts.filter(text => {
+    const page = normalize(text);
+    return latin
+      ? ` ${page} `.includes(` ${clean} `)
+      : page.replace(/ /g, '').includes(clean.replace(/ /g, ''));
+  }).length;
+}

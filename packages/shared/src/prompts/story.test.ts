@@ -168,3 +168,25 @@ describe('createStoryGenerationPrompt — companion objects', () => {
     expect(text).toContain('Never name a pet or object');
   });
 });
+
+describe('createStoryGenerationPrompt — learning words', () => {
+  it('renders the weaving rules with the parent words and the child name', () => {
+    const text = promptText({ ...baseInput, learningWords: ['splash', 'umbrella'] });
+    expect(text).toContain('LEARNING WORDS');
+    expect(text).toContain('"splash", "umbrella"');
+    expect(text).toContain('3-4 times');
+    expect(text).toContain('END of a sentence');
+    expect(text).toContain('"Emma"');
+    expect(text).toContain('learningWordsUsed');
+  });
+
+  it('emits nothing without learning words', () => {
+    expect(promptText(baseInput)).not.toContain('LEARNING WORDS');
+  });
+
+  it('caps at four words', () => {
+    const text = promptText({ ...baseInput, learningWords: ['a', 'b', 'c', 'd', 'e'] });
+    expect(text).toContain('"a", "b", "c", "d"');
+    expect(text).not.toContain('"e"');
+  });
+});

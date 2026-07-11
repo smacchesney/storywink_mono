@@ -26,6 +26,10 @@
       "types": "./dist/collage.d.ts",
       "import": "./dist/collage.js"
     },
+    "./text-emphasis": {
+      "types": "./dist/text-emphasis.d.ts",
+      "import": "./dist/text-emphasis.js"
+    },
     "./types": {
       "types": "./dist/types.d.ts",
       "import": "./dist/types.js"

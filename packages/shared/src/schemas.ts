@@ -31,6 +31,11 @@ export const updateBookSchema = z.object({
   tone: z.enum(STORY_MOODS).nullable().optional(),
   theme: z.string().max(100).nullable().optional(),
   eventSummary: z.string().max(500).nullable().optional(),
+  learningWords: z
+    .array(z.object({ word: z.string().min(1).max(30) }))
+    .max(4)
+    .nullable()
+    .optional(),
   captureQuestions: z
     .array(
       z.object({

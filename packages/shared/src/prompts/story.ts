@@ -63,9 +63,14 @@ export const STORY_RESPONSE_SCHEMA = {
           illustrationNotes: {
             type: ['string', 'null'],
             description: 'Visual effects suggestion for the illustration, or null if none'
+          },
+          learningWordsUsed: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Which of the LEARNING WORDS (verbatim) appear in this page\'s text. Empty array when none or when no learning words were given.'
           }
         },
-        required: ['pageNumber', 'text', 'illustrationNotes'],
+        required: ['pageNumber', 'text', 'illustrationNotes', 'learningWordsUsed'],
         additionalProperties: false,
       }
     }
@@ -92,6 +97,11 @@ const BRIDGE_PAGES_SCHEMA = {
       text: {
         type: 'string',
         description: 'The story text for this bridge page (same rules as every page)',
+      },
+      learningWordsUsed: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Which of the LEARNING WORDS (verbatim) appear in this bridge text. Empty array when none.',
       },
       illustrationNotes: {
         type: ['string', 'null'],
@@ -127,7 +137,7 @@ const BRIDGE_PAGES_SCHEMA = {
         additionalProperties: false,
       },
     },
-    required: ['afterPhotoPage', 'text', 'illustrationNotes', 'scene'],
+    required: ['afterPhotoPage', 'text', 'illustrationNotes', 'learningWordsUsed', 'scene'],
     additionalProperties: false,
   },
 } as const;
@@ -159,6 +169,8 @@ export interface StoryGenerationInput {
   qcFeedback?: string; // Editorial corrections from a failed story-QC round, injected on regeneration
   eventSummary?: string; // Parent-confirmed "what actually happened" brief. When present it REPLACES theme in the prompt.
   confirmedFacts?: string[]; // Parent's tapped answers to photo-derived questions ("This was Emma's first beach trip")
+  /** Parent-supplied words the child is learning (max 4). Woven 3-4x each. */
+  learningWords?: string[];
   charactersInPhotos?: {
     /** Stable roster id — bridge pages reference characters by this id. */
     characterId?: string;
@@ -365,6 +377,21 @@ export function createStoryGenerationPrompt(
     `- Great refrains feel like a heartbeat: "Splish, splash, one more splash!" → "Splish, splash, the biggest splash!" → "Splish... splash... goodnight, little splash."`,
     `- Report this phrase in the "storyArc.refrain" field.`,
     ``,
+    ...(input.learningWords?.length
+      ? [
+          `## LEARNING WORDS (the parent is teaching these — weave, never force):`,
+          `- The parent says ${input.childName || 'the child'} is learning these words right now: ${input.learningWords
+            .slice(0, 4)
+            .map(w => `"${w}"`)
+            .join(', ')}.`,
+          `- Weave EACH word into the story 3-4 times, naturally — vary the sentence frame each time, exactly like the refrain.`,
+          `- Place at least one occurrence of each word at the END of a sentence in a predictable slot, so the reading parent can pause and let the child say it.`,
+          `- Prefer sentences that also contain ${input.childName ? `"${input.childName}"` : "the child's name"} — words land best next to the child's own name.`,
+          `- At most ONE learning word per page. Never stack two on the same page, never repeat a word twice in one sentence, never bend the story to fit a word — a word that doesn't fit this story is better used 3 times than forced 4.`,
+          `- For each page, report exactly which learning words its text contains in "learningWordsUsed" (verbatim strings from the list above; empty array when none).`,
+          ``,
+        ]
+      : []),
     `## Voice & Rhythm (critical for read-aloud quality):`,
     `- **Vary sentence structure**: mix short punchy fragments ("Splish!") with slightly longer flowing sentences. Avoid monotonous Subject-Verb-Object patterns.`,
     `- **Onomatopoeia and sound words** should feel organic to the scene — rumble, swoosh, crunch, pitter-pat — not forced.`,
@@ -469,6 +496,8 @@ export interface StoryPageResponse {
   pageNumber: number;
   text: string;
   illustrationNotes?: string | null;
+  /** Which parent-supplied learning words this page's text contains. */
+  learningWordsUsed?: string[];
 }
 
 export interface StoryArc {
@@ -498,6 +527,8 @@ export interface StoryBridgePageResponse {
   afterPhotoPage: number;
   text: string;
   illustrationNotes: string | null;
+  /** Which parent-supplied learning words this bridge text contains. */
+  learningWordsUsed?: string[];
   scene: BridgeScene;
 }
 
