@@ -272,17 +272,32 @@ export function createStoryGenerationPrompt(
       characterInstruction += `\n  - SUPPORTING CAST (from the actual photos — weave them in, don't just mention them):`;
       for (const c of supporting) {
         const isPet = c.role === 'pet';
+        const isObject = c.role === 'companion_object';
         const confirmedName =
           c.namedVia === 'chip' || c.namedVia === 'childName'
-            ? ` The parent confirmed this ${isPet ? "pet's" : "person's"} name: call them "${c.name}" in the story text.`
+            ? ` The parent confirmed this ${isObject ? "object's" : isPet ? "pet's" : "person's"} name: call ${isObject ? 'it' : 'them'} "${c.name}" in the story text.`
             : '';
         const petNote = isPet
           ? ` They are the family's animal companion — keep them a real animal (sounds, wags, nuzzles), never a talking character.`
           : '';
+        const objectNote = isObject
+          ? ` It is the child's beloved object — it can be hugged, carried, dropped, lost and found, tucked in; it never walks, talks, or acts on its own. Let it anchor emotional beats (comfort at the quiet moment, joining the landing).`
+          : '';
+        const supportingRole = isObject
+          ? `Weave it in as a treasured companion`
+          : `Give them a real supporting role`;
         if (c.appearsOnPages.length > 0) {
-          characterInstruction += `\n    - ${c.name} (${c.role.replace(/_/g, ' ')}) appears on page(s) ${c.appearsOnPages.join(', ')}. Give them a real supporting role in the story: introduce them naturally when they first appear, involve them in at least one emotional beat (a shared laugh, a steadying hand, a discovery together), and if they are present near the end, include them in the landing.${confirmedName}${petNote}`;
+          characterInstruction += `\n    - ${c.name} (${c.role.replace(/_/g, ' ')}) appears on page(s) ${c.appearsOnPages.join(', ')}. ${supportingRole}${
+            isObject
+              ? ` where it appears.`
+              : ` in the story: introduce them naturally when they first appear, involve them in at least one emotional beat (a shared laugh, a steadying hand, a discovery together), and if they are present near the end, include them in the landing.`
+          }${confirmedName}${petNote}${objectNote}`;
         } else {
-          characterInstruction += `\n    - ${c.name} (${c.role.replace(/_/g, ' ')}) appears in several of the photos (exact pages unknown). Give them a real supporting role wherever you can SEE them in the storyboard images: introduce them naturally where they first appear, and involve them in at least one emotional beat.${confirmedName}${petNote}`;
+          characterInstruction += `\n    - ${c.name} (${c.role.replace(/_/g, ' ')}) appears in several of the photos (exact pages unknown). ${supportingRole}${
+            isObject
+              ? ` wherever you can SEE it in the storyboard images.`
+              : ` wherever you can SEE them in the storyboard images: introduce them naturally where they first appear, and involve them in at least one emotional beat.`
+          }${confirmedName}${petNote}${objectNote}`;
         }
       }
       characterInstruction += `\n    - Never invent appearances: a character speaks or acts on a page ONLY if they are actually on that page (or plausibly just off-frame on an adjacent one).`;
@@ -297,7 +312,7 @@ export function createStoryGenerationPrompt(
     ``,
     `  - NEVER invent a proper name for anyone. Use ONLY the names given above.`,
     `  - For unnamed people, use the warm relationship word a toddler would say — "Grandma", "Grandpa", "Daddy", "Mummy", "Auntie", "the little sister" — based on their listed role. If the relationship is unclear, use a neutral warm term like "a friend".`,
-    `  - For unnamed pets, use simple animal words ("the dog", "the cat"). Never name a pet the parent didn't name. A pet the parent DID name is a character too — use that name.`,
+    `  - For unnamed pets, use simple animal words ("the dog", "the cat"). For unnamed beloved objects, use simple object words ("her bunny", "the blanket"). Never name a pet or object the parent didn't name. A pet or object the parent DID name is a character too — use that name.`,
   ].join('\n');
 
   // BRIDGE PAGES (BRIDGE_PAGES_ENABLED): rendered only when the worker set a

@@ -141,3 +141,30 @@ describe('createStoryGenerationPrompt — parent-picked mood', () => {
     expect(text).toContain('What actually happened');
   });
 });
+
+describe('createStoryGenerationPrompt — companion objects', () => {
+  it('a named companion object gets grounded-object instructions with the confirmed name', () => {
+    const text = promptText({
+      ...baseInput,
+      charactersInPhotos: [
+        { characterId: 'child_1', name: 'Emma', role: 'main_child', appearsOnPages: [1, 2] },
+        {
+          characterId: 'object_1',
+          name: 'Mr. Hoppy',
+          role: 'companion_object',
+          appearsOnPages: [1, 2],
+          namedVia: 'chip',
+        },
+      ],
+    });
+    expect(text).toContain('call it "Mr. Hoppy" in the story text');
+    expect(text).toContain('never walks, talks, or acts on its own');
+    expect(text).toContain('treasured companion');
+  });
+
+  it('unnamed objects get simple object words, never invented names', () => {
+    const text = promptText(baseInput);
+    expect(text).toContain('simple object words');
+    expect(text).toContain('Never name a pet or object');
+  });
+});
