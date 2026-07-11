@@ -13,6 +13,8 @@ import {
   bookGeneratedFolderPrefix,
   userUploadsFolderPrefix,
   type AssetCleanupJobPayload,
+  collectAvatarGeneratedPublicIds,
+  avatarGeneratedFolderPrefix,
 } from '@storywink/shared';
 
 // Lazy singleton for the asset-cleanup queue (the shared QueueName enum in
@@ -36,7 +38,7 @@ function getAssetCleanupQueue(): Queue {
  * every book of this user is being deleted.
  */
 async function collectUserCloudinaryTargets(dbUserId: string) {
-  const [assets, books] = await Promise.all([
+  const [assets, books, avatars] = await Promise.all([
     prisma.asset.findMany({ where: { userId: dbUserId }, select: { publicId: true } }),
     prisma.book.findMany({
       where: { userId: dbUserId },
@@ -47,16 +49,27 @@ async function collectUserCloudinaryTargets(dbUserId: string) {
         pages: { select: { generatedImageUrl: true } },
       },
     }),
+    prisma.avatar.findMany({
+      where: { userId: dbUserId },
+      select: {
+        id: true,
+        renditions: { select: { turnaroundSheetUrl: true, portraitUrl: true } },
+      },
+    }),
   ]);
 
   const publicIds = new Set<string>(assets.map((a) => a.publicId));
   for (const book of books) {
     for (const id of collectBookGeneratedPublicIds(book)) publicIds.add(id);
   }
+  for (const avatar of avatars) {
+    for (const id of collectAvatarGeneratedPublicIds(avatar.renditions)) publicIds.add(id);
+  }
 
   const prefixes = [
     userUploadsFolderPrefix(dbUserId),
     ...books.map((b) => bookGeneratedFolderPrefix(b.id)),
+    ...avatars.map((a) => avatarGeneratedFolderPrefix(a.id)),
   ];
 
   return { publicIds: Array.from(publicIds), prefixes };

@@ -10,6 +10,7 @@ import {
   isDraftSweepCandidate,
   assetCleanupJobSchema,
   chunkPublicIds,
+  collectAvatarGeneratedPublicIds,
 } from './cloudinary.js';
 
 const CLOUD = 'https://res.cloudinary.com/demo';
@@ -320,5 +321,34 @@ describe('chunkPublicIds', () => {
   it('throws on a non-positive size', () => {
     expect(() => chunkPublicIds(['a'], 0)).toThrow();
     expect(() => chunkPublicIds(['a'], -1)).toThrow();
+  });
+});
+
+describe('avatar folder safety (X6)', () => {
+  it('accepts a scoped avatar prefix', () => {
+    expect(isSafeCloudinaryPrefix('storywink/avatars/clx123abc456/')).toBe(true);
+  });
+
+  it('rejects the bare avatars folder — it is not a book id', () => {
+    expect(isSafeCloudinaryPrefix('storywink/avatars/')).toBe(false);
+  });
+
+  it('still accepts book and upload prefixes', () => {
+    expect(isSafeCloudinaryPrefix('storywink/clbook1234567/')).toBe(true);
+    expect(isSafeCloudinaryPrefix('user_cluser1234567/uploads/')).toBe(true);
+  });
+
+  it('collects rendition public ids', () => {
+    expect(
+      collectAvatarGeneratedPublicIds([
+        {
+          turnaroundSheetUrl:
+            'https://res.cloudinary.com/storywink/image/upload/v1/storywink/avatars/av1/sheet.png',
+          portraitUrl:
+            'https://res.cloudinary.com/storywink/image/upload/v1/storywink/avatars/av1/portrait.png',
+        },
+        { turnaroundSheetUrl: null, portraitUrl: null },
+      ])
+    ).toEqual(['storywink/avatars/av1/sheet', 'storywink/avatars/av1/portrait']);
   });
 });

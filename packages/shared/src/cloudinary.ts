@@ -160,11 +160,43 @@ export function userUploadsFolderPrefix(dbUserId: string): string {
   return `user_${dbUserId}/uploads/`;
 }
 
+/** The avatar-scoped folder rendition uploads target (sheets + portraits). */
+export function avatarGeneratedFolderPrefix(avatarId: string): string {
+  return `storywink/avatars/${avatarId}/`;
+}
+
+/** Minimal AvatarRendition projection for Cloudinary collection. */
+export interface AvatarRenditionContent {
+  turnaroundSheetUrl: string | null;
+  portraitUrl: string | null;
+}
+
+/**
+ * Public ids of everything generated for an avatar (sheets + portraits across
+ * all its renditions). Staged source photos are Asset rows and go through the
+ * shared-asset guard separately.
+ */
+export function collectAvatarGeneratedPublicIds(
+  renditions: ReadonlyArray<AvatarRenditionContent>,
+): string[] {
+  const ids = new Set<string>();
+  for (const rendition of renditions) {
+    for (const url of [rendition.turnaroundSheetUrl, rendition.portraitUrl]) {
+      const publicId = extractCloudinaryPublicId(url);
+      if (publicId) ids.add(publicId);
+    }
+  }
+  return [...ids];
+}
+
 // Defense in depth for prefix deletion: a bug that passed "storywink/" or
-// "user_" would wipe the whole account. Only the two exact folder shapes the
-// app writes to are ever accepted, and the scoping segment must be a
-// plausible id (cuid-like), not empty or a wildcard.
-const SAFE_PREFIX_RE = /^(storywink\/[a-z0-9][a-z0-9_-]{6,}\/|user_[a-z0-9][a-z0-9_-]{6,}\/uploads\/)$/i;
+// "user_" would wipe the whole account. Only the exact folder shapes the app
+// writes to are ever accepted, and the scoping segment must be a plausible id
+// (cuid-like), not empty or a wildcard. `storywink/avatars/` alone is NOT a
+// book folder — avatar prefixes must carry the avatarId segment, and the book
+// alternative explicitly refuses the literal "avatars" segment.
+const SAFE_PREFIX_RE =
+  /^(storywink\/avatars\/[a-z0-9][a-z0-9_-]{6,}\/|storywink\/(?!avatars\/)[a-z0-9][a-z0-9_-]{6,}\/|user_[a-z0-9][a-z0-9_-]{6,}\/uploads\/)$/i;
 
 /** True only for prefixes shaped exactly like the app's scoped folders. */
 export function isSafeCloudinaryPrefix(prefix: string): boolean {
@@ -223,7 +255,13 @@ export function isDraftSweepCandidate(
 // Cleanup job payload
 // ---------------------------------------------------------------------------
 
-export const ASSET_CLEANUP_REASONS = ['book_deleted', 'user_deleted', 'draft_expired'] as const;
+export const ASSET_CLEANUP_REASONS = [
+  'book_deleted',
+  'user_deleted',
+  'draft_expired',
+  'avatar_deleted',
+  'avatar_approved',
+] as const;
 export type AssetCleanupReason = (typeof ASSET_CLEANUP_REASONS)[number];
 
 /**

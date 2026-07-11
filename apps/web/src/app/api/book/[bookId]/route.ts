@@ -336,7 +336,7 @@ export async function DELETE(
       [...book.pages.map((p) => p.assetId), book.coverAssetId],
       [],
     );
-    const [externalPages, externalCovers] = await Promise.all([
+    const [externalPages, externalCovers, avatarStaged] = await Promise.all([
       prisma.page.findMany({
         where: { assetId: { in: candidateAssetIds }, bookId: { not: bookId } },
         select: { assetId: true },
@@ -345,10 +345,17 @@ export async function DELETE(
         where: { coverAssetId: { in: candidateAssetIds }, id: { not: bookId } },
         select: { coverAssetId: true },
       }),
+      // Photos staged for an avatar (delete-after-approval hasn't fired yet)
+      // must survive book deletion — the avatar pipeline still needs them.
+      prisma.avatarPhoto.findMany({
+        where: { assetId: { in: candidateAssetIds } },
+        select: { assetId: true },
+      }),
     ]);
     const deletableAssetIds = excludeSharedAssetIds(candidateAssetIds, [
       ...externalPages.map((p) => p.assetId),
       ...externalCovers.map((b) => b.coverAssetId),
+      ...avatarStaged.map((a) => a.assetId),
     ]);
     const deletableAssets = await prisma.asset.findMany({
       where: { id: { in: deletableAssetIds } },

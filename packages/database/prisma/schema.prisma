@@ -23,6 +23,29 @@ enum BookStatus {
   PARTIAL
 }
 
+enum BookType {
+  PHOTO_STORY
+  AVATAR_STORY
+}
+
+enum AvatarKind {
+  CHILD
+  ADULT
+  PET
+  TOY
+}
+
+enum AvatarStatus {
+  DRAFT
+  READY
+}
+
+enum RenditionStatus {
+  PENDING
+  READY
+  FAILED
+}
+
 enum PageType {
   SINGLE
   SPREAD
@@ -47,6 +70,7 @@ model User {
   notifications Notification[]
   cartItems     CartItem[]
   printOrders   PrintOrder[]
+  avatars       Avatar[]
 }
 
 model Book {
@@ -54,6 +78,7 @@ model Book {
   userId            String
   title             String
   status            BookStatus     @default(DRAFT)
+  bookType   BookType   @default(PHOTO_STORY)
   pageLength        Int // 8, 12, or 16
   language          String     @default("en") // "en" or "ja"
   artStyle          String?
@@ -87,6 +112,7 @@ model Book {
   cartItems         CartItem[]
   printOrders       PrintOrder[]
   illustrationQcResults IllustrationQcResult[]
+  bookAvatars BookAvatar[]
 
   @@index([userId])
   @@index([status])
@@ -141,8 +167,86 @@ model Asset {
   createdAt    DateTime @default(now())
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   pages        Page[] // Add relation back to Page model
+  avatarPhotos AvatarPhoto[]
 
   @@index([userId])
+}
+
+
+/**
+ * Account-level character: the child, a grown-up, a pet, or a beloved toy,
+ * promoted from a finished book or created in the studio. `identity` reuses
+ * the CharacterDescription JSON shape so the illustration pipeline consumes
+ * it unchanged. Named Avatar (not Character) deliberately — a book-scoped
+ * Character table existed briefly in Dec 2025 and was reverted.
+ */
+model Avatar {
+  id          String       @id @default(cuid())
+  userId      String
+  displayName String
+  kind        AvatarKind
+  status      AvatarStatus @default(DRAFT)
+  identity    Json?
+  /** Book the avatar was promoted from, if any (no FK — books are deletable). */
+  promotedFromBookId String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  renditions  AvatarRendition[]
+  photos      AvatarPhoto[]
+  bookLinks   BookAvatar[]
+
+  @@index([userId])
+}
+
+/** One styled master reference per (avatar, artStyle): 2x2 turnaround sheet + display portrait. */
+model AvatarRendition {
+  id                 String          @id @default(cuid())
+  avatarId           String
+  artStyle           String
+  status             RenditionStatus @default(PENDING)
+  turnaroundSheetUrl String?
+  portraitUrl        String?
+  provider           String?
+  model              String?
+  validatedAt        DateTime?
+  error              String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  avatar             Avatar          @relation(fields: [avatarId], references: [id], onDelete: Cascade)
+
+  @@unique([avatarId, artStyle])
+  @@index([avatarId])
+}
+
+/**
+ * Transient staging join: photos uploaded (or picked) to make this avatar.
+ * Deleted on approval per the delete-after-approval retention posture —
+ * photos that also back book pages are exempt via the shared-asset guard.
+ */
+model AvatarPhoto {
+  avatarId  String
+  assetId   String
+  createdAt DateTime @default(now())
+  avatar    Avatar   @relation(fields: [avatarId], references: [id], onDelete: Cascade)
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@id([avatarId, assetId])
+  @@index([assetId])
+}
+
+/** Which account avatars star in a book (cast link for AVATAR_STORY + X6c reuse). */
+model BookAvatar {
+  bookId      String
+  avatarId    String
+  /** Perception roster characterId this avatar plays in THIS book, when linked. */
+  characterId String?
+  createdAt   DateTime @default(now())
+  book        Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  avatar      Avatar   @relation(fields: [avatarId], references: [id], onDelete: Cascade)
+
+  @@id([bookId, avatarId])
+  @@index([avatarId])
 }
 
 model UserProfile {
