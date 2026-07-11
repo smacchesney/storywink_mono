@@ -89,6 +89,7 @@ import { processBookFinalize } from './workers/book-finalize.worker.js';
 import { processPrintFulfillment } from './workers/print-fulfillment.worker.js';
 import { processCharacterExtraction } from './workers/character-extraction.worker.js';
 import { processPhotoAnalysis } from './workers/photo-analysis.worker.js';
+import { processAvatarRendition } from './workers/avatar-rendition.worker.js';
 import { processBookReaper } from './workers/book-reaper.worker.js';
 import { REAPER_INTERVAL_MS } from './workers/book-reaper.helpers.js';
 import { processLuluStatusPoll } from './workers/lulu-status-poll.worker.js';
@@ -258,6 +259,16 @@ const photoAnalysisWorker = new Worker(
     connection: redis,
     concurrency: parseInt(process.env.PHOTO_ANALYSIS_CONCURRENCY || '2', 10),
     lockDuration: 300000, // 5 minutes for multi-image vision analysis
+  }
+);
+
+const avatarRenditionWorker = new Worker(
+  QUEUE_NAMES.AVATAR_RENDITION,
+  processAvatarRendition,
+  {
+    connection: redis,
+    concurrency: parseInt(process.env.AVATAR_RENDITION_CONCURRENCY || '2', 10),
+    lockDuration: 300000, // 5 minutes: extraction + up to 2 sheet rounds + validation
   }
 );
 
@@ -631,6 +642,14 @@ photoAnalysisWorker.on('completed', (job) => {
   logger.info({ jobId: job.id, bookId: job.data.bookId }, 'Photo perception pass completed');
 });
 
+avatarRenditionWorker.on('completed', (job) => {
+  logger.info({ jobId: job.id, queue: 'avatar-rendition' }, 'Avatar rendition job completed');
+});
+
+avatarRenditionWorker.on('failed', (job, err) => {
+  logger.error({ jobId: job?.id, queue: 'avatar-rendition', error: err?.message }, 'Avatar rendition job failed');
+});
+
 photoAnalysisWorker.on('failed', (job, err) => {
   // Non-fatal for the book: story generation degrades gracefully without analysis.
   logger.error({
@@ -695,6 +714,7 @@ const shutdown = async () => {
   await printFulfillmentWorker.close();
   await characterExtractionWorker.close();
   await photoAnalysisWorker.close();
+  await avatarRenditionWorker.close();
   await bookReaperWorker.close();
   await bookReaperQueue.close();
   await luluStatusPollWorker.close();

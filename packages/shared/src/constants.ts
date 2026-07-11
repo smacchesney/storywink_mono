@@ -23,6 +23,7 @@ export const QUEUE_NAMES = {
   BOOK_REAPER: 'book-reaper',
   LULU_STATUS_POLL: 'lulu-status-poll',
   ASSET_CLEANUP: 'asset-cleanup',
+  AVATAR_RENDITION: 'avatar-rendition',
 } as const;
 
 // Book constraints

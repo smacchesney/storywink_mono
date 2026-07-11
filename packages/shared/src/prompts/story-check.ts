@@ -248,7 +248,9 @@ export function countLearningWordEchoes(
 ): number {
   const clean = normalize(word);
   if (!clean) return 0;
-  const latin = /[A-Za-zÀ-ɏ]/.test(clean);
+  // A Latin-script word gets boundary matching only where the surrounding
+  // text HAS word boundaries; inside ja prose, substring matching is safer.
+  const latin = language !== 'ja' && /[A-Za-zÀ-ɏ]/.test(clean);
   return pageTexts.filter(text => {
     const page = normalize(text);
     return latin

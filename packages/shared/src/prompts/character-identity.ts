@@ -313,3 +313,68 @@ export const CHARACTER_IDENTITY_RESPONSE_SCHEMA = {
   required: ['characters', 'sceneContext'],
   additionalProperties: false,
 } as const;
+
+/** Input for single-subject (account avatar) identity extraction. */
+export interface AvatarIdentityPromptInput {
+  /** AvatarKind string: CHILD | ADULT | PET | TOY. */
+  kind: string;
+  displayName: string;
+  artStyle: string;
+  photoCount: number;
+}
+
+/**
+ * Single-subject variant of the extraction prompt for account avatars: every
+ * photo shows the SAME subject (a child, a grown-up, a pet, or a beloved
+ * toy/object). Reuses CHARACTER_IDENTITY_RESPONSE_SCHEMA — the model returns
+ * a one-entry characters array.
+ */
+export function createAvatarIdentityPrompt(
+  input: AvatarIdentityPromptInput
+): { text: string } {
+  const subjectByKind: Record<string, { noun: string; role: string; traits: string }> = {
+    CHILD: {
+      noun: 'child',
+      role: 'main_child',
+      traits:
+        'hair color as an exact shade; hair style with length/texture/parting/accessories; skin tone with warm/cool specificity; body build relative to age; distinguishing features (glasses, freckles, dimples, birthmarks)',
+    },
+    ADULT: {
+      noun: 'grown-up',
+      role: 'adult',
+      traits:
+        'hair color as an exact shade; hair style; skin tone with warm/cool specificity; build; distinguishing features (glasses, beard, jewelry they always wear)',
+    },
+    PET: {
+      noun: 'pet',
+      role: 'pet',
+      traits:
+        'fur/coat color and texture (as hair color/style), collar/markings/ear shape/size relative to a child (as distinguishing features), "none" for clothing unless they wear a collar or harness',
+    },
+    TOY: {
+      noun: 'beloved toy or object',
+      role: 'companion_object',
+      traits:
+        'material and color (as hair color), texture and visible wear — "well-loved, slightly flattened fur" (as hair style), ears/patches/tags/size relative to a child (as distinguishing features), "none" for clothing',
+    },
+  };
+  const subject = subjectByKind[input.kind] ?? subjectByKind.ADULT;
+
+  return {
+    text: `Analyze all ${input.photoCount} photos provided. Every photo shows the SAME ${subject.noun}, called "${input.displayName}", who will become a recurring illustrated character in a "${input.artStyle}" art style children's book.
+
+Extract EXACTLY ONE character entry:
+
+1. **Character ID**: "avatar_subject"
+2. **Role**: "${subject.role}"
+3. **Name**: "${input.displayName}"
+4. **Physical Traits** (be extremely precise — these must match across every future illustration): apparent age (or apparent age of the object, e.g. "well-loved"); ${subject.traits}
+5. **Typical Clothing**: the most characteristic, NEUTRAL everyday outfit across the photos — this becomes the canonical reference outfit (stories will dress them differently per scene)
+6. **Style Translation**: how to render this ${subject.noun} in "${input.artStyle}" style while staying instantly recognizable — materials, construction, colors, proportions
+7. **Pages**: which photo numbers (1-${input.photoCount}) show the subject (usually all)
+
+Be ruthlessly specific. Vague descriptions like "brown hair" are insufficient. The illustrator will use YOUR description as the canonical reference for this character in every book the family ever makes.
+
+Also give sceneContext: one short sentence about the settings visible in the photos.`,
+  };
+}
