@@ -770,3 +770,5 @@ console.log(`  - Character Extraction Worker: concurrency=${CHARACTER_EXTRACTION
 console.log(`  - Redis URL: ${process.env.REDIS_URL || 'redis://localhost:6379'}`);
 console.log(`  - Log Level: ${process.env.LOG_LEVEL || 'info'}`);
 console.log('='.repeat(80));
+
+// Character library launch (2026-07-12): rebuild marker (watch-path trigger).

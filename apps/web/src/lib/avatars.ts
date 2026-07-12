@@ -92,3 +92,6 @@ export function getAvatarCleanupQueue(): Queue {
   }
   return cleanupQueue;
 }
+
+// Character library launch (2026-07-12): X6+X7 flags flipped in prod; this
+// comment exists to trigger the watched-path build that bakes NEXT_PUBLIC_*.
