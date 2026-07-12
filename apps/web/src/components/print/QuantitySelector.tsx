@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React from 'react';
 import { useTranslations } from 'next-intl';
@@ -48,9 +48,7 @@ export function QuantitySelector({
         <Minus className="h-4 w-4" />
       </Button>
 
-      <span className="w-8 text-center text-lg font-semibold tabular-nums">
-        {quantity}
-      </span>
+      <span className="w-8 text-center text-lg font-semibold tabular-nums">{quantity}</span>
 
       <Button
         type="button"

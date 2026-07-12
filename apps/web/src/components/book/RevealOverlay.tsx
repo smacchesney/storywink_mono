@@ -35,7 +35,7 @@ export function RevealOverlay({ coverImageUrl, childName, bookTitle, onOpen }: R
     () =>
       typeof window !== 'undefined' &&
       window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true,
-    []
+    [],
   );
 
   const name = childName?.trim() || bookTitle?.trim() || null;
@@ -54,8 +54,7 @@ export function RevealOverlay({ coverImageUrl, childName, bookTitle, onOpen }: R
       aria-label={t('ready')}
       className="fixed inset-0 z-[60] flex flex-col items-center justify-center overflow-hidden px-6"
       style={{
-        background:
-          'radial-gradient(ellipse at 50% 30%, #FFF9F5 0%, #FFFBF5 50%, #FFF5F0 100%)',
+        background: 'radial-gradient(ellipse at 50% 30%, #FFF9F5 0%, #FFFBF5 50%, #FFF5F0 100%)',
         opacity: isClosing ? 0 : 1,
         transition: prefersReducedMotion ? 'none' : 'opacity 300ms ease-out',
       }}
@@ -127,7 +126,7 @@ export function RevealOverlay({ coverImageUrl, childName, bookTitle, onOpen }: R
         <div
           key={i}
           aria-hidden="true"
-          className="reveal-sparkle absolute pointer-events-none"
+          className="reveal-sparkle pointer-events-none absolute"
           style={{
             top: s.top,
             left: s.left,
@@ -136,14 +135,14 @@ export function RevealOverlay({ coverImageUrl, childName, bookTitle, onOpen }: R
             animationDelay: `${s.delay}ms`,
           }}
         >
-          <svg viewBox="0 0 24 24" fill="var(--coral-primary)" className="w-full h-full">
+          <svg viewBox="0 0 24 24" fill="var(--coral-primary)" className="h-full w-full">
             <path d={STAR5} />
           </svg>
         </div>
       ))}
 
       <div
-        className="reveal-cover relative w-56 h-56 md:w-72 md:h-72 rounded-2xl overflow-hidden bg-white"
+        className="reveal-cover relative h-56 w-56 overflow-hidden rounded-2xl bg-white md:h-72 md:w-72"
         style={{ boxShadow: '0 18px 40px rgba(247, 108, 94, 0.22)' }}
       >
         {coverImageUrl ? (
@@ -162,24 +161,24 @@ export function RevealOverlay({ coverImageUrl, childName, bookTitle, onOpen }: R
               alt=""
               width={200}
               height={200}
-              className="w-2/3 h-auto object-contain"
+              className="h-auto w-2/3 object-contain"
               priority
             />
           </div>
         )}
       </div>
 
-      <div className="reveal-copy flex flex-col items-center text-center mt-8">
-        <p className="text-2xl md:text-3xl font-semibold font-playful text-gray-800">
+      <div className="reveal-copy mt-8 flex flex-col items-center text-center">
+        <p className="font-playful text-2xl font-semibold text-gray-800 md:text-3xl">
           {t('ready')}
         </p>
-        <p className="mt-2 text-sm md:text-base text-gray-500 font-playful max-w-xs">
+        <p className="mt-2 max-w-xs font-playful text-sm text-gray-500 md:text-base">
           {name ? t('madeFor', { name }) : t('readyPlain')}
         </p>
         <button
           onClick={handleOpen}
           autoFocus
-          className="mt-7 rounded-full bg-coral px-8 py-3 text-white font-playful text-base shadow-sm hover:bg-coral/90 transition-colors"
+          className="mt-7 rounded-full bg-coral px-8 py-3 font-playful text-base text-white shadow-sm transition-colors hover:bg-coral/90"
         >
           {t('open')}
         </button>

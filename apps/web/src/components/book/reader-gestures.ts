@@ -46,7 +46,7 @@ export function isOnEngineCorner(
   y: number,
   blockWidth: number,
   blockHeight: number,
-  pageWidth: number
+  pageWidth: number,
 ): boolean {
   const operatingDistance = Math.hypot(pageWidth, blockHeight) / 5;
   return (

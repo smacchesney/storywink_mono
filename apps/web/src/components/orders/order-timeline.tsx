@@ -35,27 +35,27 @@ export function OrderTimeline({ currentStep, labels }: OrderTimelineProps) {
         const inProgress = isCurrent && stepNumber === 2;
 
         return (
-          <li key={label} className="flex-1 flex flex-col items-center relative">
+          <li key={label} className="relative flex flex-1 flex-col items-center">
             {/* Connector to the previous step */}
             {i > 0 && (
               <span
                 aria-hidden
-                className={`absolute top-[13px] right-1/2 w-full h-[3px] rounded-full ${
+                className={`absolute top-[13px] right-1/2 h-[3px] w-full rounded-full ${
                   reached ? 'bg-coral' : 'bg-coral-soft'
                 }`}
               />
             )}
             <span
-              className={`relative z-10 flex items-center justify-center w-7 h-7 rounded-full border-2 ${
+              className={`relative z-10 flex h-7 w-7 items-center justify-center rounded-full border-2 ${
                 done
-                  ? 'bg-coral border-coral text-white'
+                  ? 'border-coral bg-coral text-white'
                   : inProgress
-                    ? 'bg-white border-coral'
-                    : 'bg-white border-coral-soft'
+                    ? 'border-coral bg-white'
+                    : 'border-coral-soft bg-white'
               }`}
             >
               {done ? (
-                <Check className="w-4 h-4" strokeWidth={3} />
+                <Check className="h-4 w-4" strokeWidth={3} />
               ) : inProgress ? (
                 // The printing step is live work — it gets the brand twinkle,
                 // not a generic pulsing dot. Reduced motion stills it globally.
@@ -72,8 +72,12 @@ export function OrderTimeline({ currentStep, labels }: OrderTimelineProps) {
               ) : null}
             </span>
             <span
-              className={`mt-1.5 text-xs text-center ${
-                isCurrent ? 'font-semibold text-ink' : reached ? 'text-ink' : 'text-muted-foreground'
+              className={`mt-1.5 text-center text-xs ${
+                isCurrent
+                  ? 'font-semibold text-ink'
+                  : reached
+                    ? 'text-ink'
+                    : 'text-muted-foreground'
               }`}
             >
               {label}

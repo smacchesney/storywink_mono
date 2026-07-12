@@ -91,7 +91,8 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
   // Get cover image from the included book data (prefer dedicated cover illustration)
   let coverImageUrl: string | null = null;
   if (printOrder?.book) {
-    coverImageUrl = printOrder.book.coverImageUrl || printOrder.book.pages[0]?.generatedImageUrl || null;
+    coverImageUrl =
+      printOrder.book.coverImageUrl || printOrder.book.pages[0]?.generatedImageUrl || null;
   } else if (bookId) {
     // Fallback: fetch book separately if not in printOrder
     const book = await prisma.book.findFirst({
@@ -119,28 +120,26 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
   // Brand restyle: the just-paid moment stays in Storywink's coral-and-cream
   // world (matches the progress screen's warm radial background).
   return (
-    <div className="min-h-screen py-12 px-4 bg-waiting">
-      <div className="max-w-lg mx-auto">
+    <div className="bg-waiting min-h-screen px-4 py-12">
+      <div className="mx-auto max-w-lg">
         {/* Success Icon */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-coral/10 mb-4">
-            <CheckCircle className="w-10 h-10 text-coral" />
+        <div className="mb-8 text-center">
+          <div className="mb-4 inline-flex h-20 w-20 items-center justify-center rounded-full bg-coral/10">
+            <CheckCircle className="h-10 w-10 text-coral" />
           </div>
-          <h1 className="font-playful text-2xl font-bold text-[#1a1a1a] mb-2">
+          <h1 className="mb-2 font-playful text-2xl font-bold text-[#1a1a1a]">
             {tOrders('confirmedTitle')}
           </h1>
-          <p className="text-gray-600">
-            {tOrders('confirmedBody')}
-          </p>
+          <p className="text-gray-600">{tOrders('confirmedBody')}</p>
         </div>
 
         {/* Order Details Card — cream keepsake card with a scalloped top edge */}
-        <div className="relative overflow-hidden bg-cream rounded-xl shadow-lg p-6 pt-8 mb-6">
+        <div className="relative mb-6 overflow-hidden rounded-xl bg-cream p-6 pt-8 shadow-lg">
           <ScallopEdge className="absolute inset-x-0 top-0 opacity-40" />
           {/* Book Info */}
-          <div className="flex gap-4 mb-6">
+          <div className="mb-6 flex gap-4">
             {coverImageUrl && (
-              <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+              <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
                 <Image
                   src={coolifyImageUrl(coverImageUrl)}
                   alt={bookTitle}
@@ -151,10 +150,8 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
               </div>
             )}
             <div className="flex-grow">
-              <h2 className="font-playful font-semibold text-lg text-ink mb-1">
-                {bookTitle}
-              </h2>
-              <p className="text-sm text-gray-500 mb-1">
+              <h2 className="mb-1 font-playful text-lg font-semibold text-ink">{bookTitle}</h2>
+              <p className="mb-1 text-sm text-gray-500">
                 {tOrders('quantityLabel', { count: quantity })}
               </p>
               <p className="text-sm font-medium text-coral">
@@ -175,13 +172,13 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
         </div>
 
         {/* Next Steps */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          <h3 className="font-semibold text-[#1a1a1a] mb-4">{tOrders('printingTitle')}</h3>
+        <div className="mb-6 rounded-xl bg-white p-6 shadow-lg">
+          <h3 className="mb-4 font-semibold text-[#1a1a1a]">{tOrders('printingTitle')}</h3>
           <div className="space-y-4">
             <div className="flex gap-3">
               <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-coral/10 flex items-center justify-center">
-                  <Package className="w-4 h-4 text-coral" />
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-coral/10">
+                  <Package className="h-4 w-4 text-coral" />
                 </div>
               </div>
               <div>
@@ -200,11 +197,11 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
         <div className="space-y-3">
           <Link href="/library" className="block">
             <Button
-              className="w-full bg-coral hover:bg-coral/90 text-white py-6 font-playful"
+              className="w-full bg-coral py-6 font-playful text-white hover:bg-coral/90"
               size="lg"
             >
               {tOrders('backToLibrary')}
-              <ArrowRight className="w-4 h-4 ml-2" />
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
           <Link href="/orders" className="block">
@@ -215,7 +212,7 @@ async function OrderSuccessContent({ sessionId }: { sessionId: string }) {
         </div>
 
         {/* Help Text */}
-        <p className="text-center text-sm text-gray-500 mt-6">
+        <p className="mt-6 text-center text-sm text-gray-500">
           {tOrders('helpPrompt')}{' '}
           <a href="mailto:support@storywink.ai" className="text-coral hover:underline">
             {tOrders('contactSupport')}
@@ -233,7 +230,7 @@ export default async function OrderSuccessPage({ params }: PageProps) {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen py-12 px-4 flex flex-col items-center justify-center gap-4 bg-waiting">
+        <div className="bg-waiting flex min-h-screen flex-col items-center justify-center gap-4 px-4 py-12">
           <Storydust variant="twinkle" size="card" />
           <p className="font-playful text-[var(--ink-soft)]">{tOrders('settingUp')}</p>
         </div>

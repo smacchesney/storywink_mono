@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { useState } from 'react';
 import Link from 'next/link';
@@ -11,8 +11,17 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Trash2, Eye, AlertTriangle, RefreshCw, Download, Printer, Pencil } from 'lucide-react';
+} from '@/components/ui/dropdown-menu';
+import {
+  MoreHorizontal,
+  Trash2,
+  Eye,
+  AlertTriangle,
+  RefreshCw,
+  Download,
+  Printer,
+  Pencil,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { printPageCounts } from '@storywink/shared/collage';
@@ -93,11 +102,12 @@ const BookCard: React.FC<BookCardProps> = ({
 
   // The cover tap is the one primary action; it goes where the book needs
   // the parent next.
-  const coverHref = isCompleted || isPartial || isFailed
-    ? `/book/${id}/preview`
-    : isStoryReady
-      ? `/create/review?bookId=${id}`
-      : `/create/${id}/setup`;
+  const coverHref =
+    isCompleted || isPartial || isFailed
+      ? `/book/${id}/preview`
+      : isStoryReady
+        ? `/create/review?bookId=${id}`
+        : `/create/${id}/setup`;
 
   // Prepare book data for PrintOrderSheet
   const printOrderBook: PrintOrderBook = {
@@ -106,7 +116,7 @@ const BookCard: React.FC<BookCardProps> = ({
     coverImageUrl: coverImageUrl ?? null,
     pageCount: printPageCounts(
       actualPageCount,
-      process.env.NEXT_PUBLIC_COLLAGE_PAGES_ENABLED === 'true'
+      process.env.NEXT_PUBLIC_COLLAGE_PAGES_ENABLED === 'true',
     ).interiorPages,
   };
 
@@ -120,12 +130,12 @@ const BookCard: React.FC<BookCardProps> = ({
 
   return (
     <>
-      <Card className="flex h-full flex-col gap-0 p-3 hover:shadow-md transition-shadow">
+      <Card className="flex h-full flex-col gap-0 p-3 transition-shadow hover:shadow-md">
         {/* Cover — square, page-stack edge, the whole thing is the tap target */}
         <Link
           href={coverHref}
           aria-label={t('coverAlt', { title: displayTitle })}
-          className="group relative block w-full aspect-square rounded-md overflow-hidden bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2"
+          className="group relative block aspect-square w-full overflow-hidden rounded-md bg-muted focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:outline-none"
           style={{ boxShadow: PAGE_STACK_SHADOW }}
         >
           {displayImageUrl ? (
@@ -133,10 +143,14 @@ const BookCard: React.FC<BookCardProps> = ({
               src={displayImageUrl}
               alt=""
               sizes={COVER_SIZES}
-              className={isWorking ? 'blur-sm scale-105' : 'transition-transform duration-200 group-hover:scale-[1.02]'}
+              className={
+                isWorking
+                  ? 'scale-105 blur-sm'
+                  : 'transition-transform duration-200 group-hover:scale-[1.02]'
+              }
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center">
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800">
               <span className="text-xs text-muted-foreground">{t('noPreview')}</span>
             </div>
           )}
@@ -148,7 +162,7 @@ const BookCard: React.FC<BookCardProps> = ({
               <div className="absolute inset-0 flex flex-col items-center justify-center space-y-1 px-3 text-center">
                 <Storydust variant="twinkle" size="inline" className="text-white" />
                 <TextShimmerWave
-                  className="text-sm font-semibold font-playful [--base-color:#e2e8f0] [--base-gradient-color:var(--coral-primary)]"
+                  className="font-playful text-sm font-semibold [--base-color:#e2e8f0] [--base-gradient-color:var(--coral-primary)]"
                   duration={1}
                   spread={1}
                   zDistance={1}
@@ -173,7 +187,9 @@ const BookCard: React.FC<BookCardProps> = ({
 
         {/* Title row + the one kebab (all secondary actions live here) */}
         <div className="mt-3 flex items-center justify-between gap-1">
-          <CardTitle className="text-base font-playful min-w-0 break-words leading-snug">{displayTitle}</CardTitle>
+          <CardTitle className="min-w-0 font-playful text-base leading-snug break-words">
+            {displayTitle}
+          </CardTitle>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -233,13 +249,14 @@ const BookCard: React.FC<BookCardProps> = ({
               {isFailed && onRetryClick && (
                 <>
                   <DropdownMenuItem onClick={onRetryClick} disabled={isRetrying}>
-                    <RefreshCw className="mr-2 h-4 w-4" /> {isRetrying ? t('retrying') : t('retryIllustrations')}
+                    <RefreshCw className="mr-2 h-4 w-4" />{' '}
+                    {isRetrying ? t('retrying') : t('retryIllustrations')}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                 </>
               )}
               <DropdownMenuItem
-                className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                 onClick={onDeleteClick}
                 disabled={isDeleting}
               >
@@ -251,7 +268,7 @@ const BookCard: React.FC<BookCardProps> = ({
 
         {/* Status line, only where the book needs a word */}
         {caption && (
-          <p className="mt-1 text-sm font-playful text-[var(--ink-soft)] line-clamp-2">{caption}</p>
+          <p className="mt-1 line-clamp-2 font-playful text-sm text-[var(--ink-soft)]">{caption}</p>
         )}
         {(isPartial || isFailed) && (
           <p className="mt-1 flex items-center gap-1 text-xs text-coral">
@@ -264,23 +281,23 @@ const BookCard: React.FC<BookCardProps> = ({
             enough for them; `mt-auto` keeps every card's buttons on a shared
             baseline whatever the title/status above them did. */}
         {isCompleted && (
-          <div className="mt-auto pt-3 hidden tall:md:flex items-center gap-2">
+          <div className="mt-auto hidden items-center gap-2 pt-3 tall:md:flex">
             <Button
               onClick={() => router.push(`/book/${id}/preview`)}
               size="sm"
               variant="outline"
               className="flex-1 rounded-full font-playful"
             >
-              <Eye className="h-4 w-4 mr-1.5" />
+              <Eye className="mr-1.5 h-4 w-4" />
               {t('view')}
             </Button>
             {printShippable ? (
               <Button
                 onClick={() => setShowPrintSheet(true)}
                 size="sm"
-                className="flex-1 bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
+                className="flex-1 rounded-full bg-coral font-playful hover:bg-[#E55A4C]"
               >
-                <Printer className="h-4 w-4 mr-1.5" />
+                <Printer className="mr-1.5 h-4 w-4" />
                 {t('orderPrint')}
               </Button>
             ) : (
@@ -288,63 +305,63 @@ const BookCard: React.FC<BookCardProps> = ({
               <Button
                 onClick={() => setShowExportDialog(true)}
                 size="sm"
-                className="flex-1 bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
+                className="flex-1 rounded-full bg-coral font-playful hover:bg-[#E55A4C]"
               >
-                <Download className="h-4 w-4 mr-1.5" />
+                <Download className="mr-1.5 h-4 w-4" />
                 {t('savePdf')}
               </Button>
             )}
           </div>
         )}
         {isPartial && (
-          <div className="mt-auto pt-3 hidden tall:md:flex">
+          <div className="mt-auto hidden pt-3 tall:md:flex">
             <Button
               onClick={() => router.push(`/book/${id}/resolve`)}
               size="sm"
-              className="flex-1 bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
+              className="flex-1 rounded-full bg-coral font-playful hover:bg-[#E55A4C]"
             >
-              <RefreshCw className="h-4 w-4 mr-1.5" />
+              <RefreshCw className="mr-1.5 h-4 w-4" />
               {t('fixIssues')}
             </Button>
           </div>
         )}
         {isFailed && (
-          <div className="mt-auto pt-3 hidden tall:md:flex">
+          <div className="mt-auto hidden pt-3 tall:md:flex">
             <Button
               onClick={onRetryClick}
               size="sm"
               disabled={isRetrying}
-              className="flex-1 bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
+              className="flex-1 rounded-full bg-coral font-playful hover:bg-[#E55A4C]"
             >
               {isRetrying ? (
                 <Storydust variant="twinkle" size="inline" className="mr-1.5 text-white" />
               ) : (
-                <RefreshCw className="h-4 w-4 mr-1.5" />
+                <RefreshCw className="mr-1.5 h-4 w-4" />
               )}
               {isRetrying ? t('retrying') : t('retryIllustrations')}
             </Button>
           </div>
         )}
         {isDraft && (
-          <div className="mt-auto pt-3 hidden tall:md:flex">
+          <div className="mt-auto hidden pt-3 tall:md:flex">
             <Button
               onClick={() => router.push(`/create/${id}/setup`)}
               size="sm"
-              className="flex-1 bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
+              className="flex-1 rounded-full bg-coral font-playful hover:bg-[#E55A4C]"
             >
-              <Pencil className="h-4 w-4 mr-1.5" />
+              <Pencil className="mr-1.5 h-4 w-4" />
               {t('continueMaking')}
             </Button>
           </div>
         )}
         {isStoryReady && (
-          <div className="mt-auto pt-3 hidden tall:md:flex">
+          <div className="mt-auto hidden pt-3 tall:md:flex">
             <Button
               onClick={() => router.push(`/create/review?bookId=${id}`)}
               size="sm"
-              className="flex-1 bg-coral hover:bg-[#E55A4C] rounded-full font-playful"
+              className="flex-1 rounded-full bg-coral font-playful hover:bg-[#E55A4C]"
             >
-              <Eye className="h-4 w-4 mr-1.5" />
+              <Eye className="mr-1.5 h-4 w-4" />
               {t('takeALook')}
             </Button>
           </div>

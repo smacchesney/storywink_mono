@@ -20,10 +20,13 @@ const isPublicRoute = createRouteMatcher([
  * e.g. "ja,en;q=0.9,zh;q=0.8" -> "ja"
  */
 function negotiateLocale(header: string): string {
-  const langs = header.split(',').map(part => {
-    const [lang, q] = part.trim().split(';q=');
-    return { lang: lang.split('-')[0].toLowerCase(), q: q ? parseFloat(q) : 1 };
-  }).sort((a, b) => b.q - a.q);
+  const langs = header
+    .split(',')
+    .map((part) => {
+      const [lang, q] = part.trim().split(';q=');
+      return { lang: lang.split('-')[0].toLowerCase(), q: q ? parseFloat(q) : 1 };
+    })
+    .sort((a, b) => b.q - a.q);
 
   for (const { lang } of langs) {
     if ((SUPPORTED_LANGUAGES as readonly string[]).includes(lang)) return lang;

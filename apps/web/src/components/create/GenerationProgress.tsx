@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { useEffect, useRef } from 'react';
 import Image from 'next/image';
@@ -145,7 +145,7 @@ export function GenerationProgress({ bookId, reviewFirst, onComplete }: Generati
   const illustrationFraction = rawFraction != null ? maxFractionRef.current : null;
 
   return (
-    <div className="fixed inset-0 flex flex-col items-center justify-center z-50 overflow-hidden px-6 bg-waiting">
+    <div className="bg-waiting fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden px-6">
       {/* Scenery: two clouds in the top corners + drifting star dust. */}
       <svg
         viewBox={CLOUD_VIEWBOX}
@@ -179,7 +179,7 @@ export function GenerationProgress({ bookId, reviewFirst, onComplete }: Generati
           alt={t('mascotAlt')}
           width={200}
           height={200}
-          className="w-28 h-28 md:w-36 md:h-36 object-contain"
+          className="h-28 w-28 object-contain md:h-36 md:w-36"
           priority
         />
       </div>
@@ -192,12 +192,12 @@ export function GenerationProgress({ bookId, reviewFirst, onComplete }: Generati
         </div>
       ) : isTimedOut ? (
         <div className="flex flex-col items-center text-center">
-          <p className="text-lg md:text-xl font-semibold font-playful text-gray-700 max-w-xs">
+          <p className="max-w-xs font-playful text-lg font-semibold text-gray-700 md:text-xl">
             {t('stillWorking')}
           </p>
           <button
             onClick={() => router.push('/library')}
-            className="mt-6 rounded-full bg-coral px-6 py-2.5 text-white font-playful shadow-sm hover:bg-coral/90 transition-colors"
+            className="mt-6 rounded-full bg-coral px-6 py-2.5 font-playful text-white shadow-sm transition-colors hover:bg-coral/90"
           >
             {t('goToLibrary')}
           </button>
@@ -206,7 +206,7 @@ export function GenerationProgress({ bookId, reviewFirst, onComplete }: Generati
         <>
           <div className="isolate mb-6 text-center">
             <TextShimmerWave
-              className="text-2xl md:text-3xl font-semibold font-playful [--base-color:#374151] [--base-gradient-color:var(--coral-primary)]"
+              className="font-playful text-2xl font-semibold [--base-color:#374151] [--base-gradient-color:var(--coral-primary)] md:text-3xl"
               duration={1.2}
               spread={1}
               zDistance={1}
@@ -219,16 +219,12 @@ export function GenerationProgress({ bookId, reviewFirst, onComplete }: Generati
 
           {/* The pencil draws the wait: looping while the story is written,
               then tracking real page progress once illustration starts. */}
-          <Storydust
-            variant="pencil"
-            size="hero"
-            progress={illustrationFraction ?? undefined}
-          />
+          <Storydust variant="pencil" size="hero" progress={illustrationFraction ?? undefined} />
 
-          <p className="text-xs text-gray-500 font-playful mt-8 text-center max-w-xs">
+          <p className="mt-8 max-w-xs text-center font-playful text-xs text-gray-500">
             {t('usuallyReady')}
           </p>
-          <p className="text-xs text-coral font-playful mt-2 text-center max-w-xs">
+          <p className="mt-2 max-w-xs text-center font-playful text-xs text-coral">
             {t('canLeave')}
           </p>
         </>

@@ -39,14 +39,16 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
   // Get shipping address from collected_information or customer_details
   // Note: In Stripe API 2025+, shipping is in collected_information
-  const collectedShipping = (session as Stripe.Checkout.Session & {
-    collected_information?: {
-      shipping_details?: {
-        name?: string;
-        address?: Stripe.Address;
+  const collectedShipping = (
+    session as Stripe.Checkout.Session & {
+      collected_information?: {
+        shipping_details?: {
+          name?: string;
+          address?: Stripe.Address;
+        };
       };
-    };
-  }).collected_information?.shipping_details;
+    }
+  ).collected_information?.shipping_details;
 
   const shippingAddress = collectedShipping?.address;
 
@@ -76,9 +78,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       status: 'PAYMENT_COMPLETED',
       pageCount,
       stripeSessionId: session.id,
-      stripePaymentId: typeof session.payment_intent === 'string'
-        ? session.payment_intent
-        : session.payment_intent?.id,
+      stripePaymentId:
+        typeof session.payment_intent === 'string'
+          ? session.payment_intent
+          : session.payment_intent?.id,
       totalAmount: session.amount_total || 0, // Total in cents
       currency: session.currency?.toUpperCase() || 'USD',
       shippingName: collectedShipping?.name || '',
@@ -112,7 +115,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     {
       attempts: 3,
       backoff: { type: 'exponential', delay: 60000 }, // 1 min, 2 min, 4 min
-    }
+    },
   );
 
   console.log('Queued print fulfillment for order:', printOrder.id);
@@ -126,19 +129,13 @@ export async function POST(request: NextRequest) {
   const signature = request.headers.get('stripe-signature');
 
   if (!signature) {
-    return NextResponse.json(
-      { error: 'Missing stripe-signature header' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 });
   }
 
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
     console.error('STRIPE_WEBHOOK_SECRET is not configured');
-    return NextResponse.json(
-      { error: 'Webhook secret not configured' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
   }
 
   let event: Stripe.Event;
@@ -147,10 +144,7 @@ export async function POST(request: NextRequest) {
     event = getStripe().webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err) {
     console.error('Webhook signature verification failed:', err);
-    return NextResponse.json(
-      { error: 'Invalid signature' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
   // Handle the event

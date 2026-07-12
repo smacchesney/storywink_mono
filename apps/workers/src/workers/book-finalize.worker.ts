@@ -636,8 +636,8 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
         // would be overwritten uncorrected (one wasted render).
         const titlePageRequeued = Boolean(
           qcResult &&
-            !qcResult.passed &&
-            book.pages.some((p: any) => p.isTitlePage && qcResult.failedPageIds.includes(p.id)),
+          !qcResult.passed &&
+          book.pages.some((p: any) => p.isTitlePage && qcResult.failedPageIds.includes(p.id)),
         );
         if (
           coverForQc &&

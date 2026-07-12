@@ -18,7 +18,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      markedCount: result.count
+      markedCount: result.count,
     });
   } catch (error) {
     // Handle authentication errors

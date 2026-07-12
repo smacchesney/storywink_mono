@@ -15,7 +15,7 @@ const replacePhotoSchema = z.object({
  */
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ bookId: string; pageId: string }> }
+  { params }: { params: Promise<{ bookId: string; pageId: string }> },
 ) {
   const { bookId, pageId } = await params;
 
@@ -42,8 +42,10 @@ export async function POST(
 
     if (book.status !== BookStatus.PARTIAL) {
       return NextResponse.json(
-        { error: `Photo replacement is only available for books with status PARTIAL (current: ${book.status})` },
-        { status: 409 }
+        {
+          error: `Photo replacement is only available for books with status PARTIAL (current: ${book.status})`,
+        },
+        { status: 409 },
       );
     }
 
@@ -58,12 +60,13 @@ export async function POST(
     }
 
     // Allow replacement on pages that need work (FLAGGED or PENDING without illustration)
-    const canReplace = page.moderationStatus === 'FLAGGED' ||
+    const canReplace =
+      page.moderationStatus === 'FLAGGED' ||
       (page.moderationStatus === 'PENDING' && !page.generatedImageUrl);
     if (!canReplace) {
       return NextResponse.json(
         { error: 'This page already has a completed illustration.' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -101,13 +104,16 @@ export async function POST(
 
     logger.info(
       { clerkId, dbUserId: dbUser.id, bookId, pageId, newAssetId: assetId },
-      'API: Photo replaced on FLAGGED page'
+      'API: Photo replaced on FLAGGED page',
     );
 
     return NextResponse.json({ page: updatedPage }, { status: 200 });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid request data', details: error.errors }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid request data', details: error.errors },
+        { status: 400 },
+      );
     }
 
     if (

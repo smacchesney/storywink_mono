@@ -3,11 +3,7 @@
 import React from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Pencil } from 'lucide-react';
-import {
-  STORY_MOODS,
-  STORY_MOOD_LABELS,
-  type StoryMood,
-} from '@storywink/shared/constants';
+import { STORY_MOODS, STORY_MOOD_LABELS, type StoryMood } from '@storywink/shared/constants';
 import { cn } from '@/lib/utils';
 
 interface StoryFramingProps {
@@ -53,13 +49,11 @@ export function StoryFraming({
 
   return (
     <section className="flex flex-col gap-2">
-      <label className="text-sm font-medium text-gray-600">
-        {t('howToTellIt')}
-      </label>
+      <label className="text-sm font-medium text-gray-600">{t('howToTellIt')}</label>
 
       {/* Mood row — horizontal scroll-snap, right-edge fade hints the rest. */}
       <div className="relative">
-        <div className="flex snap-x gap-1.5 overflow-x-auto pb-1 pr-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex snap-x gap-1.5 overflow-x-auto pr-6 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {STORY_MOODS.map((mood) => {
             const selected = tone === mood;
             return (
@@ -69,7 +63,7 @@ export function StoryFraming({
                 aria-pressed={selected}
                 onClick={() => onToneChange(selected ? null : mood)}
                 className={cn(
-                  'min-h-[44px] shrink-0 snap-start whitespace-nowrap rounded-full border px-4 text-sm font-playful transition-colors',
+                  'min-h-[44px] shrink-0 snap-start rounded-full border px-4 font-playful text-sm whitespace-nowrap transition-colors',
                   selected
                     ? 'border-coral bg-coral text-white'
                     : 'border-black/10 bg-white text-gray-700 hover:border-coral/50',
@@ -92,7 +86,7 @@ export function StoryFraming({
           placeholder={t('eventSummaryPlaceholder')}
           rows={3}
           maxLength={500}
-          className="w-full resize-none rounded-xl border border-black/10 bg-white px-3 py-2 font-playful text-sm text-gray-800 focus:border-coral focus:outline-none focus:ring-1 focus:ring-coral"
+          className="w-full resize-none rounded-xl border border-black/10 bg-white px-3 py-2 font-playful text-sm text-gray-800 focus:border-coral focus:ring-1 focus:ring-coral focus:outline-none"
         />
       ) : hasSummary ? (
         <button
@@ -126,7 +120,7 @@ export function StoryFraming({
               type="button"
               aria-label={t('learningWordRemove', { word })}
               onClick={() => onLearningWordsChange(learningWords.filter((w) => w !== word))}
-              className="rounded-full border border-coral bg-coral px-3 py-1 text-sm font-playful text-white"
+              className="rounded-full border border-coral bg-coral px-3 py-1 font-playful text-sm text-white"
             >
               {word} ×
             </button>
@@ -143,7 +137,7 @@ export function StoryFraming({
                 }
               }}
               onBlur={(e) => commitWord(e.currentTarget.value, e.currentTarget)}
-              className="h-[30px] w-40 rounded-full border border-black/10 bg-white px-3 text-sm font-playful text-gray-800 focus:border-coral focus:outline-none focus:ring-1 focus:ring-coral"
+              className="h-[30px] w-40 rounded-full border border-black/10 bg-white px-3 font-playful text-sm text-gray-800 focus:border-coral focus:ring-1 focus:ring-coral focus:outline-none"
             />
           )}
         </div>

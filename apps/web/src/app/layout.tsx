@@ -1,24 +1,24 @@
 // v2.2.0
-import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from 'next';
+import { Geist, Geist_Mono } from 'next/font/google';
 import { ClerkProvider } from '@clerk/nextjs';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
-import "./globals.css";
-import { SiteHeader } from "@/components/site-header";
-import { SiteFooter } from "@/components/site-footer";
-import { Toaster } from "@/components/ui/sonner";
+import './globals.css';
+import { SiteHeader } from '@/components/site-header';
+import { SiteFooter } from '@/components/site-footer';
+import { Toaster } from '@/components/ui/sonner';
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
   display: 'swap',
   preload: true,
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
   display: 'swap',
   preload: false,
 });
@@ -26,14 +26,21 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://storywink.ai'),
   title: {
-    default: "Storywink: Your Child, the Star of Their Own Storybook",
-    template: "%s | Storywink"
+    default: 'Storywink: Your Child, the Star of Their Own Storybook',
+    template: '%s | Storywink',
   },
-  description: "Turn your photos into a personalized picture book starring your child. Free to make and read, usually ready in about 15 minutes, printable as a real keepsake.",
-  keywords: ["AI storybooks", "personalized children's books", "photo to illustration", "custom storybooks", "AI children's stories"],
-  authors: [{ name: "Storywink" }],
-  creator: "Storywink",
-  publisher: "Storywink",
+  description:
+    'Turn your photos into a personalized picture book starring your child. Free to make and read, usually ready in about 15 minutes, printable as a real keepsake.',
+  keywords: [
+    'AI storybooks',
+    "personalized children's books",
+    'photo to illustration',
+    'custom storybooks',
+    "AI children's stories",
+  ],
+  authors: [{ name: 'Storywink' }],
+  creator: 'Storywink',
+  publisher: 'Storywink',
   robots: {
     index: true,
     follow: true,
@@ -51,18 +58,22 @@ export const metadata: Metadata = {
     url: '/',
     siteName: 'Storywink',
     title: 'Storywink: Your Child, the Star of Their Own Storybook',
-    description: 'Turn your photos into a personalized picture book starring your child. Free to make and read, usually ready in about 15 minutes, printable as a real keepsake.',
-    images: [{
-      url: '/og-image.jpg',
-      width: 1200,
-      height: 630,
-      alt: 'Storywink - AI Storybooks',
-    }],
+    description:
+      'Turn your photos into a personalized picture book starring your child. Free to make and read, usually ready in about 15 minutes, printable as a real keepsake.',
+    images: [
+      {
+        url: '/og-image.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Storywink - AI Storybooks',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Storywink: Your Child, the Star of Their Own Storybook',
-    description: 'Turn your photos into a personalized picture book starring your child. Free to make and read, usually ready in about 15 minutes, printable as a real keepsake.',
+    description:
+      'Turn your photos into a personalized picture book starring your child. Free to make and read, usually ready in about 15 minutes, printable as a real keepsake.',
     images: ['/og-image.jpg'],
     creator: '@storywink',
   },
@@ -77,7 +88,7 @@ export const viewport: Viewport = {
   maximumScale: 5,
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#000000' }
+    { media: '(prefers-color-scheme: dark)', color: '#000000' },
   ],
 };
 
@@ -101,15 +112,15 @@ export default async function RootLayout({
           />
         </head>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
+          className={`${geistSans.variable} ${geistMono.variable} flex min-h-screen flex-col antialiased`}
           style={{ backgroundColor: 'var(--bg-playful)' }}
         >
           <NextIntlClientProvider messages={messages}>
             <SiteHeader />
-            <main className="flex-grow relative z-10 pt-[28px]">{children}</main>
+            <main className="relative z-10 flex-grow pt-[28px]">{children}</main>
             <SiteFooter />
           </NextIntlClientProvider>
-          <Toaster 
+          <Toaster
             position="bottom-right"
             expand={false}
             richColors

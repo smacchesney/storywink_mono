@@ -36,7 +36,7 @@ export async function ensureUser(clerkUser: {
 /**
  * Helper function to get the database user ID from Clerk authentication.
  * This ensures we use the correct internal database user ID for all database operations.
- * 
+ *
  * @returns Object containing both Clerk user data and the database user record
  * @throws Error if user is not authenticated or not found in database
  */
@@ -54,7 +54,9 @@ export async function getAuthenticatedUser() {
   }
 
   // Extract primary email address
-  const primaryEmail = user.emailAddresses.find(email => email.id === user.primaryEmailAddressId)?.emailAddress;
+  const primaryEmail = user.emailAddresses.find(
+    (email) => email.id === user.primaryEmailAddressId,
+  )?.emailAddress;
 
   if (!primaryEmail) {
     throw new Error('User primary email not found');
@@ -72,6 +74,6 @@ export async function getAuthenticatedUser() {
     clerkUser: user,
     clerkId: clerkId,
     dbUser: dbUser,
-    primaryEmail: primaryEmail
+    primaryEmail: primaryEmail,
   };
-} 
+}

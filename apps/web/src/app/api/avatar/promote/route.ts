@@ -70,7 +70,11 @@ export async function POST(request: NextRequest) {
 
     // The book's validated sheet for this style, if the sheet pipeline made one.
     const references = Array.isArray(book.characterReferences)
-      ? (book.characterReferences as Array<{ characterId?: string; artStyle?: string; url?: string }>)
+      ? (book.characterReferences as Array<{
+          characterId?: string;
+          artStyle?: string;
+          url?: string;
+        }>)
       : [];
     const sheetUrl = references.find(
       (r) => r.characterId === characterId && r.artStyle === artStyle && typeof r.url === 'string',
@@ -96,9 +100,7 @@ export async function POST(request: NextRequest) {
         kind,
         promotedFromBookId: bookId,
         identity: { character: { ...character, name: displayName }, extractedForStyle: artStyle },
-        photos: sheetUrl
-          ? undefined
-          : { create: sourceAssetIds.map((assetId) => ({ assetId })) },
+        photos: sheetUrl ? undefined : { create: sourceAssetIds.map((assetId) => ({ assetId })) },
         renditions: { create: [{ artStyle, status: 'PENDING' }] },
       },
     });

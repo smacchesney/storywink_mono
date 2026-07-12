@@ -24,7 +24,7 @@ export interface CastComposition {
 }
 
 export function castComposition(kinds: CastKind[]): CastComposition {
-  const people = kinds.filter(k => k === 'CHILD' || k === 'ADULT').length;
+  const people = kinds.filter((k) => k === 'CHILD' || k === 'ADULT').length;
   const companions = kinds.length - people;
   return {
     people,
@@ -102,7 +102,7 @@ export function buildAvatarStoryRoster(cast: CastAvatarInput[]): {
   characters: RosterCharacter[];
   childName: string | null;
 } {
-  const firstChildIndex = cast.findIndex(a => a.kind === 'CHILD');
+  const firstChildIndex = cast.findIndex((a) => a.kind === 'CHILD');
   const characters = cast.map((avatar, i) => {
     const isStar = i === firstChildIndex;
     const traits = avatar.identity?.physicalTraits ?? {};
@@ -119,7 +119,8 @@ export function buildAvatarStoryRoster(cast: CastAvatarInput[]): {
         bodyBuild: traits.bodyBuild?.trim() || 'as shown on the character sheet',
         distinguishingFeatures: traits.distinguishingFeatures ?? [],
       },
-      typicalClothing: avatar.identity?.typicalClothing?.trim() || 'as shown on the character sheet',
+      typicalClothing:
+        avatar.identity?.typicalClothing?.trim() || 'as shown on the character sheet',
       styleTranslation: avatar.identity?.styleTranslation?.trim() || '',
       appearsOnPages: [],
       appearsOnAssetIds: [],
@@ -137,16 +138,18 @@ export function buildAvatarStoryRoster(cast: CastAvatarInput[]): {
  * avatar-story can start in without drawing anyone again.
  */
 export function sharedReadyStyles(
-  cast: { renditions: { artStyle: string; status: string; turnaroundSheetUrl?: string | null }[] }[],
+  cast: {
+    renditions: { artStyle: string; status: string; turnaroundSheetUrl?: string | null }[];
+  }[],
 ): string[] {
   if (cast.length === 0) return [];
   const perAvatar = cast.map(
-    a =>
+    (a) =>
       new Set(
         a.renditions
-          .filter(r => r.status === 'READY' && r.turnaroundSheetUrl !== null)
-          .map(r => r.artStyle),
+          .filter((r) => r.status === 'READY' && r.turnaroundSheetUrl !== null)
+          .map((r) => r.artStyle),
       ),
   );
-  return Array.from(perAvatar[0]).filter(style => perAvatar.every(set => set.has(style)));
+  return Array.from(perAvatar[0]).filter((style) => perAvatar.every((set) => set.has(style)));
 }

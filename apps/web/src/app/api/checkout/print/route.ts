@@ -35,10 +35,7 @@ export async function POST(request: NextRequest) {
     // Authenticate user
     const { userId: clerkUserId } = await auth();
     if (!clerkUserId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get user from database
@@ -47,10 +44,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     // Parse and validate request body
@@ -58,17 +52,14 @@ export async function POST(request: NextRequest) {
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json(
-        { error: 'Invalid request body' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
     const parsed = checkoutSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Invalid request body', details: parsed.error.errors },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -96,7 +87,7 @@ export async function POST(request: NextRequest) {
     if (!book) {
       return NextResponse.json(
         { error: 'Book not found or not ready for printing' },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -104,7 +95,7 @@ export async function POST(request: NextRequest) {
     // PDF the worker will actually ship.
     const printedPageCount = printPageCounts(
       book._count.pages,
-      process.env.COLLAGE_PAGES_ENABLED === 'true'
+      process.env.COLLAGE_PAGES_ENABLED === 'true',
     ).interiorPages;
     const printCostCents = PRINT_PRICING.RETAIL_PRICE_CENTS;
 
@@ -116,7 +107,8 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
     // Get allowed countries and shipping options from shared config
-    const allowedCountries = getAllowedCountries() as Stripe.Checkout.SessionCreateParams.ShippingAddressCollection.AllowedCountry[];
+    const allowedCountries =
+      getAllowedCountries() as Stripe.Checkout.SessionCreateParams.ShippingAddressCollection.AllowedCountry[];
     const shippingOptions = buildStripeShippingOptions();
 
     // Stripe's hosted page renders in the language the app already speaks.
@@ -169,7 +161,7 @@ export async function POST(request: NextRequest) {
         bookId: book.id,
         props: { quantity: qty },
       },
-      logger
+      logger,
     );
 
     return NextResponse.json({
@@ -178,9 +170,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     logger.error({ error }, 'Checkout session error');
-    return NextResponse.json(
-      { error: 'Failed to create checkout session' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 });
   }
 }

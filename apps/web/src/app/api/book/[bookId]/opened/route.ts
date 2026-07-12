@@ -12,10 +12,7 @@ import logger from '@/lib/logger';
  * on it fires at most once per book. Always 204 — the caller never branches
  * on this.
  */
-export async function POST(
-  _request: Request,
-  { params }: { params: Promise<{ bookId: string }> }
-) {
+export async function POST(_request: Request, { params }: { params: Promise<{ bookId: string }> }) {
   const { bookId } = await params;
 
   try {

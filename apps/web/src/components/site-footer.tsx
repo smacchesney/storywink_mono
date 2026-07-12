@@ -1,9 +1,9 @@
-import Link from "next/link";
-import { useTranslations } from "next-intl";
-import { ScallopEdge } from "@/components/ui/scallop-edge";
+import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { ScallopEdge } from '@/components/ui/scallop-edge';
 
 export function SiteFooter() {
-  const t = useTranslations("footer");
+  const t = useTranslations('footer');
   return (
     // z-10 keeps the footer above PlayfulBackground's fixed viewport wash,
     // which lives inside <main>'s z-10 stacking context and would otherwise
@@ -21,15 +21,15 @@ export function SiteFooter() {
               Storywin<span className="text-coral">k.ai</span>
             </Link>
             <p className="text-sm text-ink-soft">
-              {t("copyright", { year: new Date().getFullYear() })}
+              {t('copyright', { year: new Date().getFullYear() })}
             </p>
           </div>
           <nav className="flex gap-6 text-sm text-ink-soft">
             <Link href="/terms" className="transition-colors hover:text-coral">
-              {t("terms")}
+              {t('terms')}
             </Link>
             <Link href="/privacy" className="transition-colors hover:text-coral">
-              {t("privacy")}
+              {t('privacy')}
             </Link>
           </nav>
         </div>

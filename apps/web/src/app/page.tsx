@@ -1,35 +1,41 @@
-"use client";
+'use client';
 
-import Image from "next/image";
+import Image from 'next/image';
 import React, { useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { ChevronDown } from 'lucide-react';
-import { useAuth } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
+import { useAuth } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { AnimatedHeroText } from "@/components/ui/animated-hero-text";
-import PlayfulBackground from "@/components/ui/playful-background";
-import { ScallopEdge } from "@/components/ui/scallop-edge";
-import { EXAMPLE_BOOKS, ExampleBook } from "@/components/landing-page/example-books-data";
-import { LandingCta } from "@/components/landing-page/landing-cta";
-import PhotoToBookMorph from "@/components/landing-page/photo-to-book-morph";
-import KeepsakeSection from "@/components/landing-page/keepsake-section";
-import LandingStickyCta from "@/components/landing-page/landing-sticky-cta";
-import { cn } from "@/lib/utils";
+import { AnimatedHeroText } from '@/components/ui/animated-hero-text';
+import PlayfulBackground from '@/components/ui/playful-background';
+import { ScallopEdge } from '@/components/ui/scallop-edge';
+import { EXAMPLE_BOOKS, ExampleBook } from '@/components/landing-page/example-books-data';
+import { LandingCta } from '@/components/landing-page/landing-cta';
+import PhotoToBookMorph from '@/components/landing-page/photo-to-book-morph';
+import KeepsakeSection from '@/components/landing-page/keepsake-section';
+import LandingStickyCta from '@/components/landing-page/landing-sticky-cta';
+import { cn } from '@/lib/utils';
 
 // Lazy load components
-const ExampleBookSelector = dynamic(() => import("@/components/landing-page/example-book-selector"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex justify-center gap-4">
-      {[...Array(3)].map((_, i) => (
-        <div key={i} className="w-[140px] h-[140px] md:w-[180px] md:h-[180px] bg-[var(--cream-yellow)] rounded-xl animate-pulse" />
-      ))}
-    </div>
-  ),
-});
+const ExampleBookSelector = dynamic(
+  () => import('@/components/landing-page/example-book-selector'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex justify-center gap-4">
+        {[...Array(3)].map((_, i) => (
+          <div
+            key={i}
+            className="h-[140px] w-[140px] animate-pulse rounded-xl bg-[var(--cream-yellow)] md:h-[180px] md:w-[180px]"
+          />
+        ))}
+      </div>
+    ),
+  },
+);
 
-const ExampleBookOverlay = dynamic(() => import("@/components/landing-page/example-book-overlay"), {
+const ExampleBookOverlay = dynamic(() => import('@/components/landing-page/example-book-overlay'), {
   ssr: false,
 });
 
@@ -64,7 +70,7 @@ export default function Home() {
     if (isLoaded && !isSignedIn) {
       router.push(`/sign-in?redirect_url=${encodeURIComponent('/create')}`);
     } else {
-      router.push("/create");
+      router.push('/create');
     }
   };
 
@@ -113,10 +119,7 @@ export default function Home() {
               </p>
 
               <div ref={heroCtaRef} className="mt-6">
-                <LandingCta
-                  onClick={handleCreateStorybookClick}
-                  className="lg:items-start"
-                />
+                <LandingCta onClick={handleCreateStorybookClick} className="lg:items-start" />
               </div>
             </div>
 
@@ -137,10 +140,7 @@ export default function Home() {
             <p className="mx-auto mt-3 max-w-xl text-ink-soft">{t('proofSub')}</p>
 
             <div className="mt-10 md:mt-14">
-              <ExampleBookSelector
-                books={EXAMPLE_BOOKS}
-                onSelectBook={setSelectedBook}
-              />
+              <ExampleBookSelector books={EXAMPLE_BOOKS} onSelectBook={setSelectedBook} />
             </div>
 
             <p className="mx-auto mt-10 max-w-2xl text-ink-soft">{t('likenessLine')}</p>
@@ -164,7 +164,7 @@ export default function Home() {
                   on the md 2×2 grid it would cut between rows) */}
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute left-0 right-0 top-6 hidden border-t-2 border-dashed border-coral/30 lg:block"
+                className="pointer-events-none absolute top-6 right-0 left-0 hidden border-t-2 border-dashed border-coral/30 lg:block"
                 style={{ marginLeft: '12.5%', marginRight: '12.5%' }}
               />
 
@@ -185,12 +185,8 @@ export default function Home() {
                       className="h-full w-auto object-contain"
                     />
                   </div>
-                  <h3 className="mb-1 font-playful text-xl text-ink">
-                    {step.title}
-                  </h3>
-                  <p className="max-w-[15rem] text-sm text-ink-soft">
-                    {step.caption}
-                  </p>
+                  <h3 className="mb-1 font-playful text-xl text-ink">{step.title}</h3>
+                  <p className="max-w-[15rem] text-sm text-ink-soft">{step.caption}</p>
                 </li>
               ))}
             </ol>
@@ -235,7 +231,7 @@ export default function Home() {
                   key={index}
                   className={cn(
                     'overflow-hidden rounded-2xl border bg-white shadow-sm transition-colors',
-                    isOpen ? 'border-coral/40' : 'border-ink/10'
+                    isOpen ? 'border-coral/40' : 'border-ink/10',
                   )}
                 >
                   <button
@@ -250,7 +246,7 @@ export default function Home() {
                     <ChevronDown
                       className={cn(
                         'h-5 w-5 flex-shrink-0 transition-transform motion-reduce:transition-none',
-                        isOpen ? 'rotate-180 text-coral' : 'text-ink-soft/60'
+                        isOpen ? 'rotate-180 text-coral' : 'text-ink-soft/60',
                       )}
                     />
                   </button>
@@ -259,11 +255,11 @@ export default function Home() {
                     id={`faq-answer-${index}`}
                     className={cn(
                       'grid transition-[grid-template-rows] duration-300 motion-reduce:transition-none',
-                      isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                      isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
                     )}
                   >
                     <div className="min-h-0 overflow-hidden">
-                      <p className="px-4 pb-4 pt-0 text-[15px] leading-relaxed text-ink-soft md:px-5 md:text-base">
+                      <p className="px-4 pt-0 pb-4 text-[15px] leading-relaxed text-ink-soft md:px-5 md:text-base">
                         {item.answer}
                       </p>
                     </div>

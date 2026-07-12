@@ -22,7 +22,7 @@ export const showWorking = (message: string) => {
  */
 export const getToastDuration = (message: string): number => {
   const words = message.split(' ').length;
-  return Math.min(3000 + (words * 200), 7000);
+  return Math.min(3000 + words * 200, 7000);
 };
 
 /**
@@ -46,11 +46,7 @@ export const getErrorMessage = (error: unknown): string => {
  * Show an error toast. The parent sees only the translated `message` (and
  * optional translated `description`); the raw error goes to the log.
  */
-export const showError = (
-  error: unknown,
-  message: string,
-  description?: string
-) => {
+export const showError = (error: unknown, message: string, description?: string) => {
   logger.error({ err: getErrorMessage(error) }, `Error toast shown: ${message}`);
 
   toast.error(message, {
@@ -69,7 +65,7 @@ export const showErrorWithRetry = (
   message: string,
   onRetry: () => void,
   retryLabel: string,
-  description?: string
+  description?: string,
 ) => {
   logger.error({ err: getErrorMessage(error) }, `Error toast shown: ${message}`);
 
@@ -78,8 +74,8 @@ export const showErrorWithRetry = (
     duration: 5000,
     action: {
       label: retryLabel,
-      onClick: onRetry
-    }
+      onClick: onRetry,
+    },
   });
 };
 
@@ -94,12 +90,12 @@ export const showSuccess = (
       label: string;
       onClick: () => void;
     };
-  }
+  },
 ) => {
   toast.success(message, {
     description: options?.description,
     duration: getToastDuration(message + (options?.description || '')),
-    action: options?.action
+    action: options?.action,
   });
 };
 

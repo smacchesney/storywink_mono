@@ -61,10 +61,7 @@ export function PhotoToBookMorph({ book, pairs, onOpen, className }: PhotoToBook
     // Client-only check — the reduced-motion variant swap itself is pure CSS
     // (motion-reduce classes) so SSR and client always render the same tree.
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const id = setInterval(
-      () => setFrameIndex((i) => (i + 1) % frames.length),
-      HOLD_MS + FADE_MS
-    );
+    const id = setInterval(() => setFrameIndex((i) => (i + 1) % frames.length), HOLD_MS + FADE_MS);
     return () => clearInterval(id);
   }, [frames.length]);
 
@@ -78,48 +75,48 @@ export function PhotoToBookMorph({ book, pairs, onOpen, className }: PhotoToBook
       onClick={onOpen}
       aria-label={t('readBookAria', { title: book.title })}
       className={cn(
-        'group mx-auto block w-full max-w-[420px] cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--coral-primary)] focus-visible:ring-offset-2',
-        className
+        'group mx-auto block w-full max-w-[420px] cursor-pointer rounded-lg focus-visible:ring-2 focus-visible:ring-[var(--coral-primary)] focus-visible:ring-offset-2 focus-visible:outline-none',
+        className,
       )}
     >
-      <StorybookFrame className="w-full transition-transform duration-300 motion-reduce:transition-none group-hover:-translate-y-1">
+      <StorybookFrame className="w-full transition-transform duration-300 group-hover:-translate-y-1 motion-reduce:transition-none">
         {/* Static pair with a hand-drawn arrow — shown only under
             prefers-reduced-motion (CSS toggle, so SSR markup never varies). */}
         <div className="hidden items-center gap-2 motion-reduce:grid motion-reduce:grid-cols-[1fr_auto_1fr]">
+          <div className="relative aspect-square w-full overflow-hidden rounded-md">
+            <Image
+              src={frames[0].src}
+              alt={frames[0].alt}
+              fill
+              sizes="(max-width: 1024px) 45vw, 200px"
+              className="object-cover"
+            />
+          </div>
+          <svg
+            viewBox="0 0 48 24"
+            className="w-8 text-coral"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 14 C 13 9, 27 9, 42 12" />
+            <path d="M33 5 L 43 12 L 32 17" />
+          </svg>
+          {frames[1] && (
             <div className="relative aspect-square w-full overflow-hidden rounded-md">
               <Image
-                src={frames[0].src}
-                alt={frames[0].alt}
+                src={frames[1].src}
+                alt={frames[1].alt}
                 fill
                 sizes="(max-width: 1024px) 45vw, 200px"
                 className="object-cover"
               />
             </div>
-            <svg
-              viewBox="0 0 48 24"
-              className="w-8 text-coral"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M3 14 C 13 9, 27 9, 42 12" />
-              <path d="M33 5 L 43 12 L 32 17" />
-            </svg>
-            {frames[1] && (
-              <div className="relative aspect-square w-full overflow-hidden rounded-md">
-                <Image
-                  src={frames[1].src}
-                  alt={frames[1].alt}
-                  fill
-                  sizes="(max-width: 1024px) 45vw, 200px"
-                  className="object-cover"
-                />
-              </div>
-            )}
-          </div>
+          )}
+        </div>
 
         {/* Crossfading frames — hidden under prefers-reduced-motion. */}
         <div className="relative aspect-square w-full overflow-hidden rounded-md motion-reduce:hidden">
@@ -133,7 +130,7 @@ export function PhotoToBookMorph({ book, pairs, onOpen, className }: PhotoToBook
               priority={i === 0}
               className={cn(
                 'object-cover transition-opacity ease-in-out',
-                i === frameIndex ? 'opacity-100' : 'opacity-0'
+                i === frameIndex ? 'opacity-100' : 'opacity-0',
               )}
               style={{ transitionDuration: `${FADE_MS}ms` }}
             />

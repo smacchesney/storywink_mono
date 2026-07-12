@@ -84,7 +84,10 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
           backoff: { type: 'exponential', delay: 15000 },
         });
       } catch (queueError) {
-        logger.error({ avatarId, error: queueError }, 'Approve cleanup enqueue failed (marker persists)');
+        logger.error(
+          { avatarId, error: queueError },
+          'Approve cleanup enqueue failed (marker persists)',
+        );
       }
     }
 

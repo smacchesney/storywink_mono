@@ -69,16 +69,14 @@ export function WhatNowCard({
       className={cn(
         'absolute bottom-3 left-1/2 z-20 w-[calc(100%-1.5rem)] max-w-sm -translate-x-1/2',
         'transition-all duration-300 ease-out motion-reduce:transition-none',
-        visible
-          ? 'translate-y-0 opacity-100'
-          : 'pointer-events-none translate-y-6 opacity-0'
+        visible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-6 opacity-0',
       )}
     >
-      <div className="relative rounded-2xl border border-coral/20 bg-white/95 px-4 pb-4 pt-5 shadow-lg backdrop-blur-sm">
+      <div className="relative rounded-2xl border border-coral/20 bg-white/95 px-4 pt-5 pb-4 shadow-lg backdrop-blur-sm">
         <button
           onClick={onDismiss}
           aria-label={t('dismiss')}
-          className="absolute right-2 top-2 rounded-full p-1 text-gray-400 hover:bg-muted hover:text-gray-600"
+          className="absolute top-2 right-2 rounded-full p-1 text-gray-400 hover:bg-muted hover:text-gray-600"
         >
           <X className="h-4 w-4" />
         </button>
@@ -111,7 +109,7 @@ export function WhatNowCard({
         {printShippable ? (
           <button
             onClick={onSavePdf}
-            className="mt-3 w-full text-center text-xs text-gray-500 underline underline-offset-2 hover:text-gray-700 font-playful"
+            className="mt-3 w-full text-center font-playful text-xs text-gray-500 underline underline-offset-2 hover:text-gray-700"
           >
             {t('savePdf')}
           </button>
@@ -120,10 +118,10 @@ export function WhatNowCard({
             onClick={handlePrintInterest}
             disabled={interestSent}
             className={cn(
-              'mt-3 w-full text-center text-xs font-playful',
+              'mt-3 w-full text-center font-playful text-xs',
               interestSent
                 ? 'text-coral'
-                : 'text-gray-500 underline underline-offset-2 hover:text-gray-700'
+                : 'text-gray-500 underline underline-offset-2 hover:text-gray-700',
             )}
           >
             {interestSent ? t('printThanks') : t('printSoon')}

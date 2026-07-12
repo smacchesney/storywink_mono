@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from '@/lib/utils';
 
 interface ScallopEdgeProps {
   /** When true the scallops point up (use above a footer). Default points down (below a header). */
@@ -21,8 +21,8 @@ interface ScallopEdgeProps {
  */
 export function ScallopEdge({
   flip = false,
-  fill = "white",
-  stroke = "var(--coral-primary)",
+  fill = 'white',
+  stroke = 'var(--coral-primary)',
   className,
   style,
 }: ScallopEdgeProps) {
@@ -41,7 +41,7 @@ export function ScallopEdge({
   // one page must not share an id or the first one wins. Deriving the id from
   // flip + fill + stroke keeps it deterministic (SSR-safe) — identical ids
   // always describe identical patterns.
-  const patternId = `scallop-${flip ? "up" : "down"}-${`${fill}-${stroke}`.replace(/[^a-zA-Z0-9]/g, "")}`;
+  const patternId = `scallop-${flip ? 'up' : 'down'}-${`${fill}-${stroke}`.replace(/[^a-zA-Z0-9]/g, '')}`;
   const top = PAD;
   const bot = PAD + H;
   // Fill path: flat top edge + one scallop bump, closed.
@@ -51,29 +51,16 @@ export function ScallopEdge({
 
   return (
     <svg
-      className={cn("pointer-events-none block w-full", className)}
+      className={cn('pointer-events-none block w-full', className)}
       width="100%"
       height={height}
-      style={{ ...(flip ? { transform: "scaleY(-1)" } : {}), ...style }}
+      style={{ ...(flip ? { transform: 'scaleY(-1)' } : {}), ...style }}
       aria-hidden="true"
     >
       <defs>
-        <pattern
-          id={patternId}
-          x="0"
-          y="0"
-          width={W}
-          height={height}
-          patternUnits="userSpaceOnUse"
-        >
+        <pattern id={patternId} x="0" y="0" width={W} height={height} patternUnits="userSpaceOnUse">
           <path d={fillPath} fill={fill} />
-          <path
-            d={strokePath}
-            fill="none"
-            stroke={stroke}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
+          <path d={strokePath} fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
         </pattern>
       </defs>
       <rect width="100%" height={height} fill={`url(#${patternId})`} />

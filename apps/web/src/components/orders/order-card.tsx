@@ -44,10 +44,10 @@ export async function OrderCard({ order }: { order: OrderCardData }) {
   const supportHref = `mailto:support@storywink.ai?subject=${encodeURIComponent(`Order ${orderNumber}`)}`;
 
   return (
-    <article className="bg-white rounded-xl shadow-sm border border-cream-deep p-5 sm:p-6">
+    <article className="rounded-xl border border-cream-deep bg-white p-5 shadow-sm sm:p-6">
       {/* Book + order facts */}
       <div className="flex gap-4">
-        <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-cream flex-shrink-0">
+        <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-cream sm:h-20 sm:w-20">
           {order.coverImageUrl ? (
             <Image
               src={coolifyImageUrl(order.coverImageUrl)}
@@ -57,17 +57,17 @@ export async function OrderCard({ order }: { order: OrderCardData }) {
               className="object-cover"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-2xl" aria-hidden>
+            <div className="flex h-full w-full items-center justify-center text-2xl" aria-hidden>
               📖
             </div>
           )}
         </div>
-        <div className="flex-1 min-w-0">
-          <h2 className="font-playful text-lg text-ink truncate">{title}</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate font-playful text-lg text-ink">{title}</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
             {t('orderNumber', { number: orderNumber })} · {t('orderedOn', { date: orderedOn })}
           </p>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="mt-1 text-sm text-muted-foreground">
             {t('quantityLabel', { count: order.quantity })}
             {order.totalAmount !== null && (
               <>
@@ -84,14 +84,14 @@ export async function OrderCard({ order }: { order: OrderCardData }) {
       {/* Journey or gentle help panel */}
       {needsAttention ? (
         <div className="mt-5 rounded-lg bg-coral-soft p-4">
-          <p className="font-medium text-ink flex items-center gap-2">
-            <LifeBuoy className="w-4 h-4 text-coral-ink" aria-hidden />
+          <p className="flex items-center gap-2 font-medium text-ink">
+            <LifeBuoy className="h-4 w-4 text-coral-ink" aria-hidden />
             {t('attentionTitle')}
           </p>
-          <p className="text-sm text-ink/80 mt-1">{t('attentionBody')}</p>
+          <p className="mt-1 text-sm text-ink/80">{t('attentionBody')}</p>
           <a
             href={supportHref}
-            className="inline-block mt-2 text-sm font-medium text-coral-ink underline underline-offset-2 hover:text-coral"
+            className="mt-2 inline-block text-sm font-medium text-coral-ink underline underline-offset-2 hover:text-coral"
           >
             support@storywink.ai
           </a>
@@ -115,7 +115,7 @@ export async function OrderCard({ order }: { order: OrderCardData }) {
                 className="inline-flex items-center gap-1.5 text-sm font-medium text-coral-ink underline underline-offset-2 hover:text-coral"
               >
                 {t('trackPackage')}
-                <ExternalLink className="w-3.5 h-3.5" aria-hidden />
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden />
               </a>
             </div>
           )}

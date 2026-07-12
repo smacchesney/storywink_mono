@@ -157,22 +157,17 @@ export default function BookResolvePage() {
   // --- Derived state ---
   // Actionable pages: pages that need work AND haven't been replaced yet
   const actionablePages =
-    book?.pages.filter(
-      (p) => pageNeedsWork(p) && !replacedPageIds.includes(p.id),
-    ) || [];
+    book?.pages.filter((p) => pageNeedsWork(p) && !replacedPageIds.includes(p.id)) || [];
   const selectedFixPage = actionablePages[currentFixIndex] || null;
-  const allPagesFixed =
-    actionablePages.length === 0 && replacedPageIds.length > 0;
+  const allPagesFixed = actionablePages.length === 0 && replacedPageIds.length > 0;
 
   // For review phase: get the actual page data for replaced pages
-  const replacedPages =
-    book?.pages.filter((p) => replacedPageIds.includes(p.id)) || [];
+  const replacedPages = book?.pages.filter((p) => replacedPageIds.includes(p.id)) || [];
   const currentReviewPage = replacedPages[currentReviewIndex] || null;
   // "Illustrate my book" unlocks when every new page has words — the old
   // per-page Confirm tap is gone (editing a page still saves its text).
   const allConfirmed =
-    replacedPages.length > 0 &&
-    replacedPages.every((p) => (p.text || '').trim().length > 0);
+    replacedPages.length > 0 && replacedPages.every((p) => (p.text || '').trim().length > 0);
 
   // --- Fetch book data ---
   const fetchBook = useCallback(async () => {
@@ -228,9 +223,7 @@ export default function BookResolvePage() {
     }
 
     // Check if all actionable pages are addressed (text gen should be in progress)
-    const remaining = book.pages.filter(
-      (p) => pageNeedsWork(p) && !validIds.includes(p.id),
-    );
+    const remaining = book.pages.filter((p) => pageNeedsWork(p) && !validIds.includes(p.id));
     if (remaining.length === 0) {
       // All flagged pages were addressed, but text isn't ready yet — resume generating
       setReplacedPageIds(validIds);
@@ -246,10 +239,7 @@ export default function BookResolvePage() {
 
   // --- Clamp currentFixIndex when actionablePages shrinks ---
   useEffect(() => {
-    if (
-      currentFixIndex >= actionablePages.length &&
-      actionablePages.length > 0
-    ) {
+    if (currentFixIndex >= actionablePages.length && actionablePages.length > 0) {
       setCurrentFixIndex(actionablePages.length - 1);
     } else if (actionablePages.length === 0) {
       setCurrentFixIndex(0);
@@ -275,13 +265,10 @@ export default function BookResolvePage() {
     setIsDeleting(true);
     try {
       const token = await getToken();
-      const response = await fetch(
-        `/api/book/${bookId}/page/${pageToDelete.id}`,
-        {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const response = await fetch(`/api/book/${bookId}/page/${pageToDelete.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to remove page');
@@ -307,13 +294,10 @@ export default function BookResolvePage() {
     setIsRedrawing(true);
     try {
       const token = await getToken();
-      const response = await fetch(
-        `/api/book/${bookId}/page/${selectedFixPage.id}/reillustrate`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const response = await fetch(`/api/book/${bookId}/page/${selectedFixPage.id}/reillustrate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (response.status !== 202) {
         const err = await response.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to start re-illustration');
@@ -374,9 +358,7 @@ export default function BookResolvePage() {
       }
 
       // Track this page as replaced (deduplicate).
-      setReplacedPageIds((prev) =>
-        prev.includes(targetPageId) ? prev : [...prev, targetPageId],
-      );
+      setReplacedPageIds((prev) => (prev.includes(targetPageId) ? prev : [...prev, targetPageId]));
 
       await fetchBook();
     } catch (err: any) {
@@ -479,9 +461,7 @@ export default function BookResolvePage() {
       if (!prev) return prev;
       return {
         ...prev,
-        pages: prev.pages.map((p) =>
-          p.id === currentReviewPage.id ? { ...p, text: newText } : p,
-        ),
+        pages: prev.pages.map((p) => (p.id === currentReviewPage.id ? { ...p, text: newText } : p)),
       };
     });
   };
@@ -493,17 +473,14 @@ export default function BookResolvePage() {
     setIsSaving(true);
     try {
       const token = await getToken();
-      const res = await fetch(
-        `/api/book/${bookId}/page/${currentReviewPage.id}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ text: newText }),
+      const res = await fetch(`/api/book/${bookId}/page/${currentReviewPage.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
-      );
+        body: JSON.stringify({ text: newText }),
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'save rejected');
@@ -547,9 +524,9 @@ export default function BookResolvePage() {
   // --- Loading state ---
   if (isLoading) {
     return (
-      <div className="flex flex-col justify-center items-center min-h-screen gap-3 bg-waiting">
+      <div className="bg-waiting flex min-h-screen flex-col items-center justify-center gap-3">
         <Storydust variant="twinkle" size="card" />
-        <p className="text-[var(--ink-soft)] font-playful">{t('loading')}</p>
+        <p className="font-playful text-[var(--ink-soft)]">{t('loading')}</p>
       </div>
     );
   }
@@ -557,7 +534,7 @@ export default function BookResolvePage() {
   // --- Error state ---
   if (fetchError) {
     return (
-      <div className="flex flex-col justify-center items-center min-h-screen gap-4">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
         <p className="text-red-600">{fetchError}</p>
         <Button
           onClick={() => {
@@ -565,7 +542,7 @@ export default function BookResolvePage() {
             setIsLoading(true);
             fetchBook();
           }}
-          className="bg-coral hover:bg-coral-hover text-white rounded-full font-playful"
+          className="rounded-full bg-coral font-playful text-white hover:bg-coral-hover"
         >
           {t('retry')}
         </Button>
@@ -575,7 +552,7 @@ export default function BookResolvePage() {
 
   if (!book) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
+      <div className="flex min-h-screen items-center justify-center">
         <p className="text-muted-foreground">{t('bookNotFound')}</p>
       </div>
     );
@@ -587,9 +564,9 @@ export default function BookResolvePage() {
     selectedFixPage?.originalImageUrl;
 
   return (
-    <div className="min-h-screen px-4 py-8 max-w-2xl mx-auto">
+    <div className="mx-auto min-h-screen max-w-2xl px-4 py-8">
       {/* Header with mascot */}
-      <div className="text-center mb-6">
+      <div className="mb-6 text-center">
         <Image
           src={MASCOT_CATS_SLEEPING}
           alt=""
@@ -597,10 +574,8 @@ export default function BookResolvePage() {
           height={120}
           className="mx-auto mb-3 h-16 w-16 md:h-20 md:w-20"
         />
-        <h1 className="text-2xl sm:text-3xl font-bold text-ink font-playful">
-          {t('title')}
-        </h1>
-        <p className="text-muted-foreground mt-2">
+        <h1 className="font-playful text-2xl font-bold text-ink sm:text-3xl">{t('title')}</h1>
+        <p className="mt-2 text-muted-foreground">
           {phase === 'fix-photos'
             ? t('subtitle', { count: actionablePages.length })
             : phase === 'generating-text'
@@ -613,14 +588,12 @@ export default function BookResolvePage() {
       {phase === 'fix-photos' && (
         <>
           {/* Page Grid */}
-          <div className="grid grid-cols-6 sm:grid-cols-8 gap-2 mb-6">
+          <div className="mb-6 grid grid-cols-6 gap-2 sm:grid-cols-8">
             {book.pages.map((page) => {
               const isReplaced = replacedPageIds.includes(page.id);
               const needsWork = pageNeedsWork(page) && !isReplaced;
               const isSelected = selectedFixPage?.id === page.id;
-              const indexInActionable = actionablePages.findIndex(
-                (p) => p.id === page.id,
-              );
+              const indexInActionable = actionablePages.findIndex((p) => p.id === page.id);
 
               if (needsWork) {
                 return (
@@ -628,8 +601,7 @@ export default function BookResolvePage() {
                     key={page.id}
                     onClick={() => goToFixPage(indexInActionable)}
                     aria-label={`Page ${page.pageNumber} - needs attention`}
-                    className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all cursor-pointer
-                      ${isSelected ? 'border-coral ring-2 ring-coral/30' : 'border-peach hover:border-coral'}`}
+                    className={`relative aspect-square cursor-pointer overflow-hidden rounded-lg border-2 transition-all ${isSelected ? 'border-coral ring-2 ring-coral/30' : 'border-peach hover:border-coral'}`}
                   >
                     {page.originalImageUrl ? (
                       <Image
@@ -640,12 +612,12 @@ export default function BookResolvePage() {
                         sizes="60px"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gray-100" />
+                      <div className="h-full w-full bg-gray-100" />
                     )}
                     <div className="absolute inset-0 flex items-center justify-center bg-warn-soft/40">
                       <AlertTriangle className="h-4 w-4 text-coral-ink" />
                     </div>
-                    <span className="absolute bottom-0 left-0 right-0 text-[10px] text-center bg-black/40 text-white">
+                    <span className="absolute right-0 bottom-0 left-0 bg-black/40 text-center text-[10px] text-white">
                       {page.pageNumber}
                     </span>
                   </button>
@@ -656,27 +628,23 @@ export default function BookResolvePage() {
               return (
                 <div
                   key={page.id}
-                  className={`relative aspect-square rounded-lg overflow-hidden border-2 ${isReplaced ? 'border-coral/40' : 'border-green-200'}`}
+                  className={`relative aspect-square overflow-hidden rounded-lg border-2 ${isReplaced ? 'border-coral/40' : 'border-green-200'}`}
                 >
                   {page.generatedImageUrl || page.originalImageUrl ? (
                     <Image
-                      src={
-                        page.generatedImageUrl || page.originalImageUrl || ''
-                      }
+                      src={page.generatedImageUrl || page.originalImageUrl || ''}
                       alt={`Page ${page.pageNumber}`}
                       fill
                       className="object-cover"
                       sizes="60px"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gray-100" />
+                    <div className="h-full w-full bg-gray-100" />
                   )}
                   <div className="absolute top-0.5 right-0.5">
-                    <Check
-                      className={`h-3 w-3 ${isReplaced ? 'text-coral' : 'text-green-600'}`}
-                    />
+                    <Check className={`h-3 w-3 ${isReplaced ? 'text-coral' : 'text-green-600'}`} />
                   </div>
-                  <span className="absolute bottom-0 left-0 right-0 text-[10px] text-center bg-black/40 text-white">
+                  <span className="absolute right-0 bottom-0 left-0 bg-black/40 text-center text-[10px] text-white">
                     {page.pageNumber}
                   </span>
                 </div>
@@ -686,7 +654,7 @@ export default function BookResolvePage() {
 
           {/* Page Navigation (prev/next between actionable pages) */}
           {actionablePages.length > 0 && selectedFixPage && (
-            <div className="flex items-center justify-between mb-4 px-1">
+            <div className="mb-4 flex items-center justify-between px-1">
               <Button
                 variant="ghost"
                 size="sm"
@@ -694,7 +662,7 @@ export default function BookResolvePage() {
                 disabled={currentFixIndex === 0}
                 className="text-slate-500 disabled:opacity-30"
               >
-                <ChevronLeft className="h-4 w-4 mr-1" />
+                <ChevronLeft className="mr-1 h-4 w-4" />
                 {t('prevPage')}
               </Button>
               <span className="text-sm font-medium text-slate-600">
@@ -711,17 +679,17 @@ export default function BookResolvePage() {
                 className="text-slate-500 disabled:opacity-30"
               >
                 {t('nextPage')}
-                <ChevronRight className="h-4 w-4 ml-1" />
+                <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
             </div>
           )}
 
           {/* Action Card — choose Replace or Remove */}
           {selectedFixPage && (
-            <Card className="border-peach/60 bg-warn-soft/50 overflow-hidden">
-              <CardContent className="pt-6 px-4 sm:px-6">
+            <Card className="overflow-hidden border-peach/60 bg-warn-soft/50">
+              <CardContent className="px-4 pt-6 sm:px-6">
                 <div className="flex items-start gap-3 sm:gap-4">
-                  <div className="relative w-20 h-20 rounded-lg overflow-hidden shrink-0 border">
+                  <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border">
                     {selectedPhotoUrl ? (
                       <Image
                         src={selectedPhotoUrl}
@@ -731,7 +699,7 @@ export default function BookResolvePage() {
                         sizes="80px"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gray-200" />
+                      <div className="h-full w-full bg-gray-200" />
                     )}
                   </div>
                   <div className="flex-1">
@@ -740,24 +708,28 @@ export default function BookResolvePage() {
                         page: selectedFixPage.pageNumber,
                       })}
                     </h3>
-                    <p className="text-sm text-muted-foreground mt-1">
+                    <p className="mt-1 text-sm text-muted-foreground">
                       {selectedFixPage.source === 'BRIDGE'
                         ? t('bridgeCouldntBeDrawn')
                         : t('photoCouldntBeIllustrated')}
                     </p>
-                    <div className="flex flex-col sm:flex-row gap-2 mt-4">
+                    <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                       {selectedFixPage.source === 'BRIDGE' ? (
                         // Bridge pages have no photo to replace — offer a
                         // fresh drawing instead.
                         <Button
                           onClick={handleRedrawBridge}
                           disabled={isRedrawing}
-                          className="w-full sm:flex-1 bg-coral hover:bg-coral-hover text-white rounded-full font-playful disabled:opacity-70"
+                          className="w-full rounded-full bg-coral font-playful text-white hover:bg-coral-hover disabled:opacity-70 sm:flex-1"
                         >
                           {isRedrawing ? (
-                            <Storydust variant="twinkle" size="inline" className="mr-1.5 text-white" />
+                            <Storydust
+                              variant="twinkle"
+                              size="inline"
+                              className="mr-1.5 text-white"
+                            />
                           ) : (
-                            <Sparkles className="h-4 w-4 mr-1.5" />
+                            <Sparkles className="mr-1.5 h-4 w-4" />
                           )}
                           {t('tryDrawingAgain')}
                         </Button>
@@ -765,12 +737,16 @@ export default function BookResolvePage() {
                         <Button
                           onClick={handleReplaceClick}
                           disabled={isReplacing}
-                          className="w-full sm:flex-1 bg-coral hover:bg-coral-hover text-white rounded-full font-playful disabled:opacity-70"
+                          className="w-full rounded-full bg-coral font-playful text-white hover:bg-coral-hover disabled:opacity-70 sm:flex-1"
                         >
                           {isReplacing ? (
-                            <Storydust variant="twinkle" size="inline" className="mr-1.5 text-white" />
+                            <Storydust
+                              variant="twinkle"
+                              size="inline"
+                              className="mr-1.5 text-white"
+                            />
                           ) : (
-                            <ImagePlus className="h-4 w-4 mr-1.5" />
+                            <ImagePlus className="mr-1.5 h-4 w-4" />
                           )}
                           {isReplacing ? tUpload('replacing') : t('replacePhoto')}
                         </Button>
@@ -782,9 +758,9 @@ export default function BookResolvePage() {
                           setPageToDelete(selectedFixPage);
                           setShowDeleteDialog(true);
                         }}
-                        className="w-full sm:flex-1 rounded-full font-playful border-slate-300 text-slate-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+                        className="w-full rounded-full border-slate-300 font-playful text-slate-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600 sm:flex-1"
                       >
-                        <Trash2 className="h-4 w-4 mr-1.5" />
+                        <Trash2 className="mr-1.5 h-4 w-4" />
                         {t('removePage')}
                       </Button>
                     </div>
@@ -808,12 +784,12 @@ export default function BookResolvePage() {
           {/* "Generate Story" button — appears when all pages addressed */}
           {allPagesFixed && (
             <div className="mt-6 text-center">
-              <p className="text-sm text-muted-foreground mb-3 font-playful">
+              <p className="mb-3 font-playful text-sm text-muted-foreground">
                 {t('allPagesFixed')}
               </p>
               <Button
                 onClick={handleGenerateStory}
-                className="w-full bg-coral hover:bg-coral-hover text-white rounded-full font-playful text-lg py-6"
+                className="w-full rounded-full bg-coral py-6 font-playful text-lg text-white hover:bg-coral-hover"
               >
                 {t('generateStory')}
               </Button>
@@ -829,21 +805,17 @@ export default function BookResolvePage() {
             {isGeneratingText ? (
               <div className="flex flex-col items-center gap-4 py-8">
                 <Storydust variant="pencil" size="card" />
-                <p className="text-[var(--ink-soft)] font-playful">
-                  {t('fixingPage')}
-                </p>
+                <p className="font-playful text-[var(--ink-soft)]">{t('fixingPage')}</p>
                 <p className="text-xs text-[var(--ink-soft)]/70">
                   {t('generatingTextCount', { count: replacedPageIds.length })}
                 </p>
               </div>
             ) : textGenTimedOut ? (
               <div className="flex flex-col items-center gap-3 py-8">
-                <p className="text-coral-ink font-playful">
-                  {t('textGenerationTimeout')}
-                </p>
+                <p className="font-playful text-coral-ink">{t('textGenerationTimeout')}</p>
                 <Button
                   onClick={handleRetryTextGen}
-                  className="bg-coral hover:bg-coral-hover text-white rounded-full font-playful"
+                  className="rounded-full bg-coral font-playful text-white hover:bg-coral-hover"
                 >
                   {t('retry')}
                 </Button>
@@ -860,9 +832,7 @@ export default function BookResolvePage() {
           <PageCard
             key={currentReviewPage.id}
             id={currentReviewPage.id}
-            imageUrl={
-              currentReviewPage.asset?.url || currentReviewPage.originalImageUrl
-            }
+            imageUrl={currentReviewPage.asset?.url || currentReviewPage.originalImageUrl}
             text={currentReviewPage.text}
             pageNumber={currentReviewPage.pageNumber}
             isTitlePage={false}
@@ -888,7 +858,7 @@ export default function BookResolvePage() {
             <Button
               onClick={handleIllustrate}
               disabled={!allConfirmed || isSubmitting}
-              className="w-full bg-coral hover:bg-coral-hover text-white rounded-full font-playful text-lg py-6 disabled:opacity-50"
+              className="w-full rounded-full bg-coral py-6 font-playful text-lg text-white hover:bg-coral-hover disabled:opacity-50"
             >
               {isSubmitting && (
                 <Storydust variant="twinkle" size="inline" className="mr-2 text-white" />

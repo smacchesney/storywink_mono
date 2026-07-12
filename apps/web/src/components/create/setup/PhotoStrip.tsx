@@ -70,14 +70,9 @@ function SortableThumb({
   onRemove: () => void;
   removeLabel: string;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: photo.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: photo.id,
+  });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -92,7 +87,7 @@ function SortableThumb({
     <div
       ref={setNodeRef}
       style={style}
-      className="relative shrink-0 h-16 w-16 rounded-xl overflow-hidden border border-black/5 shadow-sm bg-gray-100"
+      className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-gray-100 shadow-sm"
     >
       {/* Drag surface — separated from the ✕ so removing doesn't start a drag. */}
       <div
@@ -106,13 +101,13 @@ function SortableThumb({
             alt=""
             fill
             sizes="64px"
-            className="object-cover pointer-events-none"
+            className="pointer-events-none object-cover"
           />
         ) : null}
       </div>
 
       {isCover && (
-        <span className="absolute bottom-0 inset-x-0 bg-coral text-white text-[9px] leading-tight font-playful text-center py-0.5 pointer-events-none">
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-coral py-0.5 text-center font-playful text-[9px] leading-tight text-white">
           {coverLabel}
         </span>
       )}
@@ -124,7 +119,7 @@ function SortableThumb({
           onClick={onRemove}
           disabled={removing}
           aria-label={removeLabel}
-          className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/75 disabled:opacity-60"
+          className="absolute top-0.5 right-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/75 disabled:opacity-60"
         >
           {removing ? (
             // A single winking spark — the full three-star twinkle can't fit
@@ -149,15 +144,7 @@ function SortableThumb({
 }
 
 /** The always-present "+" tile that opens the OS picker inline. */
-function AddTile({
-  onClick,
-  busy,
-  label,
-}: {
-  onClick: () => void;
-  busy: boolean;
-  label: string;
-}) {
+function AddTile({ onClick, busy, label }: { onClick: () => void; busy: boolean; label: string }) {
   return (
     <button
       type="button"
@@ -182,12 +169,7 @@ function AddTile({
  * which auto-refreshes perception) and each non-cover thumbnail gets an ✕ that
  * calls the page DELETE endpoint (respecting the cover + min-2 guards).
  */
-export function PhotoStrip({
-  photos,
-  onReorder,
-  bookId,
-  onPhotosChanged,
-}: PhotoStripProps) {
+export function PhotoStrip({ photos, onReorder, bookId, onPhotosChanged }: PhotoStripProps) {
   const t = useTranslations('setup');
   const tUpload = useTranslations('upload');
   const { getToken } = useAuth();
@@ -243,12 +225,9 @@ export function PhotoStrip({
         }
       });
       const rejected = picked.length - valid.length;
-      if (rejected > 0)
-        toast.error(tUpload('errorWrongTypeSome', { count: rejected }));
+      if (rejected > 0) toast.error(tUpload('errorWrongTypeSome', { count: rejected }));
       if (fileList.length > remaining)
-        toast.error(
-          tUpload('errorCapReached', { max: BOOK_CONSTRAINTS.MAX_PHOTOS }),
-        );
+        toast.error(tUpload('errorCapReached', { max: BOOK_CONSTRAINTS.MAX_PHOTOS }));
       if (valid.length === 0) return;
 
       setUploading(true);
@@ -258,9 +237,7 @@ export function PhotoStrip({
           { bookId, getToken },
         );
         if (assets.length < valid.length) {
-          toast.error(
-            tUpload('errorSomeFailed', { count: valid.length - assets.length }),
-          );
+          toast.error(tUpload('errorSomeFailed', { count: valid.length - assets.length }));
         }
         await onPhotosChanged?.();
       } catch (err) {
@@ -309,16 +286,9 @@ export function PhotoStrip({
   );
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext
-        items={items.map((p) => p.id)}
-        strategy={horizontalListSortingStrategy}
-      >
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={items.map((p) => p.id)} strategy={horizontalListSortingStrategy}>
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
           {items.map((photo, idx) => (
             <SortableThumb
               key={photo.id}
@@ -332,13 +302,7 @@ export function PhotoStrip({
             />
           ))}
 
-          {canAdd && (
-            <AddTile
-              onClick={openPicker}
-              busy={uploading}
-              label={tUpload('addPhotos')}
-            />
-          )}
+          {canAdd && <AddTile onClick={openPicker} busy={uploading} label={tUpload('addPhotos')} />}
         </div>
       </SortableContext>
 

@@ -141,7 +141,10 @@ function AvatarStoryFlow() {
       if (draft.sparkKey) setSparkKey(draft.sparkKey);
       if (draft.customSpark) setCustomSpark(draft.customSpark);
       if (draft.writingOwn) setWritingOwn(true);
-      if (draft.pageLength && (AVATAR_STORY_PAGE_LENGTHS as readonly number[]).includes(draft.pageLength)) {
+      if (
+        draft.pageLength &&
+        (AVATAR_STORY_PAGE_LENGTHS as readonly number[]).includes(draft.pageLength)
+      ) {
         setPageLength(draft.pageLength);
       }
       if (draft.language === 'en' || draft.language === 'ja') setLanguage(draft.language);
@@ -396,9 +399,7 @@ function AvatarStoryFlow() {
         <button
           type="button"
           onClick={() =>
-            step === 'cast'
-              ? router.push('/create')
-              : setStep(step === 'length' ? 'spark' : 'cast')
+            step === 'cast' ? router.push('/create') : setStep(step === 'length' ? 'spark' : 'cast')
           }
           className="flex min-h-[44px] items-center gap-1.5 rounded-full px-3 py-2 font-playful text-sm text-gray-500 hover:text-gray-700"
         >
@@ -476,7 +477,7 @@ function AvatarStoryFlow() {
                   }`}
                 >
                   {selected && (
-                    <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-coral text-white">
+                    <span className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-coral text-white">
                       <Check className="h-3.5 w-3.5" />
                     </span>
                   )}
@@ -511,7 +512,9 @@ function AvatarStoryFlow() {
             })}
           </div>
 
-          {peopleFull && <p className="mt-3 text-center text-xs text-gray-500">{t('castPeopleFull')}</p>}
+          {peopleFull && (
+            <p className="mt-3 text-center text-xs text-gray-500">{t('castPeopleFull')}</p>
+          )}
           {companionsFull && (
             <p className="mt-1 text-center text-xs text-gray-500">{t('castCompanionsFull')}</p>
           )}
@@ -574,7 +577,11 @@ function AvatarStoryFlow() {
             )}
           </div>
 
-          <StepCta disabled={premise.length === 0} onClick={() => setStep('length')} label={t('next')} />
+          <StepCta
+            disabled={premise.length === 0}
+            onClick={() => setStep('length')}
+            label={t('next')}
+          />
         </>
       )}
 
@@ -594,13 +601,17 @@ function AvatarStoryFlow() {
                   aria-pressed={active}
                   onClick={() => setPageLength(len)}
                   className={`flex min-h-[44px] flex-col items-center rounded-2xl border-2 bg-white px-2 py-4 transition-all ${
-                    active ? 'border-coral ring-2 ring-coral/25' : 'border-black/10 hover:border-coral/50'
+                    active
+                      ? 'border-coral ring-2 ring-coral/25'
+                      : 'border-black/10 hover:border-coral/50'
                   }`}
                 >
                   <span className="font-playful text-base font-semibold text-[#1a1a1a]">
                     {t(`length${len}`)}
                   </span>
-                  <span className="mt-1 text-xs text-gray-500">{t('lengthPages', { count: len })}</span>
+                  <span className="mt-1 text-xs text-gray-500">
+                    {t('lengthPages', { count: len })}
+                  </span>
                 </button>
               );
             })}
@@ -625,7 +636,11 @@ function AvatarStoryFlow() {
                         active ? 'border-coral ring-2 ring-coral ring-offset-1' : 'border-black/10'
                       }`}
                     >
-                      <img src={getStylePreviewUrl(key) ?? ''} alt={styleLabel(key)} className="h-20 w-20 object-cover" />
+                      <img
+                        src={getStylePreviewUrl(key) ?? ''}
+                        alt={styleLabel(key)}
+                        className="h-20 w-20 object-cover"
+                      />
                       <span className="absolute inset-x-0 bottom-0 bg-white/85 py-0.5 text-center font-playful text-[11px] text-[#1a1a1a]">
                         {styleLabel(key)}
                       </span>
@@ -639,7 +654,9 @@ function AvatarStoryFlow() {
           {/* No shared style: one honest repair card, never a dead end. */}
           {sharedStyles.length === 0 && (
             <div className="mx-auto mt-6 w-full max-w-md rounded-2xl border border-coral/15 bg-[#FFF9F5] px-5 py-4 text-center">
-              <p className="font-playful text-sm font-semibold text-[#1a1a1a]">{t('styleMismatch')}</p>
+              <p className="font-playful text-sm font-semibold text-[#1a1a1a]">
+                {t('styleMismatch')}
+              </p>
               <p className="mt-1 text-sm text-gray-600">{t('styleMismatchHint')}</p>
               {repairing ? (
                 <div className="mt-3 flex items-center justify-center gap-2">

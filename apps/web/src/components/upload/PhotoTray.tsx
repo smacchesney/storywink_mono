@@ -1,12 +1,6 @@
 'use client';
 
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@clerk/nextjs';
 import { useTranslations } from 'next-intl';
@@ -118,8 +112,7 @@ export function PhotoTray({
     () =>
       tiles
         .filter(
-          (tile): tile is Tile & { asset: UploadedAsset } =>
-            tile.status === 'done' && !!tile.asset,
+          (tile): tile is Tile & { asset: UploadedAsset } => tile.status === 'done' && !!tile.asset,
         )
         .map((tile) => tile.asset),
     [tiles],
@@ -142,16 +135,13 @@ export function PhotoTray({
           )
           .map((tile) => tile.asset),
       hasPending: () => tiles.some((tile) => tile.status === 'uploading'),
-      pendingCount: () =>
-        tiles.filter((tile) => tile.status === 'uploading').length,
+      pendingCount: () => tiles.filter((tile) => tile.status === 'uploading').length,
     }),
     [tiles],
   );
 
   const updateTile = useCallback((key: FileKey, patch: Partial<Tile>) => {
-    setTiles((prev) =>
-      prev.map((tile) => (tile.key === key ? { ...tile, ...patch } : tile)),
-    );
+    setTiles((prev) => prev.map((tile) => (tile.key === key ? { ...tile, ...patch } : tile)));
   }, []);
 
   // Run a batch of already-created tiles through the upload engine.
@@ -175,8 +165,7 @@ export function PhotoTray({
         setTiles((prev) =>
           prev.map((tile) => {
             const match = assets.find((a) => a.fileKey === tile.key);
-            if (match)
-              return { ...tile, status: 'done', progress: 100, asset: match };
+            if (match) return { ...tile, status: 'done', progress: 100, asset: match };
             return tile;
           }),
         );
@@ -249,9 +238,7 @@ export function PhotoTray({
         );
       }
       if (overflow > 0) {
-        import('sonner').then(({ toast }) =>
-          toast.error(t('errorCapReached', { max: cap })),
-        );
+        import('sonner').then(({ toast }) => toast.error(t('errorCapReached', { max: cap })));
       }
 
       if (accepted.length === 0) return;
@@ -333,23 +320,17 @@ export function PhotoTray({
         ))}
 
         {remaining > 0 && (
-          <AddTile
-            onClick={openPicker}
-            hasTiles={tiles.length > 0}
-            addLabel={t('addPhotos')}
-          />
+          <AddTile onClick={openPicker} hasTiles={tiles.length > 0} addLabel={t('addPhotos')} />
         )}
       </div>
 
       {/* Reassurance: big photos are optimized automatically — subtle, not a warning. */}
       {tiles.length === 0 && existingCount === 0 && (
-        <p className="mt-3 text-center text-xs text-gray-400">
-          {t('optimizeHint')}
-        </p>
+        <p className="mt-3 text-center text-xs text-gray-400">{t('optimizeHint')}</p>
       )}
 
       {(tiles.length > 0 || existingCount > 0) && (
-        <p className="mt-3 text-center text-sm font-medium text-gray-500 font-playful">
+        <p className="mt-3 text-center font-playful text-sm font-medium text-gray-500">
           {t('counter', { used: usedCount, max: cap })}
         </p>
       )}
@@ -420,11 +401,7 @@ function PhotoTile({
   return (
     <div className="relative aspect-square overflow-hidden rounded-2xl border border-black/5 bg-gray-100 shadow-sm">
       {/* eslint-disable-next-line @next/next/no-img-element -- local blob URL, next/image can't optimize it */}
-      <img
-        src={tile.previewUrl}
-        alt=""
-        className="h-full w-full object-cover"
-      />
+      <img src={tile.previewUrl} alt="" className="h-full w-full object-cover" />
 
       {/* Uploading: dim + circular progress ring */}
       {tile.status === 'uploading' && (
@@ -442,9 +419,7 @@ function PhotoTile({
           className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/55 text-white transition-colors hover:bg-black/65"
         >
           <RotateCw className="h-6 w-6" />
-          <span className="font-playful text-[11px] leading-tight">
-            {retryLabel}
-          </span>
+          <span className="font-playful text-[11px] leading-tight">{retryLabel}</span>
         </button>
       )}
 
@@ -460,7 +435,7 @@ function PhotoTile({
         type="button"
         onClick={onRemove}
         aria-label={removeLabel}
-        className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/45 text-white transition-colors hover:bg-black/70"
+        className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/45 text-white transition-colors hover:bg-black/70"
       >
         <X className="h-3.5 w-3.5" strokeWidth={2.5} />
       </button>
@@ -474,8 +449,7 @@ function ProgressRing({ pct }: { pct: number }) {
   const stroke = 3.5;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
-  const offset =
-    circumference - (Math.min(100, Math.max(0, pct)) / 100) * circumference;
+  const offset = circumference - (Math.min(100, Math.max(0, pct)) / 100) * circumference;
   return (
     <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
       <circle

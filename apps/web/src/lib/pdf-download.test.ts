@@ -18,7 +18,7 @@ describe('pdfDownloadFileName', () => {
 
   it('replaces filesystem-reserved characters with spaces', () => {
     expect(pdfDownloadFileName('cats/dogs: a "tail" <of> two?')).toBe(
-      'cats dogs a tail of two.pdf'
+      'cats dogs a tail of two.pdf',
     );
   });
 

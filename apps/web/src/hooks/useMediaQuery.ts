@@ -1,4 +1,4 @@
-"use client"; // Ensure this hook can be used in client components
+'use client'; // Ensure this hook can be used in client components
 
 import { useEffect, useState } from 'react';
 
@@ -21,11 +21,11 @@ export default function useMediaQuery(query: string): boolean {
     const handleChange = () => setMatches(mql.matches);
 
     // Set initial state again in case it changed between initial render and effect run
-    handleChange(); 
+    handleChange();
 
     mql.addEventListener('change', handleChange);
     return () => mql.removeEventListener('change', handleChange);
   }, [query]);
 
   return matches;
-} 
+}

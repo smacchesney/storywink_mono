@@ -15,10 +15,7 @@ import logger from '@/lib/logger';
  *                           via character extraction (which owns the flow).
  * FLAGGED pages are never auto-retried — the resolve flow handles those.
  */
-export async function POST(
-  _request: Request,
-  { params }: { params: Promise<{ bookId: string }> }
-) {
+export async function POST(_request: Request, { params }: { params: Promise<{ bookId: string }> }) {
   const { bookId } = await params;
 
   try {
@@ -44,26 +41,29 @@ export async function POST(
     });
 
     if (!book) {
-      return NextResponse.json({ error: 'Book not found or you do not have permission.' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Book not found or you do not have permission.' },
+        { status: 403 },
+      );
     }
 
     if (book.status === BookStatus.GENERATING || book.status === BookStatus.ILLUSTRATING) {
       return NextResponse.json(
         { error: 'This book is already being worked on.', status: book.status },
-        { status: 409 }
+        { status: 409 },
       );
     }
     if (book.status === BookStatus.COMPLETED) {
       return NextResponse.json(
         { error: 'This book is already complete.', status: book.status },
-        { status: 409 }
+        { status: 409 },
       );
     }
     if (!book.pages.length) {
       return NextResponse.json({ error: 'Cannot retry a book with no pages.' }, { status: 400 });
     }
 
-    const pagesWithText = book.pages.filter(p => p.text && p.text.trim().length > 0);
+    const pagesWithText = book.pages.filter((p) => p.text && p.text.trim().length > 0);
 
     if (pagesWithText.length === 0) {
       // Story never landed — re-run story generation from scratch. The
@@ -77,7 +77,10 @@ export async function POST(
         data: { status: BookStatus.GENERATING },
       });
       if (transition.count === 0) {
-        return NextResponse.json({ error: 'This book is already being worked on.' }, { status: 409 });
+        return NextResponse.json(
+          { error: 'This book is already being worked on.' },
+          { status: 409 },
+        );
       }
 
       const fullPages = await prisma.page.findMany({
@@ -97,7 +100,7 @@ export async function POST(
             isDoubleSpread: false,
             language: book.language || 'en',
           },
-          storyPages: fullPages.map(p => ({
+          storyPages: fullPages.map((p) => ({
             pageId: p.id,
             pageNumber: p.pageNumber,
             assetId: p.assetId,
@@ -105,32 +108,36 @@ export async function POST(
           })),
           titleWasGenerated: !book.title?.trim(),
         },
-        { attempts: 3, backoff: { type: 'exponential', delay: 10000 } }
+        { attempts: 3, backoff: { type: 'exponential', delay: 10000 } },
       );
 
       logger.info({ clerkId, bookId, stage: 'story' }, 'API: Retry re-queued story generation');
-      return NextResponse.json({ message: 'Story generation restarted.', bookId, stage: 'story' }, { status: 202 });
+      return NextResponse.json(
+        { message: 'Story generation restarted.', bookId, stage: 'story' },
+        { status: 202 },
+      );
     }
 
     // Illustration retry: reset failed/missing pages (never FLAGGED — those
     // need a new photo via the resolve flow) and re-enter via extraction.
-    const retryablePages = book.pages.filter(p => {
+    const retryablePages = book.pages.filter((p) => {
       if (p.moderationStatus === 'OK' && p.generatedImageUrl) return false;
       if (p.moderationStatus === 'FLAGGED') return false;
       return true;
     });
 
     if (retryablePages.length === 0) {
-      const flaggedCount = book.pages.filter(p => p.moderationStatus === 'FLAGGED').length;
+      const flaggedCount = book.pages.filter((p) => p.moderationStatus === 'FLAGGED').length;
       return NextResponse.json(
         {
-          message: flaggedCount > 0
-            ? `${flaggedCount} page(s) were flagged by content policy and need a different photo.`
-            : 'Nothing to retry.',
+          message:
+            flaggedCount > 0
+              ? `${flaggedCount} page(s) were flagged by content policy and need a different photo.`
+              : 'Nothing to retry.',
           bookId,
           flaggedCount,
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -147,7 +154,7 @@ export async function POST(
       return NextResponse.json({ error: 'This book is already being worked on.' }, { status: 409 });
     }
     await prisma.page.updateMany({
-      where: { id: { in: retryablePages.map(p => p.id) } },
+      where: { id: { in: retryablePages.map((p) => p.id) } },
       data: { moderationStatus: 'PENDING' },
     });
 
@@ -157,7 +164,7 @@ export async function POST(
         bookId,
         userId: dbUser.id,
         artStyle: book.artStyle || 'vignette',
-        pageIds: retryablePages.map(p => p.id),
+        pageIds: retryablePages.map((p) => p.id),
         // Book-level retry: pageIds scope the render children (already-OK
         // pages are not repainted) but finalize must still run the book-wide
         // QC pass and palette normalization.
@@ -168,16 +175,16 @@ export async function POST(
         backoff: { type: 'exponential', delay: 10000 },
         removeOnComplete: { count: 100 },
         removeOnFail: { count: 500 },
-      }
+      },
     );
 
     logger.info(
       { clerkId, bookId, stage: 'illustration', pageCount: retryablePages.length },
-      'API: Retry re-queued illustration via character extraction'
+      'API: Retry re-queued illustration via character extraction',
     );
     return NextResponse.json(
       { message: `Retrying ${retryablePages.length} page(s).`, bookId, stage: 'illustration' },
-      { status: 202 }
+      { status: 202 },
     );
   } catch (error) {
     if (

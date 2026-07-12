@@ -14,7 +14,7 @@ describe('resolveCoverImageUrl', () => {
       resolveCoverImageUrl({
         coverImageUrl: 'cover.png',
         pages: [page({ isTitlePage: true, generatedImageUrl: 'title.png' })],
-      })
+      }),
     ).toBe('cover.png');
   });
 
@@ -26,7 +26,7 @@ describe('resolveCoverImageUrl', () => {
           page({ generatedImageUrl: 'story1.png' }),
           page({ isTitlePage: true, generatedImageUrl: 'title.png' }),
         ],
-      })
+      }),
     ).toBe('title.png');
   });
 
@@ -37,7 +37,7 @@ describe('resolveCoverImageUrl', () => {
           page({ isTitlePage: true, originalImageUrl: 'title-photo.jpg' }),
           page({ generatedImageUrl: 'story2.png' }),
         ],
-      })
+      }),
     ).toBe('story2.png');
   });
 
@@ -48,12 +48,12 @@ describe('resolveCoverImageUrl', () => {
           page({ originalImageUrl: 'first-photo.jpg' }),
           page({ isTitlePage: true, originalImageUrl: 'title-photo.jpg' }),
         ],
-      })
+      }),
     ).toBe('title-photo.jpg');
     expect(
       resolveCoverImageUrl({
         pages: [page(), page({ originalImageUrl: 'only-photo.jpg' })],
-      })
+      }),
     ).toBe('only-photo.jpg');
   });
 
@@ -94,16 +94,16 @@ describe('bookContentFingerprint', () => {
     expect(bookContentFingerprint(withText)).not.toBe(bookContentFingerprint(base));
 
     expect(bookContentFingerprint({ ...base, status: 'ILLUSTRATING' })).not.toBe(
-      bookContentFingerprint(base)
+      bookContentFingerprint(base),
     );
   });
 
   it('changes when display-affecting book fields change', () => {
     expect(bookContentFingerprint({ ...base, title: 'New Title' })).not.toBe(
-      bookContentFingerprint(base)
+      bookContentFingerprint(base),
     );
     expect(bookContentFingerprint({ ...base, coverImageUrl: null })).not.toBe(
-      bookContentFingerprint(base)
+      bookContentFingerprint(base),
     );
   });
 });

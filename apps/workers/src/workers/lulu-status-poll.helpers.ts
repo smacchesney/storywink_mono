@@ -26,18 +26,12 @@ export type OpenOrderStatus = (typeof OPEN_ORDER_STATUSES)[number];
 
 /** PrintOrder statuses the poller can read or write. */
 export type PolledOrderStatus =
-  | 'SUBMITTED_TO_LULU'
-  | 'IN_PRODUCTION'
-  | 'SHIPPED'
-  | 'FAILED'
-  | 'CANCELLED';
+  'SUBMITTED_TO_LULU' | 'IN_PRODUCTION' | 'SHIPPED' | 'FAILED' | 'CANCELLED';
 
 export type AdvanceStatus = Exclude<PolledOrderStatus, 'SUBMITTED_TO_LULU'>;
 
 export type OrderTransition =
-  | { kind: 'advance'; nextStatus: AdvanceStatus }
-  | { kind: 'noop' }
-  | { kind: 'unknown' };
+  { kind: 'advance'; nextStatus: AdvanceStatus } | { kind: 'noop' } | { kind: 'unknown' };
 
 /**
  * Lulu print-job status names → PrintOrder statuses. null = a known Lulu

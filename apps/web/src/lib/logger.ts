@@ -16,7 +16,7 @@ declare const window: unknown | undefined;
  */
 const logger =
   typeof window === 'undefined'
-    ? require('./logger.server').default   // Node / server components / workers
+    ? require('./logger.server').default // Node / server components / workers
     : require('./logger.client').default; // Browser / client components
 
 export default logger;

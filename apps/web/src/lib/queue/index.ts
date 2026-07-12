@@ -59,7 +59,7 @@ export const flowProducer = new Proxy({} as FlowProducer, {
   get: (_target, prop) => {
     const instance = getFlowProducer();
     return (instance as any)[prop];
-  }
+  },
 });
 
 // Define queue names centrally
@@ -91,9 +91,9 @@ export function getWorkerConnectionOptions(): WorkerOptions {
 
 // For backward compatibility, export as property with getter
 Object.defineProperty(exports, 'workerConnectionOptions', {
-  get: function() {
+  get: function () {
     return getConnectionOptions();
-  }
+  },
 });
 
 // Example Usage (in API route or server action):
@@ -107,4 +107,4 @@ Object.defineProperty(exports, 'workerConnectionOptions', {
 // const worker = new Worker(QueueName.StoryGeneration, async job => {
 //   console.log('Processing job:', job.id, job.data);
 //   // Call AI generation logic here
-// }, workerConnectionOptions); 
+// }, workerConnectionOptions);

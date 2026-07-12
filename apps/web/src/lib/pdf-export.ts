@@ -41,7 +41,7 @@ export function pdfContentDisposition(title: string | null | undefined): string 
   // attr-chars, so escape them explicitly.
   const encoded = encodeURIComponent(`${base}.pdf`).replace(
     /['()*]/g,
-    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
   );
   return `attachment; filename="${asciiBase}.pdf"; filename*=UTF-8''${encoded}`;
 }

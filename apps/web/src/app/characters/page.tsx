@@ -83,7 +83,7 @@ function CharactersShelf() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6">
+    <div className="mx-auto w-full max-w-4xl px-4 pt-6 pb-16">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="font-playful text-2xl text-[#1a1a1a]">{t('title')}</h1>
@@ -113,7 +113,9 @@ function CharactersShelf() {
       )}
 
       {/* X6d: the shelf is a place to START stories, not just storage. */}
-      {avatars?.some((a) => a.status === 'READY' && a.renditions.some((r) => r.status === 'READY')) && (
+      {avatars?.some(
+        (a) => a.status === 'READY' && a.renditions.some((r) => r.status === 'READY'),
+      ) && (
         <Link
           href="/create/characters"
           className="mb-4 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full bg-coral px-6 py-3 font-playful text-lg text-white shadow-md hover:bg-coral/90"

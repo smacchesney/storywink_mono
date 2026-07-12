@@ -17,10 +17,7 @@ type BookWithPages = Book & { pages: Page[] };
  *
  * POST /api/book/[bookId]/export/lulu-cover
  */
-export async function POST(
-  _request: Request,
-  { params }: { params: Promise<{ bookId: string }> }
-) {
+export async function POST(_request: Request, { params }: { params: Promise<{ bookId: string }> }) {
   const { bookId } = await params;
 
   try {
@@ -30,7 +27,10 @@ export async function POST(
       return NextResponse.json({ error: 'Missing bookId parameter' }, { status: 400 });
     }
 
-    logger.info({ clerkId, dbUserId: dbUser.id, bookId }, 'Lulu cover PDF export request received.');
+    logger.info(
+      { clerkId, dbUserId: dbUser.id, bookId },
+      'Lulu cover PDF export request received.',
+    );
 
     // Fetch the book data with pages
     const bookData = await prisma.book.findUnique({
@@ -58,13 +58,16 @@ export async function POST(
             moderationStatus: true,
             moderationReason: true,
             illustrationNotes: true,
-          }
+          },
         },
       },
     });
 
     if (!bookData) {
-      logger.warn({ clerkId, dbUserId: dbUser.id, bookId }, 'Book not found or access denied for Lulu cover export.');
+      logger.warn(
+        { clerkId, dbUserId: dbUser.id, bookId },
+        'Book not found or access denied for Lulu cover export.',
+      );
       return NextResponse.json({ error: 'Book not found or access denied' }, { status: 404 });
     }
 
@@ -72,7 +75,7 @@ export async function POST(
     if (bookData.status !== 'COMPLETED' && bookData.status !== 'PARTIAL') {
       return NextResponse.json(
         { error: `Book is not ready for printing. Current status: ${bookData.status}` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -94,25 +97,28 @@ export async function POST(
       url: uploadResult.url,
       dropboxPath: uploadResult.path,
     });
-
   } catch (error) {
     // Handle authentication errors
-    if (error instanceof Error && (
-      error.message.includes('not authenticated') ||
-      error.message.includes('ID mismatch') ||
-      error.message.includes('primary email not found')
-    )) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('not authenticated') ||
+        error.message.includes('ID mismatch') ||
+        error.message.includes('primary email not found'))
+    ) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorStack = error instanceof Error ? error.stack : undefined;
 
-    logger.error({
-      bookId,
-      errorMessage,
-      errorStack
-    }, 'Error generating Lulu cover PDF.');
+    logger.error(
+      {
+        bookId,
+        errorMessage,
+        errorStack,
+      },
+      'Error generating Lulu cover PDF.',
+    );
     return NextResponse.json({ error: 'Failed to generate cover PDF' }, { status: 500 });
   }
 }

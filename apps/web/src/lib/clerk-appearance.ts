@@ -1,4 +1,4 @@
-import type { Appearance } from "@clerk/types";
+import type { Appearance } from '@clerk/types';
 
 /**
  * Brand-matched appearance for Clerk's hosted <SignIn> / <SignUp> widgets so
@@ -6,14 +6,13 @@ import type { Appearance } from "@clerk/types";
  */
 export const clerkAppearance: Appearance = {
   variables: {
-    colorPrimary: "#F76C5E",
-    colorText: "#1a1a1a",
-    borderRadius: "0.75rem",
-    fontFamily: "var(--font-geist-sans), system-ui, sans-serif",
+    colorPrimary: '#F76C5E',
+    colorText: '#1a1a1a',
+    borderRadius: '0.75rem',
+    fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
   },
   elements: {
-    formButtonPrimary:
-      "rounded-full font-semibold hover:opacity-90 transition-opacity",
-    card: "shadow-lg",
+    formButtonPrimary: 'rounded-full font-semibold hover:opacity-90 transition-opacity',
+    card: 'shadow-lg',
   },
 };

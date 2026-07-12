@@ -145,7 +145,10 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       });
     } catch (queueError) {
       // The pending marker lets the reconcile pass re-enqueue.
-      logger.error({ avatarId, error: queueError }, 'Avatar cleanup enqueue failed (marker persists)');
+      logger.error(
+        { avatarId, error: queueError },
+        'Avatar cleanup enqueue failed (marker persists)',
+      );
     }
 
     logger.info({ avatarId }, 'Character deleted');

@@ -7,10 +7,12 @@ declare global {
 }
 
 // Initialize PrismaClient, reusing the instance in development
-export const db = globalThis.__prisma || new PrismaClient({
-  // Optional: Log database queries during development
-  // log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-});
+export const db =
+  globalThis.__prisma ||
+  new PrismaClient({
+    // Optional: Log database queries during development
+    // log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  });
 
 // Store the instance in the global variable in development
-if (process.env.NODE_ENV !== 'production') globalThis.__prisma = db; 
+if (process.env.NODE_ENV !== 'production') globalThis.__prisma = db;

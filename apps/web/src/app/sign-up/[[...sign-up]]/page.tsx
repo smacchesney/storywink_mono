@@ -1,6 +1,6 @@
-import { SignUp } from "@clerk/nextjs";
-import PlayfulBackground from "@/components/ui/playful-background";
-import { clerkAppearance } from "@/lib/clerk-appearance";
+import { SignUp } from '@clerk/nextjs';
+import PlayfulBackground from '@/components/ui/playful-background';
+import { clerkAppearance } from '@/lib/clerk-appearance';
 
 export default function Page() {
   return (

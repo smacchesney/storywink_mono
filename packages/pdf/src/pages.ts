@@ -20,14 +20,7 @@ import {
  * array so the two stay in lockstep.
  */
 export type InteriorPageKind =
-  | 'title'
-  | 'dedication'
-  | 'text'
-  | 'illustration'
-  | 'ending'
-  | 'collage'
-  | 'backCover'
-  | 'blank';
+  'title' | 'dedication' | 'text' | 'illustration' | 'ending' | 'collage' | 'backCover' | 'blank';
 
 export interface InteriorPage {
   kind: InteriorPageKind;

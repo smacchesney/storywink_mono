@@ -50,8 +50,8 @@ describe('client event allowlist (POST /api/events schema)', () => {
   });
 
   it('rejects a non-cuid bookId', () => {
-    expect(
-      clientEventSchema.safeParse({ name: 'pdf_export', bookId: 'not-a-cuid' }).success,
-    ).toBe(false);
+    expect(clientEventSchema.safeParse({ name: 'pdf_export', bookId: 'not-a-cuid' }).success).toBe(
+      false,
+    );
   });
 });

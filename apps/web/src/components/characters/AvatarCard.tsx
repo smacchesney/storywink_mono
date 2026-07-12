@@ -49,7 +49,13 @@ const RESTING_TILTS = [-3, 0, 3];
  * subtle tilt and straighten/lift on hover (skipped under reduced motion).
  * Fallback chain: cutout → portrait crop → twinkle (drawing) → emoji.
  */
-export function AvatarCard({ avatar, index = 0, onRename, onDrawAgain, onDelete }: AvatarCardProps) {
+export function AvatarCard({
+  avatar,
+  index = 0,
+  onRename,
+  onDrawAgain,
+  onDelete,
+}: AvatarCardProps) {
   const t = useTranslations('characters');
   const [menuOpen, setMenuOpen] = React.useState(false);
   const prefersReduced = useReducedMotion() ?? false;
@@ -121,7 +127,7 @@ export function AvatarCard({ avatar, index = 0, onRename, onDrawAgain, onDelete 
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 px-1 pb-0.5 pt-1.5">
+        <div className="flex items-center gap-1.5 px-1 pt-1.5 pb-0.5">
           <span aria-hidden className="text-sm">
             {KIND_EMOJI[avatar.kind]}
           </span>
@@ -140,7 +146,7 @@ export function AvatarCard({ avatar, index = 0, onRename, onDrawAgain, onDelete 
       </StorybookFrame>
 
       {menuOpen && (
-        <div className="absolute bottom-12 right-2 z-20 flex flex-col rounded-xl border border-black/10 bg-white py-1 shadow-lg">
+        <div className="absolute right-2 bottom-12 z-20 flex flex-col rounded-xl border border-black/10 bg-white py-1 shadow-lg">
           {(
             [
               ['rename', () => onRename(avatar)],

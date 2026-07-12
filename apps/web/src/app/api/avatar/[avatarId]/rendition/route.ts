@@ -29,7 +29,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     // X6d's style-repair fans out one request per cast member — cap the burst.
     const rl = await checkRateLimit(`avatar-rendition:${dbUser.id}`, 30, 3600);
     if (!rl.allowed) {
-      logger.warn({ dbUserId: dbUser.id, remaining: rl.remaining }, 'Rate limit exceeded: avatar rendition');
+      logger.warn(
+        { dbUserId: dbUser.id, remaining: rl.remaining },
+        'Rate limit exceeded: avatar rendition',
+      );
       if (process.env.RATE_LIMIT_ENFORCE === 'true') {
         return NextResponse.json(
           { error: "You're drawing very quickly. Please wait a little while and try again." },

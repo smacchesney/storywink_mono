@@ -36,9 +36,9 @@ describe('createAvatarBookSchema', () => {
       }).success,
     ).toBe(false);
     expect(createAvatarBookSchema.safeParse({ ...valid, premise: '' }).success).toBe(false);
-    expect(
-      createAvatarBookSchema.safeParse({ ...valid, premise: 'x'.repeat(301) }).success,
-    ).toBe(false);
+    expect(createAvatarBookSchema.safeParse({ ...valid, premise: 'x'.repeat(301) }).success).toBe(
+      false,
+    );
   });
 
   it('trims the premise and rejects whitespace-only sparks', () => {
@@ -48,6 +48,8 @@ describe('createAvatarBookSchema', () => {
 
   it('rejects non-cuid avatar ids and foreign bookTypes', () => {
     expect(createAvatarBookSchema.safeParse({ ...valid, avatarIds: ['nope'] }).success).toBe(false);
-    expect(createAvatarBookSchema.safeParse({ ...valid, bookType: 'PHOTO_STORY' }).success).toBe(false);
+    expect(createAvatarBookSchema.safeParse({ ...valid, bookType: 'PHOTO_STORY' }).success).toBe(
+      false,
+    );
   });
 });

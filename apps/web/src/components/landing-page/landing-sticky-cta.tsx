@@ -22,7 +22,7 @@ function useOnScreen(ref: React.RefObject<HTMLElement | null>) {
     if (!el || typeof IntersectionObserver === 'undefined') return;
     const observer = new IntersectionObserver(
       (entries) => setOnScreen(entries[0]?.isIntersecting ?? false),
-      { threshold: 0 }
+      { threshold: 0 },
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -54,7 +54,7 @@ export function LandingStickyCta({
       className={cn(
         'fixed inset-x-0 bottom-0 z-40 md:hidden',
         'transition-transform duration-300 ease-out motion-reduce:transition-none',
-        visible ? 'translate-y-0' : 'pointer-events-none translate-y-full'
+        visible ? 'translate-y-0' : 'pointer-events-none translate-y-full',
       )}
     >
       <ScallopEdge flip fill="white" className="relative z-10 block" />

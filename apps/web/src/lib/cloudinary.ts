@@ -10,7 +10,9 @@ if (!cloudName || !apiKey || !apiSecret) {
     !cloudName && 'CLOUDINARY_CLOUD_NAME',
     !apiKey && 'CLOUDINARY_API_KEY',
     !apiSecret && 'CLOUDINARY_API_SECRET',
-  ].filter(Boolean).join(', ');
+  ]
+    .filter(Boolean)
+    .join(', ');
 
   logger.error(`Missing Cloudinary environment variables: ${missingVars}`);
   // In a real application, you might want to throw an error here
@@ -28,7 +30,6 @@ if (!cloudName || !apiKey || !apiSecret) {
 }
 
 export default cloudinary;
-
 
 interface SignedUrlOptions {
   version?: string | number;
@@ -53,7 +54,7 @@ export function getSignedImageUrl(publicId: string, options: SignedUrlOptions = 
       secure: true, // Ensure HTTPS
       resource_type: 'image', // Specify resource type
       // Example: Custom expiration (e.g., 10 minutes from now)
-      // expires_at: Math.floor(Date.now() / 1000) + 600, 
+      // expires_at: Math.floor(Date.now() / 1000) + 600,
     });
     logger.debug({ publicId }, 'Generated signed Cloudinary URL');
     return signedUrl;
@@ -61,8 +62,8 @@ export function getSignedImageUrl(publicId: string, options: SignedUrlOptions = 
     logger.error({ error, publicId }, 'Failed to generate signed Cloudinary URL');
     // Depending on requirements, return a placeholder URL or re-throw
     // For now, re-throwing to indicate failure clearly
-    throw error; 
+    throw error;
   }
 }
 
-// If direct import is desired: export { cloudinary, getSignedImageUrl }; 
+// If direct import is desired: export { cloudinary, getSignedImageUrl };

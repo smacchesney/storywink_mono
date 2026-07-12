@@ -8,9 +8,7 @@ import { Storydust } from '@/components/ui/storydust';
 import { BookStatus } from '@prisma/client';
 import { isValidStyle, StyleKey } from '@storywink/shared/prompts/styles';
 import { STORY_MOODS, type StoryMood } from '@storywink/shared/constants';
-import SetupSheet, {
-  SetupFormState,
-} from '@/components/create/setup/SetupSheet';
+import SetupSheet, { SetupFormState } from '@/components/create/setup/SetupSheet';
 import type { StripPhoto } from '@/components/create/setup/PhotoStrip';
 import type { CaptureQuestion } from '@/components/create/setup/CaptureChips';
 import {
@@ -109,8 +107,7 @@ export default function SetupPage() {
   const [mainCharacterId, setMainCharacterId] = useState<string | null>(null);
   const [analysisDone, setAnalysisDone] = useState(false);
 
-  const titlePending =
-    !form.title && !touched.current.title && !perceptionSettled;
+  const titlePending = !form.title && !touched.current.title && !perceptionSettled;
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -137,10 +134,8 @@ export default function SetupPage() {
     setForm((prev) => {
       const next = { ...prev };
       if (!touched.current.title && book.title?.trim()) next.title = book.title;
-      if (!touched.current.childName && book.childName)
-        next.childName = book.childName;
-      if (!touched.current.eventSummary && book.eventSummary)
-        next.eventSummary = book.eventSummary;
+      if (!touched.current.childName && book.childName) next.childName = book.childName;
+      if (!touched.current.eventSummary && book.eventSummary) next.eventSummary = book.eventSummary;
       if (!touched.current.captureQuestions && book.captureQuestions?.length) {
         next.captureQuestions = book.captureQuestions;
       }
@@ -191,18 +186,12 @@ export default function SetupPage() {
         if (cancelled || !isMountedRef.current) return;
 
         // In-flight or finished books shouldn't sit on setup.
-        if (
-          book.status === BookStatus.GENERATING ||
-          book.status === BookStatus.ILLUSTRATING
-        ) {
+        if (book.status === BookStatus.GENERATING || book.status === BookStatus.ILLUSTRATING) {
           setGenerating(true);
           setIsLoading(false);
           return;
         }
-        if (
-          book.status === BookStatus.COMPLETED ||
-          book.status === BookStatus.PARTIAL
-        ) {
+        if (book.status === BookStatus.COMPLETED || book.status === BookStatus.PARTIAL) {
           router.replace(`/book/${bookId}/preview`);
           return;
         }
@@ -251,11 +240,7 @@ export default function SetupPage() {
         // server-derived (childNameSuggestion rides the same response), so
         // no extra fetch. Still just a suggestion: fully editable, and the
         // sheet shows a one-line "for {name} again!" while it stands.
-        if (
-          !book.childName &&
-          book.childNameSuggestion &&
-          !touched.current.childName
-        ) {
+        if (!book.childName && book.childNameSuggestion && !touched.current.childName) {
           const suggestion = book.childNameSuggestion;
           setPrefilledName(suggestion);
           setForm((prev) => ({ ...prev, childName: suggestion }));
@@ -280,17 +265,13 @@ export default function SetupPage() {
     if (isLoading || generating) return;
     const needsTitle = !touched.current.title && !form.title;
     const needsSummary = !touched.current.eventSummary && !form.eventSummary;
-    const needsQuestions =
-      !touched.current.captureQuestions && form.captureQuestions.length === 0;
+    const needsQuestions = !touched.current.captureQuestions && form.captureQuestions.length === 0;
     // Keep polling while a fresh book's analysis is still in flight even if
     // the parent already typed title + summary — otherwise an eager parent
     // strands the strip mid-narration.
     const needsAnalysis =
-      !analysisDone &&
-      bookCreatedAt !== null &&
-      isFreshBook(bookCreatedAt, Date.now());
-    if (!needsTitle && !needsSummary && !needsQuestions && !needsAnalysis)
-      return;
+      !analysisDone && bookCreatedAt !== null && isFreshBook(bookCreatedAt, Date.now());
+    if (!needsTitle && !needsSummary && !needsQuestions && !needsAnalysis) return;
 
     let polls = 0;
     const MAX_POLLS = 40; // ~2 minutes at 3s
@@ -356,10 +337,7 @@ export default function SetupPage() {
       // A photo add/remove enqueues a refresh pass, so un-analyzed pages on a
       // fresh book mean reading has started over. Stale books stay quiet —
       // their poll gate would never re-arm, so a strip would strand.
-      if (
-        !allPagesAnalyzed(book.pages) &&
-        isFreshBook(book.createdAt, Date.now())
-      ) {
+      if (!allPagesAnalyzed(book.pages) && isFreshBook(book.createdAt, Date.now())) {
         setPerceptionSettled(false);
         setStripPhase('reading');
       }
@@ -401,14 +379,12 @@ export default function SetupPage() {
         autoIllustrate: !form.reviewFirst,
       };
       if (form.title.trim()) patchBody.title = form.title.trim();
-      if (form.eventSummary.trim())
-        patchBody.eventSummary = form.eventSummary.trim();
+      if (form.eventSummary.trim()) patchBody.eventSummary = form.eventSummary.trim();
       // Only ever set by a tap on the mood row — provenance stays parental.
       if (form.tone) patchBody.tone = form.tone;
       if (form.learningWords.length > 0)
         patchBody.learningWords = form.learningWords.map((word) => ({ word }));
-      if (form.captureQuestions.length > 0)
-        patchBody.captureQuestions = form.captureQuestions;
+      if (form.captureQuestions.length > 0) patchBody.captureQuestions = form.captureQuestions;
 
       const patchRes = await fetch(`/api/book/${bookId}`, {
         method: 'PATCH',
@@ -442,14 +418,12 @@ export default function SetupPage() {
   }, [bookId, form, isSubmitting, t]);
 
   if (generating) {
-    return (
-      <GenerationProgress bookId={bookId} reviewFirst={form.reviewFirst} />
-    );
+    return <GenerationProgress bookId={bookId} reviewFirst={form.reviewFirst} />;
   }
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[70vh] items-center justify-center bg-waiting">
+      <div className="bg-waiting flex min-h-[70vh] items-center justify-center">
         <Storydust variant="twinkle" size="card" />
       </div>
     );
@@ -471,7 +445,7 @@ export default function SetupPage() {
 
   return (
     <SetupSheet
-        mainCharacterId={mainCharacterId}
+      mainCharacterId={mainCharacterId}
       photos={photos}
       form={form}
       prefilledName={prefilledName}

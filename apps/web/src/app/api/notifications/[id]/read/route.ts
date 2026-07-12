@@ -7,10 +7,7 @@ import { db as prisma } from '@/lib/db';
 const paramsSchema = z.object({ id: z.string().cuid() });
 
 // POST /api/notifications/[id]/read - Mark a notification as read
-export async function POST(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { dbUser } = await getAuthenticatedUser();
     const parsedParams = paramsSchema.safeParse(await params);

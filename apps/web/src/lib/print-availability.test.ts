@@ -20,8 +20,6 @@ describe('isPrintShippableLocale', () => {
 
   it('derives ja gating from the shipping config, not a hardcoded flag', () => {
     // The gate must flip the day SHIPPING_TIERS covers JP.
-    expect(isPrintShippableLocale('ja')).toBe(
-      getAllowedCountries().includes('JP'),
-    );
+    expect(isPrintShippableLocale('ja')).toBe(getAllowedCountries().includes('JP'));
   });
 });

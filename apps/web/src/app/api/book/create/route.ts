@@ -20,7 +20,10 @@ import { createAvatarBookSchema } from '@/lib/avatar-story-schema';
 
 // Zod schema for request body validation
 const createBookSchema = z.object({
-  assetIds: z.array(z.string().cuid()).min(1, { message: 'At least one asset ID is required.' }).max(23, { message: 'Maximum 23 photos per book.' }),
+  assetIds: z
+    .array(z.string().cuid())
+    .min(1, { message: 'At least one asset ID is required.' })
+    .max(23, { message: 'Maximum 23 photos per book.' }),
   language: z.enum(['en', 'ja']).default('en'),
 });
 
@@ -48,13 +51,13 @@ async function createAvatarStoryBook(
       renditions: { where: { status: 'READY', artStyle } },
     },
   });
-  const avatarById = new Map(avatars.map(a => [a.id, a]));
+  const avatarById = new Map(avatars.map((a) => [a.id, a]));
 
   if (avatars.length !== uniqueAvatarIds.length) {
     return NextResponse.json({ error: 'Character not found.' }, { status: 404 });
   }
   const notReady = avatars.filter(
-    a => a.status !== 'READY' || !a.renditions[0]?.turnaroundSheetUrl,
+    (a) => a.status !== 'READY' || !a.renditions[0]?.turnaroundSheetUrl,
   );
   if (notReady.length > 0) {
     // The cast picker prevents this; reaching here means a stale client.
@@ -65,8 +68,8 @@ async function createAvatarStoryBook(
   }
 
   // Preserve pick order — the roster ids and the star follow it.
-  const cast = uniqueAvatarIds.map(id => avatarById.get(id)!);
-  const composition = castComposition(cast.map(a => a.kind as CastKind));
+  const cast = uniqueAvatarIds.map((id) => avatarById.get(id)!);
+  const composition = castComposition(cast.map((a) => a.kind as CastKind));
   if (!composition.ok) {
     return NextResponse.json(
       { error: 'A story fits up to 4 people plus 2 pets or toys.' },
@@ -75,7 +78,7 @@ async function createAvatarStoryBook(
   }
 
   const { characters, childName } = buildAvatarStoryRoster(
-    cast.map(a => ({
+    cast.map((a) => ({
       id: a.id,
       displayName: a.displayName,
       kind: a.kind as CastKind,
@@ -146,9 +149,17 @@ export async function POST(req: NextRequest) {
 
     const rl = await checkRateLimit(`book-create:${dbUser.id}`, 20, 3600);
     if (!rl.allowed) {
-      logger.warn({ dbUserId: dbUser.id, key: `book-create:${dbUser.id}`, remaining: rl.remaining }, 'Rate limit exceeded: book create');
+      logger.warn(
+        { dbUserId: dbUser.id, key: `book-create:${dbUser.id}`, remaining: rl.remaining },
+        'Rate limit exceeded: book create',
+      );
       if (process.env.RATE_LIMIT_ENFORCE === 'true') {
-        return NextResponse.json({ error: "You're creating books very quickly. Please wait a little while and try again." }, { status: 429 });
+        return NextResponse.json(
+          {
+            error: "You're creating books very quickly. Please wait a little while and try again.",
+          },
+          { status: 429 },
+        );
       }
     }
 
@@ -164,13 +175,20 @@ export async function POST(req: NextRequest) {
 
     // X6d: the avatar-first branch is discriminated by bookType and dark
     // behind AVATARS_ENABLED (404s like every other avatar surface).
-    if (body && typeof body === 'object' && (body as { bookType?: string }).bookType === 'AVATAR_STORY') {
+    if (
+      body &&
+      typeof body === 'object' &&
+      (body as { bookType?: string }).bookType === 'AVATAR_STORY'
+    ) {
       if (!avatarsEnabled()) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
       }
       const parsed = createAvatarBookSchema.safeParse(body);
       if (!parsed.success) {
-        logger.warn({ clerkId, dbUserId: dbUser.id, issues: parsed.error.issues }, 'API: Invalid avatar-book creation request body.');
+        logger.warn(
+          { clerkId, dbUserId: dbUser.id, issues: parsed.error.issues },
+          'API: Invalid avatar-book creation request body.',
+        );
         return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
       }
       return await createAvatarStoryBook(dbUser.id, parsed.data);
@@ -180,11 +198,25 @@ export async function POST(req: NextRequest) {
     try {
       console.log('>>> DEBUG: Book creation request body:', body);
       validatedData = createBookSchema.parse(body);
-      logger.info({ clerkId, dbUserId: dbUser.id, assetCount: validatedData.assetIds.length, assetIds: validatedData.assetIds }, 'API: Validated book creation request.');
+      logger.info(
+        {
+          clerkId,
+          dbUserId: dbUser.id,
+          assetCount: validatedData.assetIds.length,
+          assetIds: validatedData.assetIds,
+        },
+        'API: Validated book creation request.',
+      );
     } catch (error) {
-      logger.warn({ clerkId, dbUserId: dbUser.id, error }, 'API: Invalid book creation request body.');
+      logger.warn(
+        { clerkId, dbUserId: dbUser.id, error },
+        'API: Invalid book creation request body.',
+      );
       if (error instanceof z.ZodError) {
-        return NextResponse.json({ error: 'Invalid request body', details: error.errors }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Invalid request body', details: error.errors },
+          { status: 400 },
+        );
       }
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
@@ -196,7 +228,9 @@ export async function POST(req: NextRequest) {
       logger.info({ clerkId, dbUserId: dbUser.id }, 'API: Starting book creation transaction.');
 
       // Fetch Assets to get URLs - use database user ID, not Clerk ID
-      console.log(`>>> DEBUG: Querying assets - userId: ${dbUser.id}, assetIds: ${assetIds.join(', ')}`);
+      console.log(
+        `>>> DEBUG: Querying assets - userId: ${dbUser.id}, assetIds: ${assetIds.join(', ')}`,
+      );
       const assets = await tx.asset.findMany({
         where: {
           id: { in: assetIds },
@@ -208,20 +242,37 @@ export async function POST(req: NextRequest) {
           thumbnailUrl: true,
         },
       });
-      console.log(`>>> DEBUG: Found ${assets.length} of ${assetIds.length} assets for userId ${dbUser.id}`);
+      console.log(
+        `>>> DEBUG: Found ${assets.length} of ${assetIds.length} assets for userId ${dbUser.id}`,
+      );
 
       // Create a map for easy lookup
-      const assetMap = new Map(assets.map(a => [a.id, a]));
+      const assetMap = new Map(assets.map((a) => [a.id, a]));
 
       // Check if all requested assetIds were found and belong to the user
       if (assets.length !== assetIds.length) {
-          const foundIds = new Set(assets.map(a => a.id));
-          const missingIds = assetIds.filter(id => !foundIds.has(id));
-          logger.error({ clerkId, dbUserId: dbUser.id, bookId: '(pending)', missingIds, requestedIds: assetIds, foundAssets: assets }, 'API: Some assets not found or permission denied during book creation.');
-          console.error(`>>> DEBUG: Asset validation failed. Requested: ${assetIds.join(', ')}, Found: ${assets.map(a => a.id).join(', ')}`);
-          throw new Error(`Assets not found or permission denied for IDs: ${missingIds.join(', ')}`);
+        const foundIds = new Set(assets.map((a) => a.id));
+        const missingIds = assetIds.filter((id) => !foundIds.has(id));
+        logger.error(
+          {
+            clerkId,
+            dbUserId: dbUser.id,
+            bookId: '(pending)',
+            missingIds,
+            requestedIds: assetIds,
+            foundAssets: assets,
+          },
+          'API: Some assets not found or permission denied during book creation.',
+        );
+        console.error(
+          `>>> DEBUG: Asset validation failed. Requested: ${assetIds.join(', ')}, Found: ${assets.map((a) => a.id).join(', ')}`,
+        );
+        throw new Error(`Assets not found or permission denied for IDs: ${missingIds.join(', ')}`);
       }
-      logger.info({ clerkId, dbUserId: dbUser.id, assetCount: assets.length }, 'API: Fetched asset URLs within transaction.');
+      logger.info(
+        { clerkId, dbUserId: dbUser.id, assetCount: assets.length },
+        'API: Fetched asset URLs within transaction.',
+      );
 
       // 1. Create the Book record - use database user ID
       const book = await tx.book.create({
@@ -236,31 +287,40 @@ export async function POST(req: NextRequest) {
           // Other fields like artStyle will be set later in the editor
         },
       });
-      logger.info({ clerkId, dbUserId: dbUser.id, bookId: book.id }, 'API: Book record created within transaction.');
+      logger.info(
+        { clerkId, dbUserId: dbUser.id, bookId: book.id },
+        'API: Book record created within transaction.',
+      );
 
       // 2. Prepare Page records data - NOW WITH IMAGE URL
       const pagesData = assetIds.map((assetId, index) => {
-          const asset = assetMap.get(assetId);
-          if (!asset) {
-              // This shouldn't happen due to the check above, but belts and braces
-              throw new Error(`Internal error: Asset data missing for ID ${assetId}`);
-          }
-          return {
-            bookId: book.id,
-            pageNumber: index + 1, 
-            index: index,         
-            assetId: assetId,
-            originalImageUrl: asset.thumbnailUrl || asset.url, // <-- Use fetched URL (prefer thumbnail)
-            pageType: PageType.SINGLE, 
-            isTitlePage: index === 0, 
-          };
+        const asset = assetMap.get(assetId);
+        if (!asset) {
+          // This shouldn't happen due to the check above, but belts and braces
+          throw new Error(`Internal error: Asset data missing for ID ${assetId}`);
+        }
+        return {
+          bookId: book.id,
+          pageNumber: index + 1,
+          index: index,
+          assetId: assetId,
+          originalImageUrl: asset.thumbnailUrl || asset.url, // <-- Use fetched URL (prefer thumbnail)
+          pageType: PageType.SINGLE,
+          isTitlePage: index === 0,
+        };
       });
 
       // 3. Create Page records
       await tx.page.createMany({ data: pagesData });
-      logger.info({ clerkId, dbUserId: dbUser.id, bookId: book.id, pageCount: pagesData.length }, 'API: Page records created within transaction.');
+      logger.info(
+        { clerkId, dbUserId: dbUser.id, bookId: book.id, pageCount: pagesData.length },
+        'API: Page records created within transaction.',
+      );
 
-      logger.info({ clerkId, dbUserId: dbUser.id, bookId: book.id }, 'API: Book creation transaction committed.');
+      logger.info(
+        { clerkId, dbUserId: dbUser.id, bookId: book.id },
+        'API: Book creation transaction committed.',
+      );
       return book; // Return the created book
     });
 
@@ -278,24 +338,30 @@ export async function POST(req: NextRequest) {
           backoff: { type: 'exponential', delay: 5000 },
           removeOnComplete: { count: 100 },
           removeOnFail: { count: 500 },
-        }
+        },
       );
     } catch (queueError) {
-      logger.error({ bookId: newBook.id, error: queueError }, 'API: Failed to enqueue photo analysis (non-fatal).');
+      logger.error(
+        { bookId: newBook.id, error: queueError },
+        'API: Failed to enqueue photo analysis (non-fatal).',
+      );
     }
 
-    return NextResponse.json({
-      success: true,
-      data: { id: newBook.id, bookId: newBook.id }
-    }, { status: 201 }); // 201 Created
-
+    return NextResponse.json(
+      {
+        success: true,
+        data: { id: newBook.id, bookId: newBook.id },
+      },
+      { status: 201 },
+    ); // 201 Created
   } catch (error) {
     // Handle authentication errors
-    if (error instanceof Error && (
-      error.message.includes('not authenticated') ||
-      error.message.includes('ID mismatch') ||
-      error.message.includes('primary email not found')
-    )) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('not authenticated') ||
+        error.message.includes('ID mismatch') ||
+        error.message.includes('primary email not found'))
+    ) {
       logger.warn('API: Book creation attempt without authentication.');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -311,17 +377,24 @@ export async function POST(req: NextRequest) {
     if (error && typeof error === 'object') {
       const prismaError = error as { code?: string; meta?: unknown };
       if (prismaError.code) console.error('>>> Prisma error code:', prismaError.code);
-      if (prismaError.meta) console.error('>>> Prisma error meta:', JSON.stringify(prismaError.meta));
+      if (prismaError.meta)
+        console.error('>>> Prisma error meta:', JSON.stringify(prismaError.meta));
     }
-    logger.error({
-      err: error,
-      errorMessage: error instanceof Error ? error.message : String(error),
-      errorStack: error instanceof Error ? error.stack : undefined
-    }, 'API: Error during book creation transaction.');
+    logger.error(
+      {
+        err: error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+      },
+      'API: Error during book creation transaction.',
+    );
     // Specific error handling (e.g., foreign key constraint if assetId doesn't exist)
     if (error instanceof Error && error.message.includes('Foreign key constraint failed')) {
-        return NextResponse.json({ error: 'One or more provided asset IDs do not exist or belong to another user.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'One or more provided asset IDs do not exist or belong to another user.' },
+        { status: 400 },
+      );
     }
     return NextResponse.json({ error: 'Failed to create book draft' }, { status: 500 });
   }
-} 
+}

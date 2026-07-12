@@ -24,10 +24,7 @@ describe('deepMergeMessages', () => {
   });
 
   it('prefers override leaves over base leaves at every depth', () => {
-    const merged = deepMergeMessages(
-      { a: { b: { c: 'en', d: 'en' } } },
-      { a: { b: { c: 'ja' } } },
-    );
+    const merged = deepMergeMessages({ a: { b: { c: 'en', d: 'en' } } }, { a: { b: { c: 'ja' } } });
     expect(merged).toEqual({ a: { b: { c: 'ja', d: 'en' } } });
   });
 

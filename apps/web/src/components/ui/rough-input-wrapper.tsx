@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
-import RoughBorder from "@/components/ui/rough-border"; // Import RoughBorder
+import RoughBorder from '@/components/ui/rough-border'; // Import RoughBorder
 import type { Options as RoughOptions } from 'roughjs/bin/core';
-import { cn } from "@/lib/utils";
+import { cn } from '@/lib/utils';
 
 interface RoughInputWrapperProps {
   children: React.ReactNode;
@@ -12,26 +12,26 @@ interface RoughInputWrapperProps {
   focusOptions?: RoughOptions; // Optional different options on focus
 }
 
-const RoughInputWrapper: React.FC<RoughInputWrapperProps> = ({ 
-  children, 
-  className, 
-  roughOptions, 
-  focusOptions
+const RoughInputWrapper: React.FC<RoughInputWrapperProps> = ({
+  children,
+  className,
+  roughOptions,
+  focusOptions,
 }) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [isFocused, setIsFocused] = useState(false);
-  const seedRef = useRef(Math.floor(Math.random() * 2**31));
+  const seedRef = useRef(Math.floor(Math.random() * 2 ** 31));
 
   // Measure dimensions
   useEffect(() => {
     if (wrapperRef.current) {
       const updateDimensions = () => {
         if (wrapperRef.current) {
-           setDimensions({ 
-             width: wrapperRef.current.offsetWidth, 
-             height: wrapperRef.current.offsetHeight 
-           });
+          setDimensions({
+            width: wrapperRef.current.offsetWidth,
+            height: wrapperRef.current.offsetHeight,
+          });
         }
       };
       updateDimensions();
@@ -65,23 +65,23 @@ const RoughInputWrapper: React.FC<RoughInputWrapperProps> = ({
   const currentOptions = isFocused ? focusRoughOptionsCombined : defaultRoughOptions;
 
   return (
-    <div 
-      ref={wrapperRef} 
+    <div
+      ref={wrapperRef}
       className={cn(
-          "relative w-full block", // Explicitly set display: block
-          className
-        )} 
-      onFocusCapture={() => setIsFocused(true)} 
-      onBlurCapture={() => setIsFocused(false)}  
+        'relative block w-full', // Explicitly set display: block
+        className,
+      )}
+      onFocusCapture={() => setIsFocused(true)}
+      onBlurCapture={() => setIsFocused(false)}
     >
-      {/* Render children (Input/Textarea) */} 
+      {/* Render children (Input/Textarea) */}
       {children}
-      
-      {/* Render RoughBorder if dimensions are known */} 
+
+      {/* Render RoughBorder if dimensions are known */}
       {dimensions.width > 0 && dimensions.height > 0 && (
-        <RoughBorder 
-          width={dimensions.width} 
-          height={dimensions.height} 
+        <RoughBorder
+          width={dimensions.width}
+          height={dimensions.height}
           options={currentOptions}
           // Pass down className or specific styling if needed
         />
@@ -90,4 +90,4 @@ const RoughInputWrapper: React.FC<RoughInputWrapperProps> = ({
   );
 };
 
-export default RoughInputWrapper; 
+export default RoughInputWrapper;

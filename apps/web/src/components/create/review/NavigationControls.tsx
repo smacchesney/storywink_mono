@@ -23,36 +23,36 @@ const NavigationControls = ({
   canGoPrevious,
   isProcessing,
   onPrevious,
-  onNext
+  onNext,
 }: NavigationControlsProps) => {
   const t = useTranslations('review');
   return (
-    <div className="navigation-controls p-3 border-t flex justify-between items-center sticky bottom-0 bg-white z-10 shadow-md">
-      <Button 
-        variant="outline" 
+    <div className="navigation-controls sticky bottom-0 z-10 flex items-center justify-between border-t bg-white p-3 shadow-md">
+      <Button
+        variant="outline"
         onClick={onPrevious}
         disabled={!canGoPrevious || isProcessing}
         size="sm"
-        className="flex-1 max-w-[120px] border-coral text-coral hover:bg-coral hover:text-white"
+        className="max-w-[120px] flex-1 border-coral text-coral hover:bg-coral hover:text-white"
       >
-        <ChevronLeft className="h-4 w-4 mr-1" /> {t('previous')}
+        <ChevronLeft className="mr-1 h-4 w-4" /> {t('previous')}
       </Button>
-      
-      <span className="text-sm text-gray-500 mx-2">
+
+      <span className="mx-2 text-sm text-gray-500">
         {t('pageCounter', { current: currentPage + 1, total: totalPages })}
       </span>
-      
-      <Button 
+
+      <Button
         variant="outline"
         onClick={onNext}
         disabled={!canGoNext || isProcessing}
         size="sm"
-        className="flex-1 max-w-[120px] border-coral text-coral hover:bg-coral hover:text-white"
+        className="max-w-[120px] flex-1 border-coral text-coral hover:bg-coral hover:text-white"
       >
-        {t('next')} <ChevronRight className="h-4 w-4 ml-1" />
+        {t('next')} <ChevronRight className="ml-1 h-4 w-4" />
       </Button>
     </div>
   );
 };
 
-export default NavigationControls; 
+export default NavigationControls;

@@ -47,12 +47,7 @@ export function bridgeCapForPhotoCount(photoCount: number): number {
 
 export interface DroppedBridge {
   reason:
-    | 'malformed'
-    | 'bad-gap'
-    | 'duplicate-gap'
-    | 'over-cap'
-    | 'unknown-character'
-    | 'no-roster';
+    'malformed' | 'bad-gap' | 'duplicate-gap' | 'over-cap' | 'unknown-character' | 'no-roster';
   afterPhotoPage?: number;
 }
 

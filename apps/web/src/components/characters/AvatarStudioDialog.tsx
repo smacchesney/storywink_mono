@@ -232,7 +232,7 @@ export function AvatarStudioDialog({ onClose, onCreated }: AvatarStudioDialogPro
           type="button"
           aria-label={t('close')}
           onClick={onClose}
-          className="absolute right-3 top-3 rounded-full p-2 text-gray-400 hover:bg-black/5"
+          className="absolute top-3 right-3 rounded-full p-2 text-gray-400 hover:bg-black/5"
         >
           <X className="h-5 w-5" />
         </button>
@@ -265,9 +265,7 @@ export function AvatarStudioDialog({ onClose, onCreated }: AvatarStudioDialogPro
           </div>
         </div>
 
-        {step === 'detecting' && (
-          <WaitBlock label={t('lookingThrough')} />
-        )}
+        {step === 'detecting' && <WaitBlock label={t('lookingThrough')} />}
 
         {step === 'empty' && (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
@@ -385,7 +383,7 @@ function SubjectCard({
           onToggle();
         }}
         className={cn(
-          'absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border transition-colors',
+          'absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full border transition-colors',
           pick.selected
             ? 'border-coral bg-coral text-white'
             : 'border-black/20 bg-white text-transparent',
@@ -422,7 +420,7 @@ function SubjectCard({
           // there must fall through and SELECT the card, not do nothing.
           onClick={pick.selected ? (e) => e.stopPropagation() : undefined}
           onChange={(e) => onName(e.target.value)}
-          className="w-full rounded-lg border border-black/10 px-2 py-1 font-playful text-base text-[#1a1a1a] placeholder:text-gray-400 focus:border-coral focus:outline-none focus:ring-1 focus:ring-coral disabled:bg-transparent"
+          className="w-full rounded-lg border border-black/10 px-2 py-1 font-playful text-base text-[#1a1a1a] placeholder:text-gray-400 focus:border-coral focus:ring-1 focus:ring-coral focus:outline-none disabled:bg-transparent"
         />
         <p className="truncate text-xs text-gray-400">{subject.parentDescription}</p>
         <div
