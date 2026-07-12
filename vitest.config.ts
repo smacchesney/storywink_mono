@@ -27,6 +27,14 @@ export default defineConfig({
         replacement: sharedSrc('prompts/illustration.ts'),
       },
       { find: '@storywink/shared/prompts/styles', replacement: sharedSrc('prompts/styles.ts') },
+      {
+        find: '@storywink/shared/prompts/photo-analysis',
+        replacement: sharedSrc('prompts/photo-analysis.ts'),
+      },
+      {
+        find: '@storywink/shared/prompts/character-identity',
+        replacement: sharedSrc('prompts/character-identity.ts'),
+      },
       { find: '@storywink/shared/prompts', replacement: sharedSrc('prompts/index.ts') },
       { find: '@storywink/shared', replacement: sharedSrc('index.ts') },
     ],

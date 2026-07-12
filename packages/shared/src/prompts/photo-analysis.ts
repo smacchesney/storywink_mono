@@ -243,6 +243,150 @@ export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+// ---------------------------------------------------------------------------
+// Subject detection (X7 batch studio) — roster-only perception variant
+// ---------------------------------------------------------------------------
+
+/**
+ * Batch studio caps (owner decision 2026-07-12): tunable constants, the ONLY
+ * place these numbers live — routes, schemas, and UI all read them from here.
+ */
+export const MAX_BATCH_PHOTOS = 10;
+export const MAX_BATCH_SUBJECTS = 6;
+
+export const SUBJECT_DETECTION_SYSTEM_PROMPT =
+  "You are a perceptive visual analyst for a children's picture-book studio. Parents upload a handful of family photos; you identify every distinct person, pet, and beloved toy who could become a recurring illustrated character, and you describe each one precisely enough for an illustrator who has never seen them.";
+
+export interface SubjectDetectionInput {
+  photoCount: number;
+  language?: string; // "en" | "ja" — parent-facing strings only
+}
+
+/** One detected subject — the server-side identity source for batch creation. */
+export interface DetectedSubject {
+  subjectId: string;
+  role: string;
+  kindGuess: 'CHILD' | 'ADULT' | 'PET' | 'TOY';
+  /** One warm line so the parent knows who is meant — helper text, never a headline. */
+  parentDescription: string;
+  /** Short kind+trait label ("Grown-up with glasses") — NEVER a proper name. */
+  defaultLabel: string;
+  /** Clearly a foreground subject in at least one photo (vs a background passerby). */
+  isForeground: boolean;
+  physicalTraits: {
+    apparentAge: string;
+    hairColor: string;
+    hairStyle: string;
+    skinTone: string;
+    bodyBuild: string;
+    distinguishingFeatures: string[];
+  };
+  typicalClothing: string;
+  styleTranslation: string;
+  /** 1-based photo numbers this subject appears in. */
+  photoIndexes: number[];
+  /** The clearest, most frontal photo of this subject (1-based). */
+  bestPhotoIndex: number;
+}
+
+export interface SubjectDetectionResponse {
+  subjects: DetectedSubject[];
+}
+
+/**
+ * Roster-only trimmed variant of the perception prompt for the batch studio:
+ * who is in these photos, described canonically — no storyboard, no event
+ * summary, no capture questions. styleTranslation is written for the
+ * 'vignette' baseline; a different chosen style is swapped downstream
+ * (sheetSubjectForStyle handles the mismatch).
+ */
+export function createSubjectDetectionPrompt(input: SubjectDetectionInput): string {
+  const lang = input.language === 'ja' ? 'ja' : 'en';
+  return `Analyze all ${input.photoCount} photos provided. They come from one family's camera roll. A parent wants to turn the people, pets, and beloved toys in them into recurring illustrated storybook characters — but only the ones they choose. Your roster is the menu they choose from.
+
+Identify every DISTINCT subject worth offering, at most ${MAX_BATCH_SUBJECTS} (prefer the most-photographed and clearly foreground ones when more qualify):
+- every distinct person (children and grown-ups)
+- every animal companion (pet)
+- at most one clearly beloved toy or object (hugged, carried, presented — not scenery)
+
+Include background passersby ONLY when they plausibly belong to the family (recurring across photos or interacting with the children); mark anyone who is not clearly a foreground subject with isForeground=false so the app can leave them unselected.
+
+For EACH subject provide:
+1. subjectId: child_1, adult_1, pet_1, object_1, ...
+2. role: main_child, sibling, parent, grandparent, friend, pet, companion_object, ...
+3. kindGuess: CHILD | ADULT | PET | TOY
+4. parentDescription: ONE short, warm, recognizing line a parent would instantly match to the right person — "the silver-haired woman with round glasses". Kind and factual, never judgmental about bodies. ${lang === 'ja' ? 'Write it in natural Japanese.' : ''}
+5. defaultLabel: a 2-4 word placeholder label of kind + one distinguishing trait — "Grown-up with glasses", "Puppy", "Girl in the red coat". Never invent a proper name; the parent adds real names themselves. ${lang === 'ja' ? 'Write it in natural Japanese.' : ''}
+6. isForeground: true when they are clearly a foreground subject in at least one photo; false for background figures.
+7. physicalTraits (be ruthlessly specific — an illustrator uses this as the canonical reference): apparentAge; hairColor as an exact shade; hairStyle with length/texture/parting/accessories; skinTone with warm/cool specificity; bodyBuild; distinguishingFeatures[]. For pets: hairColor = fur/coat color, hairStyle = coat length and texture, distinguishingFeatures = collar, markings, ear shape, size. For a toy/object: hairColor = material and color, hairStyle = texture and wear.
+8. typicalClothing: their most characteristic, NEUTRAL everyday outfit across the photos (collar/harness or "none" for pets and objects).
+9. styleTranslation: how to render this subject in the "vignette" watercolor style while staying instantly recognizable — materials, construction, colors, proportions.
+10. photoIndexes: which photos (1-${input.photoCount}) they appear in.
+11. bestPhotoIndex: the single clearest, most frontal photo of them.
+
+Never merge two different people into one subject, and never split one person into two. If NO subject qualifies at all, return an empty subjects array.`;
+}
+
+export const SUBJECT_DETECTION_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    subjects: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          subjectId: { type: 'string' },
+          role: { type: 'string' },
+          kindGuess: { type: 'string', enum: ['CHILD', 'ADULT', 'PET', 'TOY'] },
+          parentDescription: { type: 'string' },
+          defaultLabel: { type: 'string' },
+          isForeground: { type: 'boolean' },
+          physicalTraits: {
+            type: 'object',
+            properties: {
+              apparentAge: { type: 'string' },
+              hairColor: { type: 'string' },
+              hairStyle: { type: 'string' },
+              skinTone: { type: 'string' },
+              bodyBuild: { type: 'string' },
+              distinguishingFeatures: { type: 'array', items: { type: 'string' } },
+            },
+            required: [
+              'apparentAge',
+              'hairColor',
+              'hairStyle',
+              'skinTone',
+              'bodyBuild',
+              'distinguishingFeatures',
+            ],
+            additionalProperties: false,
+          },
+          typicalClothing: { type: 'string' },
+          styleTranslation: { type: 'string' },
+          photoIndexes: { type: 'array', items: { type: 'number' } },
+          bestPhotoIndex: { type: 'number' },
+        },
+        required: [
+          'subjectId',
+          'role',
+          'kindGuess',
+          'parentDescription',
+          'defaultLabel',
+          'isForeground',
+          'physicalTraits',
+          'typicalClothing',
+          'styleTranslation',
+          'photoIndexes',
+          'bestPhotoIndex',
+        ],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['subjects'],
+  additionalProperties: false,
+} as const;
+
 /** The character shape scopeCaptureQuestions needs — structurally satisfied
  * by CharacterIdentity['characters'] entries. */
 export interface ScopeCharacterLike {
