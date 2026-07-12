@@ -63,10 +63,15 @@ export async function GET(
       return NextResponse.json({ error: 'Book not found or access denied' }, { status: 404 });
     }
 
-    // Find cover page for the title page illustration
-    const coverPage = bookData.pages.find(
-      page => isTitlePage(page.assetId, bookData.coverAssetId)
-    );
+    // Find cover page for the title page illustration.
+    // AVATAR_STORY (X6d): no photo cover exists (assetId/coverAssetId are
+    // null, so the derived helper never matches) — the persisted
+    // Page.isTitlePage column identifies the cover page instead, and
+    // Book.coverImageUrl below carries the generated painted-title cover.
+    const coverPage =
+      bookData.bookType === 'AVATAR_STORY'
+        ? bookData.pages.find(page => page.isTitlePage)
+        : bookData.pages.find(page => isTitlePage(page.assetId, bookData.coverAssetId));
     // Use coverImageUrl (dedicated cover illustration) if available, otherwise fall back to page illustration
     const titlePageForPdf = coverPage ? {
       ...coverPage,

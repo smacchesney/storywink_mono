@@ -4,6 +4,7 @@ import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { avatarsEnabled } from '@/lib/avatars';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { QueueName, getQueue } from '@/lib/queue/index';
 import { isValidStyle } from '@storywink/shared/prompts/styles';
 
@@ -23,6 +24,20 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   const { avatarId } = await params;
   try {
     const { dbUser } = await getAuthenticatedUser();
+
+    // Renditions are a money route (one Gemini sheet + validation each) and
+    // X6d's style-repair fans out one request per cast member — cap the burst.
+    const rl = await checkRateLimit(`avatar-rendition:${dbUser.id}`, 30, 3600);
+    if (!rl.allowed) {
+      logger.warn({ dbUserId: dbUser.id, remaining: rl.remaining }, 'Rate limit exceeded: avatar rendition');
+      if (process.env.RATE_LIMIT_ENFORCE === 'true') {
+        return NextResponse.json(
+          { error: "You're drawing very quickly. Please wait a little while and try again." },
+          { status: 429 },
+        );
+      }
+    }
+
     const parsed = renditionSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
@@ -32,6 +47,17 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       select: { id: true },
     });
     if (!avatar) return NextResponse.json({ error: 'Character not found' }, { status: 404 });
+
+    // Idempotent while drawing: a rendition already PENDING for this style is
+    // already on its way — don't double-spend (X6d's repair poll can overlap
+    // an impatient second tap).
+    const existing = await prisma.avatarRendition.findUnique({
+      where: { avatarId_artStyle: { avatarId, artStyle: parsed.data.artStyle } },
+      select: { status: true },
+    });
+    if (existing?.status === 'PENDING') {
+      return NextResponse.json({ success: true, alreadyDrawing: true }, { status: 202 });
+    }
 
     await prisma.avatarRendition.upsert({
       where: { avatarId_artStyle: { avatarId, artStyle: parsed.data.artStyle } },

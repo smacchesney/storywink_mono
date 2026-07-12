@@ -171,7 +171,14 @@ function buildAvatarSceneSection(
   scene: AvatarPageScene | BridgeScene | null | undefined,
   pageText: string | null,
 ): string {
-  const header = `AVATAR STORY PAGE — THIS BOOK HAS NO PHOTOS (this section supersedes the SCENE INTERPRETATION instructions above and item 2 of PEOPLE - SOURCE HIERARCHY): Image 1 is a CHARACTER SHEET, not a scene — nothing of its 2x2 grid layout, neutral poses, or plain background may appear in the illustration. Compose a brand-new scene from the instructions below. People in this scene come ONLY from this scene's cast (the characters described in the CHARACTER IDENTITY section below, when provided); their faces, hair, skin tone, proportions, and outfits follow their CHARACTER SHEETS exactly.`;
+  // Empty scene cast = a deliberate establishing shot: the instruction must
+  // say NOBODY appears, not fall back to describing the whole roster.
+  const sceneIsEmpty = !!scene && scene.charactersPresent.length === 0;
+  const header = `AVATAR STORY PAGE — THIS BOOK HAS NO PHOTOS (this section supersedes the SCENE INTERPRETATION instructions above and item 2 of PEOPLE - SOURCE HIERARCHY): Image 1 is a CHARACTER SHEET, not a scene — nothing of its 2x2 grid layout, neutral poses, or plain background may appear in the illustration. Compose a brand-new scene from the instructions below. ${
+    sceneIsEmpty
+      ? `This page is a scene-setting moment: NO characters appear — paint the setting only, no people, pets, or toys.`
+      : `People in this scene come ONLY from this scene's cast (the characters described in the CHARACTER IDENTITY section below, when provided); their faces, hair, skin tone, proportions, and outfits follow their CHARACTER SHEETS exactly.`
+  }`;
 
   if (!scene) {
     return [
@@ -250,13 +257,24 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
         ? buildInteriorAnchorSection()
         : buildBridgeSceneSection(opts.bridgeScene as BridgeScene | null | undefined);
 
-  // 3. Cross-cutting: character identity
-  const charSection = buildCharacterIdentitySection(
-    opts.characterIdentity,
-    opts.pageNumber,
-    opts.bridgeScene?.charactersPresent ?? null,
-    contentAnchor === 'sheet' || contentAnchor === 'interior',
-  );
+  // 3. Cross-cutting: character identity.
+  // Sheet-anchored pages with a scene that names NOBODY (a wide establishing
+  // shot, or every authored id failed roster validation) must not fall back
+  // to the whole-roster filter — every avatar roster entry has
+  // appearsOnPages: [], so the fallback would assert the ENTIRE cast into a
+  // deliberately empty scene.
+  const emptySceneCast =
+    contentAnchor === 'sheet' &&
+    opts.bridgeScene != null &&
+    opts.bridgeScene.charactersPresent.length === 0;
+  const charSection = emptySceneCast
+    ? null
+    : buildCharacterIdentitySection(
+        opts.characterIdentity,
+        opts.pageNumber,
+        opts.bridgeScene?.charactersPresent ?? null,
+        contentAnchor === 'sheet' || contentAnchor === 'interior',
+      );
 
   // 4. Cross-cutting: QC feedback
   const qcSection = buildQCFeedbackSection(opts.qcFeedback);

@@ -58,6 +58,20 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
     });
     if (!avatar) return NextResponse.json({ error: 'Character not found' }, { status: 404 });
 
+    // X6d guard: an avatar starring in avatar-first stories is load-bearing —
+    // deleting it would cascade the BookAvatar links and wipe the rendition
+    // sheets those books need for every re-render. The parent deletes the
+    // books first (or keeps the character); a silent brick is never OK.
+    const starringIn = await prisma.bookAvatar.count({
+      where: { avatarId, book: { bookType: 'AVATAR_STORY' } },
+    });
+    if (starringIn > 0) {
+      return NextResponse.json(
+        { code: 'STARS_IN_STORIES', count: starringIn },
+        { status: 409 },
+      );
+    }
+
     // Staged photos are deletable only when no book page/cover and no other
     // avatar references the same asset.
     const stagedAssetIds = avatar.photos.map((p) => p.assetId);

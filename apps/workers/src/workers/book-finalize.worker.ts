@@ -490,8 +490,10 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
           (p: any) => p.generatedImageUrl && p.lastRenderHadSheet,
         );
         const sheetsForJudge = anyRenderHadSheet ? sheets : [];
+        // Avatar books get cover QC unconditionally: their cover is a pure
+        // generation (no photo behind it) judged against the avatar sheets.
         const coverForQc =
-          sheetsEnabled && book.coverImageUrl && book.title
+          (sheetsEnabled || book.bookType === 'AVATAR_STORY') && book.coverImageUrl && book.title
             ? { url: book.coverImageUrl, expectedTitle: book.title }
             : null;
 
@@ -524,8 +526,12 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
             );
             // The cover is rendered by the same job (and provider) as the
             // interior title page, so its attribution comes from the title
-            // page's render-time stamps.
-            const titlePage = book.pages.find((p: any) => isTitlePage(p.assetId, book.coverAssetId));
+            // page's render-time stamps. Avatar books have no coverAssetId —
+            // the persisted isTitlePage column identifies the page instead.
+            const titlePage =
+              book.bookType === 'AVATAR_STORY'
+                ? book.pages.find((p: any) => p.isTitlePage)
+                : book.pages.find((p: any) => isTitlePage(p.assetId, book.coverAssetId));
             await prisma.illustrationQcResult.createMany({
               data: [
                 ...qcResult.pageResults.map(r => ({
@@ -767,6 +773,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
           pageNumber: p.pageNumber,
           assetId: p.assetId,
           generatedImageUrl: p.generatedImageUrl,
+          isTitlePage: p.isTitlePage,
         })),
         logger,
       });

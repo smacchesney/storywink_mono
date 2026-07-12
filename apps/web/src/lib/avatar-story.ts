@@ -29,7 +29,9 @@ export function castComposition(kinds: CastKind[]): CastComposition {
   return {
     people,
     companions,
-    ok: kinds.length > 0 && people <= MAX_CAST_PEOPLE && companions <= MAX_CAST_COMPANIONS,
+    // At least one PERSON: the story prompt keeps pets real animals and toys
+    // inanimate, so a people-less cast would have no one who can act at all.
+    ok: people >= 1 && people <= MAX_CAST_PEOPLE && companions <= MAX_CAST_COMPANIONS,
   };
 }
 

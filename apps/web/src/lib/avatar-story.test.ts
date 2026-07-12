@@ -17,8 +17,10 @@ describe('castComposition', () => {
     expect(castComposition(['CHILD', 'PET', 'PET', 'TOY']).ok).toBe(false);
   });
 
-  it('rejects an empty cast', () => {
+  it('rejects an empty cast and a people-less cast', () => {
     expect(castComposition([]).ok).toBe(false);
+    // Pets stay real animals and toys stay inanimate — someone must be able to act.
+    expect(castComposition(['PET', 'TOY']).ok).toBe(false);
   });
 
   it('exports the caps the UI mirrors', () => {

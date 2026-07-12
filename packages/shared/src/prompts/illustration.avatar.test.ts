@@ -72,6 +72,17 @@ describe('createIllustrationPrompt — sheet anchor (avatar story pages)', () =>
     expect(prompt).toContain('clothing follow the CHARACTER SHEETS; pose and scene composition follow the AVATAR STORY PAGE instructions');
     expect(prompt).toContain('Typical clothing (the CHARACTER SHEET takes precedence): yellow raincoat');
   });
+
+  it('an empty scene cast (establishing shot) drops the identity section instead of asserting the whole roster', () => {
+    const prompt = createIllustrationPrompt({
+      ...baseOpts,
+      contentAnchor: 'sheet',
+      bridgeScene: { ...scene, charactersPresent: [] },
+    });
+    expect(prompt).not.toContain('CHARACTER IDENTITY (canonical reference');
+    expect(prompt).not.toContain('Emma (main_child)');
+    expect(prompt).toContain('NO characters appear — paint the setting only');
+  });
 });
 
 describe('createIllustrationPrompt — interior anchor (avatar story covers)', () => {

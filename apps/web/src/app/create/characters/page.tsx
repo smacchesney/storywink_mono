@@ -65,6 +65,7 @@ function AvatarStoryFlow() {
   const locale = useLocale();
 
   const [avatars, setAvatars] = useState<AvatarSummary[] | null>(null);
+  const [loadTrouble, setLoadTrouble] = useState(false);
   const [step, setStep] = useState<Step>('cast');
   const [castIds, setCastIds] = useState<string[]>([]);
   const [language, setLanguage] = useState<'en' | 'ja'>(locale === 'ja' ? 'ja' : 'en');
@@ -77,10 +78,17 @@ function AvatarStoryFlow() {
   const [repairTrouble, setRepairTrouble] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // If create succeeded but the story enqueue did not, retry must reuse the
+  // SAME book — never mint a duplicate.
+  const createdBookIdRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch('/api/avatars').catch(() => null);
-    if (!res?.ok) return;
+    if (!res?.ok) {
+      setLoadTrouble(true);
+      return;
+    }
+    setLoadTrouble(false);
     const data = (await res.json()) as { avatars: AvatarSummary[] };
     setAvatars(data.avatars.filter((a) => a.status === 'READY'));
   }, []);
@@ -91,6 +99,48 @@ function AvatarStoryFlow() {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [load]);
+
+  // Wizard state survives an accidental browser-back / reload within the
+  // session — three steps of picking must never evaporate.
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    try {
+      const raw = sessionStorage.getItem('storywink-avatar-story-draft');
+      if (!raw) return;
+      const draft = JSON.parse(raw) as {
+        step?: Step;
+        castIds?: string[];
+        sparkKey?: string | null;
+        customSpark?: string;
+        writingOwn?: boolean;
+        pageLength?: AvatarStoryPageLength;
+        language?: 'en' | 'ja';
+      };
+      if (draft.castIds?.length) setCastIds(draft.castIds);
+      if (draft.sparkKey) setSparkKey(draft.sparkKey);
+      if (draft.customSpark) setCustomSpark(draft.customSpark);
+      if (draft.writingOwn) setWritingOwn(true);
+      if (draft.pageLength && (AVATAR_STORY_PAGE_LENGTHS as readonly number[]).includes(draft.pageLength)) {
+        setPageLength(draft.pageLength);
+      }
+      if (draft.language === 'en' || draft.language === 'ja') setLanguage(draft.language);
+      if (draft.step === 'spark' || draft.step === 'length') setStep(draft.step);
+    } catch {
+      /* storage unavailable or stale shape — start fresh */
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        'storywink-avatar-story-draft',
+        JSON.stringify({ step, castIds, sparkKey, customSpark, writingOwn, pageLength, language }),
+      );
+    } catch {
+      /* storage unavailable — drafting is best-effort */
+    }
+  }, [step, castIds, sparkKey, customSpark, writingOwn, pageLength, language]);
 
   const cast = useMemo(
     () =>
@@ -161,10 +211,14 @@ function AvatarStoryFlow() {
     setRepairing(true);
     setRepairTrouble(false);
     const target = styleForRepair;
+    // Skip cast members already READY *and* those already drawing (a
+    // PENDING rendition is already paid for — never double-spend).
     const missing = cast.filter(
       (a) =>
         !a.renditions.some(
-          (r) => r.artStyle === target && r.status === 'READY' && r.turnaroundSheetUrl,
+          (r) =>
+            r.artStyle === target &&
+            ((r.status === 'READY' && r.turnaroundSheetUrl) || r.status === 'PENDING'),
         ),
     );
     await Promise.all(
@@ -177,7 +231,16 @@ function AvatarStoryFlow() {
       ),
     );
     if (pollRef.current) clearInterval(pollRef.current);
+    // Drawings settle in 30-90s; past four minutes something is wedged —
+    // stop the poll and offer the retry state instead of spinning forever.
+    const pollStartedAt = Date.now();
     pollRef.current = setInterval(async () => {
+      if (Date.now() - pollStartedAt > 240_000) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setRepairing(false);
+        setRepairTrouble(true);
+        return;
+      }
       const res = await fetch('/api/avatars').catch(() => null);
       if (!res?.ok) return;
       const data = (await res.json()) as { avatars: AvatarSummary[] };
@@ -210,22 +273,37 @@ function AvatarStoryFlow() {
     if (isCreating || !artStyle || !premise || cast.length === 0) return;
     setIsCreating(true);
     try {
-      const res = await fetch('/api/book/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bookType: 'AVATAR_STORY',
-          avatarIds: castIds,
-          premise,
-          pageLength,
-          artStyle,
-          language,
-        }),
-      });
-      if (!res.ok) throw new Error(`create ${res.status}`);
-      const data = (await res.json()) as { data?: { bookId?: string } };
-      const bookId = data.data?.bookId;
-      if (!bookId) throw new Error('create returned no bookId');
+      // Reuse the book from a half-finished attempt (created but the story
+      // enqueue did not land) — a retry tap must never mint a duplicate.
+      let bookId = createdBookIdRef.current;
+      if (!bookId) {
+        const res = await fetch('/api/book/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bookType: 'AVATAR_STORY',
+            avatarIds: castIds,
+            premise,
+            pageLength,
+            artStyle,
+            language,
+          }),
+        });
+        if (res.status === 409) {
+          // A cast drawing is not READY in this style anymore (redraw or
+          // deletion raced us) — re-check the cast rather than "try again".
+          toast(t('createNotReady'));
+          setRepairTrouble(false);
+          setIsCreating(false);
+          void load();
+          return;
+        }
+        if (!res.ok) throw new Error(`create ${res.status}`);
+        const data = (await res.json()) as { data?: { bookId?: string } };
+        bookId = data.data?.bookId ?? null;
+        if (!bookId) throw new Error('create returned no bookId');
+        createdBookIdRef.current = bookId;
+      }
 
       const storyRes = await fetch('/api/generate/story', {
         method: 'POST',
@@ -235,6 +313,11 @@ function AvatarStoryFlow() {
       if (storyRes.status !== 202) throw new Error(`generate ${storyRes.status}`);
 
       rememberCreatePath('avatars');
+      try {
+        sessionStorage.removeItem('storywink-avatar-story-draft');
+      } catch {
+        /* storage unavailable */
+      }
       router.push(`/create/${bookId}/setup`);
     } catch (err) {
       logger.error({ err }, 'Avatar story creation did not go through');
@@ -242,6 +325,21 @@ function AvatarStoryFlow() {
       setIsCreating(false);
     }
   };
+
+  if (loadTrouble && avatars === null) {
+    return (
+      <div className="mx-auto flex min-h-[60vh] w-full max-w-md flex-col items-center justify-center px-4 text-center">
+        <p className="font-playful text-lg text-[#1a1a1a]">{t('loadTrouble')}</p>
+        <button
+          type="button"
+          onClick={() => void load()}
+          className="mt-4 min-h-[44px] rounded-full bg-coral px-6 py-3 font-playful text-white shadow-md hover:bg-coral/90"
+        >
+          {t('loadRetry')}
+        </button>
+      </div>
+    );
+  }
 
   if (avatars === null) {
     return (
@@ -334,6 +432,7 @@ function AvatarStoryFlow() {
                 <button
                   key={avatar.id}
                   type="button"
+                  aria-pressed={selected}
                   onClick={() => toggleCast(avatar)}
                   disabled={capped}
                   className={`relative flex min-h-[44px] flex-col items-center rounded-2xl border-2 bg-white p-3 transition-all ${
@@ -378,6 +477,9 @@ function AvatarStoryFlow() {
           {companionsFull && (
             <p className="mt-1 text-center text-xs text-gray-500">{t('castCompanionsFull')}</p>
           )}
+          {castIds.length > 0 && composition.people === 0 && (
+            <p className="mt-3 text-center text-xs text-gray-500">{t('castNeedsPerson')}</p>
+          )}
 
           <StepCta disabled={!composition.ok} onClick={() => setStep('spark')} label={t('next')} />
         </>
@@ -397,6 +499,7 @@ function AvatarStoryFlow() {
                 <button
                   key={key}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => {
                     setSparkKey(key);
                     setWritingOwn(false);
@@ -450,6 +553,7 @@ function AvatarStoryFlow() {
                 <button
                   key={len}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => setPageLength(len)}
                   className={`flex min-h-[44px] flex-col items-center rounded-2xl border-2 bg-white px-2 py-4 transition-all ${
                     active ? 'border-coral ring-2 ring-coral/25' : 'border-black/10 hover:border-coral/50'
@@ -477,6 +581,7 @@ function AvatarStoryFlow() {
                     <button
                       key={key}
                       type="button"
+                      aria-pressed={active}
                       onClick={() => setArtStyle(key)}
                       className={`relative overflow-hidden rounded-xl border-2 transition-all ${
                         active ? 'border-coral ring-2 ring-coral ring-offset-1' : 'border-black/10'

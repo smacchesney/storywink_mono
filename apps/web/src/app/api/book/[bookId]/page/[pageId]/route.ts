@@ -124,7 +124,7 @@ export async function DELETE(
         coverAssetId: true,
         status: true,
         pages: {
-          select: { id: true, assetId: true, index: true },
+          select: { id: true, assetId: true, index: true, isTitlePage: true },
           orderBy: { index: 'asc' },
         },
       },
@@ -145,7 +145,14 @@ export async function DELETE(
     // CONSTRAINT 1: Cannot delete cover page.
     // `code` lets the client show its own localized, friendly copy; the
     // `error` string stays for logs and older clients.
-    if (pageToDelete.assetId === book.coverAssetId) {
+    // Photo books match on the cover asset; avatar-story pages are all
+    // photo-less (null === null must NOT lock every page), so their cover is
+    // the persisted isTitlePage row instead.
+    const isCoverPage =
+      pageToDelete.assetId !== null
+        ? pageToDelete.assetId === book.coverAssetId
+        : pageToDelete.isTitlePage;
+    if (isCoverPage) {
       logger.warn({ clerkId, bookId, pageId }, 'API: Cannot delete cover page');
       return NextResponse.json(
         { code: 'COVER_LOCKED', error: 'Cannot delete the cover photo. Please select a different cover first.' },

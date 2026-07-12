@@ -35,7 +35,11 @@ export async function mergeLinkedAvatarSheets(opts: {
         avatar: {
           include: {
             renditions: {
-              where: { status: 'READY', artStyle: artStyle ?? 'vignette' },
+              // Any rendition still holding a sheet counts: a "draw again"
+              // flips the row to PENDING but keeps the last good sheet URL,
+              // and a re-render mid-redraw must keep its anchor rather than
+              // fail the page. READY is preferred below.
+              where: { artStyle: artStyle ?? 'vignette', turnaroundSheetUrl: { not: null } },
             },
           },
         },
@@ -44,7 +48,9 @@ export async function mergeLinkedAvatarSheets(opts: {
 
     const avatarRefs: CharacterSheetRef[] = [];
     for (const link of links) {
-      const sheetUrl = link.avatar.renditions[0]?.turnaroundSheetUrl;
+      const rendition =
+        link.avatar.renditions.find((r) => r.status === 'READY') ?? link.avatar.renditions[0];
+      const sheetUrl = rendition?.turnaroundSheetUrl;
       if (!link.characterId || !sheetUrl) continue;
       avatarRefs.push({
         characterId: link.characterId,

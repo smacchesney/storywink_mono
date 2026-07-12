@@ -481,14 +481,15 @@
     "matchQuestion": "Is this {name}?",
     "matchYes": "Yes, it's them",
     "matchNo": "Not them",
-    "matchLinked": "{name} will look just like their character."
+    "matchLinked": "{name} will look just like their character.",
+    "deleteStarsInStories": "{name} stars in a character story — that book needs them. Delete the book first, or keep them both."
   },
   "avatarStories": {
     "cardTitle": "With {name} & friends",
     "cardTitleGeneric": "With your characters",
     "cardSubtitle": "Pick who is in it — we make it up together",
     "cardExplainer": "New: the characters you have kept can star in made-up stories.",
-    "cardLastTime": "Where you left off last time",
+    "cardLastTime": "Last time you started here",
     "castTitle": "Who is in this story?",
     "castHint": "Up to 4 people, plus 2 pets or toys",
     "castPeopleFull": "That is a full cast — 4 people is the limit",
@@ -504,7 +505,7 @@
     "sparkFort": "The great blanket fort",
     "sparkMoon": "A trip to the moon before bedtime",
     "sparkSock": "The mystery of the missing sock",
-    "sparkDragon": "A tiny dragon comes to visit",
+    "sparkDragon": "The bravest bath time ever",
     "lengthTitle": "How long a tale?",
     "length8": "Quick tale",
     "length12": "Cozy classic",
@@ -521,6 +522,10 @@
     "createCta": "Make our story",
     "creating": "Getting started…",
     "createTrouble": "That did not go through — please try again",
-    "shelfCta": "Make a story together"
+    "shelfCta": "Make a story together",
+    "loadTrouble": "Your characters didn’t come along — one more try?",
+    "loadRetry": "Try again",
+    "castNeedsPerson": "Add at least one person — pets and toys join in beside them",
+    "createNotReady": "A drawing changed just now — check your cast and try once more"
   }
 }

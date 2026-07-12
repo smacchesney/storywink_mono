@@ -481,14 +481,15 @@
     "matchQuestion": "この子は {name} ですか？",
     "matchYes": "はい、そうです",
     "matchNo": "ちがいます",
-    "matchLinked": "{name} は キャラクターと おなじ すがたで とうじょうします。"
+    "matchLinked": "{name} は キャラクターと おなじ すがたで とうじょうします。",
+    "deleteStarsInStories": "{name}はキャラクターのお話に出演中です — その絵本に必要です。先に絵本を削除するか、どちらもそのままに。"
   },
   "avatarStories": {
     "cardTitle": "{name}となかまたちと",
     "cardTitleGeneric": "うちのキャラクターたちと",
     "cardSubtitle": "だれが出るかえらんだら、お話はおまかせ",
     "cardExplainer": "あたらしくなりました: のこしたキャラクターが、空想のお話の主役になれます。",
-    "cardLastTime": "前回はこちらでした",
+    "cardLastTime": "前回はここからはじめました",
     "castTitle": "だれが出てくるお話?",
     "castHint": "人は4人まで、ペットやおもちゃは2つまで",
     "castPeopleFull": "人はここまで — 4人でいっぱいです",
@@ -504,7 +505,7 @@
     "sparkFort": "もうふのおしろ",
     "sparkMoon": "ねるまえに月へおでかけ",
     "sparkSock": "きえたくつしたのなぞ",
-    "sparkDragon": "ちいさなドラゴンがやってきた",
+    "sparkDragon": "いちばんゆうかんなおふろタイム",
     "lengthTitle": "どのくらいのながさ?",
     "length8": "みじかいおはなし",
     "length12": "ちょうどいい定番",
@@ -521,6 +522,10 @@
     "createCta": "お話をつくる",
     "creating": "はじめています…",
     "createTrouble": "うまくいきませんでした — もういちどためしてください",
-    "shelfCta": "いっしょにお話をつくる"
+    "shelfCta": "いっしょにお話をつくる",
+    "loadTrouble": "キャラクターをよみこめませんでした — もういちどためしますか?",
+    "loadRetry": "もういちど",
+    "castNeedsPerson": "人をひとりはえらんでください — ペットやおもちゃはそのおともに",
+    "createNotReady": "絵がかわったばかりのようです — キャストをたしかめて、もういちどどうぞ"
   }
 }

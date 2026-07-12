@@ -41,6 +41,8 @@ interface PalettePage {
   pageNumber: number;
   assetId: string | null;
   generatedImageUrl: string | null;
+  /** Persisted cover flag — the anchor for photo-less (avatar-story) books. */
+  isTitlePage?: boolean;
 }
 
 export interface NormalizeBookPaletteParams {
@@ -116,7 +118,11 @@ export async function normalizeBookPalette(params: NormalizeBookPaletteParams): 
       api_secret: process.env.CLOUDINARY_API_SECRET,
     });
 
-    const titlePage = pages.find(p => isTitlePage(p.assetId, coverAssetId));
+    const titlePage =
+      pages.find(p => isTitlePage(p.assetId, coverAssetId)) ??
+      // Avatar-story books: no photo cover exists — anchor to the persisted
+      // isTitlePage row instead of silently skipping normalization.
+      pages.find(p => p.isTitlePage === true);
     if (!titlePage?.generatedImageUrl) {
       logger.info({ bookId }, 'Palette normalization skipped: no title-page render to anchor to');
       return;

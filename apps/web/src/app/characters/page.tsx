@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
 import { Plus } from 'lucide-react';
 import AvatarCard, { type AvatarSummary } from '@/components/characters/AvatarCard';
 import AvatarStudioDialog from '@/components/characters/AvatarStudioDialog';
@@ -72,7 +73,12 @@ function CharactersShelf() {
 
   const remove = async (avatar: AvatarSummary) => {
     if (!window.confirm(t('deleteConfirm', { name: avatar.displayName }))) return;
-    await fetch(`/api/avatar/${avatar.id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/avatar/${avatar.id}`, { method: 'DELETE' });
+    if (res.status === 409) {
+      // X6d: this character stars in avatar-first stories — those books need
+      // its drawings for every re-render, so the stories go first.
+      toast(t('deleteStarsInStories', { name: avatar.displayName }));
+    }
     void load();
   };
 

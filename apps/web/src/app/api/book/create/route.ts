@@ -169,11 +169,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const body = await req.json().catch(() => null);
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      // Same response malformed JSON always got (pre-X6d parity: the parse
+      // error never reached the zod branch, so no `details` field).
+      logger.warn({ clerkId, dbUserId: dbUser.id }, 'API: Book creation body was not valid JSON.');
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
 
     // X6d: the avatar-first branch is discriminated by bookType and dark
     // behind AVATARS_ENABLED (404s like every other avatar surface).
-    if (body && typeof body === 'object' && body.bookType === 'AVATAR_STORY') {
+    if (body && typeof body === 'object' && (body as { bookType?: string }).bookType === 'AVATAR_STORY') {
       if (!avatarsEnabled()) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
       }

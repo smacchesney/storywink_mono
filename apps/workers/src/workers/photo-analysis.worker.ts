@@ -56,6 +56,16 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
   });
 
   if (!book) throw new Error('Book not found');
+
+  // AVATAR_STORY (X6d): perception must never run — the roster was composed
+  // from the linked avatars and eventSummary holds the parent-picked premise;
+  // a perception pass would overwrite both. Guard here (the chokepoint) so
+  // no enqueue path can clobber an avatar book.
+  if (book.bookType === 'AVATAR_STORY') {
+    logger.warn({ bookId, jobId: job.id }, 'Photo perception skipped: AVATAR_STORY book');
+    return { success: true, skipped: 'avatar_story' };
+  }
+
   if (!book.pages.length) throw new Error('Book has no pages');
 
   let additionalCharacters: { name: string; relationship: string }[] | null = null;
