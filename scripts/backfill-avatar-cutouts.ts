@@ -72,15 +72,20 @@ async function main() {
   });
   try {
     for (const r of actionable) {
+      const jobId = `cutout-backfill-${r.avatar.id}-${r.artStyle}`;
       await queue.add(
-        `avatar-${r.avatar.id}-${r.artStyle}-cutout`,
+        jobId,
         {
           avatarId: r.avatar.id,
           userId: r.avatar.userId,
           artStyle: r.artStyle,
           cutoutOnly: true,
         },
-        { attempts: 2, backoff: { type: 'exponential', delay: 10000 } },
+        // Deterministic jobId: re-running the script while a prior job is still
+        // queued/active is a no-op instead of a double Gemini spend for the
+        // same rendition. (Once the job completes and clears, a re-run can
+        // re-enqueue — but the worker then no-ops on the present cutoutUrl.)
+        { jobId, attempts: 2, backoff: { type: 'exponential', delay: 10000 } },
       );
       console.log(`  enqueued: ${r.avatar.displayName} (${r.artStyle})`);
     }

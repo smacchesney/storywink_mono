@@ -82,20 +82,31 @@ export async function processAvatarRendition(job: Job<AvatarRenditionJobData>): 
       logger.warn({ avatarId, artStyle }, 'Cutout-only job without identity — skipping');
       return;
     }
+    const anchorSheet = existing.turnaroundSheetUrl;
     const cutoutUrl = await generateAvatarCutout({
       openai,
       avatarId,
       artStyle,
       kind: avatar.kind,
       subject: cutoutSubjectForStyle(identity, artStyle),
-      sheetUrl: existing.turnaroundSheetUrl,
+      sheetUrl: anchorSheet,
       logger,
     });
     if (cutoutUrl) {
-      await prisma.avatarRendition.update({
-        where: { id: existing.id },
+      // Guard against a "draw again" that redrew this rendition while the
+      // backfill cutout was generating: write ONLY if the sheet is still the
+      // one we anchored to AND no cutout landed meanwhile. A concurrent redraw
+      // (new sheet, or its own fresh cutout) wins — this stale one is dropped.
+      const written = await prisma.avatarRendition.updateMany({
+        where: { id: existing.id, cutoutUrl: null, turnaroundSheetUrl: anchorSheet },
         data: { cutoutUrl },
       });
+      if (written.count === 0) {
+        logger.info(
+          { avatarId, artStyle },
+          'Cutout-only write skipped — rendition changed under us (redraw won)',
+        );
+      }
     }
     return;
   }

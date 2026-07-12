@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { assertCanCreateAvatar } from '@/lib/entitlements';
-import { avatarsEnabled } from '@/lib/avatars';
+import { avatarsEnabled, reapUnattachedStagedAssets } from '@/lib/avatars';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { QueueName, getQueue } from '@/lib/queue/index';
 import {
@@ -74,11 +75,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Capacity pre-check BEFORE the single-use consume: a user already at the
+    // avatar cap would otherwise burn their detection, create zero, and get
+    // funnelled into paid re-detects. Fail here with the cap payload and the
+    // detection survives for a retry after they free a slot.
+    const capacity = await assertCanCreateAvatar(dbUser.id);
+    if (!capacity.allowed) {
+      return NextResponse.json({ code: 'AVATAR_CAP', cap: capacity.cap }, { status: 403 });
+    }
+
     // Single-use redemption: the atomic rename lets exactly ONE request in —
-    // a double-tap cannot mint the whole batch twice.
+    // a double-tap cannot mint the whole batch twice. Props are STRIPPED in the
+    // same write so no AI-derived descriptions of children (or non-consenting
+    // background strangers) survive past the create — the retention promise.
     const consumed = await prisma.appEvent.updateMany({
       where: { id: detectionId, name: AVATAR_DETECTION_EVENT },
-      data: { name: AVATAR_DETECTION_CONSUMED_EVENT },
+      data: { name: AVATAR_DETECTION_CONSUMED_EVENT, props: Prisma.JsonNull },
     });
     if (consumed.count === 0) {
       return NextResponse.json({ code: 'DETECTION_USED' }, { status: 409 });
@@ -154,6 +166,12 @@ export async function POST(request: NextRequest) {
         failed.push({ subjectId: pick.subjectId, reason: 'create' });
       }
     }
+
+    // Retention: staged photos that ended up attached to no avatar (beyond the
+    // ≤3/subject cap, or belonging to unselected subjects) are reaped now —
+    // reapUnattachedStagedAssets keeps only the ids no page/cover/avatar
+    // references, so the created avatars' photos are safe.
+    await reapUnattachedStagedAssets(dbUser.id, stored.assetIds);
 
     logger.info(
       { detectionId, created: created.length, failed: failed.length, stoppedAtCap },

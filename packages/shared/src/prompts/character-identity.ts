@@ -388,9 +388,13 @@ export function createCharacterCutoutPrompt(input: {
       `the first image is the character's model sheet (ground truth for identity); ` +
       `the final ${styleRefCount === 1 ? 'image shows' : `${styleRefCount} images show`} the artistic style to apply.`,
     `THE FIGURE: exactly ONE character, ${pose}. Full body from head to feet, both feet fully visible, centered horizontally, occupying about 85% of the frame height.`,
+    // Anchor the outfit to the model sheet (the visual ground truth the
+    // validator compares against), not to a trait string the sheet never
+    // pinned — otherwise a typicalClothing that differs from what the sheet
+    // drew produces a cutout the sameCharacter check rejects.
     character.typicalClothing
-      ? `They wear their own everyday outfit: ${character.typicalClothing}.`
-      : null,
+      ? `They wear the SAME outfit they wear on the model sheet — their own everyday clothes (${character.typicalClothing}).`
+      : `They wear the SAME outfit they wear on the model sheet.`,
     sheetCharacterBlock(character),
     styleBible,
     `BACKGROUND: plain PURE WHITE (#FFFFFF) everywhere the character is not. No scenery, no props, no ground line, no cast shadows, no vignetting.`,

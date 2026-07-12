@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { useLocale, useTranslations } from 'next-intl';
 import { X, Check } from 'lucide-react';
 import PhotoTray, { type PhotoTrayHandle } from '@/components/upload/PhotoTray';
@@ -70,6 +71,7 @@ export function AvatarStudioDialog({ onClose, onCreated }: AvatarStudioDialogPro
   const [picks, setPicks] = React.useState<Record<string, PickState>>({});
   const [artStyle, setArtStyle] = React.useState<StyleKey>('vignette');
   const [error, setError] = React.useState<string | null>(null);
+  const [pendingCount, setPendingCount] = React.useState(0);
   const trayRef = React.useRef<PhotoTrayHandle>(null);
   // The photo set the current detection covers — unchanged photos skip a
   // second (paid) detect call when the parent taps Back and Next again.
@@ -77,9 +79,31 @@ export function AvatarStudioDialog({ onClose, onCreated }: AvatarStudioDialogPro
 
   const selectedCount = subjects.filter((s) => picks[s.subjectId]?.selected).length;
 
+  const onAssetsChange = React.useCallback((next: UploadedAsset[]) => {
+    setAssets(next);
+    setPendingCount(trayRef.current?.pendingCount() ?? 0);
+  }, []);
+  const onBatchSettled = React.useCallback(() => {
+    setPendingCount(trayRef.current?.pendingCount() ?? 0);
+  }, []);
+
   const detect = async () => {
+    // Never detect over a partial set: wait out any in-flight uploads first so
+    // a photo mid-upload can't be silently dropped from the roster.
+    setStep('detecting');
+    setError(null);
+    const waitStart = Date.now();
+    while (trayRef.current?.hasPending()) {
+      if (Date.now() - waitStart > 60_000) break;
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    setPendingCount(0);
     const uploaded = trayRef.current?.getUploadedAssets() ?? assets;
-    if (uploaded.length === 0) return;
+    if (uploaded.length === 0) {
+      setError(t('createError'));
+      setStep('photos');
+      return;
+    }
     const photoKey = uploaded
       .map((a) => a.id)
       .sort()
@@ -88,8 +112,6 @@ export function AvatarStudioDialog({ onClose, onCreated }: AvatarStudioDialogPro
       setStep('confirm');
       return;
     }
-    setStep('detecting');
-    setError(null);
     try {
       const res = await fetch('/api/avatars/detect', {
         method: 'POST',
@@ -153,16 +175,35 @@ export function AvatarStudioDialog({ onClose, onCreated }: AvatarStudioDialogPro
         setStep('photos');
         return;
       }
+      if (res.status === 403) {
+        // Already at the character cap: nothing was created and the detection
+        // was NOT burned. Say so plainly rather than looping into a re-detect.
+        const { toast } = await import('sonner');
+        toast(t('capFull'));
+        setStep('confirm');
+        return;
+      }
       if (!res.ok) throw new Error(String(res.status));
       const data = (await res.json()) as {
         created: Array<{ avatarId: string }>;
+        failed?: Array<{ subjectId: string; reason: string }>;
         stoppedAtCap?: number;
       };
-      if (data.stoppedAtCap !== undefined && data.created.length > 0) {
-        const { toast } = await import('sonner');
+      const { toast } = await import('sonner');
+      if (data.stoppedAtCap !== undefined) {
+        // Zero-created-at-cap and some-created-then-cap both land here — always
+        // tell the parent what happened instead of a silent close or a loop.
         toast(t('capStopped', { count: data.created.length }));
+      } else if (data.failed && data.failed.length > 0 && data.created.length > 0) {
+        // Partial success is fine, but reported (plan decision).
+        toast(t('someFailed', { made: data.created.length, missed: data.failed.length }));
       }
-      if (data.created.length === 0) throw new Error('nothing created');
+      if (data.created.length === 0) {
+        // Nothing landed and it wasn't the cap — a real failure, stay put.
+        setError(t('createError'));
+        setStep('style');
+        return;
+      }
       onCreated();
       onClose();
     } catch {
@@ -171,8 +212,13 @@ export function AvatarStudioDialog({ onClose, onCreated }: AvatarStudioDialogPro
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 md:items-center">
+  // Portaled to document.body so the modal escapes the layout's `main`
+  // (relative z-10) stacking context — otherwise the sticky header (z-50)
+  // paints over the top of a tall confirm step. See root layout.
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 md:items-center">
       <div className="relative flex max-h-[92dvh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-t-2xl bg-white p-5 md:rounded-2xl">
         <button
           type="button"
@@ -193,12 +239,21 @@ export function AvatarStudioDialog({ onClose, onCreated }: AvatarStudioDialogPro
           <p className="font-playful text-sm text-gray-600">
             {t('photosHintBatch', { max: MAX_BATCH_PHOTOS })}
           </p>
-          <PhotoTray maxPhotos={MAX_BATCH_PHOTOS} trayRef={trayRef} onAssetsChange={setAssets} />
+          <PhotoTray
+            maxPhotos={MAX_BATCH_PHOTOS}
+            trayRef={trayRef}
+            onAssetsChange={onAssetsChange}
+            onBatchSettled={onBatchSettled}
+          />
           {error && step === 'photos' && (
             <p className="font-playful text-sm text-red-500">{error}</p>
           )}
           <div className="flex justify-end">
-            <NextButton disabled={assets.length === 0} onClick={detect} label={t('next')} />
+            <NextButton
+              disabled={assets.length === 0 && pendingCount === 0}
+              onClick={detect}
+              label={pendingCount > 0 ? t('stillUploading', { count: pendingCount }) : t('next')}
+            />
           </div>
         </div>
 
@@ -279,7 +334,8 @@ export function AvatarStudioDialog({ onClose, onCreated }: AvatarStudioDialogPro
 
         {step === 'creating' && <WaitBlock label={t('creatingBatch')} />}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -353,12 +409,18 @@ function SubjectCard({
           maxLength={50}
           disabled={!pick.selected}
           placeholder={subject.defaultLabel}
-          onClick={(e) => e.stopPropagation()}
+          // Only swallow the card's toggle gesture while selected (the input is
+          // live). On an unselected card the input is disabled and dead — a tap
+          // there must fall through and SELECT the card, not do nothing.
+          onClick={pick.selected ? (e) => e.stopPropagation() : undefined}
           onChange={(e) => onName(e.target.value)}
           className="w-full rounded-lg border border-black/10 px-2 py-1 font-playful text-base text-[#1a1a1a] placeholder:text-gray-400 focus:border-coral focus:outline-none focus:ring-1 focus:ring-coral disabled:bg-transparent"
         />
         <p className="truncate text-xs text-gray-400">{subject.parentDescription}</p>
-        <div className="flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="flex flex-wrap gap-1"
+          onClick={pick.selected ? (e) => e.stopPropagation() : undefined}
+        >
           {AVATAR_KINDS.map((kind) => (
             <button
               key={kind}

@@ -3,9 +3,15 @@ import OpenAI from 'openai';
 import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
-import { avatarsEnabled } from '@/lib/avatars';
+import { avatarsEnabled, reapUnattachedStagedAssets } from '@/lib/avatars';
 import { checkRateLimit } from '@/lib/rateLimit';
-import { detectRequestSchema, AVATAR_DETECTION_EVENT, type StoredDetection } from '@/lib/avatar-batch';
+import {
+  detectRequestSchema,
+  AVATAR_DETECTION_EVENT,
+  AVATAR_DETECTION_CONSUMED_EVENT,
+  DETECTION_TTL_MS,
+  type StoredDetection,
+} from '@/lib/avatar-batch';
 import {
   createSubjectDetectionPrompt,
   SUBJECT_DETECTION_SYSTEM_PROMPT,
@@ -17,6 +23,38 @@ import { optimizeCloudinaryUrlForVision } from '@storywink/shared/utils';
 
 // Perception tier (mirrors apps/workers/src/config/models.ts).
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'gpt-5-mini';
+
+/**
+ * Delete this user's expired detection rows and reap the staged photos any
+ * abandoned (detect-but-never-create) session left behind. Fire-and-forget
+ * from the request path — a failure here never blocks a detect.
+ */
+async function sweepExpiredDetections(dbUserId: string): Promise<void> {
+  try {
+    const cutoff = new Date(Date.now() - DETECTION_TTL_MS);
+    const expired = await prisma.appEvent.findMany({
+      where: {
+        userId: dbUserId,
+        name: { in: [AVATAR_DETECTION_EVENT, AVATAR_DETECTION_CONSUMED_EVENT] },
+        createdAt: { lt: cutoff },
+      },
+      select: { id: true, name: true, props: true },
+    });
+    if (expired.length === 0) return;
+
+    // Only UNCONSUMED rows still hold staged photos worth reaping — consumed
+    // rows already released theirs at create time and carry stripped props.
+    const orphanAssetIds = expired
+      .filter((e) => e.name === AVATAR_DETECTION_EVENT)
+      .flatMap((e) => (e.props as unknown as StoredDetection | null)?.assetIds ?? []);
+    await prisma.appEvent.deleteMany({ where: { id: { in: expired.map((e) => e.id) } } });
+    if (orphanAssetIds.length > 0) {
+      await reapUnattachedStagedAssets(dbUserId, orphanAssetIds);
+    }
+  } catch (error) {
+    logger.warn({ dbUserId, error }, 'Detection sweep failed (non-fatal)');
+  }
+}
 
 /**
  * Batch studio step 1: one vision call over the uploaded photos → who could
@@ -47,6 +85,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
     const { assetIds, language } = parsed.data;
+
+    // Retention sweep: this caller's expired detections carry AI-derived
+    // descriptions of everyone in the photos (including background strangers).
+    // Delete the rows and reap any staged photos those abandoned sessions left
+    // behind — the "we only use photos to draw, then let them go" promise.
+    void sweepExpiredDetections(dbUser.id);
 
     // Ownership pin: every photo must be the caller's own upload.
     const owned = await prisma.asset.findMany({
@@ -94,20 +138,37 @@ export async function POST(request: NextRequest) {
     });
 
     const detection = JSON.parse(response.output_text) as SubjectDetectionResponse;
-    // Model output is untrusted: clamp the cap and sanitize photo indexes so
-    // the stored copy is already in-range for the batch route.
-    const subjects = (detection.subjects ?? []).slice(0, MAX_BATCH_SUBJECTS).map((subject) => {
-      const photoIndexes = (subject.photoIndexes ?? []).filter(
-        (i) => Number.isInteger(i) && i >= 1 && i <= photos.length,
-      );
-      const bestPhotoIndex =
-        Number.isInteger(subject.bestPhotoIndex) &&
-        subject.bestPhotoIndex >= 1 &&
-        subject.bestPhotoIndex <= photos.length
-          ? subject.bestPhotoIndex
-          : (photoIndexes[0] ?? 1);
-      return { ...subject, photoIndexes, bestPhotoIndex };
-    });
+    // Model output is untrusted: clamp the cap, dedupe subjectIds (a repeated
+    // id would 400 the batch schema and entangle the confirm cards), sanitize
+    // photo indexes, and DROP any subject with no valid photo — it has no
+    // thumbnail and can't be drawn, so it must never reach the roster or
+    // fabricate a photo link the model never asserted.
+    const seenSubjectIds = new Set<string>();
+    const subjects = (detection.subjects ?? [])
+      .filter((subject) => {
+        if (!subject.subjectId || seenSubjectIds.has(subject.subjectId)) return false;
+        seenSubjectIds.add(subject.subjectId);
+        return true;
+      })
+      .map((subject) => {
+        const photoIndexes = Array.from(
+          new Set(
+            (subject.photoIndexes ?? []).filter(
+              (i) => Number.isInteger(i) && i >= 1 && i <= photos.length,
+            ),
+          ),
+        );
+        const bestPhotoIndex =
+          Number.isInteger(subject.bestPhotoIndex) &&
+          subject.bestPhotoIndex >= 1 &&
+          subject.bestPhotoIndex <= photos.length &&
+          photoIndexes.includes(subject.bestPhotoIndex)
+            ? subject.bestPhotoIndex
+            : photoIndexes[0];
+        return { ...subject, photoIndexes, bestPhotoIndex };
+      })
+      .filter((subject) => subject.photoIndexes.length > 0 && subject.bestPhotoIndex !== undefined)
+      .slice(0, MAX_BATCH_SUBJECTS);
 
     const stored: StoredDetection = { assetIds, subjects, language };
     const event = await prisma.appEvent.create({
