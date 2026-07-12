@@ -13,6 +13,12 @@ import {
   StoryBridgePageResponse,
   STORY_RESPONSE_SCHEMA,
   STORY_RESPONSE_SCHEMA_WITH_BRIDGES,
+  createAvatarStoryPrompt,
+  AvatarStoryGenerationInput,
+  AvatarStoryResponse,
+  AVATAR_STORY_SYSTEM_PROMPT,
+  STORY_RESPONSE_SCHEMA_AVATAR,
+  AvatarPageScene,
 } from '@storywink/shared/prompts/story';
 import {
   createStoryQCPrompt,
@@ -20,6 +26,10 @@ import {
   STORY_QC_RESPONSE_SCHEMA,
   STORY_QC_THRESHOLDS,
   StoryQCResponse,
+  createAvatarStoryQCPrompt,
+  AVATAR_STORY_QC_SYSTEM_PROMPT,
+  AVATAR_STORY_QC_RESPONSE_SCHEMA,
+  AvatarStoryQCResponse,
   countRefrainEchoes,
   countLearningWordEchoes,
   isChildNameCheckable,
@@ -42,6 +52,7 @@ import {
   ResolvedCastEntry,
   CastCoverageResult,
 } from '../lib/resolveCast.js';
+import { buildAvatarCastForPrompt, extractAvatarScene } from '../lib/avatar-story.js';
 import { STORY_MODEL, ANALYSIS_MODEL } from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -272,6 +283,132 @@ async function evaluateStoryQuality(
   };
 }
 
+/**
+ * Editorial review for AVATAR_STORY books (X6d). Same shape as the photo
+ * evaluator — deterministic refrain in code, one regen max — but captionRisk
+ * is meaningless without photos and is dropped; premiseTruth (does the story
+ * deliver the parent-picked spark?) is scored LOG-ONLY, mirroring the
+ * telemetry-first rollout of every other new check.
+ */
+async function evaluateAvatarStoryQuality(
+  openai: OpenAI,
+  storyResponse: StoryResponse,
+  input: AvatarStoryGenerationInput,
+  bookId: string,
+): Promise<{ passed: boolean; feedback: string }> {
+  const problems: string[] = [];
+  const sortedPages = [...storyResponse.pages].sort((a, b) => a.pageNumber - b.pageNumber);
+  const pageTexts = sortedPages.map(p => p.text || '');
+
+  const refrain = storyResponse.storyArc?.refrain || '';
+  const echoes = countRefrainEchoes(refrain, pageTexts, input.language);
+  if (echoes < STORY_QC_THRESHOLDS.minRefrainEchoes) {
+    problems.push(
+      `The refrain "${refrain}" is only recognizable on ${echoes} page(s). It must echo (with variation) on at least ${STORY_QC_THRESHOLDS.minRefrainEchoes} pages.`,
+    );
+  }
+
+  // LOG-ONLY: learning-word dose, same telemetry as the photo path.
+  if (input.learningWords?.length) {
+    const wordCounts = input.learningWords.map(word => ({
+      word,
+      pages: countLearningWordEchoes(word, pageTexts, input.language),
+    }));
+    logger.info(
+      { bookId, wordCounts, target: '3-4 pages per word' },
+      'Learning-word echo counts (log-only)',
+    );
+  }
+
+  const result = await openai.responses.create({
+    model: ANALYSIS_MODEL,
+    instructions: AVATAR_STORY_QC_SYSTEM_PROMPT,
+    input: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'input_text',
+            text: createAvatarStoryQCPrompt({
+              storyArc: storyResponse.storyArc,
+              pages: sortedPages.map(p => ({ pageNumber: p.pageNumber, text: p.text })),
+              language: input.language,
+              premise: input.premise,
+              cast: input.cast.map(c => ({ name: c.name, role: c.role })),
+            }),
+          },
+        ],
+      },
+    ],
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'avatar_story_qc',
+        strict: true,
+        schema: AVATAR_STORY_QC_RESPONSE_SCHEMA as Record<string, unknown>,
+      },
+    },
+  });
+
+  if (!result.output_text) throw new Error('Story QC returned empty response');
+  const qc = JSON.parse(result.output_text) as AvatarStoryQCResponse;
+
+  // LOG-ONLY childName echoes, script-gated exactly like the photo path.
+  const childName = input.childName?.trim();
+  let childNameCheck: 'checked' | 'skipped' | 'absent' = 'absent';
+  let childNameEchoes: number | null = null;
+  let childNameInLanding: boolean | null = null;
+  if (childName) {
+    if (isChildNameCheckable(childName, input.language || 'en')) {
+      const nameEchoes = countChildNameEchoes(childName, pageTexts);
+      childNameCheck = 'checked';
+      childNameEchoes = nameEchoes.pagesWithName;
+      childNameInLanding = nameEchoes.nameInLanding;
+    } else {
+      childNameCheck = 'skipped';
+    }
+  }
+
+  logger.info(
+    {
+      bookId,
+      bookType: 'AVATAR_STORY',
+      refrainEchoes: echoes,
+      arcCoherence: qc.arcCoherence,
+      readAloudRhythm: qc.readAloudRhythm,
+      lastPageLanding: qc.lastPageLanding,
+      // LOG-ONLY dimension: premiseTruth never pushes into `problems` at
+      // launch (flip to enforcing only after Railway data validates the
+      // distribution — every new trigger is a silent extra generation).
+      premiseTruth: qc.premiseTruth,
+      pageIssues: qc.pages.filter(p => p.issue).length,
+      childNameCheck,
+      childNameEchoes,
+      childNameInLanding,
+      castSize: input.cast.length,
+    },
+    'Story QC scores',
+  );
+
+  if (qc.arcCoherence < STORY_QC_THRESHOLDS.minArcCoherence) {
+    problems.push(`Arc coherence scored ${qc.arcCoherence}/10 — the pages must actually deliver the declared desire → escalation → peak → soft landing.`);
+  }
+  if (qc.readAloudRhythm < STORY_QC_THRESHOLDS.minReadAloudRhythm) {
+    problems.push(`Read-aloud rhythm scored ${qc.readAloudRhythm}/10 — vary sentence lengths and make it musical when spoken.`);
+  }
+  if (!qc.lastPageLanding) {
+    problems.push('The final page must land as a soft, warm exhale — no summary statements.');
+  }
+  if (problems.length > 0 && qc.feedback) {
+    problems.push(qc.feedback);
+  }
+
+  return {
+    passed: problems.length === 0,
+    feedback: problems.map((p, i) => `${i + 1}. ${p}`).join('\n'),
+  };
+}
+
 export async function processStoryGeneration(job: Job<StoryGenerationJob & { singlePageId?: string; titleWasGenerated?: boolean }>) {
   // Wrap everything in try-catch to catch early errors
   try {
@@ -330,6 +467,12 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       throw new Error('Book not found');
     }
 
+    // AVATAR_STORY (X6d): every page of an avatar book is a photo-less
+    // BRIDGE-source row authored at creation time — they ARE the book, not
+    // derivatives of a previous story, so the purge below must never touch
+    // them. Keyed on the DB row (bookType), never on a flag.
+    const isAvatarStory = book.bookType === 'AVATAR_STORY';
+
     // PURGE-AT-START (bridge pages): BRIDGE rows are app-authored derivatives
     // of a PREVIOUS story, so a fresh generation must never inherit them —
     // this makes BullMQ retries idempotent and re-generation from COMPLETED
@@ -337,7 +480,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
     // flag rollback must not survive a regen either. Runs BEFORE the
     // pageLength comparison below so the mismatch warn can't fire spuriously,
     // and pageLength is recomputed in the same transaction.
-    if (book.pages.some(p => p.source === 'BRIDGE')) {
+    if (!isAvatarStory && book.pages.some(p => p.source === 'BRIDGE')) {
       const survivors = book.pages.filter(p => p.source !== 'BRIDGE');
       await prisma.$transaction(async (tx) => {
         await tx.page.deleteMany({ where: { bookId, source: 'BRIDGE' } });
@@ -469,16 +612,20 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
     // whose photos were all removed are dropped (never reintroduce removed
     // people); partially-resolvable characters stay in the cast page-less
     // rather than asserting wrong page numbers.
-    const charactersInPhotos = mergedCharacters.length
+    // AVATAR_STORY: the roster has no asset stamps (there are no photos) —
+    // resolveCastEntries would drop everyone. The cast reaches the prompt via
+    // buildAvatarCastForPrompt below instead.
+    const charactersInPhotos = !isAvatarStory && mergedCharacters.length
       ? resolveCastEntries(mergedCharacters, storyPages.map(p => p.assetId))
       : [];
 
     // BRIDGE_PAGES_ENABLED: request bridges only when the flag is on AND a
     // grounded roster exists (identity-less books get no bridges — there is
     // nothing to validate charactersPresent against). Cap is code-enforced
-    // again at validation time.
+    // again at validation time. AVATAR_STORY books never get bridges: every
+    // page is already photo-less, regardless of the bridge flag.
     const bridgeCap =
-      bridgePagesEnabled() && charactersInPhotos.length > 0
+      !isAvatarStory && bridgePagesEnabled() && charactersInPhotos.length > 0
         ? bridgeCapForPhotoCount(storyPages.length)
         : 0;
 
@@ -527,11 +674,44 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       }),
     };
 
+    // AVATAR_STORY (X6d): the premise (stored on eventSummary at creation)
+    // replaces the photo storyboard; the cast is the stored avatar roster,
+    // page-less; the model plans the page sequence and emits a structured
+    // scene per page.
+    const avatarInput: AvatarStoryGenerationInput | null = isAvatarStory
+      ? {
+          bookTitle: book.title || 'My Special Story',
+          pageCount: storyPages.length,
+          premise: book.eventSummary?.trim() || book.theme?.trim() || 'a wonderful adventure together',
+          cast: buildAvatarCastForPrompt(mergedCharacters),
+          childName: book.childName || undefined,
+          tone: book.tone || undefined,
+          language: book.language || 'en',
+          suggestTitle: job.data.titleWasGenerated === true,
+          qcFeedback: undefined,
+          learningWords: storyInput.learningWords,
+        }
+      : null;
+
+    if (isAvatarStory) {
+      logger.info(
+        {
+          bookId,
+          castSize: avatarInput!.cast.length,
+          pageCount: avatarInput!.pageCount,
+          hasPremise: !!book.eventSummary?.trim(),
+        },
+        'Avatar-story generation input assembled',
+      );
+    }
+
     const jobStartedAt = Date.now();
 
     // Generate the story (optionally with editorial corrections from a failed QC round)
     const generateStory = async (qcFeedback?: string): Promise<StoryResponse> => {
-      const promptParts = createStoryGenerationPrompt({ ...storyInput, qcFeedback });
+      const promptParts = isAvatarStory
+        ? createAvatarStoryPrompt({ ...avatarInput!, qcFeedback })
+        : createStoryGenerationPrompt({ ...storyInput, qcFeedback });
       const contentParts: Array<
         | { type: 'input_text'; text: string }
         | { type: 'input_image'; image_url: string; detail: 'high' }
@@ -548,7 +728,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
 
       const result = await openai.responses.create({
         model: STORY_MODEL,
-        instructions: STORY_GENERATION_SYSTEM_PROMPT,
+        instructions: isAvatarStory ? AVATAR_STORY_SYSTEM_PROMPT : STORY_GENERATION_SYSTEM_PROMPT,
         input: [{ role: 'user', content: contentParts }],
         text: {
           format: {
@@ -557,10 +737,13 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
             strict: true,
             // The bridge-enabled schema is requested ONLY when the prompt
             // carries the bridge section; flag-off requests are byte-identical
-            // to the legacy schema.
-            schema: (bridgeCap > 0
-              ? STORY_RESPONSE_SCHEMA_WITH_BRIDGES
-              : STORY_RESPONSE_SCHEMA) as unknown as Record<string, unknown>,
+            // to the legacy schema. AVATAR_STORY requests the scene-per-page
+            // variant instead.
+            schema: (isAvatarStory
+              ? STORY_RESPONSE_SCHEMA_AVATAR
+              : bridgeCap > 0
+                ? STORY_RESPONSE_SCHEMA_WITH_BRIDGES
+                : STORY_RESPONSE_SCHEMA) as unknown as Record<string, unknown>,
           },
         },
       });
@@ -623,7 +806,9 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
     let qcPassed = true;
     let regenerated = false;
     try {
-      const verdict = await evaluateStoryQuality(openai, storyResponse, storyInput, bookId, acceptedBridges);
+      const verdict = isAvatarStory
+        ? await evaluateAvatarStoryQuality(openai, storyResponse, avatarInput!, bookId)
+        : await evaluateStoryQuality(openai, storyResponse, storyInput, bookId, acceptedBridges);
       if (!verdict.passed) {
         qcPassed = false;
         if (Date.now() - jobStartedAt < STORY_QC_TIME_BUDGET_MS) {
@@ -652,8 +837,16 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       illustrationNotes: string | null;
       textConfirmed: boolean;
       learningWordsUsed: string[];
+      /** AVATAR_STORY only: validated model scene → Page.bridgeScene. */
+      bridgeScene?: AvatarPageScene | null;
     }
     let pageUpdates: PageUpdateData[] = [];
+
+    // AVATAR_STORY: validate-or-degrade each page's scene before persisting.
+    // A malformed scene never fails the job — the page renders from text.
+    const rosterIdsForScenes = isAvatarStory
+      ? (avatarInput!.cast.map(c => c.characterId) ?? [])
+      : [];
 
     try {
       logger.info({ bookId, pageCount: storyResponse.pages?.length }, 'Parsing story response');
@@ -706,12 +899,25 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
           hasIllustrationNotes: !!notes
         }, 'Prepared page update');
 
+        // AVATAR_STORY: carry the validated scene along (photo books: undefined).
+        const rawScene = isAvatarStory
+          ? (content as AvatarStoryResponse['pages'][number] | undefined)?.scene
+          : undefined;
+        const scene = isAvatarStory ? extractAvatarScene(rawScene, rosterIdsForScenes) : undefined;
+        if (isAvatarStory && rawScene && !scene) {
+          logger.warn(
+            { bookId, pageId: page.id, storyPosition },
+            'Avatar page scene failed validation — page will render from text alone',
+          );
+        }
+
         return {
           pageId: page.id,
           text: finalText,
           illustrationNotes: notes,
           textConfirmed: trimmedText.length > 0,
           learningWordsUsed: content?.learningWordsUsed ?? [],
+          ...(isAvatarStory ? { bridgeScene: scene } : {}),
         };
       });
     } catch (mappingError) {
@@ -743,6 +949,12 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
               illustrationNotes: update.illustrationNotes,
               textConfirmed: update.textConfirmed,
               learningWordsUsed: update.learningWordsUsed,
+              // AVATAR_STORY: persist the validated scene (or clear a stale
+              // one from a previous run). Photo books never touch the column.
+              ...(update.bridgeScene !== undefined
+                ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  { bridgeScene: (update.bridgeScene ?? null) as any } // Prisma Json column
+                : {}),
             },
           });
           updateResults.push(result);
@@ -893,7 +1105,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
         name: 'story_ready',
         userId: book.userId,
         bookId,
-        props: { regenerated, qcPassed, bridgePages: acceptedBridges.length },
+        props: { regenerated, qcPassed, bridgePages: acceptedBridges.length, bookType: book.bookType },
       },
       logger,
     );
@@ -990,8 +1202,11 @@ async function processSinglePageTextGeneration(
   const targetPage = book.pages.find(p => p.id === pageId);
   if (!targetPage) throw new Error('Target page not found');
 
+  // AVATAR_STORY (X6d): pages have no photos by design — the rewrite runs
+  // from the premise, the cast, and this page's stored scene instead.
+  const isAvatarStory = book.bookType === 'AVATAR_STORY';
   const photoUrl = targetPage.asset?.url || targetPage.asset?.thumbnailUrl || targetPage.originalImageUrl;
-  if (!photoUrl) throw new Error('Target page has no photo');
+  if (!photoUrl && !isAvatarStory) throw new Error('Target page has no photo');
 
   // Get all story pages for context
   const storyPages = book.pages;
@@ -1037,26 +1252,40 @@ async function processSinglePageTextGeneration(
     consumedQuestionIds = new Set(merge.consumedQuestionIds);
     cast = resolveCastEntries(merge.characters, storyPages.map(p => p.assetId));
   }
-  const castInfo = cast.length > 0
-    ? `People in this book's photos: ${cast
-        .map(c => `"${c.name}" (${c.role.replace(/_/g, ' ')})`)
-        .join(', ')}. NEVER invent a proper name — for unnamed people use the warm relationship word a toddler would say ("Grandma", "Daddy"); for unnamed pets use "the dog" / "the cat".`
-    : '';
+  // AVATAR_STORY: the roster has no asset stamps, so resolveCastEntries
+  // drops everyone — read the stored roster directly instead.
+  const avatarCast = isAvatarStory ? buildAvatarCastForPrompt(rawIdentity?.characters) : [];
+  const castInfo = isAvatarStory
+    ? avatarCast.length > 0
+      ? `The cast of this story (picked by the parent): ${avatarCast
+          .map(c => `"${c.name}" (${c.role.replace(/_/g, ' ')})`)
+          .join(', ')}. NEVER invent a new character or proper name.`
+      : ''
+    : cast.length > 0
+      ? `People in this book's photos: ${cast
+          .map(c => `"${c.name}" (${c.role.replace(/_/g, ' ')})`)
+          .join(', ')}. NEVER invent a proper name — for unnamed people use the warm relationship word a toddler would say ("Grandma", "Daddy"); for unnamed pets use "the dog" / "the cat".`
+      : '';
 
   const confirmedFacts = buildConfirmedFacts(
     captureQuestions.filter(q => !consumedQuestionIds.has(q.id)),
   );
   // Exactly ONE experience-context block, eventSummary superseding theme —
-  // same condition as full generation.
-  const eventContext = book.eventSummary
-    ? [
-        `## What actually happened (confirmed by the parent — the story must feel TRUE to this):`,
-        `- "${book.eventSummary}"`,
-        ...confirmedFacts.map(f => `- Parent confirmed: ${f}`),
-      ].join('\n')
-    : book.theme
-      ? `## Story context from the parent:\n"${book.theme}"`
-      : '';
+  // same condition as full generation. AVATAR_STORY: eventSummary holds the
+  // parent-picked premise, so it gets spark framing, not what-happened framing.
+  const eventContext = isAvatarStory
+    ? book.eventSummary
+      ? `## The spark this story was built on (picked by the parent):\n- "${book.eventSummary}"\n- This page must stay inside the spark's promise — it is an invented adventure, not a real day.`
+      : ''
+    : book.eventSummary
+      ? [
+          `## What actually happened (confirmed by the parent — the story must feel TRUE to this):`,
+          `- "${book.eventSummary}"`,
+          ...confirmedFacts.map(f => `- Parent confirmed: ${f}`),
+        ].join('\n')
+      : book.theme
+        ? `## Story context from the parent:\n"${book.theme}"`
+        : '';
   // Mood parity with full generation: a regenerated page must stay in the
   // same key the parent picked for the book.
   const moodContext = book.tone
@@ -1088,15 +1317,20 @@ async function processSinglePageTextGeneration(
     prevContext ? `## Story so far (previous pages):\n${prevContext}` : '## This is near the beginning of the story.',
     '',
     `## Your task:`,
-    `Write story text for page ${targetPage.pageNumber} based on the photo provided. Write 2-4 sentences (max 50 words). The text should feel warm, playful, and natural when read aloud to a toddler.`,
+    isAvatarStory
+      ? `Write story text for page ${targetPage.pageNumber} based on this page's scene and the story around it. Write 2-4 sentences (max 50 words). The text should feel warm, playful, and natural when read aloud to a toddler.`
+      : `Write story text for page ${targetPage.pageNumber} based on the photo provided. Write 2-4 sentences (max 50 words). The text should feel warm, playful, and natural when read aloud to a toddler.`,
     ...(analysisLine ? [analysisLine] : []),
+    ...(isAvatarStory && targetPage.bridgeScene
+      ? [`THIS PAGE'S SCENE (what the illustration will show): ${JSON.stringify(targetPage.bridgeScene)}`]
+      : []),
     '',
     nextContext ? `## What comes after (for continuity):\n${nextContext}` : '## This is near the end of the story.',
     '',
     `Also provide brief illustrationNotes describing any visual effects or mood for the illustrator, or null if the photo speaks for itself.`,
   ].join('\n');
 
-  const imageUrl = optimizeCloudinaryUrlForVision(convertHeicToJpeg(photoUrl));
+  const imageUrl = photoUrl ? optimizeCloudinaryUrlForVision(convertHeicToJpeg(photoUrl)) : null;
 
   const SINGLE_PAGE_SCHEMA = {
     type: 'object',
@@ -1110,12 +1344,14 @@ async function processSinglePageTextGeneration(
 
   const result = await openai.responses.create({
     model: STORY_MODEL,
-    instructions: STORY_GENERATION_SYSTEM_PROMPT,
+    instructions: isAvatarStory ? AVATAR_STORY_SYSTEM_PROMPT : STORY_GENERATION_SYSTEM_PROMPT,
     input: [
       {
         role: 'user',
         content: [
-          { type: 'input_image', image_url: imageUrl, detail: 'high' as const },
+          ...(imageUrl
+            ? [{ type: 'input_image' as const, image_url: imageUrl, detail: 'high' as const }]
+            : []),
           { type: 'input_text', text: promptText },
         ],
       },
