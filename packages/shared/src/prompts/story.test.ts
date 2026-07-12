@@ -3,7 +3,7 @@ import { createStoryGenerationPrompt, StoryGenerationInput } from './story.js';
 
 function promptText(input: StoryGenerationInput): string {
   return createStoryGenerationPrompt(input)
-    .map(part => ('text' in part ? part.text : ''))
+    .map((part) => ('text' in part ? part.text : ''))
     .join('\n');
 }
 
@@ -34,9 +34,7 @@ describe('createStoryGenerationPrompt — cast rendering', () => {
   it('renders exact pages for fully-resolved supporting characters', () => {
     const text = promptText({
       ...baseInput,
-      charactersInPhotos: [
-        { name: 'Grandma', role: 'grandparent', appearsOnPages: [1, 2] },
-      ],
+      charactersInPhotos: [{ name: 'Grandma', role: 'grandparent', appearsOnPages: [1, 2] }],
     });
     expect(text).toContain('Grandma (grandparent) appears on page(s) 1, 2');
     expect(text).not.toContain('exact pages unknown');
@@ -45,11 +43,11 @@ describe('createStoryGenerationPrompt — cast rendering', () => {
   it('renders the page-less variant when appearsOnPages is empty', () => {
     const text = promptText({
       ...baseInput,
-      charactersInPhotos: [
-        { name: 'Grandma', role: 'grandparent', appearsOnPages: [] },
-      ],
+      charactersInPhotos: [{ name: 'Grandma', role: 'grandparent', appearsOnPages: [] }],
     });
-    expect(text).toContain('Grandma (grandparent) appears in several of the photos (exact pages unknown)');
+    expect(text).toContain(
+      'Grandma (grandparent) appears in several of the photos (exact pages unknown)',
+    );
     expect(text).toContain('include them only on pages where you can actually see them');
     expect(text).not.toContain('appears on page(s)');
   });
@@ -70,9 +68,7 @@ describe('createStoryGenerationPrompt — cast rendering', () => {
   it('excludes the main child from the supporting cast block', () => {
     const text = promptText({
       ...baseInput,
-      charactersInPhotos: [
-        { name: 'Emma', role: 'main_child', appearsOnPages: [1, 2] },
-      ],
+      charactersInPhotos: [{ name: 'Emma', role: 'main_child', appearsOnPages: [1, 2] }],
     });
     expect(text).not.toContain('SUPPORTING CAST');
   });

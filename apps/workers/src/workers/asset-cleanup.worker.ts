@@ -95,7 +95,9 @@ async function deleteByPrefix(prefix: string): Promise<number> {
     { prefix, iterations: MAX_PREFIX_DELETE_ITERATIONS, deleted },
     'Asset cleanup: prefix delete still partial after max iterations — job retry will resume',
   );
-  throw new Error(`Prefix delete incomplete for ${prefix} after ${MAX_PREFIX_DELETE_ITERATIONS} iterations`);
+  throw new Error(
+    `Prefix delete incomplete for ${prefix} after ${MAX_PREFIX_DELETE_ITERATIONS} iterations`,
+  );
 }
 
 /** One enqueued deletion job: {publicIds, prefixes?, reason, userId?, bookId?}. */
@@ -216,10 +218,7 @@ async function collectBookCleanupTargets(book: SweepCandidate) {
   });
 
   const publicIds = [
-    ...new Set([
-      ...deletableAssets.map((a) => a.publicId),
-      ...collectBookGeneratedPublicIds(book),
-    ]),
+    ...new Set([...deletableAssets.map((a) => a.publicId), ...collectBookGeneratedPublicIds(book)]),
   ];
 
   return { publicIds, prefixes: [bookGeneratedFolderPrefix(book.id)] };
@@ -295,7 +294,10 @@ async function reconcilePendingCleanups(now: Date): Promise<number> {
         {
           // Deterministic id: repeated reconcile passes dedupe against the
           // original enqueue (and each other) while the job is still around.
-          jobId: reason === 'book_deleted' ? `cleanup-book-${event.bookId}` : `cleanup-draft-${event.bookId}`,
+          jobId:
+            reason === 'book_deleted'
+              ? `cleanup-book-${event.bookId}`
+              : `cleanup-draft-${event.bookId}`,
           attempts: 3,
           backoff: { type: 'exponential', delay: 10000 },
           removeOnComplete: { count: 100 },
@@ -309,7 +311,11 @@ async function reconcilePendingCleanups(now: Date): Promise<number> {
       );
     } catch (error) {
       logger.error(
-        { bookId: event.bookId, eventId: event.id, error: error instanceof Error ? error.message : String(error) },
+        {
+          bookId: event.bookId,
+          eventId: event.id,
+          error: error instanceof Error ? error.message : String(error),
+        },
         'Asset cleanup reconcile: failed to process pending record',
       );
     }
@@ -342,7 +348,9 @@ async function runDraftSweep(job: Job) {
       await reconcilePendingCleanups(now);
     } catch (reconcileError) {
       logger.error(
-        { error: reconcileError instanceof Error ? reconcileError.message : String(reconcileError) },
+        {
+          error: reconcileError instanceof Error ? reconcileError.message : String(reconcileError),
+        },
         'Asset cleanup reconcile pass failed — continuing with sweep',
       );
     }
@@ -374,7 +382,13 @@ async function runDraftSweep(job: Job) {
           book.updatedAt,
           book.pages.map((p) => p.updatedAt),
         );
-        if (!isDraftSweepCandidate({ status: book.status, updatedAt: lastActivity }, now, retentionDays)) {
+        if (
+          !isDraftSweepCandidate(
+            { status: book.status, updatedAt: lastActivity },
+            now,
+            retentionDays,
+          )
+        ) {
           summary.skipped += 1;
           continue;
         }
@@ -499,7 +513,12 @@ async function runDraftSweep(job: Job) {
         }
 
         logger.info(
-          { bookId: book.id, userId: book.userId, ageDays, publicIdCount: targets.publicIds.length },
+          {
+            bookId: book.id,
+            userId: book.userId,
+            ageDays,
+            publicIdCount: targets.publicIds.length,
+          },
           'Draft sweep: expired draft deleted and asset cleanup enqueued',
         );
         summary.swept += 1;

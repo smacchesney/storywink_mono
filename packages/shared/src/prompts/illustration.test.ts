@@ -62,7 +62,7 @@ describe('createIllustrationPrompt character identity section', () => {
     expect(prompt).toContain('rendered with soft pencil hatching and warm graphite tones');
   });
 
-  it("names the appearing character", () => {
+  it('names the appearing character', () => {
     expect(prompt).toContain('Aria');
   });
 
@@ -166,7 +166,9 @@ describe('role-labeled reference ordering (character sheets)', () => {
     });
     expect(prompt).toContain('using the 5 images provided, in this order:');
     expect(prompt).toContain('image 2 is a CHARACTER SHEET');
-    expect(prompt).toContain("image 3 is the book's approved interior illustration of this same scene");
+    expect(prompt).toContain(
+      "image 3 is the book's approved interior illustration of this same scene",
+    );
   });
 });
 
@@ -209,7 +211,9 @@ describe('bridge prompt variant (source=BRIDGE pages)', () => {
     expect(bridgePrompt).toContain('BRIDGE PAGE — THIS PAGE HAS NO PHOTO OF ITS OWN');
     expect(bridgePrompt).toContain('the same people moments later');
     expect(bridgePrompt).toContain('do NOT copy its pose');
-    expect(bridgePrompt).toContain('DEPICT THIS NEW MOMENT INSTEAD: marching down the path, bucket swinging');
+    expect(bridgePrompt).toContain(
+      'DEPICT THIS NEW MOMENT INSTEAD: marching down the path, bucket swinging',
+    );
     expect(bridgePrompt).toContain('Location: the sandy path to the beach');
     expect(bridgePrompt).toContain('red bucket');
   });

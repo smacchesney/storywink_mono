@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 
 async function fixTitlePageInconsistencies() {
   console.log('🔧 Starting title page consistency fix...');
-  
+
   try {
     // Get all books with their pages
     const books = await prisma.book.findMany({
@@ -26,7 +26,7 @@ async function fixTitlePageInconsistencies() {
 
     for (const book of books) {
       console.log(`\n📖 Checking book ${book.id} (${book.title || 'Untitled'})`);
-      
+
       const updates = [];
       let bookUpdates = 0;
 
@@ -36,13 +36,15 @@ async function fixTitlePageInconsistencies() {
         const currentIsTitlePage = page.isTitlePage;
 
         if (shouldBeTitlePage !== currentIsTitlePage) {
-          console.log(`  ⚠️  Page ${page.pageNumber}: isTitlePage should be ${shouldBeTitlePage} but is ${currentIsTitlePage}`);
-          
+          console.log(
+            `  ⚠️  Page ${page.pageNumber}: isTitlePage should be ${shouldBeTitlePage} but is ${currentIsTitlePage}`,
+          );
+
           updates.push(
             prisma.page.update({
               where: { id: page.id },
               data: { isTitlePage: shouldBeTitlePage },
-            })
+            }),
           );
           bookUpdates++;
         }
@@ -59,7 +61,6 @@ async function fixTitlePageInconsistencies() {
 
     console.log(`\n🎉 Migration completed!`);
     console.log(`📊 Total updates: ${totalUpdates} pages across ${books.length} books`);
-
   } catch (error) {
     console.error('❌ Error during migration:', error);
     throw error;
@@ -69,8 +70,7 @@ async function fixTitlePageInconsistencies() {
 }
 
 // Run the migration
-fixTitlePageInconsistencies()
-  .catch((error) => {
-    console.error('💥 Migration failed:', error);
-    process.exit(1);
-  });
+fixTitlePageInconsistencies().catch((error) => {
+  console.error('💥 Migration failed:', error);
+  process.exit(1);
+});

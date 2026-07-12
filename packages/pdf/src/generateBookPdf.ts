@@ -33,7 +33,7 @@ import { resolveLogger } from './logger.js';
  */
 export async function generateBookPdf(
   bookData: BookWithPages,
-  options: GenerateBookPdfOptions
+  options: GenerateBookPdfOptions,
 ): Promise<Buffer> {
   const {
     fonts,
@@ -45,7 +45,10 @@ export async function generateBookPdf(
   } = options;
   const log = resolveLogger(options.logger);
 
-  log.info({ bookId: bookData.id, hasTitle: !!titlePage, includeBackCover, padToFour }, 'Starting PDF generation...');
+  log.info(
+    { bookId: bookData.id, hasTitle: !!titlePage, includeBackCover, padToFour },
+    'Starting PDF generation...',
+  );
 
   try {
     const language = bookData.language || 'en';
@@ -93,15 +96,20 @@ export async function generateBookPdf(
 
     log.info(
       { bookId: bookData.id, bufferSize: pdfBuffer.length, pageCount: pageHtmlArray.length },
-      'PDF buffer generated.'
+      'PDF buffer generated.',
     );
 
     return pdfBuffer;
   } catch (error: unknown) {
     const err = error as Error;
     log.error(
-      { bookId: bookData.id, errorMessage: err.message, errorStack: err.stack, errorName: err.name },
-      'Error during PDF generation'
+      {
+        bookId: bookData.id,
+        errorMessage: err.message,
+        errorStack: err.stack,
+        errorName: err.name,
+      },
+      'Error during PDF generation',
     );
     throw new Error(`Failed to generate PDF: ${err.message}`);
   }

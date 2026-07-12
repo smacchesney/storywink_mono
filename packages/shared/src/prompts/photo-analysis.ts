@@ -82,13 +82,15 @@ export function createPhotoAnalysisPrompt(input: PhotoAnalysisInput): string {
     ? `The main child is named "${input.childName}".`
     : 'Identify the main child in the photos.';
   const additionalContext = input.additionalCharacters?.length
-    ? `Other people who may appear: ${input.additionalCharacters.map(c => `${c.name} (${c.relationship})`).join(', ')}.`
+    ? `Other people who may appear: ${input.additionalCharacters.map((c) => `${c.name} (${c.relationship})`).join(', ')}.`
     : '';
   const lang = input.language === 'ja' ? 'ja' : 'en';
   const priorRosterContext = input.priorCharacters?.length
     ? `These characters were identified in an earlier pass over this book's photos: ${input.priorCharacters
-        .map(c => `${c.characterId} (${c.role}${c.name ? `, name: ${c.name}` : ''})`)
-        .join('; ')}. Reuse the SAME characterId for the same real person or animal wherever they still appear.`
+        .map((c) => `${c.characterId} (${c.role}${c.name ? `, name: ${c.name}` : ''})`)
+        .join(
+          '; ',
+        )}. Reuse the SAME characterId for the same real person or animal wherever they still appear.`
     : '';
 
   return `Analyze all ${input.storyPages.length} photos, provided in page order. They come from one family and will become a personalized picture book for a toddler, illustrated in a "${input.artStyle}" art style.
@@ -149,10 +151,21 @@ export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
           action: { type: 'string' },
           emotion: { type: 'string' },
           eventSignals: { type: 'array', items: { type: 'string' } },
-          narrativeRole: { type: 'string', enum: ['opening', 'rising', 'peak', 'quiet', 'closing'] },
+          narrativeRole: {
+            type: 'string',
+            enum: ['opening', 'rising', 'peak', 'quiet', 'closing'],
+          },
           characterIds: { type: 'array', items: { type: 'string' } },
         },
-        required: ['pageNumber', 'setting', 'action', 'emotion', 'eventSignals', 'narrativeRole', 'characterIds'],
+        required: [
+          'pageNumber',
+          'setting',
+          'action',
+          'emotion',
+          'eventSignals',
+          'narrativeRole',
+          'characterIds',
+        ],
         additionalProperties: false,
       },
     },
@@ -174,14 +187,29 @@ export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
               bodyBuild: { type: 'string' },
               distinguishingFeatures: { type: 'array', items: { type: 'string' } },
             },
-            required: ['apparentAge', 'hairColor', 'hairStyle', 'skinTone', 'bodyBuild', 'distinguishingFeatures'],
+            required: [
+              'apparentAge',
+              'hairColor',
+              'hairStyle',
+              'skinTone',
+              'bodyBuild',
+              'distinguishingFeatures',
+            ],
             additionalProperties: false,
           },
           typicalClothing: { type: 'string' },
           styleTranslation: { type: 'string' },
           appearsOnPages: { type: 'array', items: { type: 'number' } },
         },
-        required: ['characterId', 'role', 'name', 'physicalTraits', 'typicalClothing', 'styleTranslation', 'appearsOnPages'],
+        required: [
+          'characterId',
+          'role',
+          'name',
+          'physicalTraits',
+          'typicalClothing',
+          'styleTranslation',
+          'appearsOnPages',
+        ],
         additionalProperties: false,
       },
     },
@@ -204,7 +232,14 @@ export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
       },
     },
   },
-  required: ['pageAnalysis', 'characters', 'sceneContext', 'eventSummary', 'suggestedTitle', 'captureQuestions'],
+  required: [
+    'pageAnalysis',
+    'characters',
+    'sceneContext',
+    'eventSummary',
+    'suggestedTitle',
+    'captureQuestions',
+  ],
   additionalProperties: false,
 } as const;
 
@@ -239,9 +274,9 @@ export function scopeCaptureQuestions(
   questions: CaptureQuestion[],
   characters: ScopeCharacterLike[],
 ): CaptureQuestion[] {
-  const mainChild = characters.find(c => c.role === 'main_child');
+  const mainChild = characters.find((c) => c.role === 'main_child');
   const mainPages = new Set(mainChild?.appearsOnPages ?? []);
-  const byId = new Map(characters.map(c => [c.characterId, c]));
+  const byId = new Map(characters.map((c) => [c.characterId, c]));
 
   const seenCharacterIds = new Set<string>();
   const peopleNaming: CaptureQuestion[] = [];
@@ -259,7 +294,7 @@ export function scopeCaptureQuestions(
     if (seenCharacterIds.has(q.characterId)) continue;
     const pages = character.appearsOnPages ?? [];
     if (pages.length < 2) continue; // one-photo passerby (or one-photo object)
-    if (!pages.some(p => mainPages.has(p))) continue; // background stranger — never sharing a photo with the child
+    if (!pages.some((p) => mainPages.has(p))) continue; // background stranger — never sharing a photo with the child
     seenCharacterIds.add(q.characterId);
     if (character.role === 'companion_object') objectNaming.push(q);
     else peopleNaming.push(q);

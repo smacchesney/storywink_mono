@@ -48,7 +48,7 @@ export function buildInteriorFontFaces(fonts: PdfFonts, language: string): strin
 
 /** Builds the single `@font-face` block used by the cover spread (Excalifont only). */
 export function buildCoverFontFace(
-  fonts: Pick<PdfFonts, 'excalifontBase64' | 'excalifontFormat'>
+  fonts: Pick<PdfFonts, 'excalifontBase64' | 'excalifontFormat'>,
 ): string {
   return fonts.excalifontBase64
     ? `@font-face {

@@ -30,7 +30,12 @@ import {
   SHEET_VALIDATION_SYSTEM_PROMPT,
   SHEET_VALIDATION_RESPONSE_SCHEMA,
 } from '@storywink/shared/prompts/character-identity';
-import { getStyleBible, isValidStyle, STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
+import {
+  getStyleBible,
+  isValidStyle,
+  STYLE_LIBRARY,
+  StyleKey,
+} from '@storywink/shared/prompts/styles';
 import { optimizeCloudinaryUrlForVision } from '@storywink/shared/utils';
 import { getIllustrator } from './illustrators/index.js';
 import type { IllustrationImageInput } from './illustrators/index.js';
@@ -116,10 +121,14 @@ export async function ensureCharacterSheets(
     const toGenerate: CharacterDescription[] = [];
     for (const character of selected) {
       const existing = entries.find(
-        e => e.characterId === character.characterId && e.artStyle === artStyle,
+        (e) => e.characterId === character.characterId && e.artStyle === artStyle,
       );
       if (existing) {
-        reused.push({ characterId: character.characterId, name: character.name, url: existing.url });
+        reused.push({
+          characterId: character.characterId,
+          name: character.name,
+          url: existing.url,
+        });
       } else {
         toGenerate.push(character);
       }
@@ -154,7 +163,7 @@ export async function ensureCharacterSheets(
 
     // Per-character generations run in parallel.
     const generationRun = Promise.all(
-      toGenerate.map(character =>
+      toGenerate.map((character) =>
         generateAndValidateSheet({
           bookId,
           artStyle,
@@ -169,7 +178,7 @@ export async function ensureCharacterSheets(
       ),
     ).then(async (outcomes: SheetGenerationOutcome[]) => {
       const newEntries = outcomes
-        .map(o => o.entry)
+        .map((o) => o.entry)
         .filter((e): e is CharacterReferenceEntry => Boolean(e));
       const totalAttempts = outcomes.reduce((sum, o) => sum + o.attempts, 0);
 
@@ -183,7 +192,7 @@ export async function ensureCharacterSheets(
           userId,
           bookId,
           props: {
-            characters: toGenerate.map(c => c.characterId),
+            characters: toGenerate.map((c) => c.characterId),
             attempts: totalAttempts,
             validated: newEntries.length,
           },
@@ -198,7 +207,7 @@ export async function ensureCharacterSheets(
     // keeps going in the background and persists late results, so the NEXT
     // run (or a re-illustrate) reuses them for free.
     let budgetTimer: ReturnType<typeof setTimeout> | undefined;
-    const budget = new Promise<'BUDGET_EXCEEDED'>(resolve => {
+    const budget = new Promise<'BUDGET_EXCEEDED'>((resolve) => {
       budgetTimer = setTimeout(() => resolve('BUDGET_EXCEEDED'), SHEET_BUDGET_MS);
     });
 
@@ -211,7 +220,7 @@ export async function ensureCharacterSheets(
         { bookId, artStyle, budgetMs: SHEET_BUDGET_MS },
         'Character sheet budget exceeded — proceeding sheetless (late results persist for reuse)',
       );
-      generationRun.catch(error =>
+      generationRun.catch((error) =>
         logger.warn(
           { bookId, error: error instanceof Error ? error.message : 'Unknown error' },
           'Background character sheet generation failed after budget expiry',
@@ -225,10 +234,9 @@ export async function ensureCharacterSheets(
       return reused;
     }
 
-    const generatedRefs: CharacterSheetRef[] = raced.map(entry => ({
+    const generatedRefs: CharacterSheetRef[] = raced.map((entry) => ({
       characterId: entry.characterId,
-      name:
-        identity.characters.find(c => c.characterId === entry.characterId)?.name ?? null,
+      name: identity.characters.find((c) => c.characterId === entry.characterId)?.name ?? null,
       url: entry.url,
     }));
 
@@ -268,7 +276,17 @@ interface GenerateSheetParams {
 async function generateAndValidateSheet(
   params: GenerateSheetParams,
 ): Promise<SheetGenerationOutcome> {
-  const { bookId, artStyle, character, pages, styleExemplars, styleExemplarUrls, deadline, attemptBudget, logger } = params;
+  const {
+    bookId,
+    artStyle,
+    character,
+    pages,
+    styleExemplars,
+    styleExemplarUrls,
+    deadline,
+    attemptBudget,
+    logger,
+  } = params;
 
   let attempts = 0;
 
@@ -287,11 +305,17 @@ async function generateAndValidateSheet(
     // First generation + at most one regeneration on validation failure.
     for (let round = 0; round < 2; round++) {
       if (Date.now() >= deadline) {
-        logger.warn({ bookId, characterId: character.characterId }, 'Sheet deadline reached — stopping');
+        logger.warn(
+          { bookId, characterId: character.characterId },
+          'Sheet deadline reached — stopping',
+        );
         return { entry: null, attempts };
       }
       if (attemptBudget.used >= MAX_SHEET_GENERATIONS_PER_BOOK) {
-        logger.warn({ bookId, characterId: character.characterId }, 'Book-wide sheet generation cap reached');
+        logger.warn(
+          { bookId, characterId: character.characterId },
+          'Book-wide sheet generation cap reached',
+        );
         return { entry: null, attempts };
       }
       attemptBudget.used += 1;
@@ -380,7 +404,12 @@ async function uploadSheet(
           folder: `storywink/${bookId}/refs`,
           public_id: `char_${characterId}_${artStyle}`,
           overwrite: true,
-          tags: [`book:${bookId}`, `character:${characterId}`, `style:${artStyle}`, 'character-sheet'],
+          tags: [
+            `book:${bookId}`,
+            `character:${characterId}`,
+            `style:${artStyle}`,
+            'character-sheet',
+          ],
           resource_type: 'image',
         },
         (error, result) => {
@@ -405,7 +434,9 @@ interface ValidateSheetParams {
   styleExemplarUrls: string[];
 }
 
-async function validateSheet(params: ValidateSheetParams): Promise<{ passed: boolean; notes: string }> {
+async function validateSheet(
+  params: ValidateSheetParams,
+): Promise<{ passed: boolean; notes: string }> {
   const { character, artStyle, photoUrls, sheetUrl, styleExemplarUrls } = params;
 
   if (!process.env.OPENAI_API_KEY) {
@@ -425,9 +456,17 @@ async function validateSheet(params: ValidateSheetParams): Promise<{ passed: boo
     | { type: 'input_text'; text: string }
     | { type: 'input_image'; image_url: string; detail: 'high' }
   > = [
-    ...photoUrls.map(url => ({ type: 'input_image' as const, image_url: url, detail: 'high' as const })),
+    ...photoUrls.map((url) => ({
+      type: 'input_image' as const,
+      image_url: url,
+      detail: 'high' as const,
+    })),
     { type: 'input_image', image_url: optimizeCloudinaryUrlForVision(sheetUrl), detail: 'high' },
-    ...styleExemplarUrls.map(url => ({ type: 'input_image' as const, image_url: url, detail: 'high' as const })),
+    ...styleExemplarUrls.map((url) => ({
+      type: 'input_image' as const,
+      image_url: url,
+      detail: 'high' as const,
+    })),
     { type: 'input_text', text: promptText },
   ];
 
@@ -475,5 +514,8 @@ async function persistCharacterReferences(
     where: { id: bookId },
     data: { characterReferences: entries as unknown as object },
   });
-  logger.info({ bookId, newCount: newEntries.length, totalCount: entries.length }, 'Persisted character sheet references');
+  logger.info(
+    { bookId, newCount: newEntries.length, totalCount: entries.length },
+    'Persisted character sheet references',
+  );
 }

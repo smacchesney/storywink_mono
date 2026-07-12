@@ -10,7 +10,10 @@ import {
   type AnchorCandidate,
 } from './bridge-pages.js';
 
-function makeBridge(afterPhotoPage: number, overrides: Partial<StoryBridgePageResponse> = {}): StoryBridgePageResponse {
+function makeBridge(
+  afterPhotoPage: number,
+  overrides: Partial<StoryBridgePageResponse> = {},
+): StoryBridgePageResponse {
   return {
     afterPhotoPage,
     text: `Bridge text after page ${afterPhotoPage}`,
@@ -82,8 +85,8 @@ describe('validateBridgePages (validate-or-drop, never throw)', () => {
       [{ afterPhotoPage: 2 }, makeBridge(3, { text: '   ' }), makeBridge(4)],
       ROSTER,
     );
-    expect(accepted.map(b => b.afterPhotoPage)).toEqual([4]);
-    expect(dropped.map(d => d.reason)).toEqual(['malformed', 'malformed']);
+    expect(accepted.map((b) => b.afterPhotoPage)).toEqual([4]);
+    expect(dropped.map((d) => d.reason)).toEqual(['malformed', 'malformed']);
   });
 
   it('drops out-of-range gaps (before first photo / past the end)', () => {
@@ -91,8 +94,8 @@ describe('validateBridgePages (validate-or-drop, never throw)', () => {
       [makeBridge(0), makeBridge(11), makeBridge(10)], // 10 = trailing wind-down, allowed
       ROSTER,
     );
-    expect(accepted.map(b => b.afterPhotoPage)).toEqual([10]);
-    expect(dropped.map(d => d.reason).sort()).toEqual(['bad-gap', 'malformed']); // 0 fails zod min(1)
+    expect(accepted.map((b) => b.afterPhotoPage)).toEqual([10]);
+    expect(dropped.map((d) => d.reason).sort()).toEqual(['bad-gap', 'malformed']); // 0 fails zod min(1)
   });
 
   it('drops bridges naming characters outside the roster', () => {
@@ -113,10 +116,7 @@ describe('validateBridgePages (validate-or-drop, never throw)', () => {
   });
 
   it('allows at most one bridge per gap (first wins)', () => {
-    const { accepted, dropped } = validateBridgePages(
-      [makeBridge(3), makeBridge(3)],
-      ROSTER,
-    );
+    const { accepted, dropped } = validateBridgePages([makeBridge(3), makeBridge(3)], ROSTER);
     expect(accepted).toHaveLength(1);
     expect(dropped[0].reason).toBe('duplicate-gap');
   });
@@ -142,7 +142,7 @@ describe('planPageSequence (insertion + renumber)', () => {
 
   it('no bridges → photos keep their positions untouched', () => {
     const plan = planPageSequence(photoIds, []);
-    expect(plan.map(e => [e.kind, e.photoPageId, e.pageNumber])).toEqual([
+    expect(plan.map((e) => [e.kind, e.photoPageId, e.pageNumber])).toEqual([
       ['photo', 'p1', 1],
       ['photo', 'p2', 2],
       ['photo', 'p3', 3],
@@ -152,7 +152,7 @@ describe('planPageSequence (insertion + renumber)', () => {
 
   it('interleaves a mid-book bridge and shifts later photos', () => {
     const plan = planPageSequence(photoIds, [makeBridge(2)]);
-    expect(plan.map(e => [e.kind, e.pageNumber])).toEqual([
+    expect(plan.map((e) => [e.kind, e.pageNumber])).toEqual([
       ['photo', 1],
       ['photo', 2],
       ['bridge', 3],
@@ -160,7 +160,7 @@ describe('planPageSequence (insertion + renumber)', () => {
       ['photo', 5],
     ]);
     // index is always pageNumber - 1
-    expect(plan.every(e => e.index === e.pageNumber - 1)).toBe(true);
+    expect(plan.every((e) => e.index === e.pageNumber - 1)).toBe(true);
   });
 
   it('supports a trailing bridge after the last photo', () => {
@@ -171,10 +171,15 @@ describe('planPageSequence (insertion + renumber)', () => {
 
   it('two bridges land in their own gaps in reading order', () => {
     const plan = planPageSequence(photoIds, [makeBridge(3), makeBridge(1)]);
-    expect(plan.map(e => e.kind)).toEqual([
-      'photo', 'bridge', 'photo', 'photo', 'bridge', 'photo',
+    expect(plan.map((e) => e.kind)).toEqual([
+      'photo',
+      'bridge',
+      'photo',
+      'photo',
+      'bridge',
+      'photo',
     ]);
-    expect(plan.map(e => e.pageNumber)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(plan.map((e) => e.pageNumber)).toEqual([1, 2, 3, 4, 5, 6]);
   });
 });
 
@@ -209,9 +214,7 @@ describe('resolveBridgeAnchor', () => {
   });
 
   it('never anchors to another bridge; null when no photos exist', () => {
-    const onlyBridges: AnchorCandidate[] = [
-      { pageNumber: 1, source: 'BRIDGE', assetUrl: null },
-    ];
+    const onlyBridges: AnchorCandidate[] = [{ pageNumber: 1, source: 'BRIDGE', assetUrl: null }];
     expect(resolveBridgeAnchor(onlyBridges, 1)).toBeNull();
   });
 
@@ -229,9 +232,7 @@ describe('resolveBridgeAnchor', () => {
     });
 
     it('null when no photos exist, same as the default direction', () => {
-      const onlyBridges: AnchorCandidate[] = [
-        { pageNumber: 1, source: 'BRIDGE', assetUrl: null },
-      ];
+      const onlyBridges: AnchorCandidate[] = [{ pageNumber: 1, source: 'BRIDGE', assetUrl: null }];
       expect(resolveBridgeAnchor(onlyBridges, 1, 'next')).toBeNull();
     });
   });

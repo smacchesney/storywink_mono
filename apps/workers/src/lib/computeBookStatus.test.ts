@@ -13,11 +13,7 @@ function page(overrides: Partial<StatusPage> = {}): StatusPage {
 
 describe('computeBookStatus', () => {
   it('returns COMPLETED when every page has text and an illustration', () => {
-    const pages = [
-      page({ assetId: 'a1' }),
-      page({ assetId: 'a2' }),
-      page({ assetId: 'a3' }),
-    ];
+    const pages = [page({ assetId: 'a1' }), page({ assetId: 'a2' }), page({ assetId: 'a3' })];
     expect(computeBookStatus(pages, 'a1')).toBe('COMPLETED');
   });
 

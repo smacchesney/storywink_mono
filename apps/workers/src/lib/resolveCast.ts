@@ -119,7 +119,7 @@ export function mergeCastNames<T extends MergeableCharacter>(input: {
   captureQuestions: CaptureAnswerLike[] | null | undefined;
   childName: string | null | undefined;
 }): MergeCastResult<T> {
-  const characters = input.characters.map(c => ({ ...c }));
+  const characters = input.characters.map((c) => ({ ...c }));
   const consumedQuestionIds: string[] = [];
   let changed = false;
 
@@ -143,13 +143,13 @@ export function mergeCastNames<T extends MergeableCharacter>(input: {
     }
   };
 
-  const answered = (input.captureQuestions ?? []).filter(q => {
+  const answered = (input.captureQuestions ?? []).filter((q) => {
     const a = q.answer?.trim();
     return !!q.characterId && !!a && a !== SKIP_SENTINEL;
   });
 
   for (const q of answered) {
-    const target = characters.find(c => c.characterId === q.characterId);
+    const target = characters.find((c) => c.characterId === q.characterId);
     // A failed join, and a naming answer pointing at main_child (the star's
     // name comes from the setup sheet), are both left unconsumed.
     if (target && target.role !== 'main_child') {
@@ -160,7 +160,7 @@ export function mergeCastNames<T extends MergeableCharacter>(input: {
 
   const childName = input.childName?.trim();
   if (childName) {
-    const main = characters.find(c => c.role === 'main_child');
+    const main = characters.find((c) => c.role === 'main_child');
     if (main && (main.name !== childName || main.namedVia !== 'childName')) {
       main.name = childName;
       main.namedVia = 'childName';
@@ -187,8 +187,8 @@ export function resolveCastEntries(
   characters: MergedCastCharacter[],
   currentOrderedAssetIds: (string | null)[],
 ): ResolvedCastEntry[] {
-  return characters.flatMap(c =>
-    resolveCastForStory([c], currentOrderedAssetIds).map(resolved => ({
+  return characters.flatMap((c) =>
+    resolveCastForStory([c], currentOrderedAssetIds).map((resolved) => ({
       ...resolved,
       namedVia: c.namedVia,
     })),
@@ -278,7 +278,7 @@ export function checkCastNameCoverage(
     }
 
     result.checked += 1;
-    const covered = pageIndexes.some(i => nameMatches(entry.name, pageTexts[i]));
+    const covered = pageIndexes.some((i) => nameMatches(entry.name, pageTexts[i]));
     if (covered) result.covered += 1;
     else result.missing.push(entry.name);
   }

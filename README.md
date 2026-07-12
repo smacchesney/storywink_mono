@@ -10,6 +10,7 @@ Two apps and two shared packages:
 - **`apps/workers`** — Background job processors (BullMQ) for all AI work
 
 Shared packages:
+
 - **`packages/database`** — Prisma schema and database client
 - **`packages/shared`** — Shared types, schemas, prompts, and Redis helpers
 
@@ -18,6 +19,7 @@ The web app owns every HTTP endpoint (book operations, webhooks, queue enqueue, 
 ## Quick Start
 
 ### Prerequisites
+
 - Node.js 18+
 - PostgreSQL
 - Redis
@@ -65,6 +67,7 @@ storywink-monorepo/
 ## Available Scripts
 
 ### Root Level
+
 - `npm run dev` — Start all services in development mode
 - `npm run build` — Build all services
 - `npm run lint` — Lint all code
@@ -72,6 +75,7 @@ storywink-monorepo/
 - `npm run check-types` — Type-check all packages
 
 ### Database
+
 - `npm run db:generate` — Generate Prisma client
 - `npm run db:migrate` — Run migrations
 - `npm run db:studio` — Open Prisma Studio
@@ -81,6 +85,7 @@ storywink-monorepo/
 Each app ships an `.env.example` — that file is the source of truth for the full list.
 
 ### Web (`apps/web`) — key vars
+
 - `DATABASE_URL` — PostgreSQL connection
 - `REDIS_URL` — Redis connection (queue enqueue)
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` — Clerk auth
@@ -88,6 +93,7 @@ Each app ships an `.env.example` — that file is the source of truth for the fu
 - `STRIPE_*`, `LULU_*`, `DROPBOX_*` — payment and print-on-demand
 
 ### Workers (`apps/workers`) — key vars
+
 - `DATABASE_URL` — PostgreSQL connection
 - `REDIS_URL` — Redis connection
 - `OPENAI_API_KEY` — Story, character extraction, QC
@@ -107,6 +113,7 @@ Provision PostgreSQL and Redis, set the environment variables above per service,
 ## Development Workflow
 
 1. **Feature Development**
+
    ```bash
    git checkout -b feature/your-feature
    npm run dev
@@ -133,6 +140,7 @@ Provision PostgreSQL and Redis, set the environment variables above per service,
 ## Documentation
 
 See the `docs/` folder:
+
 - `docs/architecture-details.md` — Data flow, text overlay, illustration handling, art styles
 - `docs/print-on-demand.md` — Lulu API, Stripe, PDF generation
 

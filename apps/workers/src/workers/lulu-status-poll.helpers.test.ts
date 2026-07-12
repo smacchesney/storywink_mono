@@ -62,13 +62,21 @@ describe('decideOrderTransition', () => {
   });
 
   it('treats known pre-production Lulu states as no-ops', () => {
-    for (const lulu of ['CREATED', 'UNPAID', 'PAYMENT_IN_PROGRESS', 'PRODUCTION_DELAYED', 'PRODUCTION_READY']) {
+    for (const lulu of [
+      'CREATED',
+      'UNPAID',
+      'PAYMENT_IN_PROGRESS',
+      'PRODUCTION_DELAYED',
+      'PRODUCTION_READY',
+    ]) {
       expect(decideOrderTransition('SUBMITTED_TO_LULU', lulu)).toEqual({ kind: 'noop' });
     }
   });
 
   it('flags unknown Lulu statuses instead of guessing', () => {
-    expect(decideOrderTransition('SUBMITTED_TO_LULU', 'SOME_NEW_STATUS')).toEqual({ kind: 'unknown' });
+    expect(decideOrderTransition('SUBMITTED_TO_LULU', 'SOME_NEW_STATUS')).toEqual({
+      kind: 'unknown',
+    });
     expect(decideOrderTransition('SUBMITTED_TO_LULU', '')).toEqual({ kind: 'unknown' });
     expect(decideOrderTransition('SUBMITTED_TO_LULU', undefined)).toEqual({ kind: 'unknown' });
     expect(decideOrderTransition('SUBMITTED_TO_LULU', null)).toEqual({ kind: 'unknown' });

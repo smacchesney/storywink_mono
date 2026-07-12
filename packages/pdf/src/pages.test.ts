@@ -41,7 +41,10 @@ function makeBook(n: number): BookWithPages {
   } as unknown as BookWithPages;
 }
 
-function kinds(book: BookWithPages, opts?: Parameters<typeof assembleInteriorPages>[1]): InteriorPageKind[] {
+function kinds(
+  book: BookWithPages,
+  opts?: Parameters<typeof assembleInteriorPages>[1],
+): InteriorPageKind[] {
   return assembleInteriorPages(book, opts).map((p) => p.kind);
 }
 
@@ -150,14 +153,7 @@ describe('assembleInteriorPages — user export path (title, back cover, no padd
       includeBackCover: true,
       padToFour: false,
     });
-    expect(pages).toEqual([
-      'title',
-      'dedication',
-      'text',
-      'illustration',
-      'ending',
-      'backCover',
-    ]);
+    expect(pages).toEqual(['title', 'dedication', 'text', 'illustration', 'ending', 'backCover']);
   });
 });
 
@@ -176,7 +172,7 @@ describe('assembleInteriorPages — count authority parity with calculatePrinted
     it(`N=${n}: unpadded content count matches calculatePrintedPageCount`, () => {
       const book = makeBook(n);
       const content = assembleInteriorPages(book, { padToFour: false }).filter(
-        (p) => p.kind !== 'blank'
+        (p) => p.kind !== 'blank',
       );
       expect(content.length).toBe(calculatePrintedPageCount(n));
     });

@@ -74,14 +74,14 @@ function buildCharacterIdentitySection(
   // ids resolve (roster re-extracted since the story ran), fall back to the
   // photo-page filter rather than dropping the identity block entirely.
   const bridgeFiltered = bridgeCharacterIds?.length
-    ? characterIdentity.characters.filter(c => bridgeCharacterIds.includes(c.characterId))
+    ? characterIdentity.characters.filter((c) => bridgeCharacterIds.includes(c.characterId))
     : [];
 
   const relevantCharacters = bridgeFiltered.length
     ? bridgeFiltered
     : pageNumber
       ? characterIdentity.characters.filter(
-          c =>
+          (c) =>
             isMainCharacterRole(c.role) ||
             c.appearsOnPages.includes(pageNumber) ||
             c.appearsOnPages.length === 0,
@@ -108,7 +108,7 @@ function buildCharacterIdentitySection(
     : `this page's photo takes precedence`;
 
   const charDescriptions = relevantCharacters
-    .map(c => {
+    .map((c) => {
       const traits = c.physicalTraits;
       return [
         `- ${c.name || c.characterId} (${c.role}):`,
@@ -147,7 +147,7 @@ function buildCharacterIdentitySection(
 function buildBridgeSceneSection(bridgeScene: BridgeScene | null | undefined): string | null {
   if (!bridgeScene) return null;
 
-  const props = bridgeScene.props.filter(p => p.trim());
+  const props = bridgeScene.props.filter((p) => p.trim());
   return [
     `BRIDGE PAGE — THIS PAGE HAS NO PHOTO OF ITS OWN (this section supersedes the SCENE INTERPRETATION instructions above and item 2 of PEOPLE - SOURCE HIERARCHY):`,
     `Image 1 is a PHOTO of the SAME people taken moments around this scene — the same people moments later. On this page it rules ONLY identity, outfits, and setting continuity — do NOT copy its pose, its composition, its moment, or which people are present. People in this scene come ONLY from this scene's cast (the characters described in the CHARACTER IDENTITY section below, when provided); never add other people from the photo.`,
@@ -187,7 +187,7 @@ function buildAvatarSceneSection(
     ].join(' ');
   }
 
-  const props = scene.props.filter(p => p.trim());
+  const props = scene.props.filter((p) => p.trim());
   return [
     header,
     `DEPICT THIS MOMENT: ${scene.action}`,

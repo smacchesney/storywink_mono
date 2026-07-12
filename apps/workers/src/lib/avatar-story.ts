@@ -54,7 +54,7 @@ export function buildAvatarCastForPrompt(
     .filter((c): c is StoredRosterCharacter & { characterId: string; name: string } =>
       Boolean(c.characterId?.trim() && c.name?.trim()),
     )
-    .map(c => ({
+    .map((c) => ({
       characterId: c.characterId,
       name: c.name,
       role: c.role?.trim() || 'grown-up',
@@ -70,7 +70,10 @@ export function buildAvatarCastForPrompt(
  * parent's wait).
  */
 export function avatarStoryQcProblems(
-  qc: Pick<AvatarStoryQCResponse, 'arcCoherence' | 'readAloudRhythm' | 'lastPageLanding' | 'feedback'>,
+  qc: Pick<
+    AvatarStoryQCResponse,
+    'arcCoherence' | 'readAloudRhythm' | 'lastPageLanding' | 'feedback'
+  >,
   refrain: string,
   refrainEchoes: number,
 ): string[] {
@@ -81,10 +84,14 @@ export function avatarStoryQcProblems(
     );
   }
   if (qc.arcCoherence < STORY_QC_THRESHOLDS.minArcCoherence) {
-    problems.push(`Arc coherence scored ${qc.arcCoherence}/10 — the pages must actually deliver the declared desire → escalation → peak → soft landing.`);
+    problems.push(
+      `Arc coherence scored ${qc.arcCoherence}/10 — the pages must actually deliver the declared desire → escalation → peak → soft landing.`,
+    );
   }
   if (qc.readAloudRhythm < STORY_QC_THRESHOLDS.minReadAloudRhythm) {
-    problems.push(`Read-aloud rhythm scored ${qc.readAloudRhythm}/10 — vary sentence lengths and make it musical when spoken.`);
+    problems.push(
+      `Read-aloud rhythm scored ${qc.readAloudRhythm}/10 — vary sentence lengths and make it musical when spoken.`,
+    );
   }
   if (!qc.lastPageLanding) {
     problems.push('The final page must land as a soft, warm exhale — no summary statements.');
@@ -111,8 +118,8 @@ export function orderCharacterSheets<T extends { characterId: string }>(
   );
   if (!starCharacterId) return byRoster;
   return [
-    ...byRoster.filter(s => s.characterId === starCharacterId),
-    ...byRoster.filter(s => s.characterId !== starCharacterId),
+    ...byRoster.filter((s) => s.characterId === starCharacterId),
+    ...byRoster.filter((s) => s.characterId !== starCharacterId),
   ];
 }
 
@@ -131,6 +138,6 @@ export function extractAvatarScene(
   const roster = new Set(rosterCharacterIds);
   return {
     ...parsed.data,
-    charactersPresent: parsed.data.charactersPresent.filter(id => roster.has(id)),
+    charactersPresent: parsed.data.charactersPresent.filter((id) => roster.has(id)),
   };
 }

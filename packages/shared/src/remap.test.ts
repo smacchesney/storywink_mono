@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { remapCharacterPages } from './utils.js';
 
-const identity = (chars: { appearsOnPages: number[]; appearsOnAssetIds?: (string | null)[] }[]) => ({
+const identity = (
+  chars: { appearsOnPages: number[]; appearsOnAssetIds?: (string | null)[] }[],
+) => ({
   characters: chars,
 });
 

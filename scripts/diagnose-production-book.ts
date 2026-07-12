@@ -47,11 +47,11 @@ async function diagnoseProductionBook(bookId: string) {
   console.log(`  - Created: ${book.createdAt.toISOString()}`);
 
   // Calculate statistics
-  const titlePages = book.pages.filter(p => p.isTitlePage);
-  const storyPages = book.pages.filter(p => !p.isTitlePage);
-  const pagesWithText = book.pages.filter(p => p.text && p.text.trim().length > 0);
-  const pagesWithImages = book.pages.filter(p => p.generatedImageUrl);
-  const titlePagesCalculated = book.pages.filter(p => p.assetId === book.coverAssetId);
+  const titlePages = book.pages.filter((p) => p.isTitlePage);
+  const storyPages = book.pages.filter((p) => !p.isTitlePage);
+  const pagesWithText = book.pages.filter((p) => p.text && p.text.trim().length > 0);
+  const pagesWithImages = book.pages.filter((p) => p.generatedImageUrl);
+  const titlePagesCalculated = book.pages.filter((p) => p.assetId === book.coverAssetId);
 
   console.log(`\n📊 Page Statistics:`);
   console.log(`  - Title Pages (by flag): ${titlePages.length}`);
@@ -85,7 +85,9 @@ async function diagnoseProductionBook(bookId: string) {
     console.log(`  - Moderation: ${page.moderationStatus}`);
 
     if (page.moderationReason) {
-      console.log(`  - Reason: ${page.moderationReason.substring(0, 80)}${page.moderationReason.length > 80 ? '...' : ''}`);
+      console.log(
+        `  - Reason: ${page.moderationReason.substring(0, 80)}${page.moderationReason.length > 80 ? '...' : ''}`,
+      );
     }
   }
 
@@ -96,17 +98,25 @@ async function diagnoseProductionBook(bookId: string) {
   const issues: string[] = [];
 
   if (titlePages.length !== titlePagesCalculated.length) {
-    issues.push(`Title page count mismatch: ${titlePages.length} (flag) vs ${titlePagesCalculated.length} (calculated)`);
+    issues.push(
+      `Title page count mismatch: ${titlePages.length} (flag) vs ${titlePagesCalculated.length} (calculated)`,
+    );
   }
 
-  const storyPagesWithoutText = storyPages.filter(p => !p.text || p.text.trim().length === 0);
+  const storyPagesWithoutText = storyPages.filter((p) => !p.text || p.text.trim().length === 0);
   if (storyPagesWithoutText.length > 0) {
-    issues.push(`${storyPagesWithoutText.length} story page(s) without text: ${storyPagesWithoutText.map(p => p.pageNumber).join(', ')}`);
+    issues.push(
+      `${storyPagesWithoutText.length} story page(s) without text: ${storyPagesWithoutText.map((p) => p.pageNumber).join(', ')}`,
+    );
   }
 
-  const pagesWithMismatch = book.pages.filter(p => (p.assetId === book.coverAssetId) !== p.isTitlePage);
+  const pagesWithMismatch = book.pages.filter(
+    (p) => (p.assetId === book.coverAssetId) !== p.isTitlePage,
+  );
   if (pagesWithMismatch.length > 0) {
-    issues.push(`${pagesWithMismatch.length} page(s) with isTitlePage mismatch: ${pagesWithMismatch.map(p => p.pageNumber).join(', ')}`);
+    issues.push(
+      `${pagesWithMismatch.length} page(s) with isTitlePage mismatch: ${pagesWithMismatch.map((p) => p.pageNumber).join(', ')}`,
+    );
   }
 
   if (book.pages.length !== book.pageLength) {
@@ -127,7 +137,9 @@ async function diagnoseProductionBook(bookId: string) {
 const bookId = process.argv[2];
 if (!bookId) {
   console.error('Usage: npx tsx scripts/diagnose-production-book.ts <bookId>');
-  console.error('   Or: railway run --service workers npx tsx scripts/diagnose-production-book.ts <bookId>');
+  console.error(
+    '   Or: railway run --service workers npx tsx scripts/diagnose-production-book.ts <bookId>',
+  );
   process.exit(1);
 }
 

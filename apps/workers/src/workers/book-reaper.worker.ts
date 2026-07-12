@@ -194,7 +194,10 @@ async function requeueStuckBook(book: StuckBook): Promise<'requeued' | 'failed' 
     data: { updatedAt: new Date() },
   });
 
-  logger.info({ bookId: book.id, stage, stalledStatus: book.status }, 'Reaper: requeued stuck book');
+  logger.info(
+    { bookId: book.id, stage, stalledStatus: book.status },
+    'Reaper: requeued stuck book',
+  );
   return 'requeued';
 }
 

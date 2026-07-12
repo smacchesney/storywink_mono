@@ -53,12 +53,8 @@ export function collectCollagePhotos(bookData: BookWithPages): CollagePhoto[] {
 export function collageCellUrl(url: string, windowIn: number): string {
   if (!url.includes('/image/upload/')) return url;
   const px = Math.round(windowIn * 300);
-  return url.replace(
-    '/upload/',
-    `/upload/f_jpg,q_auto:good,c_lfill,w_${px},h_${px},g_auto:faces/`
-  );
+  return url.replace('/upload/', `/upload/f_jpg,q_auto:good,c_lfill,w_${px},h_${px},g_auto:faces/`);
 }
-
 
 /** A small hand-drawn coral heart — the page's single brand accent. */
 const CORAL_HEART_SVG = `<svg width="26" height="24" viewBox="0 0 26 24" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-left: 0.12in;"><path d="M13 21C9 17 2.5 12.5 2.5 7.5 2.5 4.4 5 2.5 7.6 2.5 9.7 2.5 11.9 3.8 13 6 14.1 3.8 16.3 2.5 18.4 2.5 21 2.5 23.5 4.4 23.5 7.5 23.5 12.5 17 17 13 21Z" fill="${CORAL_COLOR}" opacity="0.9"/></svg>`;
@@ -162,7 +158,7 @@ export function generateCollagePageHtml(options: CollagePageOptions): string {
  */
 export function generateCollagePagesHtml(
   bookData: BookWithPages,
-  imageUrlTransform?: ImageUrlTransform
+  imageUrlTransform?: ImageUrlTransform,
 ): string[] {
   const photos = collectCollagePhotos(bookData);
   const plan = planCollage(photos.length);
@@ -182,7 +178,7 @@ export function generateCollagePagesHtml(
         language,
         createdAt,
         imageUrlTransform,
-      })
+      }),
     );
     offset += count;
   });

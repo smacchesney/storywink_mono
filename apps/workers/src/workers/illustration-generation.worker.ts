@@ -6,7 +6,10 @@ import type { IllustrationInput } from '../lib/illustrators/index.js';
 import type { EscalationJobFields } from '../lib/escalation.js';
 import { v2 as cloudinary } from 'cloudinary';
 import pino from 'pino';
-import { createIllustrationPrompt, IllustrationPromptOptions } from '@storywink/shared/prompts/illustration';
+import {
+  createIllustrationPrompt,
+  IllustrationPromptOptions,
+} from '@storywink/shared/prompts/illustration';
 import type { BridgeScene } from '@storywink/shared/prompts/story';
 import { resolveBridgeAnchor } from '../lib/bridge-pages.js';
 import { orderCharacterSheets } from '../lib/avatar-story.js';
@@ -57,11 +60,7 @@ function isTransientError(error: Error): boolean {
     'engine overloaded',
   ];
   // Non-transient OpenAI errors: billing / account issues should fail fast.
-  const nonTransientPatterns = [
-    'insufficient_quota',
-    'invalid_api_key',
-    'account_deactivated',
-  ];
+  const nonTransientPatterns = ['insufficient_quota', 'invalid_api_key', 'account_deactivated'];
   if (nonTransientPatterns.some((p) => message.includes(p))) return false;
   return transientPatterns.some((pattern) => message.includes(pattern));
 }
@@ -71,11 +70,10 @@ function isTransientError(error: Error): boolean {
  */
 function isLastAttempt(job: Job): boolean {
   const maxAttempts = job.opts?.attempts || 1;
-  return (job.attemptsMade + 1) >= maxAttempts;
+  return job.attemptsMade + 1 >= maxAttempts;
 }
 
 export async function processIllustrationGeneration(job: Job<IllustrationGenerationJobV2>) {
-
   // ============================================================================
   // DIAGNOSTIC: Write job start entry IMMEDIATELY (before ANY processing)
   // ============================================================================
@@ -108,21 +106,43 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     console.error('[DIAGNOSTIC] Failed to write job start diagnostic:', dbError);
   }
 
-  const { bookId, pageId, userId, pageNumber, artStyle, illustrationNotes, isTitlePage, bookTitle, text, characterIdentity, qcRound, qcFeedback, language } = job.data;
+  const {
+    bookId,
+    pageId,
+    userId,
+    pageNumber,
+    artStyle,
+    illustrationNotes,
+    isTitlePage,
+    bookTitle,
+    text,
+    characterIdentity,
+    qcRound,
+    qcFeedback,
+    language,
+  } = job.data;
 
-  console.log(`[IllustrationWorker] Starting job ${job.id} for page ${pageNumber} of book ${bookId}`);
+  console.log(
+    `[IllustrationWorker] Starting job ${job.id} for page ${pageNumber} of book ${bookId}`,
+  );
   console.log(`  - PageId: ${pageId}`);
   console.log(`  - Is Title Page: ${isTitlePage}`);
   console.log(`  - Art Style: ${artStyle}`);
   console.log(`  - Has Text: ${!!text} (${text?.length || 0} chars)`);
   console.log(`  - Illustration Notes: ${illustrationNotes ? 'Yes' : 'None'}`);
-  console.log(`  - Character Identity: ${characterIdentity ? `${characterIdentity.characters.length} characters` : 'None'}`);
+  console.log(
+    `  - Character Identity: ${characterIdentity ? `${characterIdentity.characters.length} characters` : 'None'}`,
+  );
   console.log(`  - QC Round: ${qcRound || 0}`);
   if (qcFeedback) console.log(`  - QC Feedback: ${qcFeedback.substring(0, 200)}...`);
 
   try {
     // Validate prerequisites
-    if (!process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET || !process.env.CLOUDINARY_CLOUD_NAME) {
+    if (
+      !process.env.CLOUDINARY_API_KEY ||
+      !process.env.CLOUDINARY_API_SECRET ||
+      !process.env.CLOUDINARY_CLOUD_NAME
+    ) {
       throw new Error('Cloudinary API credentials not configured');
     }
 
@@ -146,54 +166,71 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     if (escalation?.model) {
       try {
         illustrator = getEscalationIllustrator(escalation.model);
-        console.log(`[IllustrationWorker] QC escalation for page ${pageNumber}: rendering on ${illustrator.name}/${illustrator.modelId}`);
+        console.log(
+          `[IllustrationWorker] QC escalation for page ${pageNumber}: rendering on ${illustrator.name}/${illustrator.modelId}`,
+        );
         logger.info(
-          { jobId: job.id, pageId, pageNumber, provider: illustrator.name, model: illustrator.modelId },
+          {
+            jobId: job.id,
+            pageId,
+            pageNumber,
+            provider: illustrator.name,
+            model: illustrator.modelId,
+          },
           'Escalated re-render — using escalation model override',
         );
       } catch (escalationError: any) {
         logger.warn(
-          { jobId: job.id, pageId, pageNumber, model: escalation.model, error: escalationError.message },
+          {
+            jobId: job.id,
+            pageId,
+            pageNumber,
+            model: escalation.model,
+            error: escalationError.message,
+          },
           'Escalation provider unavailable — falling back to default illustrator',
         );
       }
     }
 
-    logger.info({
-      jobId: job.id, 
-      userId, 
-      bookId, 
-      pageId, 
-      pageNumber,
-      parentJobId: job.parent?.id,
-      attemptsMade: job.attemptsMade
-    }, 'Processing illustration generation job...');
-    
+    logger.info(
+      {
+        jobId: job.id,
+        userId,
+        bookId,
+        pageId,
+        pageNumber,
+        parentJobId: job.parent?.id,
+        attemptsMade: job.attemptsMade,
+      },
+      'Processing illustration generation job...',
+    );
+
     const page = await prisma.page.findUnique({
       where: { id: pageId },
-      include: { 
+      include: {
         book: true,
-        asset: true 
+        asset: true,
       },
     });
 
     if (!page) {
       throw new Error('Page not found');
     }
-    
+
     // All pages (including cover) must have story text
     if (!text || text.trim().length === 0) {
       console.error(`[IllustrationWorker] ERROR: Page ${pageNumber} has no text!`);
       throw new Error('Page has no text - cannot generate illustration without story content');
     }
-    
+
     console.log(`[IllustrationWorker] Page validation passed for page ${pageNumber}`);
-    
+
     // Verify book ownership
     if (page.book.userId !== userId) {
       throw new Error('User does not own this book');
     }
-    
+
     let contentImageBuffer: Buffer | null = null;
     let contentImageMimeType: string | null = null;
 
@@ -202,9 +239,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     // the QC requeue path in book-finalize builds child jobs directly and
     // carries no bridge fields, and scoped reillustrate does the same.
     const isBridgePage = page.source === 'BRIDGE';
-    const bridgeScene = isBridgePage
-      ? (page.bridgeScene as unknown as BridgeScene | null)
-      : null;
+    const bridgeScene = isBridgePage ? (page.bridgeScene as unknown as BridgeScene | null) : null;
 
     // AVATAR_STORY (X6d): the whole book is photo-less — every page is a
     // bridge-source row, but there is no adjacent photo to anchor to; the
@@ -235,7 +270,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         },
       });
       const anchor = resolveBridgeAnchor(
-        photoPages.map(p => ({
+        photoPages.map((p) => ({
           pageNumber: p.pageNumber,
           source: p.source,
           assetUrl: p.asset?.url || p.asset?.thumbnailUrl || null,
@@ -247,7 +282,9 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         bridgeScene?.outfitFrom ?? 'previous',
       );
       rawAnchorUrl = anchor?.assetUrl ?? undefined;
-      console.log(`[IllustrationWorker] Bridge page ${pageNumber}: anchoring to photo page ${anchor?.pageNumber ?? 'NONE'}`);
+      console.log(
+        `[IllustrationWorker] Bridge page ${pageNumber}: anchoring to photo page ${anchor?.pageNumber ?? 'NONE'}`,
+      );
       logger.info(
         { jobId: job.id, pageId, pageNumber, anchorPageNumber: anchor?.pageNumber ?? null },
         'Bridge page — resolved anchor photo from DB',
@@ -259,47 +296,77 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       : undefined;
 
     if (originalImageUrl) {
-        try {
-            logger.info({ jobId: job.id, pageNumber }, `Fetching original content image from ${originalImageUrl}`);
-            console.log(`[IllustrationWorker] Fetching original image for page ${pageNumber}...`);
-            const imageResponse = await fetch(originalImageUrl);
-            if (!imageResponse.ok) {
-                throw new Error(`Failed to fetch content image: ${imageResponse.status} ${imageResponse.statusText}`);
-            }
-            const contentTypeHeader = imageResponse.headers.get('content-type');
-            contentImageMimeType = contentTypeHeader?.startsWith('image/') 
-                ? contentTypeHeader 
-                : (originalImageUrl.endsWith('.png') ? 'image/png' : 'image/jpeg');
-            
-            const imageArrayBuffer = await imageResponse.arrayBuffer();
-            contentImageBuffer = Buffer.from(imageArrayBuffer);
-            logger.info({ jobId: job.id, pageNumber }, `Fetched content image (${contentImageMimeType}).`);
-        } catch (fetchError: any) {
-            logger.error({ jobId: job.id, pageId, pageNumber, error: fetchError.message }, 'Failed to fetch content image.');
-            throw fetchError;
+      try {
+        logger.info(
+          { jobId: job.id, pageNumber },
+          `Fetching original content image from ${originalImageUrl}`,
+        );
+        console.log(`[IllustrationWorker] Fetching original image for page ${pageNumber}...`);
+        const imageResponse = await fetch(originalImageUrl);
+        if (!imageResponse.ok) {
+          throw new Error(
+            `Failed to fetch content image: ${imageResponse.status} ${imageResponse.statusText}`,
+          );
         }
+        const contentTypeHeader = imageResponse.headers.get('content-type');
+        contentImageMimeType = contentTypeHeader?.startsWith('image/')
+          ? contentTypeHeader
+          : originalImageUrl.endsWith('.png')
+            ? 'image/png'
+            : 'image/jpeg';
+
+        const imageArrayBuffer = await imageResponse.arrayBuffer();
+        contentImageBuffer = Buffer.from(imageArrayBuffer);
+        logger.info(
+          { jobId: job.id, pageNumber },
+          `Fetched content image (${contentImageMimeType}).`,
+        );
+      } catch (fetchError: any) {
+        logger.error(
+          { jobId: job.id, pageId, pageNumber, error: fetchError.message },
+          'Failed to fetch content image.',
+        );
+        throw fetchError;
+      }
     } else if (!isAvatarBook) {
-         logger.error({ jobId: job.id, pageId, pageNumber }, 'Original content image URL is missing.');
-         throw new Error('Missing originalImageUrl for illustration generation.');
+      logger.error({ jobId: job.id, pageId, pageNumber }, 'Original content image URL is missing.');
+      throw new Error('Missing originalImageUrl for illustration generation.');
     }
 
     if ((!contentImageBuffer || !contentImageMimeType) && !isAvatarBook) {
-        logger.error({ jobId: job.id, pageId, pageNumber }, 'Content image buffer or mime type missing.');
-        throw new Error('Content image buffer/mime type missing.');
+      logger.error(
+        { jobId: job.id, pageId, pageNumber },
+        'Content image buffer or mime type missing.',
+      );
+      throw new Error('Content image buffer/mime type missing.');
     }
 
     const styleKey = artStyle as StyleKey;
 
     // Defensive check: Ensure STYLE_LIBRARY is loaded (prevent race condition on module import)
     if (!STYLE_LIBRARY || Object.keys(STYLE_LIBRARY).length === 0) {
-      logger.error({ jobId: job.id, pageId, pageNumber }, 'STYLE_LIBRARY not loaded - module import race condition detected');
+      logger.error(
+        { jobId: job.id, pageId, pageNumber },
+        'STYLE_LIBRARY not loaded - module import race condition detected',
+      );
       throw new Error('STYLE_LIBRARY not loaded - please retry');
     }
 
     const styleData = STYLE_LIBRARY[styleKey];
     if (!styleData) {
-      logger.error({ jobId: job.id, pageId, pageNumber, styleKey, availableStyles: Object.keys(STYLE_LIBRARY) }, 'Invalid style key - not found in STYLE_LIBRARY');
-      throw new Error(`Invalid style key: ${styleKey}. Available styles: ${Object.keys(STYLE_LIBRARY).join(', ')}`);
+      logger.error(
+        {
+          jobId: job.id,
+          pageId,
+          pageNumber,
+          styleKey,
+          availableStyles: Object.keys(STYLE_LIBRARY),
+        },
+        'Invalid style key - not found in STYLE_LIBRARY',
+      );
+      throw new Error(
+        `Invalid style key: ${styleKey}. Available styles: ${Object.keys(STYLE_LIBRARY).join(', ')}`,
+      );
     }
 
     // Character sheets (CHARACTER_SHEETS_ENABLED): validated 2x2 turnaround
@@ -322,7 +389,9 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       // findMany and must never pick the anchor.
       let sheetSources = job.data.characterSheets;
       if (isAvatarBook && sheetSources.length > 1) {
-        const starId = characterIdentity?.characters?.find(c => c.role?.startsWith('main'))?.characterId;
+        const starId = characterIdentity?.characters?.find((c) =>
+          c.role?.startsWith('main'),
+        )?.characterId;
         sheetSources = orderCharacterSheets(sheetSources, starId ?? null);
       }
       for (const sheet of sheetSources) {
@@ -330,12 +399,19 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
           sheetRefs.push(await fetchImageInput(optimizeCloudinaryUrlForVision(sheet.url)));
         } catch (sheetFetchError: any) {
           logger.warn(
-            { jobId: job.id, pageNumber, characterId: sheet.characterId, error: sheetFetchError.message },
+            {
+              jobId: job.id,
+              pageNumber,
+              characterId: sheet.characterId,
+              error: sheetFetchError.message,
+            },
             'Failed to fetch character sheet — continuing without it',
           );
         }
       }
-      console.log(`[IllustrationWorker] Fetched ${sheetRefs.length} character sheet(s) for page ${pageNumber}`);
+      console.log(
+        `[IllustrationWorker] Fetched ${sheetRefs.length} character sheet(s) for page ${pageNumber}`,
+      );
     }
 
     // All pages (including cover) use standard style references for the story illustration.
@@ -400,12 +476,16 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       console.error(`  - Value: ${styleData.referenceImageUrls}`);
       console.error(`  - Available keys: ${Object.keys(styleData).join(', ')}`);
       console.error('='.repeat(80));
-      console.error('[DIAGNOSTIC] Wrote failure details to WorkerDiagnostic table - query with MCP');
+      console.error(
+        '[DIAGNOSTIC] Wrote failure details to WorkerDiagnostic table - query with MCP',
+      );
 
       // Force log flush with small delay to ensure Railway captures output
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      throw new Error(`Missing referenceImageUrls for style: ${styleKey}. Attempt ${job.attemptsMade + 1}/${job.opts?.attempts || 'unknown'}`);
+      throw new Error(
+        `Missing referenceImageUrls for style: ${styleKey}. Attempt ${job.attemptsMade + 1}/${job.opts?.attempts || 'unknown'}`,
+      );
     }
 
     // Fetch all style reference images
@@ -413,15 +493,22 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
 
     for (const styleRefUrl of styleReferenceUrls) {
       try {
-        logger.info({ jobId: job.id, pageNumber }, `Fetching style reference image from ${styleRefUrl}`);
+        logger.info(
+          { jobId: job.id, pageNumber },
+          `Fetching style reference image from ${styleRefUrl}`,
+        );
         const styleResponse = await fetch(styleRefUrl);
         if (!styleResponse.ok) {
-          throw new Error(`Failed to fetch style image: ${styleResponse.status} ${styleResponse.statusText}`);
+          throw new Error(
+            `Failed to fetch style image: ${styleResponse.status} ${styleResponse.statusText}`,
+          );
         }
         const styleContentTypeHeader = styleResponse.headers.get('content-type');
         const mimeType = styleContentTypeHeader?.startsWith('image/')
           ? styleContentTypeHeader
-          : (styleRefUrl.endsWith('.png') ? 'image/png' : 'image/jpeg');
+          : styleRefUrl.endsWith('.png')
+            ? 'image/png'
+            : 'image/jpeg';
 
         const styleArrayBuffer = await styleResponse.arrayBuffer();
         styleReferenceBuffers.push({
@@ -430,17 +517,25 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         });
         logger.info({ jobId: job.id, pageNumber }, `Fetched style reference image (${mimeType}).`);
       } catch (fetchError: any) {
-        logger.error({ jobId: job.id, pageId, pageNumber, styleKey, error: fetchError.message }, 'Failed to fetch style reference image.');
+        logger.error(
+          { jobId: job.id, pageId, pageNumber, styleKey, error: fetchError.message },
+          'Failed to fetch style reference image.',
+        );
         throw fetchError;
       }
     }
 
     if (styleReferenceBuffers.length === 0) {
-        logger.error({ jobId: job.id, pageId, pageNumber }, 'No style reference images fetched successfully.');
-        throw new Error('No style reference images fetched.');
+      logger.error(
+        { jobId: job.id, pageId, pageNumber },
+        'No style reference images fetched successfully.',
+      );
+      throw new Error('No style reference images fetched.');
     }
 
-    console.log(`[IllustrationWorker] Fetched ${styleReferenceBuffers.length} style reference image(s) for page ${pageNumber}`);
+    console.log(
+      `[IllustrationWorker] Fetched ${styleReferenceBuffers.length} style reference image(s) for page ${pageNumber}`,
+    );
 
     // AVATAR_STORY: no photo exists — the FIRST character sheet becomes the
     // content image (image 1) and the rest stay reference sheets. A page with
@@ -453,9 +548,14 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     } else if (isAvatarBook && sheetRefs.length > 0) {
       contentInput = sheetRefs.shift()!;
       sheetAnchored = true;
-      console.log(`[IllustrationWorker] Avatar-story page ${pageNumber}: anchoring render to the star's character sheet`);
+      console.log(
+        `[IllustrationWorker] Avatar-story page ${pageNumber}: anchoring render to the star's character sheet`,
+      );
     } else {
-      logger.error({ jobId: job.id, pageId, pageNumber, isAvatarBook }, 'No content anchor available for render.');
+      logger.error(
+        { jobId: job.id, pageId, pageNumber, isAvatarBook },
+        'No content anchor available for render.',
+      );
       throw new Error(
         isAvatarBook
           ? 'Avatar-story page has no character sheet to anchor the render'
@@ -468,101 +568,141 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     // For the primary illustration, always use story-style prompt (isTitlePage: false).
     // Cover pages get a separate cover-style illustration generated afterwards.
     const promptInput: IllustrationPromptOptions = {
-        style: styleKey,
-        pageText: text,
-        bookTitle: bookTitle,
-        isTitlePage: false,
-        illustrationNotes: illustrationNotes,
-        language: language || 'en',
-        referenceImageCount: styleReferenceBuffers.length,
-        characterIdentity: characterIdentity || null,
-        pageNumber: pageNumber,
-        qcFeedback: qcFeedback || null,
-        characterSheetCount: sheetRefs.length,
-        // Bridge pages: re-roles image 1 (anchor photo, not this page's
-        // scene) and filters identity by scene.charactersPresent.
-        // Avatar-story pages: re-roles image 1 as a character sheet and
-        // composes the scene from the story model (or the page text).
-        bridgeScene,
-        ...(sheetAnchored ? { contentAnchor: 'sheet' as const } : {}),
+      style: styleKey,
+      pageText: text,
+      bookTitle: bookTitle,
+      isTitlePage: false,
+      illustrationNotes: illustrationNotes,
+      language: language || 'en',
+      referenceImageCount: styleReferenceBuffers.length,
+      characterIdentity: characterIdentity || null,
+      pageNumber: pageNumber,
+      qcFeedback: qcFeedback || null,
+      characterSheetCount: sheetRefs.length,
+      // Bridge pages: re-roles image 1 (anchor photo, not this page's
+      // scene) and filters identity by scene.charactersPresent.
+      // Avatar-story pages: re-roles image 1 as a character sheet and
+      // composes the scene from the story model (or the page text).
+      bridgeScene,
+      ...(sheetAnchored ? { contentAnchor: 'sheet' as const } : {}),
     };
-    
-    logger.info({ jobId: job.id, pageId, promptInput }, "Constructed promptInput for createIllustrationPrompt");
+
+    logger.info(
+      { jobId: job.id, pageId, promptInput },
+      'Constructed promptInput for createIllustrationPrompt',
+    );
     const textPrompt = createIllustrationPrompt(promptInput);
-    logger.info({ jobId: job.id, pageId, pageNumber, promptLength: textPrompt.length }, 'Generated illustration prompt.');
-    
+    logger.info(
+      { jobId: job.id, pageId, pageNumber, promptLength: textPrompt.length },
+      'Generated illustration prompt.',
+    );
+
     console.log(`[IllustrationWorker] Generated prompt for page ${pageNumber}:`);
     console.log(`  - Prompt length: ${textPrompt.length} chars`);
     console.log(`  - First 100 chars: ${textPrompt.substring(0, 100)}...`);
 
-    logger.info({ jobId: job.id, pageId, pageNumber, refCount: styleReferenceBuffers.length }, 'Prepared images for illustration provider.');
+    logger.info(
+      { jobId: job.id, pageId, pageNumber, refCount: styleReferenceBuffers.length },
+      'Prepared images for illustration provider.',
+    );
 
     let generatedImageBase64: string | null = null;
     let moderationBlocked = false;
     let moderationReasonText: string | null = null;
 
     const MAX_CONTENT_POLICY_RETRIES = 2;
-    for (let contentPolicyAttempt = 0; contentPolicyAttempt <= MAX_CONTENT_POLICY_RETRIES; contentPolicyAttempt++) {
-    // Reset for each attempt
-    moderationBlocked = false;
-    moderationReasonText = null;
-    generatedImageBase64 = null;
+    for (
+      let contentPolicyAttempt = 0;
+      contentPolicyAttempt <= MAX_CONTENT_POLICY_RETRIES;
+      contentPolicyAttempt++
+    ) {
+      // Reset for each attempt
+      moderationBlocked = false;
+      moderationReasonText = null;
+      generatedImageBase64 = null;
 
-    if (contentPolicyAttempt > 0) {
+      if (contentPolicyAttempt > 0) {
         const delayMs = 3000 + Math.random() * 2000; // 3-5s jittered delay
-        console.log(`[IllustrationWorker] Content policy retry ${contentPolicyAttempt}/${MAX_CONTENT_POLICY_RETRIES} for page ${pageNumber}, waiting ${Math.round(delayMs)}ms...`);
-        logger.info({ jobId: job.id, pageNumber, attempt: contentPolicyAttempt + 1, maxAttempts: MAX_CONTENT_POLICY_RETRIES + 1 }, 'Retrying after content policy block...');
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
+        console.log(
+          `[IllustrationWorker] Content policy retry ${contentPolicyAttempt}/${MAX_CONTENT_POLICY_RETRIES} for page ${pageNumber}, waiting ${Math.round(delayMs)}ms...`,
+        );
+        logger.info(
+          {
+            jobId: job.id,
+            pageNumber,
+            attempt: contentPolicyAttempt + 1,
+            maxAttempts: MAX_CONTENT_POLICY_RETRIES + 1,
+          },
+          'Retrying after content policy block...',
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
 
-    try {
-       logger.info({ jobId: job.id, pageId, pageNumber, provider: illustrator.name }, 'Calling illustration provider...');
-       console.log(`[IllustrationWorker] Calling ${illustrator.name} for page ${pageNumber} with ${styleReferenceBuffers.length} style ref(s)...`);
+      try {
+        logger.info(
+          { jobId: job.id, pageId, pageNumber, provider: illustrator.name },
+          'Calling illustration provider...',
+        );
+        console.log(
+          `[IllustrationWorker] Calling ${illustrator.name} for page ${pageNumber} with ${styleReferenceBuffers.length} style ref(s)...`,
+        );
 
-       const illustrationInput: IllustrationInput = {
-         contentImage: contentInput,
-         // Ordered between photo and style refs; the prompt's role line
-         // (characterSheetCount) names each image by this position.
-         ...(sheetRefs.length > 0 ? { characterRefs: sheetRefs } : {}),
-         styleRefs: styleReferenceBuffers,
-         prompt: textPrompt,
-       };
+        const illustrationInput: IllustrationInput = {
+          contentImage: contentInput,
+          // Ordered between photo and style refs; the prompt's role line
+          // (characterSheetCount) names each image by this position.
+          ...(sheetRefs.length > 0 ? { characterRefs: sheetRefs } : {}),
+          styleRefs: styleReferenceBuffers,
+          prompt: textPrompt,
+        };
 
-       const result = await illustrator.generate(illustrationInput);
+        const result = await illustrator.generate(illustrationInput);
 
-       logger.info({ jobId: job.id, pageId, pageNumber, provider: illustrator.name }, 'Received response from illustration provider.');
-       console.log(`[IllustrationWorker] ${illustrator.name} response received for page ${pageNumber}`);
+        logger.info(
+          { jobId: job.id, pageId, pageNumber, provider: illustrator.name },
+          'Received response from illustration provider.',
+        );
+        console.log(
+          `[IllustrationWorker] ${illustrator.name} response received for page ${pageNumber}`,
+        );
 
-       if (result.imageBase64) {
-         generatedImageBase64 = result.imageBase64;
-         logger.info({ jobId: job.id, pageId, pageNumber }, 'Extracted generated image data.');
-       } else {
-         moderationBlocked = true;
-         moderationReasonText = result.blockedReason ?? 'Image generation returned no data.';
-         logger.warn({
-           jobId: job.id, pageId, pageNumber,
-           attempt: contentPolicyAttempt + 1,
-           maxAttempts: MAX_CONTENT_POLICY_RETRIES + 1,
-           reason: moderationReasonText,
-         }, 'Illustration provider reported content block or no image data.');
-       }
-
-    } catch (apiError: any) {
+        if (result.imageBase64) {
+          generatedImageBase64 = result.imageBase64;
+          logger.info({ jobId: job.id, pageId, pageNumber }, 'Extracted generated image data.');
+        } else {
+          moderationBlocked = true;
+          moderationReasonText = result.blockedReason ?? 'Image generation returned no data.';
+          logger.warn(
+            {
+              jobId: job.id,
+              pageId,
+              pageNumber,
+              attempt: contentPolicyAttempt + 1,
+              maxAttempts: MAX_CONTENT_POLICY_RETRIES + 1,
+              reason: moderationReasonText,
+            },
+            'Illustration provider reported content block or no image data.',
+          );
+        }
+      } catch (apiError: any) {
         // Extract detailed error information from illustration provider response
         const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
         const errorCode = apiError?.code || apiError?.response?.status;
         const errorDetails = apiError?.response?.data || apiError?.details;
 
         // Check for specific error types
-        const isSafetyBlock = errorMessage.toLowerCase().includes('safety') ||
-                              errorMessage.toLowerCase().includes('blocked') ||
-                              errorMessage.toLowerCase().includes('content policy');
-        const isCopyrightIssue = errorMessage.toLowerCase().includes('copyright') ||
-                                 errorMessage.toLowerCase().includes('proprietary') ||
-                                 errorMessage.toLowerCase().includes('trademark');
+        const isSafetyBlock =
+          errorMessage.toLowerCase().includes('safety') ||
+          errorMessage.toLowerCase().includes('blocked') ||
+          errorMessage.toLowerCase().includes('content policy');
+        const isCopyrightIssue =
+          errorMessage.toLowerCase().includes('copyright') ||
+          errorMessage.toLowerCase().includes('proprietary') ||
+          errorMessage.toLowerCase().includes('trademark');
         const isContentPolicyBlock = isSafetyBlock || isCopyrightIssue;
 
-        logger.error({
+        logger.error(
+          {
             jobId: job.id,
             pageId,
             pageNumber,
@@ -572,8 +712,10 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
             isSafetyBlock,
             isCopyrightIssue,
             isContentPolicyBlock,
-            fullError: JSON.stringify(apiError, null, 2)
-        }, 'Error calling illustration provider API.');
+            fullError: JSON.stringify(apiError, null, 2),
+          },
+          'Error calling illustration provider API.',
+        );
 
         console.error(`[IllustrationWorker] ${illustrator.name} API error for page ${pageNumber}:`);
         console.error(`  - Error: ${errorMessage}`);
@@ -585,34 +727,42 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
 
         // Content policy violations - retry up to MAX_CONTENT_POLICY_RETRIES times before giving up
         if (isContentPolicyBlock) {
-            moderationBlocked = true;
-            moderationReasonText = `${errorMessage}${errorCode ? ` (Code: ${errorCode})` : ''}${isSafetyBlock ? ' [SAFETY]' : ''}${isCopyrightIssue ? ' [COPYRIGHT]' : ''}`;
-            if (contentPolicyAttempt < MAX_CONTENT_POLICY_RETRIES) {
-                console.log(`[IllustrationWorker] Content policy block on attempt ${contentPolicyAttempt + 1}/${MAX_CONTENT_POLICY_RETRIES + 1} for page ${pageNumber}, will retry...`);
-                continue; // retry loop
-            }
-            console.log(`[IllustrationWorker] Content policy block after ${MAX_CONTENT_POLICY_RETRIES + 1} attempts - marking as FLAGGED`);
-            // Don't throw - let job complete successfully with FLAGGED status
+          moderationBlocked = true;
+          moderationReasonText = `${errorMessage}${errorCode ? ` (Code: ${errorCode})` : ''}${isSafetyBlock ? ' [SAFETY]' : ''}${isCopyrightIssue ? ' [COPYRIGHT]' : ''}`;
+          if (contentPolicyAttempt < MAX_CONTENT_POLICY_RETRIES) {
+            console.log(
+              `[IllustrationWorker] Content policy block on attempt ${contentPolicyAttempt + 1}/${MAX_CONTENT_POLICY_RETRIES + 1} for page ${pageNumber}, will retry...`,
+            );
+            continue; // retry loop
+          }
+          console.log(
+            `[IllustrationWorker] Content policy block after ${MAX_CONTENT_POLICY_RETRIES + 1} attempts - marking as FLAGGED`,
+          );
+          // Don't throw - let job complete successfully with FLAGGED status
         } else {
-            // Other API errors (possibly transient) - re-throw to trigger outer catch block retry logic
-            console.log(`[IllustrationWorker] API error (possibly transient) - re-throwing for retry logic`);
-            throw apiError;
+          // Other API errors (possibly transient) - re-throw to trigger outer catch block retry logic
+          console.log(
+            `[IllustrationWorker] API error (possibly transient) - re-throwing for retry logic`,
+          );
+          throw apiError;
         }
-    }
+      }
 
-    // If we got image data, break out of retry loop
-    if (generatedImageBase64 && !moderationBlocked) {
+      // If we got image data, break out of retry loop
+      if (generatedImageBase64 && !moderationBlocked) {
         break;
-    }
+      }
 
-    // If no image data but not from an API error (response had no image), handle retry
-    if (moderationBlocked && contentPolicyAttempt < MAX_CONTENT_POLICY_RETRIES) {
-        console.log(`[IllustrationWorker] Content policy block on attempt ${contentPolicyAttempt + 1}/${MAX_CONTENT_POLICY_RETRIES + 1} for page ${pageNumber}, will retry...`);
+      // If no image data but not from an API error (response had no image), handle retry
+      if (moderationBlocked && contentPolicyAttempt < MAX_CONTENT_POLICY_RETRIES) {
+        console.log(
+          `[IllustrationWorker] Content policy block on attempt ${contentPolicyAttempt + 1}/${MAX_CONTENT_POLICY_RETRIES + 1} for page ${pageNumber}, will retry...`,
+        );
         continue;
-    }
+      }
 
-    // All retries exhausted or success — break out
-    break;
+      // All retries exhausted or success — break out
+      break;
     } // end content policy retry loop
 
     let finalImageUrl: string | undefined = undefined;
@@ -621,114 +771,151 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     let interiorRenderBuffer: Buffer | null = null;
     if (generatedImageBase64 && !moderationBlocked) {
       try {
-          logger.info({ jobId: job.id, pageId, pageNumber }, 'Decoding and uploading generated image to Cloudinary...');
-          let generatedImageBuffer = Buffer.from(generatedImageBase64, 'base64');
+        logger.info(
+          { jobId: job.id, pageId, pageNumber },
+          'Decoding and uploading generated image to Cloudinary...',
+        );
+        let generatedImageBuffer = Buffer.from(generatedImageBase64, 'base64');
 
-          // Upscale from 2048×2048 to Lulu print size (2625×2625) for 300 DPI at 8.75"
-          // This ensures 300 DPI quality for 8.75" × 8.75" print with bleed
-          try {
-              logger.info({ jobId: job.id, pageId, pageNumber }, 'Upscaling image for print quality (2048 → 2625px)...');
-              console.log(`[IllustrationWorker] Upscaling page ${pageNumber} to 2625×2625 for print`);
-              generatedImageBuffer = await upscaleForPrint(generatedImageBuffer);
-              interiorRenderBuffer = generatedImageBuffer;
-              logger.info({ jobId: job.id, pageId, pageNumber }, 'Image upscaled successfully.');
-          } catch (upscaleError: any) {
-              const errorMessage = `Image upscaling failed: ${upscaleError.message}`;
-              logger.error({
-                  jobId: job.id,
-                  pageId,
-                  pageNumber,
-                  error: upscaleError.message,
-                  stack: upscaleError.stack,
-              }, errorMessage);
-              console.error(`[IllustrationWorker] Upscaling failed for page ${pageNumber}: ${upscaleError.message}`);
-              throw new Error(errorMessage);
-          }
+        // Upscale from 2048×2048 to Lulu print size (2625×2625) for 300 DPI at 8.75"
+        // This ensures 300 DPI quality for 8.75" × 8.75" print with bleed
+        try {
+          logger.info(
+            { jobId: job.id, pageId, pageNumber },
+            'Upscaling image for print quality (2048 → 2625px)...',
+          );
+          console.log(`[IllustrationWorker] Upscaling page ${pageNumber} to 2625×2625 for print`);
+          generatedImageBuffer = await upscaleForPrint(generatedImageBuffer);
+          interiorRenderBuffer = generatedImageBuffer;
+          logger.info({ jobId: job.id, pageId, pageNumber }, 'Image upscaled successfully.');
+        } catch (upscaleError: any) {
+          const errorMessage = `Image upscaling failed: ${upscaleError.message}`;
+          logger.error(
+            {
+              jobId: job.id,
+              pageId,
+              pageNumber,
+              error: upscaleError.message,
+              stack: upscaleError.stack,
+            },
+            errorMessage,
+          );
+          console.error(
+            `[IllustrationWorker] Upscaling failed for page ${pageNumber}: ${upscaleError.message}`,
+          );
+          throw new Error(errorMessage);
+        }
 
-          // Logo overlay is now only applied to the separate cover illustration (generated below)
+        // Logo overlay is now only applied to the separate cover illustration (generated below)
 
-          const uploadResult = await new Promise<any>((resolve, reject) => {
-               cloudinary.uploader.upload_stream(
-                   {
-                       folder: `storywink/${bookId}/generated`,
-                       public_id: `page_${pageNumber}`,
-                       overwrite: true,
-                       tags: [`book:${bookId}`, `page:${pageId}`, `pageNum:${pageNumber}`, `style:${styleKey}`],
-                       resource_type: "image"
-                   },
-                   (error, result) => {
-                       if (error) { reject(error); } else { resolve(result); }
-                   }
-               ).end(generatedImageBuffer);
-          });
+        const uploadResult = await new Promise<any>((resolve, reject) => {
+          cloudinary.uploader
+            .upload_stream(
+              {
+                folder: `storywink/${bookId}/generated`,
+                public_id: `page_${pageNumber}`,
+                overwrite: true,
+                tags: [
+                  `book:${bookId}`,
+                  `page:${pageId}`,
+                  `pageNum:${pageNumber}`,
+                  `style:${styleKey}`,
+                ],
+                resource_type: 'image',
+              },
+              (error, result) => {
+                if (error) {
+                  reject(error);
+                } else {
+                  resolve(result);
+                }
+              },
+            )
+            .end(generatedImageBuffer);
+        });
 
-          if (!uploadResult?.secure_url) {
-              throw new Error('Cloudinary upload did not return a secure URL.');
-          }
-          finalImageUrl = uploadResult.secure_url;
-          logger.info({ jobId: job.id, pageId, pageNumber, cloudinaryUrl: finalImageUrl }, 'Successfully uploaded generated image to Cloudinary');
-          console.log(`[IllustrationWorker] Image uploaded for page ${pageNumber}: ${finalImageUrl}`);
-
+        if (!uploadResult?.secure_url) {
+          throw new Error('Cloudinary upload did not return a secure URL.');
+        }
+        finalImageUrl = uploadResult.secure_url;
+        logger.info(
+          { jobId: job.id, pageId, pageNumber, cloudinaryUrl: finalImageUrl },
+          'Successfully uploaded generated image to Cloudinary',
+        );
+        console.log(`[IllustrationWorker] Image uploaded for page ${pageNumber}: ${finalImageUrl}`);
       } catch (uploadError: any) {
-          logger.error({ jobId: job.id, pageId, pageNumber, error: uploadError.message }, 'Failed to upload generated image to Cloudinary.');
-          moderationBlocked = true;
-          moderationReasonText = moderationReasonText || `Cloudinary upload failed: ${uploadError.message}`;
+        logger.error(
+          { jobId: job.id, pageId, pageNumber, error: uploadError.message },
+          'Failed to upload generated image to Cloudinary.',
+        );
+        moderationBlocked = true;
+        moderationReasonText =
+          moderationReasonText || `Cloudinary upload failed: ${uploadError.message}`;
       }
     }
 
     try {
-        await prisma.page.update({
-            where: { id: pageId },
-            data: {
-                // Overwrite the image only on a successful render+upload. On a
-                // block/failure any previous image (e.g. the round-1 render a
-                // QC re-render is replacing) stays in place — an imperfect
-                // page beats an empty one.
-                ...(!moderationBlocked && finalImageUrl
-                    ? {
-                        generatedImageUrl: finalImageUrl,
-                        // Render-time attribution stamps: finalize persists QC
-                        // rows from these; it cannot infer provider/model.
-                        lastRenderProvider: illustrator.name,
-                        lastRenderModel: illustrator.modelId,
-                        // sheetRefs is what this render actually conditioned
-                        // on (truthful even when a sheet fetch degraded), so
-                        // QC ground truth can be derived per render, not from
-                        // Book.characterReferences at finalize time. The
-                        // avatar-story anchor sheet counts too.
-                        lastRenderHadSheet: renderHadSheet,
-                    }
-                    : {}),
-                moderationStatus: moderationBlocked ? "FLAGGED" : "OK",
-                // Blocked renders never reach QC rows, so attribution for them
-                // lives in the moderation reason itself.
-                moderationReason: moderationBlocked && moderationReasonText
-                    ? `[${illustrator.name}/${illustrator.modelId}] ${moderationReasonText}`
-                    : moderationReasonText,
-            },
-        });
-        logger.info({ 
-            jobId: job.id, 
-            pageId, 
-            pageNumber, 
-            status: moderationBlocked ? "FLAGGED" : "OK",
-            reason: moderationReasonText
-        }, 'Page status updated.');
-        
-        console.log(`[IllustrationWorker] Page ${pageNumber} completed:`);
-        console.log(`  - Status: ${moderationBlocked ? "FLAGGED" : "OK"}`);
-        console.log(`  - Generated Image: ${finalImageUrl ? 'Success' : 'Failed'}`);
-        if (moderationReasonText) {
-          console.log(`  - Reason: ${moderationReasonText}`);
-        }
+      await prisma.page.update({
+        where: { id: pageId },
+        data: {
+          // Overwrite the image only on a successful render+upload. On a
+          // block/failure any previous image (e.g. the round-1 render a
+          // QC re-render is replacing) stays in place — an imperfect
+          // page beats an empty one.
+          ...(!moderationBlocked && finalImageUrl
+            ? {
+                generatedImageUrl: finalImageUrl,
+                // Render-time attribution stamps: finalize persists QC
+                // rows from these; it cannot infer provider/model.
+                lastRenderProvider: illustrator.name,
+                lastRenderModel: illustrator.modelId,
+                // sheetRefs is what this render actually conditioned
+                // on (truthful even when a sheet fetch degraded), so
+                // QC ground truth can be derived per render, not from
+                // Book.characterReferences at finalize time. The
+                // avatar-story anchor sheet counts too.
+                lastRenderHadSheet: renderHadSheet,
+              }
+            : {}),
+          moderationStatus: moderationBlocked ? 'FLAGGED' : 'OK',
+          // Blocked renders never reach QC rows, so attribution for them
+          // lives in the moderation reason itself.
+          moderationReason:
+            moderationBlocked && moderationReasonText
+              ? `[${illustrator.name}/${illustrator.modelId}] ${moderationReasonText}`
+              : moderationReasonText,
+        },
+      });
+      logger.info(
+        {
+          jobId: job.id,
+          pageId,
+          pageNumber,
+          status: moderationBlocked ? 'FLAGGED' : 'OK',
+          reason: moderationReasonText,
+        },
+        'Page status updated.',
+      );
+
+      console.log(`[IllustrationWorker] Page ${pageNumber} completed:`);
+      console.log(`  - Status: ${moderationBlocked ? 'FLAGGED' : 'OK'}`);
+      console.log(`  - Generated Image: ${finalImageUrl ? 'Success' : 'Failed'}`);
+      if (moderationReasonText) {
+        console.log(`  - Reason: ${moderationReasonText}`);
+      }
     } catch (dbError: any) {
-         logger.error({ jobId: job.id, pageId, pageNumber, error: dbError.message }, 'Failed to update page status in database.');
-         throw dbError; 
+      logger.error(
+        { jobId: job.id, pageId, pageNumber, error: dbError.message },
+        'Failed to update page status in database.',
+      );
+      throw dbError;
     }
 
     // Generate separate COVER illustration for the cover page (with cover prompt + logo)
     if (isTitlePage && !moderationBlocked && finalImageUrl) {
-      console.log(`[IllustrationWorker] Generating separate cover illustration for title page ${pageNumber}...`);
+      console.log(
+        `[IllustrationWorker] Generating separate cover illustration for title page ${pageNumber}...`,
+      );
       try {
         // Cover binding (CHARACTER_SHEETS_ENABLED): the cover call receives
         // the character sheet(s) plus the approved interior title-page render
@@ -753,7 +940,10 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
           language: language || 'en',
           characterIdentity: characterIdentity || null,
           pageNumber,
-          contentImage: avatarCoverAnchor ?? { buffer: contentImageBuffer!, mimeType: contentImageMimeType! },
+          contentImage: avatarCoverAnchor ?? {
+            buffer: contentImageBuffer!,
+            mimeType: contentImageMimeType!,
+          },
           characterSheetRefs: isAvatarBook
             ? [...(sheetAnchored ? [contentInput] : []), ...sheetRefs]
             : sheetRefs,
@@ -767,12 +957,19 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         });
 
         if ('coverUrl' in coverOutcome) {
-          console.log(`[IllustrationWorker] Cover illustration generated and stored: ${coverOutcome.coverUrl}`);
+          console.log(
+            `[IllustrationWorker] Cover illustration generated and stored: ${coverOutcome.coverUrl}`,
+          );
         }
       } catch (coverError: any) {
         // Cover illustration failure is non-fatal -- the story illustration is already saved
-        logger.error({ jobId: job.id, bookId, pageNumber, error: coverError.message }, 'Cover illustration generation failed (non-fatal)');
-        console.error(`[IllustrationWorker] Cover illustration failed for page ${pageNumber}: ${coverError.message}`);
+        logger.error(
+          { jobId: job.id, bookId, pageNumber, error: coverError.message },
+          'Cover illustration generation failed (non-fatal)',
+        );
+        console.error(
+          `[IllustrationWorker] Cover illustration failed for page ${pageNumber}: ${coverError.message}`,
+        );
       }
     }
 
@@ -783,9 +980,8 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       success: true,
       imageUrl: finalImageUrl,
       pageNumber,
-      moderationStatus: moderationBlocked ? "FLAGGED" : "OK"
+      moderationStatus: moderationBlocked ? 'FLAGGED' : 'OK',
     };
-    
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const transient = isTransientError(error);
@@ -811,12 +1007,21 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       hasIllustrationNotes: !!illustrationNotes,
       hasText: !!text,
       textLength: text?.length || 0,
-      failureStage: errorMessage.includes('text overlay') || errorMessage.includes('Text overlay') ? 'text_overlay' :
-                   (errorMessage.includes('Gemini') || errorMessage.includes('Google') ||
-                    errorMessage.includes('OpenAI') || errorMessage.includes('gpt-image')) ? 'ai_generation' :
-                   errorMessage.includes('Cloudinary') ? 'image_upload' :
-                   errorMessage.includes('fetch') ? 'image_fetch' :
-                   errorMessage.includes('database') ? 'database_update' : 'unknown'
+      failureStage:
+        errorMessage.includes('text overlay') || errorMessage.includes('Text overlay')
+          ? 'text_overlay'
+          : errorMessage.includes('Gemini') ||
+              errorMessage.includes('Google') ||
+              errorMessage.includes('OpenAI') ||
+              errorMessage.includes('gpt-image')
+            ? 'ai_generation'
+            : errorMessage.includes('Cloudinary')
+              ? 'image_upload'
+              : errorMessage.includes('fetch')
+                ? 'image_fetch'
+                : errorMessage.includes('database')
+                  ? 'database_update'
+                  : 'unknown',
     };
 
     logger.error(errorContext, 'Illustration generation error');
@@ -832,30 +1037,42 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     // TRANSIENT + NOT LAST ATTEMPT: Re-throw WITHOUT updating page status
     // BullMQ will retry automatically with exponential backoff
     if (willRetry) {
-      console.log(`[IllustrationWorker] Transient error detected - BullMQ will retry automatically`);
-      await new Promise(resolve => setTimeout(resolve, 100)); // Flush logs
+      console.log(
+        `[IllustrationWorker] Transient error detected - BullMQ will retry automatically`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Flush logs
       throw error;
     }
 
     // PERMANENT ERROR or LAST ATTEMPT: Mark page as FAILED
-    console.error(`[IllustrationWorker] Marking page ${pageNumber} as FAILED (permanent error or final attempt)`);
+    console.error(
+      `[IllustrationWorker] Marking page ${pageNumber} as FAILED (permanent error or final attempt)`,
+    );
 
     try {
       await prisma.page.update({
         where: { id: pageId },
         data: {
           moderationStatus: 'FAILED',
-          moderationReason: `Job failed (${errorContext.failureStage}): ${errorMessage}`.slice(0, 1000),
+          moderationReason: `Job failed (${errorContext.failureStage}): ${errorMessage}`.slice(
+            0,
+            1000,
+          ),
         },
       });
       console.error(`[IllustrationWorker] Page ${pageNumber} marked as FAILED in database`);
     } catch (updateError: any) {
-       logger.error({ jobId: job.id, bookId, error: updateError.message }, 'Failed to update page status to FAILED after job error.');
-       console.error(`[IllustrationWorker] WARNING: Could not mark page ${pageNumber} as failed in database: ${updateError.message}`);
+      logger.error(
+        { jobId: job.id, bookId, error: updateError.message },
+        'Failed to update page status to FAILED after job error.',
+      );
+      console.error(
+        `[IllustrationWorker] WARNING: Could not mark page ${pageNumber} as failed in database: ${updateError.message}`,
+      );
     }
 
     // Force log flush delay before throwing to ensure Railway captures logs
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     throw error;
   }

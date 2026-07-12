@@ -34,9 +34,7 @@ export interface BullMQConnectionOptions {
  * const redis = new Redis(createBullMQConnection());
  * ```
  */
-export function createBullMQConnection(
-  redisUrl?: string
-): BullMQConnectionOptions {
+export function createBullMQConnection(redisUrl?: string): BullMQConnectionOptions {
   const url = redisUrl || process.env.REDIS_URL;
 
   if (!url) {

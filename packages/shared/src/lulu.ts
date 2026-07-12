@@ -142,4 +142,5 @@ export const LULU_TEST_ADDRESS = {
 
 // Type exports
 export type LuluShippingLevel = (typeof LULU_CONFIG.SHIPPING_LEVELS)[number];
-export type LuluPodPackageId = (typeof LULU_CONFIG.POD_PACKAGES)[keyof typeof LULU_CONFIG.POD_PACKAGES];
+export type LuluPodPackageId =
+  (typeof LULU_CONFIG.POD_PACKAGES)[keyof typeof LULU_CONFIG.POD_PACKAGES];

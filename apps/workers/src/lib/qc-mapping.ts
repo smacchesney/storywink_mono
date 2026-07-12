@@ -42,9 +42,7 @@ export function mapQcResultsToPages(
   const unmatchedEchoes: number[] = [];
 
   for (const pr of pageResults) {
-    const ref = Number.isInteger(pr.pageNumber)
-      ? pageMapping[pr.pageNumber - 1]
-      : undefined;
+    const ref = Number.isInteger(pr.pageNumber) ? pageMapping[pr.pageNumber - 1] : undefined;
 
     if (!ref) {
       unmatchedEchoes.push(pr.pageNumber);

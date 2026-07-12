@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  scopeCaptureQuestions,
-  CaptureQuestion,
-  ScopeCharacterLike,
-} from './photo-analysis.js';
+import { scopeCaptureQuestions, CaptureQuestion, ScopeCharacterLike } from './photo-analysis.js';
 
 const q = (overrides: Partial<CaptureQuestion>): CaptureQuestion => ({
   id: 'q1',
@@ -13,9 +9,7 @@ const q = (overrides: Partial<CaptureQuestion>): CaptureQuestion => ({
   ...overrides,
 });
 
-const character = (
-  overrides: Partial<ScopeCharacterLike>,
-): ScopeCharacterLike => ({
+const character = (overrides: Partial<ScopeCharacterLike>): ScopeCharacterLike => ({
   characterId: 'adult_1',
   role: 'grandparent',
   name: null,
@@ -35,7 +29,7 @@ describe('scopeCaptureQuestions', () => {
       [q({ id: 'q1', characterId: 'adult_1' })],
       [mainChild, character({})],
     );
-    expect(result.map(x => x.id)).toEqual(['q1']);
+    expect(result.map((x) => x.id)).toEqual(['q1']);
   });
 
   it('drops naming questions for one-photo passersby', () => {
@@ -71,13 +65,10 @@ describe('scopeCaptureQuestions', () => {
 
   it('keeps one naming question per character (first wins)', () => {
     const result = scopeCaptureQuestions(
-      [
-        q({ id: 'q1', characterId: 'adult_1' }),
-        q({ id: 'q2', characterId: 'adult_1' }),
-      ],
+      [q({ id: 'q1', characterId: 'adult_1' }), q({ id: 'q2', characterId: 'adult_1' })],
       [mainChild, character({})],
     );
-    expect(result.map(x => x.id)).toEqual(['q1']);
+    expect(result.map((x) => x.id)).toEqual(['q1']);
   });
 
   it('covers pets: an unnamed recurring pet sharing photos with the child qualifies', () => {
@@ -85,7 +76,7 @@ describe('scopeCaptureQuestions', () => {
       [q({ id: 'q1', characterId: 'pet_1', options: ['Our dog', "Grandma's dog"] })],
       [mainChild, character({ characterId: 'pet_1', role: 'pet', appearsOnPages: [2, 4] })],
     );
-    expect(result.map(x => x.id)).toEqual(['q1']);
+    expect(result.map((x) => x.id)).toEqual(['q1']);
   });
 
   it('sorts naming questions first and caps them at 2 of the 3 slots', () => {
@@ -104,7 +95,7 @@ describe('scopeCaptureQuestions', () => {
       ],
     );
     // Two naming slots, then the highlight question survives.
-    expect(result.map(x => x.id)).toEqual(['n1', 'n2', 'highlight']);
+    expect(result.map((x) => x.id)).toEqual(['n1', 'n2', 'highlight']);
   });
 
   it('lets overflow naming questions refill trailing slots when no other kinds exist', () => {
@@ -121,7 +112,7 @@ describe('scopeCaptureQuestions', () => {
         character({ characterId: 'pet_1', role: 'pet' }),
       ],
     );
-    expect(result.map(x => x.id)).toEqual(['n1', 'n2', 'n3']);
+    expect(result.map((x) => x.id)).toEqual(['n1', 'n2', 'n3']);
   });
 
   it('caps the total at 3 questions', () => {
@@ -129,7 +120,7 @@ describe('scopeCaptureQuestions', () => {
       [q({ id: 'q1' }), q({ id: 'q2' }), q({ id: 'q3' }), q({ id: 'q4' })],
       [mainChild],
     );
-    expect(result.map(x => x.id)).toEqual(['q1', 'q2', 'q3']);
+    expect(result.map((x) => x.id)).toEqual(['q1', 'q2', 'q3']);
   });
 
   it('drops all naming questions when the roster has no main child (cannot verify scoping)', () => {
@@ -137,7 +128,7 @@ describe('scopeCaptureQuestions', () => {
       [q({ id: 'n1', characterId: 'adult_1' }), q({ id: 'other' })],
       [character({})],
     );
-    expect(result.map(x => x.id)).toEqual(['other']);
+    expect(result.map((x) => x.id)).toEqual(['other']);
   });
 });
 
@@ -157,7 +148,7 @@ describe('scopeCaptureQuestions — companion objects', () => {
       ],
       [mainChild, character({}), bunny],
     );
-    expect(result.map(x => x.id)).toEqual(['q1', 'q2', 'q3']);
+    expect(result.map((x) => x.id)).toEqual(['q1', 'q2', 'q3']);
   });
 
   it('people naming outranks the object question inside the naming cap', () => {
@@ -176,7 +167,7 @@ describe('scopeCaptureQuestions — companion objects', () => {
       ],
     );
     // 2 people-naming take both naming slots; object question drops; other survives.
-    expect(result.map(x => x.id)).toEqual(['q2', 'q3', 'q4']);
+    expect(result.map((x) => x.id)).toEqual(['q2', 'q3', 'q4']);
   });
 
   it('drops an object question for a one-photo object', () => {

@@ -50,10 +50,7 @@ describe('resolveCastForStory', () => {
 
   it('returns exact current pages when every stamped asset survives (reorder-safe)', () => {
     // Photos reordered since perception: asset-c now first, asset-a third.
-    const cast = resolveCastForStory(
-      [character({})],
-      ['asset-c', 'asset-b', 'asset-a'],
-    );
+    const cast = resolveCastForStory([character({})], ['asset-c', 'asset-b', 'asset-a']);
     expect(cast).toEqual([
       { characterId: 'adult_1', name: 'grandparent', role: 'grandparent', appearsOnPages: [1, 3] },
     ]);
@@ -83,8 +80,12 @@ describe('resolveCastForStory', () => {
   });
 
   it('drops legacy characters without assetId stamps', () => {
-    expect(resolveCastForStory([character({ appearsOnAssetIds: undefined })], ['asset-a'])).toEqual([]);
-    expect(resolveCastForStory([character({ appearsOnAssetIds: [null, null] })], ['asset-a'])).toEqual([]);
+    expect(resolveCastForStory([character({ appearsOnAssetIds: undefined })], ['asset-a'])).toEqual(
+      [],
+    );
+    expect(
+      resolveCastForStory([character({ appearsOnAssetIds: [null, null] })], ['asset-a']),
+    ).toEqual([]);
   });
 
   it('skips null stamps but resolves the rest exactly', () => {

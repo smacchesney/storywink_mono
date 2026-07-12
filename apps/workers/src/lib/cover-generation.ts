@@ -12,7 +12,10 @@ import { v2 as cloudinary } from 'cloudinary';
 import type { Logger } from 'pino';
 import prisma from '../database/index.js';
 import { CharacterIdentity } from '@storywink/shared';
-import { createIllustrationPrompt, IllustrationPromptOptions } from '@storywink/shared/prompts/illustration';
+import {
+  createIllustrationPrompt,
+  IllustrationPromptOptions,
+} from '@storywink/shared/prompts/illustration';
 import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
 import { getIllustrator } from './illustrators/index.js';
 import type { IllustrationImageInput } from './illustrators/index.js';
@@ -53,9 +56,7 @@ export interface CoverGenerationOptions {
   logger: Logger;
 }
 
-export type CoverGenerationResult =
-  | { coverUrl: string }
-  | { blockedReason: string };
+export type CoverGenerationResult = { coverUrl: string } | { blockedReason: string };
 
 /**
  * Renders the cover, upscales it for print, applies the logo overlay,
@@ -123,10 +124,7 @@ export async function generateAndStoreCover(
   const illustrator = getIllustrator();
   const coverResult = await illustrator.generate({
     contentImage,
-    characterRefs: [
-      ...characterSheetRefs,
-      ...(interiorRenderRef ? [interiorRenderRef] : []),
-    ],
+    characterRefs: [...characterSheetRefs, ...(interiorRenderRef ? [interiorRenderRef] : [])],
     styleRefs: coverRefBuffers,
     prompt: coverTextPrompt,
   });

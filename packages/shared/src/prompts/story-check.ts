@@ -25,9 +25,7 @@ export interface StoryQCInput {
 }
 
 export function createStoryQCPrompt(input: StoryQCInput): string {
-  const pagesBlock = input.pages
-    .map(p => `--- Page ${p.pageNumber} ---\n${p.text}`)
-    .join('\n');
+  const pagesBlock = input.pages.map((p) => `--- Page ${p.pageNumber} ---\n${p.text}`).join('\n');
 
   // Mirror generation: exactly ONE experience-context block, with the
   // confirmed eventSummary superseding the legacy free-text theme, and
@@ -35,7 +33,7 @@ export function createStoryQCPrompt(input: StoryQCInput): string {
   const contextBlock = input.eventSummary
     ? `\n# What actually happened (confirmed by the parent)\n"${input.eventSummary}" — the story must deliver this specific day.\n${
         input.confirmedFacts?.length
-          ? input.confirmedFacts.map(f => `- Parent confirmed: ${f}`).join('\n') + '\n'
+          ? input.confirmedFacts.map((f) => `- Parent confirmed: ${f}`).join('\n') + '\n'
           : ''
       }`
     : input.theme
@@ -87,7 +85,10 @@ export const STORY_QC_RESPONSE_SCHEMA = {
         properties: {
           pageNumber: { type: 'number' },
           captionRisk: { type: 'number', description: '0-10' },
-          issue: { type: ['string', 'null'], description: 'Specific problem on this page, or null' },
+          issue: {
+            type: ['string', 'null'],
+            description: 'Specific problem on this page, or null',
+          },
         },
         required: ['pageNumber', 'captionRisk', 'issue'],
         additionalProperties: false,
@@ -97,9 +98,19 @@ export const STORY_QC_RESPONSE_SCHEMA = {
       type: ['number', 'null'],
       description: '0-10 when an event summary was provided, else null',
     },
-    feedback: { type: ['string', 'null'], description: 'Numbered corrections if failing, else null' },
+    feedback: {
+      type: ['string', 'null'],
+      description: 'Numbered corrections if failing, else null',
+    },
   },
-  required: ['arcCoherence', 'readAloudRhythm', 'lastPageLanding', 'pages', 'truthToEvent', 'feedback'],
+  required: [
+    'arcCoherence',
+    'readAloudRhythm',
+    'lastPageLanding',
+    'pages',
+    'truthToEvent',
+    'feedback',
+  ],
   additionalProperties: false,
 } as const;
 
@@ -152,14 +163,14 @@ export interface AvatarStoryQCInput {
 }
 
 export function createAvatarStoryQCPrompt(input: AvatarStoryQCInput): string {
-  const pagesBlock = input.pages
-    .map(p => `--- Page ${p.pageNumber} ---\n${p.text}`)
-    .join('\n');
+  const pagesBlock = input.pages.map((p) => `--- Page ${p.pageNumber} ---\n${p.text}`).join('\n');
 
   const castBlock = input.cast?.length
     ? `\n# The cast the parent picked\n${input.cast
-        .map(c => `- ${c.name} (${c.role.replace(/_/g, ' ')})`)
-        .join('\n')}\nEvery cast member should matter to the story; no character outside this list may appear.\n`
+        .map((c) => `- ${c.name} (${c.role.replace(/_/g, ' ')})`)
+        .join(
+          '\n',
+        )}\nEvery cast member should matter to the story; no character outside this list may appear.\n`
     : '';
 
   return `Review this ${input.pages.length}-page toddler picture-book manuscript. It is an INVENTED adventure (no photos) starring the family's own characters, built on a premise the parent picked.
@@ -205,7 +216,10 @@ export const AVATAR_STORY_QC_RESPONSE_SCHEMA = {
         type: 'object',
         properties: {
           pageNumber: { type: 'number' },
-          issue: { type: ['string', 'null'], description: 'Specific problem on this page, or null' },
+          issue: {
+            type: ['string', 'null'],
+            description: 'Specific problem on this page, or null',
+          },
         },
         required: ['pageNumber', 'issue'],
         additionalProperties: false,
@@ -215,9 +229,19 @@ export const AVATAR_STORY_QC_RESPONSE_SCHEMA = {
       type: 'number',
       description: '0-10 — does the manuscript deliver the parent-picked premise',
     },
-    feedback: { type: ['string', 'null'], description: 'Numbered corrections if failing, else null' },
+    feedback: {
+      type: ['string', 'null'],
+      description: 'Numbered corrections if failing, else null',
+    },
   },
-  required: ['arcCoherence', 'readAloudRhythm', 'lastPageLanding', 'pages', 'premiseTruth', 'feedback'],
+  required: [
+    'arcCoherence',
+    'readAloudRhythm',
+    'lastPageLanding',
+    'pages',
+    'premiseTruth',
+    'feedback',
+  ],
   additionalProperties: false,
 } as const;
 
@@ -263,7 +287,7 @@ export function countRefrainEchoes(
     for (let i = 0; i + runLength <= compact.length; i++) {
       runs.add(compact.slice(i, i + runLength));
     }
-    return pageTexts.filter(text => {
+    return pageTexts.filter((text) => {
       const compactPage = normalize(text).replace(/ /g, '');
       for (const run of runs) {
         if (compactPage.includes(run)) return true;
@@ -272,12 +296,12 @@ export function countRefrainEchoes(
     }).length;
   }
 
-  const words = cleanRefrain.split(' ').filter(w => w.length > 2);
+  const words = cleanRefrain.split(' ').filter((w) => w.length > 2);
   if (words.length === 0) return 0;
   const needed = Math.ceil(words.length / 2);
-  return pageTexts.filter(text => {
+  return pageTexts.filter((text) => {
     const page = ` ${normalize(text)} `;
-    const hits = words.filter(w => page.includes(` ${w} `)).length;
+    const hits = words.filter((w) => page.includes(` ${w} `)).length;
     return hits >= needed;
   }).length;
 }
@@ -328,9 +352,7 @@ export function countChildNameEchoes(childName: string, pageTexts: string[]): Ch
   const compactName = name.replace(/ /g, '');
   const matches = (text: string): boolean => {
     const page = normalize(text);
-    return latin
-      ? ` ${page} `.includes(` ${name} `)
-      : page.replace(/ /g, '').includes(compactName);
+    return latin ? ` ${page} `.includes(` ${name} `) : page.replace(/ /g, '').includes(compactName);
   };
 
   const flags = pageTexts.map(matches);
@@ -356,7 +378,7 @@ export function countLearningWordEchoes(
   // A Latin-script word gets boundary matching only where the surrounding
   // text HAS word boundaries; inside ja prose, substring matching is safer.
   const latin = language !== 'ja' && /[A-Za-zÀ-ɏ]/.test(clean);
-  return pageTexts.filter(text => {
+  return pageTexts.filter((text) => {
     const page = normalize(text);
     return latin
       ? ` ${page} `.includes(` ${clean} `)

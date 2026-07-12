@@ -121,11 +121,11 @@ export async function normalizeBookPalette(params: NormalizeBookPaletteParams): 
     });
 
     const titlePage =
-      pages.find(p => isTitlePage(p.assetId, coverAssetId)) ??
+      pages.find((p) => isTitlePage(p.assetId, coverAssetId)) ??
       // Avatar-story books ONLY: no photo cover exists — anchor to the
       // persisted isTitlePage row. Photo books keep the derived-helper
       // semantics exactly (bookType-gated like every sibling call site).
-      (params.bookType === 'AVATAR_STORY' ? pages.find(p => p.isTitlePage === true) : undefined);
+      (params.bookType === 'AVATAR_STORY' ? pages.find((p) => p.isTitlePage === true) : undefined);
     if (!titlePage?.generatedImageUrl) {
       logger.info({ bookId }, 'Palette normalization skipped: no title-page render to anchor to');
       return;
@@ -134,14 +134,19 @@ export async function normalizeBookPalette(params: NormalizeBookPaletteParams): 
     const reference = await fetchImageInput(titlePage.generatedImageUrl);
     const referenceStats = await statsForBuffer(reference.buffer);
 
-    const targets = pages.filter(p => p.id !== titlePage.id && p.generatedImageUrl);
+    const targets = pages.filter((p) => p.id !== titlePage.id && p.generatedImageUrl);
 
     let normalized = 0;
     let skipped = 0;
     for (const page of targets) {
       if (overBudget()) {
         logger.info(
-          { bookId, budgetMs: PALETTE_BUDGET_MS, normalized, remaining: targets.length - normalized - skipped },
+          {
+            bookId,
+            budgetMs: PALETTE_BUDGET_MS,
+            normalized,
+            remaining: targets.length - normalized - skipped,
+          },
           'Palette normalization budget exhausted — skipping remaining pages',
         );
         return;
@@ -150,7 +155,11 @@ export async function normalizeBookPalette(params: NormalizeBookPaletteParams): 
       try {
         const image = await fetchImageInput(page.generatedImageUrl!);
         const pageStats = await statsForBuffer(image.buffer);
-        const coefficients = computeTransferCoefficients(pageStats, referenceStats, PALETTE_STRENGTH);
+        const coefficients = computeTransferCoefficients(
+          pageStats,
+          referenceStats,
+          PALETTE_STRENGTH,
+        );
         const delta = meanDelta(pageStats, referenceStats);
 
         if (isNearIdentity(coefficients)) {

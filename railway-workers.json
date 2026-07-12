@@ -4,12 +4,7 @@
     "builder": "DOCKERFILE",
     "dockerfilePath": "apps/workers/Dockerfile",
     "dockerContext": ".",
-    "watchPatterns": [
-      "/apps/workers/**",
-      "/packages/**",
-      "/package.json",
-      "/turbo.json"
-    ]
+    "watchPatterns": ["/apps/workers/**", "/packages/**", "/package.json", "/turbo.json"]
   },
   "deploy": {
     "restartPolicyType": "ON_FAILURE",

@@ -23,7 +23,9 @@ function getDropboxClient(): Dropbox {
   if (_dbx) return _dbx;
 
   if (!appKey || !appSecret || !refreshToken) {
-    throw new Error('Dropbox not configured: Missing DROPBOX_APP_KEY, DROPBOX_APP_SECRET, or DROPBOX_REFRESH_TOKEN');
+    throw new Error(
+      'Dropbox not configured: Missing DROPBOX_APP_KEY, DROPBOX_APP_SECRET, or DROPBOX_REFRESH_TOKEN',
+    );
   }
 
   // Create auth instance with refresh token - automatically handles token refresh
@@ -50,7 +52,7 @@ function getDropboxClient(): Dropbox {
 export async function uploadPdfToDropbox(
   buffer: Buffer,
   bookId: string,
-  filename: 'interior.pdf' | 'cover.pdf'
+  filename: 'interior.pdf' | 'cover.pdf',
 ): Promise<{ url: string; path: string }> {
   const dbx = getDropboxClient();
 
@@ -81,7 +83,9 @@ export async function uploadPdfToDropbox(
     // If link already exists, fetch it
     const errorObj = error as { error?: { error_summary?: string } };
     if (errorObj?.error?.error_summary?.includes('shared_link_already_exists')) {
-      console.log(`[Dropbox] Shared link already exists for ${dropboxPath}, fetching existing link...`);
+      console.log(
+        `[Dropbox] Shared link already exists for ${dropboxPath}, fetching existing link...`,
+      );
       const listResult = await dbx.sharingListSharedLinks({
         path: dropboxPath,
         direct_only: true,

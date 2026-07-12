@@ -68,7 +68,7 @@ describe('Lulu interior HTML — frozen rendering inputs (default path)', () => 
     const html = luluInteriorHtml(10);
     for (let i = 1; i <= 10; i++) {
       expect(html).toContain(
-        `https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:best/v1/page-${i}.png`
+        `https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:best/v1/page-${i}.png`,
       );
     }
     // Raw mascot URLs are NOT substrings of their transformed forms, so

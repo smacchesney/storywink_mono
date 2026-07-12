@@ -47,12 +47,14 @@ describe('buildAvatarCastForPrompt', () => {
   });
 
   it('drops entries without a characterId or a name and defaults blank roles', () => {
-    const cast = buildAvatarCastForPrompt([
-      { characterId: '', name: 'Ghost' },
-      { characterId: 'avatar_3', name: '  ' },
-      { characterId: 'avatar_4', name: 'Auntie', role: '' },
-      null as unknown as { characterId: string },
-    ].filter(Boolean) as Parameters<typeof buildAvatarCastForPrompt>[0]);
+    const cast = buildAvatarCastForPrompt(
+      [
+        { characterId: '', name: 'Ghost' },
+        { characterId: 'avatar_3', name: '  ' },
+        { characterId: 'avatar_4', name: 'Auntie', role: '' },
+        null as unknown as { characterId: string },
+      ].filter(Boolean) as Parameters<typeof buildAvatarCastForPrompt>[0],
+    );
     expect(cast).toEqual([
       { characterId: 'avatar_4', name: 'Auntie', role: 'grown-up', description: undefined },
     ]);
@@ -89,7 +91,9 @@ describe('extractAvatarScene', () => {
   it('returns null for malformed scenes (never throws)', () => {
     expect(extractAvatarScene(null, ['avatar_1'])).toBeNull();
     expect(extractAvatarScene({ location: '' }, ['avatar_1'])).toBeNull();
-    expect(extractAvatarScene({ ...validScene, outfitFrom: 'previous' }, ['avatar_1'])).not.toBeNull();
+    expect(
+      extractAvatarScene({ ...validScene, outfitFrom: 'previous' }, ['avatar_1']),
+    ).not.toBeNull();
   });
 
   it('tolerates an empty charactersPresent (wide establishing shot)', () => {
@@ -106,7 +110,7 @@ describe('orderCharacterSheets', () => {
   ];
 
   it('star first, then roster (pick) order — image 1 is always the star', () => {
-    expect(orderCharacterSheets(sheets, 'avatar_2').map(s => s.characterId)).toEqual([
+    expect(orderCharacterSheets(sheets, 'avatar_2').map((s) => s.characterId)).toEqual([
       'avatar_2',
       'avatar_1',
       'avatar_3',
@@ -114,7 +118,7 @@ describe('orderCharacterSheets', () => {
   });
 
   it('no star (adult-only cast) → deterministic roster order, never DB order', () => {
-    expect(orderCharacterSheets(sheets, null).map(s => s.characterId)).toEqual([
+    expect(orderCharacterSheets(sheets, null).map((s) => s.characterId)).toEqual([
       'avatar_1',
       'avatar_2',
       'avatar_3',
@@ -123,14 +127,14 @@ describe('orderCharacterSheets', () => {
 
   it('numeric-aware: avatar_10 sorts after avatar_2', () => {
     const wide = [{ characterId: 'avatar_10' }, { characterId: 'avatar_2' }];
-    expect(orderCharacterSheets(wide, null).map(s => s.characterId)).toEqual([
+    expect(orderCharacterSheets(wide, null).map((s) => s.characterId)).toEqual([
       'avatar_2',
       'avatar_10',
     ]);
   });
 
   it('a star id missing from the sheets degrades to roster order', () => {
-    expect(orderCharacterSheets(sheets, 'avatar_9').map(s => s.characterId)).toEqual([
+    expect(orderCharacterSheets(sheets, 'avatar_9').map((s) => s.characterId)).toEqual([
       'avatar_1',
       'avatar_2',
       'avatar_3',
@@ -152,7 +156,7 @@ describe('avatarStoryQcProblems', () => {
       1,
     );
     expect(problems).toHaveLength(5); // 4 failures + appended feedback
-    expect(problems.some(p => p.includes('refrain'))).toBe(true);
+    expect(problems.some((p) => p.includes('refrain'))).toBe(true);
     expect(problems.at(-1)).toBe('1. Fix it.');
   });
 

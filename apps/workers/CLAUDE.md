@@ -3,6 +3,7 @@
 Background job processors for AI operations.
 
 ## Stack
+
 - BullMQ workers with TypeScript
 - `gpt-5.5` (OpenAI Responses API, override via `STORY_MODEL`) for story generation
 - `gpt-5-mini` for character extraction and QC (illustration QC + story QC)
@@ -10,13 +11,16 @@ Background job processors for AI operations.
 - Redis via `createBullMQConnection()` from `@storywink/shared/redis`
 
 ## Key Directories
+
 - `src/workers/` — Job processor implementations
 - `src/lib/` — AI client wrappers and utilities
 
 ## PDF Generation
+
 All PDF generation lives in the shared `packages/pdf` workspace (`@storywink/pdf`). This app supplies fonts via `src/utils/pdf-fonts.ts`; the print-fulfillment worker calls the package. The Lulu output path is production-verified — behavior changes there require a new proof print.
 
 ## Patterns
+
 - All AI operations are async — enqueued by Next.js API routes in `apps/web`, processed here
 - Workers should be idempotent — a job may be retried on failure
 - Use `@storywink/shared` for all shared types, schemas, and prompts

@@ -18,15 +18,13 @@ export interface CaptureQuestionLike {
  * the story prompt. Unanswered, blank, and skipped questions are dropped —
  * the '__skip__' sentinel must never reach the model.
  */
-export function buildConfirmedFacts(
-  questions: CaptureQuestionLike[] | null | undefined,
-): string[] {
+export function buildConfirmedFacts(questions: CaptureQuestionLike[] | null | undefined): string[] {
   return (questions ?? [])
-    .filter(q => {
+    .filter((q) => {
       const answer = q.answer?.trim();
       return !!answer && answer !== SKIP_SENTINEL;
     })
-    .map(q => `${q.question} → ${q.answer}`);
+    .map((q) => `${q.question} → ${q.answer}`);
 }
 
 export interface RawCastCharacter {
@@ -70,13 +68,11 @@ export function resolveCastForStory(
 
   const resolved: ResolvedCastMember[] = [];
   for (const character of characters) {
-    const stamps = (character.appearsOnAssetIds ?? []).filter(
-      (id): id is string => !!id,
-    );
+    const stamps = (character.appearsOnAssetIds ?? []).filter((id): id is string => !!id);
     if (stamps.length === 0) continue; // legacy identity without stamps — nothing verifiable
 
     const pages = stamps
-      .map(id => positionByAsset.get(id))
+      .map((id) => positionByAsset.get(id))
       .filter((p): p is number => p !== undefined);
     if (pages.length === 0) continue; // every photo with this character was removed
 
@@ -85,9 +81,7 @@ export function resolveCastForStory(
       name: character.name || character.role.replace(/_/g, ' '),
       role: character.role,
       appearsOnPages:
-        pages.length === stamps.length
-          ? [...new Set(pages)].sort((a, b) => a - b)
-          : [],
+        pages.length === stamps.length ? [...new Set(pages)].sort((a, b) => a - b) : [],
     });
   }
   return resolved;

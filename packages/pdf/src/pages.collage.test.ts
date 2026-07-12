@@ -34,7 +34,10 @@ function makePage(i: number, overrides: Partial<CollagePage> = {}): CollagePage 
   } as unknown as CollagePage;
 }
 
-function makeBook(n: number, pageOverrides: (i: number) => Partial<CollagePage> = () => ({})): BookWithPages {
+function makeBook(
+  n: number,
+  pageOverrides: (i: number) => Partial<CollagePage> = () => ({}),
+): BookWithPages {
   return {
     id: 'book-1',
     title: 'Test Book',
@@ -58,7 +61,7 @@ describe('collectCollagePhotos', () => {
 
   it('skips bridge pages and pages without a loaded asset', () => {
     const book = makeBook(4, (i) =>
-      i === 2 ? { source: 'BRIDGE', assetId: null, asset: null } : i === 3 ? { asset: null } : {}
+      i === 2 ? { source: 'BRIDGE', assetId: null, asset: null } : i === 3 ? { asset: null } : {},
     );
     expect(collectCollagePhotos(book)).toHaveLength(2);
   });
@@ -67,9 +70,9 @@ describe('collectCollagePhotos', () => {
 describe('collageCellUrl', () => {
   it('inserts an exact-size face-centered jpg fill crop', () => {
     expect(
-      collageCellUrl('https://res.cloudinary.com/storywink/image/upload/v1/orig.jpg', 2.5)
+      collageCellUrl('https://res.cloudinary.com/storywink/image/upload/v1/orig.jpg', 2.5),
     ).toBe(
-      'https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:good,c_lfill,w_750,h_750,g_auto:faces/v1/orig.jpg'
+      'https://res.cloudinary.com/storywink/image/upload/f_jpg,q_auto:good,c_lfill,w_750,h_750,g_auto:faces/v1/orig.jpg',
     );
   });
 
@@ -134,10 +137,14 @@ describe('assembleInteriorPages — collage insertion', () => {
     }).map((p) => p.kind);
     expect(kinds).toEqual([
       'dedication',
-      'text', 'illustration',
-      'text', 'illustration',
-      'text', 'illustration',
-      'text', 'illustration',
+      'text',
+      'illustration',
+      'text',
+      'illustration',
+      'text',
+      'illustration',
+      'text',
+      'illustration',
       'ending',
       'collage',
       'backCover',

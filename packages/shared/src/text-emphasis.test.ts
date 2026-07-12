@@ -20,7 +20,7 @@ describe('splitEmphasisSegments', () => {
 
   it('never lights up substrings of larger Latin words', () => {
     const segments = splitEmphasisSegments('The catalog shows a cat.', ['cat']);
-    expect(segments.filter(s => s.emphasized).map(s => s.text)).toEqual(['cat']);
+    expect(segments.filter((s) => s.emphasized).map((s) => s.text)).toEqual(['cat']);
   });
 
   it('matches CJK words as exact substrings', () => {
@@ -33,13 +33,18 @@ describe('splitEmphasisSegments', () => {
   });
 
   it('longer words win overlaps', () => {
-    const segments = splitEmphasisSegments('Her raincoat kept the rain away.', ['rain', 'raincoat']);
-    expect(segments.filter(s => s.emphasized).map(s => s.text)).toEqual(['raincoat', 'rain']);
+    const segments = splitEmphasisSegments('Her raincoat kept the rain away.', [
+      'rain',
+      'raincoat',
+    ]);
+    expect(segments.filter((s) => s.emphasized).map((s) => s.text)).toEqual(['raincoat', 'rain']);
   });
 
   it('round-trips: concatenated segments equal the input', () => {
     const text = 'Umbrella up! The umbrella dances in the rain.';
-    const joined = splitEmphasisSegments(text, ['umbrella', 'rain']).map(s => s.text).join('');
+    const joined = splitEmphasisSegments(text, ['umbrella', 'rain'])
+      .map((s) => s.text)
+      .join('');
     expect(joined).toBe(text);
   });
 });

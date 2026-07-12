@@ -18,9 +18,7 @@ let cachedProvider: IllustrationProvider | null = null;
 function readProviderName(): IllustrationProviderName {
   const raw = (process.env.ILLUSTRATION_PROVIDER ?? 'gemini').toLowerCase();
   if (raw !== 'gemini' && raw !== 'openai') {
-    throw new Error(
-      `Unknown ILLUSTRATION_PROVIDER "${raw}". Expected "gemini" or "openai".`,
-    );
+    throw new Error(`Unknown ILLUSTRATION_PROVIDER "${raw}". Expected "gemini" or "openai".`);
   }
   return raw;
 }

@@ -54,7 +54,9 @@ export async function processPrintFulfillment(job: Job<PrintFulfillmentJob>): Pr
 
     // Verify the order is ready for processing
     if (printOrder.status !== 'PAYMENT_COMPLETED') {
-      console.log(`[PrintFulfillment] Order ${printOrderId} status is ${printOrder.status}, expected PAYMENT_COMPLETED`);
+      console.log(
+        `[PrintFulfillment] Order ${printOrderId} status is ${printOrder.status}, expected PAYMENT_COMPLETED`,
+      );
       // If already submitted, skip
       if (printOrder.status === 'SUBMITTED_TO_LULU' || printOrder.status === 'IN_PRODUCTION') {
         console.log(`[PrintFulfillment] Order already processed, skipping`);
@@ -96,8 +98,7 @@ export async function processPrintFulfillment(job: Job<PrintFulfillmentJob>): Pr
     // Same collage rule as checkout + the interior route: flag on AND under
     // the 48-page saddle-stitch cap, so the shipped PDF matches the priced count.
     const includeCollage =
-      process.env.COLLAGE_PAGES_ENABLED === 'true' &&
-      collagePagesForPrint(book.pages.length) > 0;
+      process.env.COLLAGE_PAGES_ENABLED === 'true' && collagePagesForPrint(book.pages.length) > 0;
     const interiorPdfBuffer = await generateBookPdf(book, {
       fonts: pdfFonts,
       includeCollage,
@@ -181,7 +182,6 @@ export async function processPrintFulfillment(job: Job<PrintFulfillmentJob>): Pr
     console.log('='.repeat(80));
 
     await job.updateProgress({ stage: 'completed', percent: 100 });
-
   } catch (error: unknown) {
     const err = error as Error;
     Sentry.captureException(err, {

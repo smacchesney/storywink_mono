@@ -156,8 +156,7 @@ async function main() {
     const runA = await runJudgeOnce(openai, imageUrls, identity, language);
     const runB = await runJudgeOnce(openai, imageUrls, identity, language);
 
-    const byEcho = (run: JudgeResponse) =>
-      new Map(run.pageResults.map((r) => [r.pageNumber, r]));
+    const byEcho = (run: JudgeResponse) => new Map(run.pageResults.map((r) => [r.pageNumber, r]));
     const mapA = byEcho(runA);
     const mapB = byEcho(runB);
 
@@ -188,7 +187,9 @@ async function main() {
   }
 
   console.log(`\n${'='.repeat(64)}`);
-  console.log(`Judge variance across ${pagesScored} pages (${bookIds.length} book(s), 2 runs each)`);
+  console.log(
+    `Judge variance across ${pagesScored} pages (${bookIds.length} book(s), 2 runs each)`,
+  );
   console.log('='.repeat(64));
   for (const [label] of DIMENSIONS) {
     const ds = deltas[label];
@@ -197,12 +198,8 @@ async function main() {
     );
   }
   console.log(`  pass/fail verdict flips: ${passFlips}/${pagesScored}`);
-  console.log(
-    `\nMinimum detectable delta baseline: a with/without-sheet difference in mean`,
-  );
-  console.log(
-    `scores smaller than the mean |Δ| above is judge noise, not signal — do not`,
-  );
+  console.log(`\nMinimum detectable delta baseline: a with/without-sheet difference in mean`);
+  console.log(`scores smaller than the mean |Δ| above is judge noise, not signal — do not`);
   console.log(`make sheet go/no-go decisions on differences below it.`);
 }
 

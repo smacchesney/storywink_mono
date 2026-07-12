@@ -3,7 +3,9 @@
 // ----------------------------------
 
 // Prompt part types for multi-modal story generation
-export interface TextPart { text: string }
+export interface TextPart {
+  text: string;
+}
 export interface ImagePlaceholder {
   type: 'image_placeholder';
   imageUrl: string;
@@ -28,15 +30,18 @@ export const STORY_RESPONSE_SCHEMA = {
         },
         refrain: {
           type: 'string',
-          description: 'A 4-8 word phrase that will recur 3+ times with variation throughout the story',
+          description:
+            'A 4-8 word phrase that will recur 3+ times with variation throughout the story',
         },
         emotionalPeak: {
           type: 'string',
-          description: 'The moment of biggest feeling — wonder, triumph, laughter, or warmth (1 sentence)',
+          description:
+            'The moment of biggest feeling — wonder, triumph, laughter, or warmth (1 sentence)',
         },
         resolution: {
           type: 'string',
-          description: 'How does the story land? What feeling does the child carry into sleep? (1 sentence)',
+          description:
+            'How does the story land? What feeling does the child carry into sleep? (1 sentence)',
         },
       },
       required: ['desire', 'refrain', 'emotionalPeak', 'resolution'],
@@ -44,7 +49,8 @@ export const STORY_RESPONSE_SCHEMA = {
     },
     suggestedTitle: {
       type: 'string',
-      description: 'A short, evocative book title (2-6 words) in the story language. Suggest one even if a title was provided.',
+      description:
+        'A short, evocative book title (2-6 words) in the story language. Suggest one even if a title was provided.',
     },
     pages: {
       type: 'array',
@@ -54,26 +60,27 @@ export const STORY_RESPONSE_SCHEMA = {
         properties: {
           pageNumber: {
             type: 'number',
-            description: 'The 1-based page number'
+            description: 'The 1-based page number',
           },
           text: {
             type: 'string',
-            description: 'The story text for this page (2-4 sentences, max 50 words)'
+            description: 'The story text for this page (2-4 sentences, max 50 words)',
           },
           illustrationNotes: {
             type: ['string', 'null'],
-            description: 'Visual effects suggestion for the illustration, or null if none'
+            description: 'Visual effects suggestion for the illustration, or null if none',
           },
           learningWordsUsed: {
             type: 'array',
             items: { type: 'string' },
-            description: 'Which of the LEARNING WORDS (verbatim) appear in this page\'s text. Empty array when none or when no learning words were given.'
-          }
+            description:
+              "Which of the LEARNING WORDS (verbatim) appear in this page's text. Empty array when none or when no learning words were given.",
+          },
         },
         required: ['pageNumber', 'text', 'illustrationNotes', 'learningWordsUsed'],
         additionalProperties: false,
-      }
-    }
+      },
+    },
   },
   required: ['storyArc', 'suggestedTitle', 'pages'],
   additionalProperties: false,
@@ -101,7 +108,8 @@ const BRIDGE_PAGES_SCHEMA = {
       learningWordsUsed: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Which of the LEARNING WORDS (verbatim) appear in this bridge text. Empty array when none.',
+        description:
+          'Which of the LEARNING WORDS (verbatim) appear in this bridge text. Empty array when none.',
       },
       illustrationNotes: {
         type: ['string', 'null'],
@@ -113,10 +121,14 @@ const BRIDGE_PAGES_SCHEMA = {
         properties: {
           location: {
             type: 'string',
-            description: 'Where this moment happens — plausibly between the adjacent photos’ settings',
+            description:
+              'Where this moment happens — plausibly between the adjacent photos’ settings',
           },
           timeOfDay: { type: 'string', description: 'e.g. "morning", "golden afternoon"' },
-          action: { type: 'string', description: 'What the characters are DOING in this new moment' },
+          action: {
+            type: 'string',
+            description: 'What the characters are DOING in this new moment',
+          },
           charactersPresent: {
             type: 'array',
             items: { type: 'string' },
@@ -218,9 +230,7 @@ Your north star: Would a parent want to re-read this 100 times? That requires em
 // STORY GENERATION PROMPT
 // ----------------------------------
 
-export function createStoryGenerationPrompt(
-  input: StoryGenerationInput
-): StoryPromptPart[] {
+export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryPromptPart[] {
   const parts: StoryPromptPart[] = [];
 
   // ---------- CONFIG ----------
@@ -264,7 +274,7 @@ export function createStoryGenerationPrompt(
     characterInstruction = `  - The main character is named "${input.childName}". Use this name directly in the story text.`;
     if (input.additionalCharacters && input.additionalCharacters.length > 0) {
       const charList = input.additionalCharacters
-        .map(c => `"${c.name}" (${c.relationship})`)
+        .map((c) => `"${c.name}" (${c.relationship})`)
         .join(', ');
       characterInstruction += `\n  - Other characters who may appear: ${charList}. Identify which characters appear in each photo and use their names appropriately.`;
     }
@@ -279,7 +289,7 @@ export function createStoryGenerationPrompt(
   // exact pages are unknown — they get the page-less variant instead of
   // asserted (possibly wrong) page numbers.
   if (input.charactersInPhotos?.length) {
-    const supporting = input.charactersInPhotos.filter(c => c.role !== 'main_child');
+    const supporting = input.charactersInPhotos.filter((c) => c.role !== 'main_child');
     if (supporting.length > 0) {
       characterInstruction += `\n  - SUPPORTING CAST (from the actual photos — weave them in, don't just mention them):`;
       for (const c of supporting) {
@@ -313,7 +323,7 @@ export function createStoryGenerationPrompt(
         }
       }
       characterInstruction += `\n    - Never invent appearances: a character speaks or acts on a page ONLY if they are actually on that page (or plausibly just off-frame on an adjacent one).`;
-      if (supporting.some(c => c.appearsOnPages.length === 0)) {
+      if (supporting.some((c) => c.appearsOnPages.length === 0)) {
         characterInstruction += ` For characters whose exact pages are unknown, include them only on pages where you can actually see them in the storyboard images.`;
       }
     }
@@ -330,7 +340,7 @@ export function createStoryGenerationPrompt(
   // BRIDGE PAGES (BRIDGE_PAGES_ENABLED): rendered only when the worker set a
   // positive cap AND the roster carries characterIds (identity-less books
   // must never get bridges — there is nothing to ground them to).
-  const bridgeRoster = (input.charactersInPhotos ?? []).filter(c => c.characterId);
+  const bridgeRoster = (input.charactersInPhotos ?? []).filter((c) => c.characterId);
   const bridgeSection =
     input.bridgeCap && input.bridgeCap > 0 && bridgeRoster.length > 0
       ? [
@@ -340,7 +350,8 @@ export function createStoryGenerationPrompt(
           `- At most ONE bridge per gap, and never before the first photo. "afterPhotoPage" is the storyboard page the bridge follows (${input.storyPages.length} = after the last photo).`,
           `- GROUNDING (non-negotiable): a bridge may show ONLY people and pets from this roster, referenced by characterId in "scene.charactersPresent":`,
           ...bridgeRoster.map(
-            c => `    - characterId "${c.characterId}" = ${c.name} (${c.role.replace(/_/g, ' ')})`,
+            (c) =>
+              `    - characterId "${c.characterId}" = ${c.name} (${c.role.replace(/_/g, ' ')})`,
           ),
           `- Never invent a person, a pet, or a named place. The setting must sit plausibly BETWEEN the adjacent photos' settings (use their WHAT'S HERE notes); the action must grow out of what the adjacent photos actually show. Set "scene.outfitFrom" to whichever adjacent photo the outfits should copy.`,
           `- Bridge text follows every rule in this prompt (refrain, hand-off, length limits) and must read as part of the same continuous story.`,
@@ -382,7 +393,7 @@ export function createStoryGenerationPrompt(
           `## LEARNING WORDS (the parent is teaching these — weave, never force):`,
           `- The parent says ${input.childName || 'the child'} is learning these words right now: ${input.learningWords
             .slice(0, 4)
-            .map(w => `"${w}"`)
+            .map((w) => `"${w}"`)
             .join(', ')}.`,
           `- Weave EACH word into the story 3-4 times, naturally — vary the sentence frame each time, exactly like the refrain.`,
           `- Place at least one occurrence of each word at the END of a sentence in a predictable slot, so the reading parent can pause and let the child say it.`,
@@ -416,52 +427,64 @@ export function createStoryGenerationPrompt(
       ? `- The parent has NOT chosen a title yet — your "suggestedTitle" WILL become the book's title. Make it short (2-6 words), warm, and specific to this story${input.language === 'ja' ? ', written in Japanese (hiragana/katakana, no kanji)' : ''}. Avoid generic titles like "A Special Day".`
       : `- The parent chose the title above. Still provide a "suggestedTitle" as an alternative, but the story should honor the existing title.`,
     ``,
-    ...(input.qcFeedback ? [
-      `## CRITICAL CORRECTIONS (from editorial review of your previous draft):`,
-      `- A previous draft of this story failed editorial review. You MUST address every point below in this rewrite:`,
-      input.qcFeedback.split('\n').map(line => `  ${line}`).join('\n'),
-      ``,
-    ] : []),
-    ...(input.tone ? [
-      `## Story Mood (picked by the parent):`,
-      `- The parent asked for a **"${input.tone}"** telling. Let it steer word choice, pacing, and the energy of the peak. The mood is a promise to the parent, not a garnish.`,
-      ``,
-    ] : []),
+    ...(input.qcFeedback
+      ? [
+          `## CRITICAL CORRECTIONS (from editorial review of your previous draft):`,
+          `- A previous draft of this story failed editorial review. You MUST address every point below in this rewrite:`,
+          input.qcFeedback
+            .split('\n')
+            .map((line) => `  ${line}`)
+            .join('\n'),
+          ``,
+        ]
+      : []),
+    ...(input.tone
+      ? [
+          `## Story Mood (picked by the parent):`,
+          `- The parent asked for a **"${input.tone}"** telling. Let it steer word choice, pacing, and the energy of the peak. The mood is a promise to the parent, not a garnish.`,
+          ``,
+        ]
+      : []),
     // Exactly ONE experience-context block reaches the prompt: the confirmed
     // eventSummary supersedes the legacy free-text theme when present.
-    ...(input.eventSummary ? [
-      `## What actually happened (confirmed by the parent — this is the heart of the story):`,
-      `- "${input.eventSummary}"`,
-      ...(input.confirmedFacts?.length
-        ? input.confirmedFacts.map(f => `- Parent confirmed: ${f}`)
+    ...(input.eventSummary
+      ? [
+          `## What actually happened (confirmed by the parent — this is the heart of the story):`,
+          `- "${input.eventSummary}"`,
+          ...(input.confirmedFacts?.length
+            ? input.confirmedFacts.map((f) => `- Parent confirmed: ${f}`)
+            : []),
+          `- The story must feel TRUE to this. It should inform the desire, the peak, and the landing — not appear as a one-line mention.`,
+          ``,
+        ]
+      : input.theme
+        ? [
+            `## Story Context:`,
+            `- The parent described this story as: **"${input.theme}"**. Weave this context into the narrative — it should inform the story arc, not just be mentioned once.`,
+            ``,
+          ]
         : []),
-      `- The story must feel TRUE to this. It should inform the desire, the peak, and the landing — not appear as a one-line mention.`,
-      ``,
-    ] : input.theme ? [
-      `## Story Context:`,
-      `- The parent described this story as: **"${input.theme}"**. Weave this context into the narrative — it should inform the story arc, not just be mentioned once.`,
-      ``,
-    ] : []),
     `## Length:`,
     `- **2-4 sentences per page, maximum 50 words** (for the ${input.storyPages.length} pages provided).`,
     `  - This 50 word limit is STRICT — text is displayed on its own page but must stay concise for toddler attention spans.`,
-    `  - Vary length across pages for rhythm: some pages deserve a single punchy line, others need a beat more.`
+    `  - Vary length across pages for rhythm: some pages deserve a single punchy line, others need a beat more.`,
   ].join('\n');
 
   // Language-specific instructions (appended when not English)
-  const languageInstruction = input.language === 'ja'
-    ? [
-        `\n## Language — Japanese (日本語):`,
-        `- Write ALL story text ("text" field) in **Japanese**.`,
-        `- Use **hiragana** primarily, as this book is for toddlers (ages 2-4). **No kanji at all.** Katakana is OK for onomatopoeia and foreign words.`,
-        `- Maintain the same warm, playful, read-aloud quality described above, adapted for Japanese.`,
-        `- Use Japanese onomatopoeia naturally (ざぶーん, どきどき, ぴょんぴょん, きらきら, etc.).`,
-        `- Character names should remain as provided (do not transliterate to katakana unless they are clearly non-Japanese names).`,
-        `- For unnamed people, use the warm hiragana relationship word a toddler would say (おばあちゃん、おじいちゃん、おかあさん、おとうさん、おねえちゃん、おにいちゃん、いもうと、おとうと) — NEVER invent a name. For unnamed pets use わんちゃん / ねこちゃん style words.`,
-        `- **Length constraint (replaces the English rule above):** 2-4 sentences per page, **maximum 80 characters** per page.`,
-        `- The "illustrationNotes" field must remain in **English** (the illustration AI only understands English).`,
-      ].join('\n')
-    : '';
+  const languageInstruction =
+    input.language === 'ja'
+      ? [
+          `\n## Language — Japanese (日本語):`,
+          `- Write ALL story text ("text" field) in **Japanese**.`,
+          `- Use **hiragana** primarily, as this book is for toddlers (ages 2-4). **No kanji at all.** Katakana is OK for onomatopoeia and foreign words.`,
+          `- Maintain the same warm, playful, read-aloud quality described above, adapted for Japanese.`,
+          `- Use Japanese onomatopoeia naturally (ざぶーん, どきどき, ぴょんぴょん, きらきら, etc.).`,
+          `- Character names should remain as provided (do not transliterate to katakana unless they are clearly non-Japanese names).`,
+          `- For unnamed people, use the warm hiragana relationship word a toddler would say (おばあちゃん、おじいちゃん、おかあさん、おとうさん、おねえちゃん、おにいちゃん、いもうと、おとうと) — NEVER invent a name. For unnamed pets use わんちゃん / ねこちゃん style words.`,
+          `- **Length constraint (replaces the English rule above):** 2-4 sentences per page, **maximum 80 characters** per page.`,
+          `- The "illustrationNotes" field must remain in **English** (the illustration AI only understands English).`,
+        ].join('\n')
+      : '';
 
   const illustrationNotesInstructions = [
     `\n- For **each** page, also suggest "illustrationNotes" to dynamically enhance the image with fun effects:`,
@@ -481,7 +504,7 @@ export function createStoryGenerationPrompt(
     `\n- Final Output:`,
     `\nReturn ONLY a valid JSON object with a "storyArc" object, a "suggestedTitle" string, AND a "pages" array${bridgeSection ? ', AND a "bridgePages" array (empty when no bridges are needed — the usual case)' : ''}. Plan the storyArc FIRST (desire, refrain, emotionalPeak, resolution), then write pages that follow that arc.`,
     `Each page element must have "pageNumber" (number), "text" (string), and "illustrationNotes" (string or null).`,
-    `Example format: {"storyArc":{"desire":"...","refrain":"...","emotionalPeak":"...","resolution":"..."},"suggestedTitle":"...","pages":[{"pageNumber":1,"text":"Sample text...","illustrationNotes":"Suggestion..."}]}`
+    `Example format: {"storyArc":{"desire":"...","refrain":"...","emotionalPeak":"...","resolution":"..."},"suggestedTitle":"...","pages":[{"pageNumber":1,"text":"Sample text...","illustrationNotes":"Suggestion..."}]}`,
   ].join('');
 
   parts.push({
@@ -573,8 +596,7 @@ export interface AvatarStoryResponse {
 
 const AVATAR_PAGE_SCENE_SCHEMA = {
   type: 'object',
-  description:
-    'Structured scene record — the illustrator has NO photo for any page of this book',
+  description: 'Structured scene record — the illustrator has NO photo for any page of this book',
   properties: {
     location: {
       type: 'string',
@@ -687,7 +709,9 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
           ? ` — the child's beloved object. It can be hugged, carried, dropped, lost and found, tucked in; it never walks, talks, or acts on its own. Let it anchor emotional beats.`
           : ` — give them a real supporting role: involve them in at least one emotional beat (a shared laugh, a steadying hand, a discovery together), and if they are present near the end, include them in the landing.`;
     const desc = c.description ? ` Appearance: ${c.description}.` : '';
-    castLines.push(`- characterId "${c.characterId}" = ${c.name} (${c.role.replace(/_/g, ' ')})${flavor}${desc}`);
+    castLines.push(
+      `- characterId "${c.characterId}" = ${c.name} (${c.role.replace(/_/g, ' ')})${flavor}${desc}`,
+    );
   }
   castLines.push(
     `- Not everyone needs to be on every page — but everyone the parent picked should MATTER to the story.`,
@@ -743,7 +767,7 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
           `## LEARNING WORDS (the parent is teaching these — weave, never force):`,
           `- The parent says ${input.childName || 'the child'} is learning these words right now: ${input.learningWords
             .slice(0, 4)
-            .map(w => `"${w}"`)
+            .map((w) => `"${w}"`)
             .join(', ')}.`,
           `- Weave EACH word into the story 3-4 times, naturally — vary the sentence frame each time, exactly like the refrain.`,
           `- Place at least one occurrence of each word at the END of a sentence in a predictable slot, so the reading parent can pause and let the child say it.`,
@@ -777,7 +801,10 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
       ? [
           `## CRITICAL CORRECTIONS (from editorial review of your previous draft):`,
           `- A previous draft of this story failed editorial review. You MUST address every point below in this rewrite:`,
-          input.qcFeedback.split('\n').map(line => `  ${line}`).join('\n'),
+          input.qcFeedback
+            .split('\n')
+            .map((line) => `  ${line}`)
+            .join('\n'),
           ``,
         ]
       : []),

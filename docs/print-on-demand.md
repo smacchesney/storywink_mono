@@ -11,16 +11,16 @@ Lulu Print-on-Demand API integration for printing physical children's books, wit
 
 ## Key Files
 
-| File | Purpose |
-|------|---------|
-| `packages/shared/src/lulu.ts` | Lulu constants, PDF specs, shipping labels |
-| `apps/workers/src/utils/lulu-client.ts` | Lulu API client with OAuth (order submission) |
-| `apps/web/src/app/api/checkout/print/route.ts` | Creates Stripe Checkout sessions |
-| `apps/web/src/app/api/webhooks/stripe/route.ts` | Handles payment completion, queues fulfillment |
-| `apps/web/src/app/api/book/[bookId]/export/lulu-interior/route.ts` | Interior PDF generation |
-| `apps/web/src/app/api/book/[bookId]/export/lulu-cover/route.ts` | Cover PDF generation |
-| `apps/web/src/lib/stripe.ts` | Stripe config, pricing constants |
-| `apps/workers/src/workers/print-fulfillment.worker.ts` | PDF generation + Lulu submission |
+| File                                                               | Purpose                                        |
+| ------------------------------------------------------------------ | ---------------------------------------------- |
+| `packages/shared/src/lulu.ts`                                      | Lulu constants, PDF specs, shipping labels     |
+| `apps/workers/src/utils/lulu-client.ts`                            | Lulu API client with OAuth (order submission)  |
+| `apps/web/src/app/api/checkout/print/route.ts`                     | Creates Stripe Checkout sessions               |
+| `apps/web/src/app/api/webhooks/stripe/route.ts`                    | Handles payment completion, queues fulfillment |
+| `apps/web/src/app/api/book/[bookId]/export/lulu-interior/route.ts` | Interior PDF generation                        |
+| `apps/web/src/app/api/book/[bookId]/export/lulu-cover/route.ts`    | Cover PDF generation                           |
+| `apps/web/src/lib/stripe.ts`                                       | Stripe config, pricing constants               |
+| `apps/workers/src/workers/print-fulfillment.worker.ts`             | PDF generation + Lulu submission               |
 
 All HTTP endpoints live in the Next.js web app; the Lulu order submission runs in the workers.
 
@@ -52,12 +52,14 @@ Worker: Generate PDFs → Dropbox → Lulu API
 ## Lulu API Quirks
 
 1. **Different field names per endpoint**:
+
    - `/shipping-options/` uses `country` in shipping_address
    - `/print-job-cost-calculations/` uses `country_code` in shipping_address
 
 2. **phone_number required**: Both endpoints require `phone_number` in shipping_address
 
 3. **Response formats differ**:
+
    - `/shipping-options/` returns array directly (not wrapped)
    - `/print-job-cost-calculations/` returns object with nested fields
 
@@ -68,14 +70,14 @@ Worker: Generate PDFs → Dropbox → Lulu API
 
 ## PDF Specifications (8.5x8.5" Saddle Stitch)
 
-| Spec | Interior | Cover Spread |
-|------|----------|--------------|
-| Trim Size | 8.5" × 8.5" | 17.25" × 8.75" (back + front) |
-| With Bleed | 8.75" × 8.75" | Same |
-| Bleed Margin | 0.125" | 0.125" |
-| Resolution | 300 DPI | 300 DPI |
-| Pixels | 2625 × 2625 | 5175 × 2625 |
-| Page Count | 4-48 (divisible by 4) | N/A |
+| Spec         | Interior              | Cover Spread                  |
+| ------------ | --------------------- | ----------------------------- |
+| Trim Size    | 8.5" × 8.5"           | 17.25" × 8.75" (back + front) |
+| With Bleed   | 8.75" × 8.75"         | Same                          |
+| Bleed Margin | 0.125"                | 0.125"                        |
+| Resolution   | 300 DPI               | 300 DPI                       |
+| Pixels       | 2625 × 2625           | 5175 × 2625                   |
+| Page Count   | 4-48 (divisible by 4) | N/A                           |
 
 Two PDFs are sent to Lulu per order:
 
@@ -89,12 +91,14 @@ Two PDFs are sent to Lulu per order:
 Lulu print PDFs are stored in Dropbox (Cloudinary has a 10MB upload limit).
 
 **Folder Structure**:
+
 ```
 /Apps/Storywink/lulu-prints/{bookId}/interior.pdf
 /Apps/Storywink/lulu-prints/{bookId}/cover.pdf
 ```
 
 **Key Files**:
+
 - `apps/web/src/lib/dropbox.ts` — Dropbox client with refresh token auth
 - URLs converted to `?dl=1` for direct download (required by Lulu)
 
@@ -103,6 +107,7 @@ Lulu print PDFs are stored in Dropbox (Cloudinary has a 10MB upload limit).
 Workers use Puppeteer with system Chromium (not `@sparticuz/chromium`).
 
 **Dockerfile** (`apps/workers/Dockerfile`):
+
 ```dockerfile
 RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont font-noto font-noto-emoji
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
@@ -112,6 +117,7 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ## Recovery Script
 
 Retry failed print orders:
+
 ```bash
 npx tsx scripts/retry-failed-print-order.ts <orderId>
 ```
@@ -119,6 +125,7 @@ npx tsx scripts/retry-failed-print-order.ts <orderId>
 ## Stripe API Note
 
 `shipping_details` is NOT an expandable field — it's a direct property on the session object:
+
 ```typescript
 // Correct
 const session = await stripe.checkout.sessions.retrieve(sessionId, {

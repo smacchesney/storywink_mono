@@ -16,24 +16,27 @@ interface RowSpec {
 }
 
 function makeBookWithRows(rows: RowSpec[]): BookWithPages {
-  const pages: Page[] = rows.map((row, i) => ({
-    id: `page-${i + 1}`,
-    pageNumber: i + 1,
-    index: i,
-    assetId: row.assetId,
-    text: `Story text ${i + 1}`,
-    generatedImageUrl: `https://example.com/page-${i + 1}.png`,
-    originalImageUrl: null,
-    textConfirmed: true,
-    pageType: 'SINGLE',
-    isTitlePage: i === 0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    bookId: 'book-1',
-    moderationStatus: 'OK',
-    moderationReason: null,
-    illustrationNotes: null,
-  } as unknown as Page));
+  const pages: Page[] = rows.map(
+    (row, i) =>
+      ({
+        id: `page-${i + 1}`,
+        pageNumber: i + 1,
+        index: i,
+        assetId: row.assetId,
+        text: `Story text ${i + 1}`,
+        generatedImageUrl: `https://example.com/page-${i + 1}.png`,
+        originalImageUrl: null,
+        textConfirmed: true,
+        pageType: 'SINGLE',
+        isTitlePage: i === 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        bookId: 'book-1',
+        moderationStatus: 'OK',
+        moderationReason: null,
+        illustrationNotes: null,
+      }) as unknown as Page,
+  );
 
   return {
     id: 'book-1',
@@ -112,11 +115,7 @@ describe('assembleInteriorPages — bridge rows (assetId null, fully illustrated
     // A bridge adds 2 raw interior pages. When the photo-only count already
     // needed blank padding (2+2N not a multiple of 4), the bridge lands in
     // that padding for free; otherwise it buys one more sheet.
-    const threePhotos = makeBookWithRows([
-      { assetId: 'a1' },
-      { assetId: 'a2' },
-      { assetId: 'a3' },
-    ]);
+    const threePhotos = makeBookWithRows([{ assetId: 'a1' }, { assetId: 'a2' }, { assetId: 'a3' }]);
     const threePhotosOneBridge = makeBookWithRows([
       { assetId: 'a1' },
       { assetId: 'a2' },

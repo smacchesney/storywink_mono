@@ -6,12 +6,7 @@
     "buildArgs": {
       "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
     },
-    "watchPatterns": [
-      "/apps/web/**",
-      "/packages/**",
-      "/package.json",
-      "/turbo.json"
-    ]
+    "watchPatterns": ["/apps/web/**", "/packages/**", "/package.json", "/turbo.json"]
   },
   "deploy": {
     "healthcheckPath": "/api/health",

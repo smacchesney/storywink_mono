@@ -6,14 +6,12 @@ import type { Page } from './types.js';
 describe('escapeHtml', () => {
   it('escapes the five HTML-significant characters', () => {
     expect(escapeHtml(`Tom & Jerry <3 "quotes" 'apostrophes'`)).toBe(
-      'Tom &amp; Jerry &lt;3 &quot;quotes&quot; &#39;apostrophes&#39;'
+      'Tom &amp; Jerry &lt;3 &quot;quotes&quot; &#39;apostrophes&#39;',
     );
   });
 
   it('passes plain text through byte-identical', () => {
-    expect(escapeHtml('Splish, splash, one more splash!')).toBe(
-      'Splish, splash, one more splash!'
-    );
+    expect(escapeHtml('Splish, splash, one more splash!')).toBe('Splish, splash, one more splash!');
   });
 });
 

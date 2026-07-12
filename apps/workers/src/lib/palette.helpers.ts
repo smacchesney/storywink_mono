@@ -63,7 +63,7 @@ export function computeChannelStats(pixels: Uint8Array, channels: number): Chann
     }
   }
 
-  const mean = sum.map(s => s / pixelCount) as [number, number, number];
+  const mean = sum.map((s) => s / pixelCount) as [number, number, number];
   const std = sumSq.map((sq, c) => {
     const variance = sq / pixelCount - mean[c] * mean[c];
     return Math.sqrt(Math.max(0, variance));
@@ -120,11 +120,8 @@ export function computeTransferCoefficients(
  * Per-channel mean delta (reference - source) — the log line's "how far off
  * was this page" number, in 0-255 units.
  */
-export function meanDelta(
-  source: ChannelStats,
-  reference: ChannelStats,
-): [number, number, number] {
-  return [0, 1, 2].map(c => reference.mean[c] - source.mean[c]) as [number, number, number];
+export function meanDelta(source: ChannelStats, reference: ChannelStats): [number, number, number] {
+  return [0, 1, 2].map((c) => reference.mean[c] - source.mean[c]) as [number, number, number];
 }
 
 /**
@@ -138,7 +135,6 @@ export function isNearIdentity(
 ): boolean {
   return coefficients.multipliers.every(
     (m, c) =>
-      Math.abs(m - 1) <= epsilonMultiplier &&
-      Math.abs(coefficients.offsets[c]) <= epsilonOffset,
+      Math.abs(m - 1) <= epsilonMultiplier && Math.abs(coefficients.offsets[c]) <= epsilonOffset,
   );
 }

@@ -1,10 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  buildReadyEmail,
-  emailBaseUrl,
-  escapeHtml,
-  readyEmailEnabled,
-} from './email.helpers.js';
+import { buildReadyEmail, emailBaseUrl, escapeHtml, readyEmailEnabled } from './email.helpers.js';
 
 const ENV_KEYS = [
   'READY_EMAIL_ENABLED',
@@ -74,11 +69,11 @@ describe('buildReadyEmail', () => {
 
   it('localizes by book language (ja)', () => {
     const completed = buildReadyEmail({ ...base, status: 'COMPLETED', language: 'ja' });
-    expect(completed.subject).toBe('「Mia\'s Big Day」ができあがりました');
+    expect(completed.subject).toBe("「Mia's Big Day」ができあがりました");
     expect(completed.html).toContain('えほんをひらく');
 
     const partial = buildReadyEmail({ ...base, status: 'PARTIAL', language: 'ja' });
-    expect(partial.subject).toBe('「Mia\'s Big Day」が読めるようになりました');
+    expect(partial.subject).toBe("「Mia's Big Day」が読めるようになりました");
   });
 
   it('falls back to English for unknown languages', () => {

@@ -59,7 +59,9 @@ async function diagnoseBook(bookId: string) {
       console.log(`  ⚠️  WARNING: Story page with no text!`);
     }
     if (isTitlePage !== page.isTitlePage) {
-      console.log(`  ⚠️  MISMATCH: Calculated isTitlePage (${isTitlePage}) != Database (${page.isTitlePage})`);
+      console.log(
+        `  ⚠️  MISMATCH: Calculated isTitlePage (${isTitlePage}) != Database (${page.isTitlePage})`,
+      );
     }
   }
 
@@ -67,11 +69,13 @@ async function diagnoseBook(bookId: string) {
   console.log(`Summary:`);
   console.log(`${'='.repeat(80)}`);
 
-  const titlePages = book.pages.filter(p => p.assetId === book.coverAssetId);
-  const storyPages = book.pages.filter(p => p.assetId !== book.coverAssetId);
-  const pagesWithoutText = book.pages.filter(p => !p.text || p.text.trim().length === 0);
-  const pagesWithIllustrations = book.pages.filter(p => p.generatedImageUrl);
-  const mismatchedPages = book.pages.filter(p => (p.assetId === book.coverAssetId) !== p.isTitlePage);
+  const titlePages = book.pages.filter((p) => p.assetId === book.coverAssetId);
+  const storyPages = book.pages.filter((p) => p.assetId !== book.coverAssetId);
+  const pagesWithoutText = book.pages.filter((p) => !p.text || p.text.trim().length === 0);
+  const pagesWithIllustrations = book.pages.filter((p) => p.generatedImageUrl);
+  const mismatchedPages = book.pages.filter(
+    (p) => (p.assetId === book.coverAssetId) !== p.isTitlePage,
+  );
 
   console.log(`  - Title Pages: ${titlePages.length}`);
   console.log(`  - Story Pages: ${storyPages.length}`);
@@ -80,11 +84,15 @@ async function diagnoseBook(bookId: string) {
   console.log(`  - Pages With isTitlePage Mismatch: ${mismatchedPages.length}`);
 
   if (pagesWithoutText.length > 0) {
-    console.log(`\n  ⚠️  Pages without text: ${pagesWithoutText.map(p => p.pageNumber).join(', ')}`);
+    console.log(
+      `\n  ⚠️  Pages without text: ${pagesWithoutText.map((p) => p.pageNumber).join(', ')}`,
+    );
   }
 
   if (mismatchedPages.length > 0) {
-    console.log(`\n  ⚠️  Pages with isTitlePage mismatch: ${mismatchedPages.map(p => p.pageNumber).join(', ')}`);
+    console.log(
+      `\n  ⚠️  Pages with isTitlePage mismatch: ${mismatchedPages.map((p) => p.pageNumber).join(', ')}`,
+    );
   }
 
   console.log(`\n${'='.repeat(80)}\n`);

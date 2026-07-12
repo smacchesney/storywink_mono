@@ -34,8 +34,7 @@ const DEFAULT_TIMEOUT_MS = 120_000;
  */
 export async function renderPdf(params: RenderPdfParams): Promise<Buffer> {
   const timeoutMs = params.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const executablePath =
-    process.env.PUPPETEER_EXECUTABLE_PATH || (await chromium.executablePath());
+  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || (await chromium.executablePath());
 
   const browser = await puppeteer.launch({
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
@@ -71,7 +70,7 @@ export async function renderPdf(params: RenderPdfParams): Promise<Buffer> {
             img.onload = resolve;
             img.onerror = reject;
           });
-        })
+        }),
       );
     });
 

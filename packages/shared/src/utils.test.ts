@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { isTitlePage, categorizePages, calculatePrintedPageCount, convertHeicToJpeg } from './utils.js';
+import {
+  isTitlePage,
+  categorizePages,
+  calculatePrintedPageCount,
+  convertHeicToJpeg,
+} from './utils.js';
 
 describe('isTitlePage', () => {
   it('is true when the page asset matches the cover asset', () => {
@@ -23,11 +28,7 @@ describe('isTitlePage', () => {
 
 describe('categorizePages', () => {
   it('splits cover pages out while keeping every page as a story page', () => {
-    const pages = [
-      { assetId: 'cover-1' },
-      { assetId: 'a2' },
-      { assetId: 'a3' },
-    ];
+    const pages = [{ assetId: 'cover-1' }, { assetId: 'a2' }, { assetId: 'a3' }];
     const { storyPages, coverPages } = categorizePages(pages, 'cover-1');
 
     // storyPages includes ALL pages (the cover photo participates in the story).
@@ -79,13 +80,13 @@ describe('convertHeicToJpeg', () => {
 
   it('rewrites .heic URLs with an f_jpg transform', () => {
     expect(convertHeicToJpeg(`${base}.heic`)).toBe(
-      'https://res.cloudinary.com/storywink/image/upload/f_jpg,fl_force_strip/v1/user_x/photo.heic'
+      'https://res.cloudinary.com/storywink/image/upload/f_jpg,fl_force_strip/v1/user_x/photo.heic',
     );
   });
 
   it('rewrites .heif URLs with an f_jpg transform', () => {
     expect(convertHeicToJpeg(`${base}.heif`)).toBe(
-      'https://res.cloudinary.com/storywink/image/upload/f_jpg,fl_force_strip/v1/user_x/photo.heif'
+      'https://res.cloudinary.com/storywink/image/upload/f_jpg,fl_force_strip/v1/user_x/photo.heif',
     );
   });
 

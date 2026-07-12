@@ -20,12 +20,10 @@ describe('mergeCastNames', () => {
   it('merges a chip answer onto its character by characterId and consumes the question', () => {
     const result = mergeCastNames({
       characters: [mainChild, character({})],
-      captureQuestions: [
-        { id: 'q1', characterId: 'adult_1', answer: 'Grandma' },
-      ],
+      captureQuestions: [{ id: 'q1', characterId: 'adult_1', answer: 'Grandma' }],
       childName: 'Emma',
     });
-    const grandma = result.characters.find(c => c.characterId === 'adult_1')!;
+    const grandma = result.characters.find((c) => c.characterId === 'adult_1')!;
     expect(grandma.name).toBe('Grandma');
     expect(grandma.namedVia).toBe('chip');
     expect(result.consumedQuestionIds).toEqual(['q1']);
@@ -50,7 +48,7 @@ describe('mergeCastNames', () => {
       childName: null,
     });
     expect(result.consumedQuestionIds).toEqual([]);
-    expect(result.characters.every(c => c.name === null)).toBe(true);
+    expect(result.characters.every((c) => c.name === null)).toBe(true);
   });
 
   it('never guesses on a failed join, even with a single unnamed candidate (unnamed beats misnamed)', () => {
@@ -61,7 +59,7 @@ describe('mergeCastNames', () => {
       captureQuestions: [{ id: 'q1', characterId: 'adult_1', answer: 'Grandma' }],
       childName: null,
     });
-    const remaining = result.characters.find(c => c.characterId === 'adult_2')!;
+    const remaining = result.characters.find((c) => c.characterId === 'adult_2')!;
     expect(remaining.name).toBeNull();
     expect(result.consumedQuestionIds).toEqual([]);
   });
@@ -72,7 +70,7 @@ describe('mergeCastNames', () => {
       captureQuestions: [{ id: 'q1', characterId: 'adult_1', answer: 'Family friend' }],
       childName: null,
     });
-    const friend = result.characters.find(c => c.characterId === 'adult_1')!;
+    const friend = result.characters.find((c) => c.characterId === 'adult_1')!;
     expect(friend.name).toBeNull();
     expect(friend.namedVia).toBeUndefined();
     expect(friend.role).toBe('family friend');
@@ -85,18 +83,18 @@ describe('mergeCastNames', () => {
       captureQuestions: [{ id: 'q1', characterId: 'pet_1', answer: 'Our dog' }],
       childName: null,
     });
-    const pet = result.characters.find(c => c.characterId === 'pet_1')!;
+    const pet = result.characters.find((c) => c.characterId === 'pet_1')!;
     expect(pet.name).toBe('Our dog');
     expect(pet.namedVia).toBe('chip');
   });
 
-  it("refines a pet's role for a generic pet category (\"A friend's cat\")", () => {
+  it('refines a pet\'s role for a generic pet category ("A friend\'s cat")', () => {
     const result = mergeCastNames({
       characters: [mainChild, character({ characterId: 'pet_1', role: 'pet' })],
       captureQuestions: [{ id: 'q1', characterId: 'pet_1', answer: "A friend's cat" }],
       childName: null,
     });
-    const pet = result.characters.find(c => c.characterId === 'pet_1')!;
+    const pet = result.characters.find((c) => c.characterId === 'pet_1')!;
     expect(pet.name).toBeNull();
     expect(pet.role).toBe("a friend's cat");
     expect(result.consumedQuestionIds).toEqual(['q1']);
@@ -131,7 +129,12 @@ describe('mergeCastNames', () => {
   it('reports changed=false when the merge is a no-op (already merged)', () => {
     const result = mergeCastNames({
       characters: [
-        character({ characterId: 'child_1', role: 'main_child', name: 'Emma', namedVia: 'childName' }),
+        character({
+          characterId: 'child_1',
+          role: 'main_child',
+          name: 'Emma',
+          namedVia: 'childName',
+        }),
         character({ name: 'Grandma', namedVia: 'chip' }),
       ],
       captureQuestions: [{ id: 'q1', characterId: 'adult_1', answer: 'Grandma' }],
@@ -153,14 +156,18 @@ describe('mergeCastNames', () => {
 });
 
 describe('isGenericCategoryAnswer', () => {
-  it.each(['Family friend', 'a friend', 'Neighbour', "A friend's dog", 'ともだちの ねこ', 'しりあい'])(
-    'flags %s as generic',
-    answer => expect(isGenericCategoryAnswer(answer)).toBe(true),
-  );
+  it.each([
+    'Family friend',
+    'a friend',
+    'Neighbour',
+    "A friend's dog",
+    'ともだちの ねこ',
+    'しりあい',
+  ])('flags %s as generic', (answer) => expect(isGenericCategoryAnswer(answer)).toBe(true));
 
   it.each(['Grandma', 'Auntie Mei', 'Our dog', "Grandma's dog", 'おばあちゃん', 'Rex'])(
     'keeps %s as a usable name',
-    answer => expect(isGenericCategoryAnswer(answer)).toBe(false),
+    (answer) => expect(isGenericCategoryAnswer(answer)).toBe(false),
   );
 });
 
@@ -256,7 +263,7 @@ describe('mergeCastNames — companion objects', () => {
       captureQuestions: [{ id: 'q2', characterId: 'object_1', answer: 'Mr. Hoppy' }],
       childName: 'Mia',
     });
-    const obj = result.characters.find(c => c.characterId === 'object_1')!;
+    const obj = result.characters.find((c) => c.characterId === 'object_1')!;
     expect(obj.name).toBe('Mr. Hoppy');
     expect(obj.namedVia).toBe('chip');
     expect(result.consumedQuestionIds).toEqual(['q2']);
@@ -268,7 +275,7 @@ describe('mergeCastNames — companion objects', () => {
       captureQuestions: [{ id: 'q1', characterId: 'object_1', answer: 'Teacher' }],
       childName: null,
     });
-    const obj = result.characters.find(c => c.characterId === 'object_1')!;
+    const obj = result.characters.find((c) => c.characterId === 'object_1')!;
     expect(obj.role).toBe('companion_object');
     expect(obj.name).toBe('Teacher');
     expect(obj.namedVia).toBe('chip');

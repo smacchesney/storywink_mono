@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createBookSchema, additionalCharacterSchema, bridgePageResponseSchema } from './schemas.js';
+import {
+  createBookSchema,
+  additionalCharacterSchema,
+  bridgePageResponseSchema,
+} from './schemas.js';
 
 describe('createBookSchema', () => {
   it('parses a valid payload and applies defaults', () => {
@@ -46,13 +50,20 @@ describe('createBookSchema', () => {
 
 describe('additionalCharacterSchema', () => {
   it('parses a valid character', () => {
-    const result = additionalCharacterSchema.parse({ name: 'Grandma', relationship: 'grandmother' });
+    const result = additionalCharacterSchema.parse({
+      name: 'Grandma',
+      relationship: 'grandmother',
+    });
     expect(result).toEqual({ name: 'Grandma', relationship: 'grandmother' });
   });
 
   it('rejects an empty name or relationship', () => {
-    expect(additionalCharacterSchema.safeParse({ name: '', relationship: 'friend' }).success).toBe(false);
-    expect(additionalCharacterSchema.safeParse({ name: 'Sam', relationship: '' }).success).toBe(false);
+    expect(additionalCharacterSchema.safeParse({ name: '', relationship: 'friend' }).success).toBe(
+      false,
+    );
+    expect(additionalCharacterSchema.safeParse({ name: 'Sam', relationship: '' }).success).toBe(
+      false,
+    );
   });
 });
 
@@ -98,7 +109,9 @@ describe('bridgePageResponseSchema (story response additions)', () => {
   });
 
   it('rejects non-integer afterPhotoPage', () => {
-    expect(bridgePageResponseSchema.safeParse({ ...valid, afterPhotoPage: 2.5 }).success).toBe(false);
+    expect(bridgePageResponseSchema.safeParse({ ...valid, afterPhotoPage: 2.5 }).success).toBe(
+      false,
+    );
     expect(bridgePageResponseSchema.safeParse({ ...valid, afterPhotoPage: 0 }).success).toBe(false);
   });
 });

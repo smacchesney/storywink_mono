@@ -54,9 +54,9 @@ describe('mapQcResultsToPages', () => {
     );
 
     // Index-based mapping (the old bug) would attribute score 3 to page-a.
-    expect(mapped.find(r => r.pageId === 'page-c')?.overallScore).toBe(3);
-    expect(mapped.find(r => r.pageId === 'page-a')?.overallScore).toBe(9);
-    expect(mapped.find(r => r.pageId === 'page-b')?.overallScore).toBe(7);
+    expect(mapped.find((r) => r.pageId === 'page-c')?.overallScore).toBe(3);
+    expect(mapped.find((r) => r.pageId === 'page-a')?.overallScore).toBe(9);
+    expect(mapped.find((r) => r.pageId === 'page-b')?.overallScore).toBe(7);
   });
 
   it('drops out-of-range and non-integer echoes and reports them', () => {

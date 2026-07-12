@@ -4,11 +4,11 @@ Storywink stores children's photos, so deletion has to be real: when a parent de
 
 ## What gets deleted, and when
 
-| Trigger | Database | Cloudinary |
-| --- | --- | --- |
-| **Book delete** (`DELETE /api/book/[bookId]`) | Book row + cascade (pages, notifications, QC results). Asset rows are user-scoped and stay. | Original photos the book references (unless another book of the user also references them), generated page illustrations, the cover render, character sheets, and the whole `storywink/<bookId>/` folder (catches renders superseded by QC rounds). |
-| **Account delete** (Clerk `user.deleted` webhook) | User row + cascade (books, pages, assets, orders, notifications). | Every uploaded photo (`user_<dbUserId>/uploads/`), plus all generated content for every book (`storywink/<bookId>/` per book). Includes uploads that never made it into a book. |
-| **Draft retention sweep** (weekly, inside the asset-cleanup worker) | DRAFT books untouched for `DRAFT_RETENTION_DAYS` (default 90) are deleted (cascade), max 100 per sweep. Non-DRAFT books are never touched, however old. | Same path as a manual book delete, with reason `draft_expired`. |
+| Trigger                                                             | Database                                                                                                                                                | Cloudinary                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Book delete** (`DELETE /api/book/[bookId]`)                       | Book row + cascade (pages, notifications, QC results). Asset rows are user-scoped and stay.                                                             | Original photos the book references (unless another book of the user also references them), generated page illustrations, the cover render, character sheets, and the whole `storywink/<bookId>/` folder (catches renders superseded by QC rounds). |
+| **Account delete** (Clerk `user.deleted` webhook)                   | User row + cascade (books, pages, assets, orders, notifications).                                                                                       | Every uploaded photo (`user_<dbUserId>/uploads/`), plus all generated content for every book (`storywink/<bookId>/` per book). Includes uploads that never made it into a book.                                                                     |
+| **Draft retention sweep** (weekly, inside the asset-cleanup worker) | DRAFT books untouched for `DRAFT_RETENTION_DAYS` (default 90) are deleted (cascade), max 100 per sweep. Non-DRAFT books are never touched, however old. | Same path as a manual book delete, with reason `draft_expired`.                                                                                                                                                                                     |
 
 Ordering is always: collect Cloudinary public ids while the rows still exist, delete the database rows, then enqueue the cleanup job. If collection fails, the request fails **without deleting anything**, so a retry can never leak photos. If the enqueue fails after a successful row delete, the request still succeeds (the user's deletion happened) and an error log flags that Cloudinary content was not removed.
 
@@ -24,10 +24,10 @@ Shared helpers live in `packages/shared/src/cloudinary.ts`: `extractCloudinaryPu
 
 ## Environment flags (workers service)
 
-| Flag | Default | Effect |
-| --- | --- | --- |
+| Flag                    | Default | Effect                                                                                                                                                                                                                                                                                                                      |
+| ----------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ASSET_CLEANUP_ENFORCE` | `false` | **Dry-run by default.** While false, cleanup jobs log exactly what they would delete and write `assets_delete_dry_run` events; the draft sweep only logs candidates and writes one `draft_sweep_candidate` event per book. Set to `true` to actually delete Cloudinary content and let the sweep delete expired draft rows. |
-| `DRAFT_RETENTION_DAYS` | `90` | Inactivity window (by `updatedAt`) before a DRAFT book qualifies for the sweep. Invalid values fall back to 90. |
+| `DRAFT_RETENTION_DAYS`  | `90`    | Inactivity window (by `updatedAt`) before a DRAFT book qualifies for the sweep. Invalid values fall back to 90.                                                                                                                                                                                                             |
 
 Rollout: deploy with the default (dry-run), audit the worker logs and AppEvents for a week of real deletions and one sweep, then set `ASSET_CLEANUP_ENFORCE=true` on the workers service. The web routes always collect and enqueue; only the worker decides.
 

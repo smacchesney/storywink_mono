@@ -12,9 +12,9 @@ async function listRecentBooks() {
       status: true,
       createdAt: true,
       _count: {
-        select: { pages: true }
-      }
-    }
+        select: { pages: true },
+      },
+    },
   });
 
   console.log('Recent Books (last 10):');

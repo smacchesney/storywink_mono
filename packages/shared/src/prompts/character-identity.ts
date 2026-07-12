@@ -19,15 +19,13 @@ export interface CharacterExtractionInput {
   }[];
 }
 
-export function createCharacterExtractionPrompt(
-  input: CharacterExtractionInput
-): { text: string } {
+export function createCharacterExtractionPrompt(input: CharacterExtractionInput): { text: string } {
   const characterContext = input.childName
     ? `The main child is named "${input.childName}".`
     : 'Identify the main child in the photos.';
 
   const additionalContext = input.additionalCharacters?.length
-    ? `Other people who may appear: ${input.additionalCharacters.map(c => `${c.name} (${c.relationship})`).join(', ')}.`
+    ? `Other people who may appear: ${input.additionalCharacters.map((c) => `${c.name} (${c.relationship})`).join(', ')}.`
     : '';
 
   return {
@@ -58,7 +56,7 @@ Also describe the overall scene context (indoor/outdoor settings, time of day pa
 
 Be ruthlessly specific. Vague descriptions like "brown hair" are insufficient. Say "medium-length wavy dark brown hair parted slightly to the left, reaching just below the ears, with a small red hair clip on the right side."
 
-The illustrator will use YOUR description as the canonical reference for maintaining identity across every page. Any ambiguity will result in inconsistent characters.`
+The illustrator will use YOUR description as the canonical reference for maintaining identity across every page. Any ambiguity will result in inconsistent characters.`,
   };
 }
 
@@ -96,7 +94,7 @@ export function createStyleTranslationRefreshPrompt(
   artStyle: string,
 ): string {
   const characterBlocks = characters
-    .map(c => {
+    .map((c) => {
       const t = c.physicalTraits;
       return [
         `- characterId: ${c.characterId} (${c.role}${c.name ? `, name: ${c.name}` : ''})`,
@@ -291,24 +289,39 @@ export const CHARACTER_IDENTITY_RESPONSE_SCHEMA = {
               bodyBuild: { type: 'string' },
               distinguishingFeatures: {
                 type: 'array',
-                items: { type: 'string' }
-              }
+                items: { type: 'string' },
+              },
             },
-            required: ['apparentAge', 'hairColor', 'hairStyle', 'skinTone', 'bodyBuild', 'distinguishingFeatures'],
+            required: [
+              'apparentAge',
+              'hairColor',
+              'hairStyle',
+              'skinTone',
+              'bodyBuild',
+              'distinguishingFeatures',
+            ],
             additionalProperties: false,
           },
           typicalClothing: { type: 'string' },
           styleTranslation: { type: 'string' },
           appearsOnPages: {
             type: 'array',
-            items: { type: 'number' }
-          }
+            items: { type: 'number' },
+          },
         },
-        required: ['characterId', 'role', 'name', 'physicalTraits', 'typicalClothing', 'styleTranslation', 'appearsOnPages'],
+        required: [
+          'characterId',
+          'role',
+          'name',
+          'physicalTraits',
+          'typicalClothing',
+          'styleTranslation',
+          'appearsOnPages',
+        ],
         additionalProperties: false,
-      }
+      },
     },
-    sceneContext: { type: 'string' }
+    sceneContext: { type: 'string' },
   },
   required: ['characters', 'sceneContext'],
   additionalProperties: false,
@@ -329,9 +342,7 @@ export interface AvatarIdentityPromptInput {
  * toy/object). Reuses CHARACTER_IDENTITY_RESPONSE_SCHEMA — the model returns
  * a one-entry characters array.
  */
-export function createAvatarIdentityPrompt(
-  input: AvatarIdentityPromptInput
-): { text: string } {
+export function createAvatarIdentityPrompt(input: AvatarIdentityPromptInput): { text: string } {
   const subjectByKind: Record<string, { noun: string; role: string; traits: string }> = {
     CHILD: {
       noun: 'child',

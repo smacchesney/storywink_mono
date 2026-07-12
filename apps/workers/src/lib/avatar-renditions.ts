@@ -109,8 +109,7 @@ export async function extractAvatarIdentity(
     characters: Array<SheetCharacterInput & { appearsOnPages?: number[] }>;
   };
   const wantedRole = AVATAR_KIND_ROLES[kind] ?? 'adult';
-  const character =
-    parsed.characters.find((c) => c.role === wantedRole) ?? parsed.characters[0];
+  const character = parsed.characters.find((c) => c.role === wantedRole) ?? parsed.characters[0];
   if (!character) throw new Error('Avatar identity extraction returned no subject');
 
   logger.info(

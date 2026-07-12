@@ -24,17 +24,14 @@ const hasLatin = (value: string) => /[A-Za-zÀ-ɏ]/.test(value);
  * supplied. Case-insensitive for Latin words; exact for CJK. Returns a
  * single plain segment when nothing matches (or no words are given).
  */
-export function splitEmphasisSegments(
-  text: string,
-  words: string[],
-): EmphasisSegment[] {
-  const cleaned = [...new Set(words.map(w => w.trim()).filter(Boolean))].sort(
+export function splitEmphasisSegments(text: string, words: string[]): EmphasisSegment[] {
+  const cleaned = [...new Set(words.map((w) => w.trim()).filter(Boolean))].sort(
     (a, b) => b.length - a.length,
   );
   if (!text || cleaned.length === 0) return [{ text, emphasized: false }];
 
   const alternatives = cleaned
-    .map(word => {
+    .map((word) => {
       const escaped = escapeRegExp(word);
       // Latin words match on boundaries ("cat" never lights up "catalog");
       // CJK has no spaces, so the exact parent-supplied string is the token.

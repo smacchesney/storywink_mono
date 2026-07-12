@@ -17,12 +17,14 @@
 ## File Structure
 
 **Create:**
+
 - `apps/workers/src/lib/illustrators/types.ts` — `IllustrationProvider` interface, `IllustrationInput`, `IllustrationOutput`.
 - `apps/workers/src/lib/illustrators/gemini.ts` — `GeminiProvider` (lift-and-shift from current worker).
 - `apps/workers/src/lib/illustrators/openai.ts` — `OpenAIProvider` using `images.edit`.
 - `apps/workers/src/lib/illustrators/index.ts` — `getIllustrator()` factory + startup validation.
 
 **Modify:**
+
 - `apps/workers/src/workers/illustration-generation.worker.ts` — replace two inline Gemini calls with `illustrator.generate(...)`. Extend `isTransientError()` with OpenAI markers.
 - `apps/workers/CLAUDE.md` — update stack description.
 - `CLAUDE.md` (root) — update stack description.
@@ -34,6 +36,7 @@
 ## Task 1: Define provider interface and shared types
 
 **Files:**
+
 - Create: `apps/workers/src/lib/illustrators/types.ts`
 
 - [ ] **Step 1: Create the types module**
@@ -105,6 +108,7 @@ git commit -m "feat(workers): add IllustrationProvider interface"
 ## Task 2: Implement GeminiProvider (lift-and-shift from worker)
 
 **Files:**
+
 - Create: `apps/workers/src/lib/illustrators/gemini.ts`
 
 - [ ] **Step 1: Create the Gemini provider**
@@ -160,9 +164,7 @@ export class GeminiProvider implements IllustrationProvider {
       },
     });
 
-    const imagePart = result?.candidates?.[0]?.content?.parts?.find(
-      (part: any) => part.inlineData,
-    );
+    const imagePart = result?.candidates?.[0]?.content?.parts?.find((part: any) => part.inlineData);
 
     if (imagePart?.inlineData?.data) {
       return { imageBase64: imagePart.inlineData.data };
@@ -170,7 +172,8 @@ export class GeminiProvider implements IllustrationProvider {
 
     logger.warn({ provider: 'gemini' }, 'Gemini response contained no image data');
     return {
-      blockedReason: 'Image generation failed or blocked by content policy (no image data in response).',
+      blockedReason:
+        'Image generation failed or blocked by content policy (no image data in response).',
     };
   }
 }
@@ -193,6 +196,7 @@ git commit -m "feat(workers): extract GeminiProvider"
 ## Task 3: Implement OpenAIProvider
 
 **Files:**
+
 - Create: `apps/workers/src/lib/illustrators/openai.ts`
 
 - [ ] **Step 1: Create the OpenAI provider**
@@ -318,6 +322,7 @@ git commit -m "feat(workers): add OpenAIProvider using gpt-image-2"
 ## Task 4: Build the provider factory with startup validation
 
 **Files:**
+
 - Create: `apps/workers/src/lib/illustrators/index.ts`
 
 - [ ] **Step 1: Create the factory**
@@ -339,9 +344,7 @@ let cachedProvider: IllustrationProvider | null = null;
 function readProviderName(): IllustrationProviderName {
   const raw = (process.env.ILLUSTRATION_PROVIDER ?? 'gemini').toLowerCase();
   if (raw !== 'gemini' && raw !== 'openai') {
-    throw new Error(
-      `Unknown ILLUSTRATION_PROVIDER "${raw}". Expected "gemini" or "openai".`,
-    );
+    throw new Error(`Unknown ILLUSTRATION_PROVIDER "${raw}". Expected "gemini" or "openai".`);
   }
   return raw;
 }
@@ -398,6 +401,7 @@ git commit -m "feat(workers): provider factory with startup validation"
 ## Task 5: Integrate the illustrator into the worker (story-page call)
 
 **Files:**
+
 - Modify: `apps/workers/src/workers/illustration-generation.worker.ts`
 
 - [ ] **Step 1: Add illustrator import and remove GoogleGenAI import**
@@ -405,11 +409,13 @@ git commit -m "feat(workers): provider factory with startup validation"
 At the top of `apps/workers/src/workers/illustration-generation.worker.ts`:
 
 Replace:
+
 ```ts
 import { GoogleGenAI } from '@google/genai';
 ```
 
 with:
+
 ```ts
 import { getIllustrator } from '../lib/illustrators/index.js';
 import type { IllustrationInput } from '../lib/illustrators/index.js';
@@ -418,25 +424,28 @@ import type { IllustrationInput } from '../lib/illustrators/index.js';
 - [ ] **Step 2: Remove the in-function Gemini client initialization**
 
 Find (around line 128–131):
+
 ```ts
-    // Initialize Google AI
-    const ai = new GoogleGenAI({
-      apiKey: process.env.GOOGLE_API_KEY,
-    });
+// Initialize Google AI
+const ai = new GoogleGenAI({
+  apiKey: process.env.GOOGLE_API_KEY,
+});
 ```
 
 Replace with:
+
 ```ts
-    const illustrator = getIllustrator();
+const illustrator = getIllustrator();
 ```
 
 - [ ] **Step 3: Remove the `GOOGLE_API_KEY` precondition check**
 
 Find (around line 109–111):
+
 ```ts
-    if (!process.env.GOOGLE_API_KEY) {
-      throw new Error('Google API key not configured');
-    }
+if (!process.env.GOOGLE_API_KEY) {
+  throw new Error('Google API key not configured');
+}
 ```
 
 Delete these lines. The provider constructor now enforces its own key requirement and the startup-validation call in Task 4 catches missing keys before any job runs.
@@ -448,33 +457,46 @@ Find the try block starting around line 399 (`logger.info({ jobId: job.id, pageI
 Replace the entire block from `logger.info({ ... }, 'Calling Gemini 3.1 Flash Image API...');` through the end of the success/no-image-data branch (just before the `} catch (apiError: any) {`) with:
 
 ```ts
-       logger.info({ jobId: job.id, pageId, pageNumber, provider: illustrator.name }, 'Calling illustration provider...');
-       console.log(`[IllustrationWorker] Calling ${illustrator.name} for page ${pageNumber} with ${styleReferenceBuffers.length} style ref(s)...`);
+logger.info(
+  { jobId: job.id, pageId, pageNumber, provider: illustrator.name },
+  'Calling illustration provider...',
+);
+console.log(
+  `[IllustrationWorker] Calling ${illustrator.name} for page ${pageNumber} with ${styleReferenceBuffers.length} style ref(s)...`,
+);
 
-       const illustrationInput: IllustrationInput = {
-         contentImage: { buffer: contentImageBuffer, mimeType: contentImageMimeType },
-         styleRefs: styleReferenceBuffers,
-         prompt: textPrompt,
-       };
+const illustrationInput: IllustrationInput = {
+  contentImage: { buffer: contentImageBuffer, mimeType: contentImageMimeType },
+  styleRefs: styleReferenceBuffers,
+  prompt: textPrompt,
+};
 
-       const result = await illustrator.generate(illustrationInput);
+const result = await illustrator.generate(illustrationInput);
 
-       logger.info({ jobId: job.id, pageId, pageNumber, provider: illustrator.name }, 'Received response from illustration provider.');
-       console.log(`[IllustrationWorker] ${illustrator.name} response received for page ${pageNumber}`);
+logger.info(
+  { jobId: job.id, pageId, pageNumber, provider: illustrator.name },
+  'Received response from illustration provider.',
+);
+console.log(`[IllustrationWorker] ${illustrator.name} response received for page ${pageNumber}`);
 
-       if (result.imageBase64) {
-         generatedImageBase64 = result.imageBase64;
-         logger.info({ jobId: job.id, pageId, pageNumber }, 'Extracted generated image data.');
-       } else {
-         moderationBlocked = true;
-         moderationReasonText = result.blockedReason ?? 'Image generation returned no data.';
-         logger.warn({
-           jobId: job.id, pageId, pageNumber,
-           attempt: contentPolicyAttempt + 1,
-           maxAttempts: MAX_CONTENT_POLICY_RETRIES + 1,
-           reason: moderationReasonText,
-         }, 'Illustration provider reported content block or no image data.');
-       }
+if (result.imageBase64) {
+  generatedImageBase64 = result.imageBase64;
+  logger.info({ jobId: job.id, pageId, pageNumber }, 'Extracted generated image data.');
+} else {
+  moderationBlocked = true;
+  moderationReasonText = result.blockedReason ?? 'Image generation returned no data.';
+  logger.warn(
+    {
+      jobId: job.id,
+      pageId,
+      pageNumber,
+      attempt: contentPolicyAttempt + 1,
+      maxAttempts: MAX_CONTENT_POLICY_RETRIES + 1,
+      reason: moderationReasonText,
+    },
+    'Illustration provider reported content block or no image data.',
+  );
+}
 ```
 
 The existing `} catch (apiError: any) {` block (error classification, content-policy detection, retry loop) remains unchanged below this — it still catches thrown errors from `illustrator.generate()` exactly as it caught them from `ai.models.generateContent()`.
@@ -496,6 +518,7 @@ git commit -m "feat(workers): route story-page illustration through provider int
 ## Task 6: Replace the cover illustration call
 
 **Files:**
+
 - Modify: `apps/workers/src/workers/illustration-generation.worker.ts`
 
 - [ ] **Step 1: Replace the cover call block**
@@ -505,53 +528,61 @@ Find the cover-illustration block (around lines 613–706). Specifically, replac
 Replace with:
 
 ```ts
-        const coverInput: IllustrationInput = {
-          contentImage: { buffer: contentImageBuffer, mimeType: contentImageMimeType },
-          styleRefs: coverRefBuffers,
-          prompt: coverTextPrompt,
-        };
+const coverInput: IllustrationInput = {
+  contentImage: { buffer: contentImageBuffer, mimeType: contentImageMimeType },
+  styleRefs: coverRefBuffers,
+  prompt: coverTextPrompt,
+};
 
-        const coverResult = await illustrator.generate(coverInput);
+const coverResult = await illustrator.generate(coverInput);
 
-        if (coverResult.imageBase64) {
-          let coverBuffer = Buffer.from(coverResult.imageBase64, 'base64');
+if (coverResult.imageBase64) {
+  let coverBuffer = Buffer.from(coverResult.imageBase64, 'base64');
 
-          // Upscale for print
-          coverBuffer = await upscaleForPrint(coverBuffer);
+  // Upscale for print
+  coverBuffer = await upscaleForPrint(coverBuffer);
 
-          // Apply logo overlay to cover illustration
-          coverBuffer = await addLogoToTitlePage(coverBuffer);
+  // Apply logo overlay to cover illustration
+  coverBuffer = await addLogoToTitlePage(coverBuffer);
 
-          // Upload cover illustration to Cloudinary
-          const coverUpload = await new Promise<any>((resolve, reject) => {
-            cloudinary.uploader.upload_stream(
-              {
-                folder: `storywink/${bookId}/generated`,
-                public_id: `cover_illustration`,
-                overwrite: true,
-                tags: [`book:${bookId}`, `cover`, `style:${styleKey}`],
-                resource_type: 'image',
-              },
-              (error, result) => {
-                if (error) reject(error); else resolve(result);
-              },
-            ).end(coverBuffer);
-          });
+  // Upload cover illustration to Cloudinary
+  const coverUpload = await new Promise<any>((resolve, reject) => {
+    cloudinary.uploader
+      .upload_stream(
+        {
+          folder: `storywink/${bookId}/generated`,
+          public_id: `cover_illustration`,
+          overwrite: true,
+          tags: [`book:${bookId}`, `cover`, `style:${styleKey}`],
+          resource_type: 'image',
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        },
+      )
+      .end(coverBuffer);
+  });
 
-          if (coverUpload?.secure_url) {
-            await prisma.book.update({
-              where: { id: bookId },
-              data: { coverImageUrl: coverUpload.secure_url },
-            });
-            console.log(`[IllustrationWorker] Cover illustration generated and stored: ${coverUpload.secure_url}`);
-            logger.info({ jobId: job.id, bookId, coverUrl: coverUpload.secure_url }, 'Cover illustration stored in Book.coverImageUrl');
-          }
-        } else {
-          logger.warn(
-            { jobId: job.id, bookId, pageNumber, reason: coverResult.blockedReason },
-            'Cover illustration generation returned no image data',
-          );
-        }
+  if (coverUpload?.secure_url) {
+    await prisma.book.update({
+      where: { id: bookId },
+      data: { coverImageUrl: coverUpload.secure_url },
+    });
+    console.log(
+      `[IllustrationWorker] Cover illustration generated and stored: ${coverUpload.secure_url}`,
+    );
+    logger.info(
+      { jobId: job.id, bookId, coverUrl: coverUpload.secure_url },
+      'Cover illustration stored in Book.coverImageUrl',
+    );
+  }
+} else {
+  logger.warn(
+    { jobId: job.id, bookId, pageNumber, reason: coverResult.blockedReason },
+    'Cover illustration generation returned no image data',
+  );
+}
 ```
 
 The surrounding try/catch (the outer `try { ... } catch (coverError: any) {` block and the cover-style reference fetching logic above it) remains unchanged.
@@ -573,6 +604,7 @@ git commit -m "feat(workers): route cover illustration through provider interfac
 ## Task 7: Extend transient-error classification for OpenAI
 
 **Files:**
+
 - Modify: `apps/workers/src/workers/illustration-generation.worker.ts`
 
 - [ ] **Step 1: Update isTransientError**
@@ -611,11 +643,7 @@ function isTransientError(error: Error): boolean {
     'engine overloaded',
   ];
   // Non-transient OpenAI errors: billing / account issues should fail fast.
-  const nonTransientPatterns = [
-    'insufficient_quota',
-    'invalid_api_key',
-    'account_deactivated',
-  ];
+  const nonTransientPatterns = ['insufficient_quota', 'invalid_api_key', 'account_deactivated'];
   if (nonTransientPatterns.some((p) => message.includes(p))) return false;
   return transientPatterns.some((pattern) => message.includes(pattern));
 }
@@ -682,6 +710,7 @@ git commit -m "chore: formatting after illustrator refactor"
 ## Task 9: Update documentation
 
 **Files:**
+
 - Modify: `apps/workers/CLAUDE.md`
 - Modify: `CLAUDE.md` (root)
 
@@ -751,15 +780,18 @@ Create a test book in staging, let it finish generating. Confirm pages render ex
 - [ ] **Step 2: Add OpenAI config and flip flag**
 
 In Railway staging, on the `workers` service:
+
 - Set `OPENAI_API_KEY` to a valid key.
 - Set `ILLUSTRATION_PROVIDER=openai`.
 - Leave `OPENAI_IMAGE_QUALITY` unset (defaults to `high`).
 - Leave `OPENAI_THINKING` unset (defaults to `false`).
 
 Wait for auto-redeploy. Tail logs:
+
 ```bash
 railway logs --service workers
 ```
+
 Expected at startup: one log line matching `Illustration provider selected` with `provider: 'openai'`.
 
 - [ ] **Step 3: Generate a test book with gpt-image-2**
@@ -767,6 +799,7 @@ Expected at startup: one log line matching `Illustration provider selected` with
 Use the same source photos as Step 1's control book. Let the book fully finish (all story pages + cover).
 
 Verify:
+
 - [ ] All pages have `generatedImageUrl` populated in DB.
 - [ ] Cover has `Book.coverImageUrl` set with logo overlay visible.
 - [ ] Cloudinary folder `storywink/<bookId>/generated/` contains one image per page plus `cover_illustration`.
@@ -776,6 +809,7 @@ Verify:
 - [ ] **Step 4: Side-by-side quality comparison**
 
 Generate the same book on both providers using the same source photos. Compare:
+
 - Character-identity consistency across pages.
 - Style-reference fidelity.
 - Cover text legibility (gpt-image-2 should be noticeably better here — this is its headline improvement).
@@ -788,6 +822,7 @@ In Railway staging, change `ILLUSTRATION_PROVIDER` back to `gemini`. Wait for re
 - [ ] **Step 6: Document findings**
 
 Write a short note in the PR description summarizing:
+
 - Did gpt-image-2 output justify ~5-8× per-image cost?
 - Any content-policy blocks encountered?
 - Decision: flip production or keep on Gemini.

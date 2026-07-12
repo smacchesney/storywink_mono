@@ -23,11 +23,7 @@ export function readyEmailEnabled(): boolean {
 
 /** Web origin the email's button links to. */
 export function emailBaseUrl(): string {
-  return (
-    process.env.APP_BASE_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    'https://storywink.ai'
-  );
+  return process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://storywink.ai';
 }
 
 export type ReadyEmailStatus = 'COMPLETED' | 'PARTIAL';
@@ -58,16 +54,16 @@ interface TemplateStrings {
 const TEMPLATES: Record<'en' | 'ja', Record<ReadyEmailStatus, TemplateStrings>> = {
   en: {
     COMPLETED: {
-      subject: title => `${title} is ready — open your book`,
+      subject: (title) => `${title} is ready — open your book`,
       heading: 'It’s ready!',
-      body: title => `Every page of “${title}” is illustrated and waiting for you.`,
+      body: (title) => `Every page of “${title}” is illustrated and waiting for you.`,
       button: 'Open your book',
       footer: 'Made for you by Storywink.ai',
     },
     PARTIAL: {
       subject: () => 'Ready to read — a few pages need one more look',
       heading: 'Ready to read',
-      body: title =>
+      body: (title) =>
         `“${title}” is ready to read. A couple of pages need one more look — you can finish them up with a tap.`,
       button: 'Read what’s ready',
       footer: 'Made for you by Storywink.ai',
@@ -75,16 +71,16 @@ const TEMPLATES: Record<'en' | 'ja', Record<ReadyEmailStatus, TemplateStrings>> 
   },
   ja: {
     COMPLETED: {
-      subject: title => `「${title}」ができあがりました`,
+      subject: (title) => `「${title}」ができあがりました`,
       heading: 'できあがりました！',
-      body: title => `「${title}」のすべてのページにイラストが入りました。ひらいてみてください。`,
+      body: (title) => `「${title}」のすべてのページにイラストが入りました。ひらいてみてください。`,
       button: 'えほんをひらく',
       footer: 'Storywink.ai より',
     },
     PARTIAL: {
-      subject: title => `「${title}」が読めるようになりました`,
+      subject: (title) => `「${title}」が読めるようになりました`,
       heading: 'もう読みはじめられます',
-      body: title =>
+      body: (title) =>
         `「${title}」は読みはじめられます。いくつかのページは、あとすこしで完成します。アプリからかんたんに仕上げられます。`,
       button: 'えほんをひらく',
       footer: 'Storywink.ai より',

@@ -53,7 +53,11 @@ import {
   ResolvedCastEntry,
   CastCoverageResult,
 } from '../lib/resolveCast.js';
-import { buildAvatarCastForPrompt, extractAvatarScene, avatarStoryQcProblems } from '../lib/avatar-story.js';
+import {
+  buildAvatarCastForPrompt,
+  extractAvatarScene,
+  avatarStoryQcProblems,
+} from '../lib/avatar-story.js';
 import { STORY_MODEL, ANALYSIS_MODEL } from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -130,13 +134,13 @@ async function evaluateStoryQuality(
   const sortedPages = [...storyResponse.pages].sort((a, b) => a.pageNumber - b.pageNumber);
   // Photo-positional texts (page 1..N = storyboard photos), used where
   // positions matter (castNameCoverage's appearsOnPages windows).
-  const pageTexts = sortedPages.map(p => p.text || '');
+  const pageTexts = sortedPages.map((p) => p.text || '');
 
   // Reading-order texts (bridges interleaved) — the book the parent will
   // actually read. Refrain echoes and the childName counts judge this.
-  const bridgesByGap = new Map(acceptedBridges.map(b => [b.afterPhotoPage, b]));
+  const bridgesByGap = new Map(acceptedBridges.map((b) => [b.afterPhotoPage, b]));
   const readingOrderTexts: string[] = [];
-  sortedPages.forEach(p => {
+  sortedPages.forEach((p) => {
     readingOrderTexts.push(p.text || '');
     const bridge = bridgesByGap.get(p.pageNumber);
     if (bridge) readingOrderTexts.push(bridge.text);
@@ -148,8 +152,8 @@ async function evaluateStoryQuality(
   // plus an explicit "[BRIDGE PAGE — inserted after page N]" label, so the
   // judge reads the true sequence without renumbering any photo page.
   const qcPages = [
-    ...sortedPages.map(p => ({ pageNumber: p.pageNumber, text: p.text })),
-    ...acceptedBridges.map(b => ({
+    ...sortedPages.map((p) => ({ pageNumber: p.pageNumber, text: p.text })),
+    ...acceptedBridges.map((b) => ({
       pageNumber: b.afterPhotoPage + 0.5,
       text: `[BRIDGE PAGE — inserted after page ${b.afterPhotoPage}, generated without a photo]\n${b.text}`,
     })),
@@ -161,7 +165,7 @@ async function evaluateStoryQuality(
   // LOG-ONLY: learning-word dose. Every enforcing check risks a silent extra
   // generation during the parent's wait, so this ships as telemetry first.
   if (input.learningWords?.length) {
-    const wordCounts = input.learningWords.map(word => ({
+    const wordCounts = input.learningWords.map((word) => ({
       word,
       pages: countLearningWordEchoes(word, readingOrderTexts, input.language),
     }));
@@ -245,7 +249,7 @@ async function evaluateStoryQuality(
       arcCoherence: qc.arcCoherence,
       readAloudRhythm: qc.readAloudRhythm,
       lastPageLanding: qc.lastPageLanding,
-      maxCaptionRisk: Math.max(0, ...qc.pages.map(p => p.captionRisk)),
+      maxCaptionRisk: Math.max(0, ...qc.pages.map((p) => p.captionRisk)),
       childNameCheck,
       childNameEchoes,
       childNameInLanding,
@@ -261,17 +265,23 @@ async function evaluateStoryQuality(
   );
 
   if (qc.arcCoherence < STORY_QC_THRESHOLDS.minArcCoherence) {
-    problems.push(`Arc coherence scored ${qc.arcCoherence}/10 — the pages must actually deliver the declared desire → escalation → peak → soft landing.`);
+    problems.push(
+      `Arc coherence scored ${qc.arcCoherence}/10 — the pages must actually deliver the declared desire → escalation → peak → soft landing.`,
+    );
   }
   if (qc.readAloudRhythm < STORY_QC_THRESHOLDS.minReadAloudRhythm) {
-    problems.push(`Read-aloud rhythm scored ${qc.readAloudRhythm}/10 — vary sentence lengths and make it musical when spoken.`);
+    problems.push(
+      `Read-aloud rhythm scored ${qc.readAloudRhythm}/10 — vary sentence lengths and make it musical when spoken.`,
+    );
   }
   if (!qc.lastPageLanding) {
     problems.push('The final page must land as a soft, warm exhale — no summary statements.');
   }
   for (const page of qc.pages) {
     if (page.captionRisk > STORY_QC_THRESHOLDS.maxCaptionRisk) {
-      problems.push(`Page ${page.pageNumber} reads like a photo caption (risk ${page.captionRisk}/10). ${page.issue || 'Rewrite from the child\'s inner experience.'}`);
+      problems.push(
+        `Page ${page.pageNumber} reads like a photo caption (risk ${page.captionRisk}/10). ${page.issue || "Rewrite from the child's inner experience."}`,
+      );
     }
   }
   if (problems.length > 0 && qc.feedback) {
@@ -298,14 +308,14 @@ async function evaluateAvatarStoryQuality(
   bookId: string,
 ): Promise<{ passed: boolean; feedback: string }> {
   const sortedPages = [...storyResponse.pages].sort((a, b) => a.pageNumber - b.pageNumber);
-  const pageTexts = sortedPages.map(p => p.text || '');
+  const pageTexts = sortedPages.map((p) => p.text || '');
 
   const refrain = storyResponse.storyArc?.refrain || '';
   const echoes = countRefrainEchoes(refrain, pageTexts, input.language);
 
   // LOG-ONLY: learning-word dose, same telemetry as the photo path.
   if (input.learningWords?.length) {
-    const wordCounts = input.learningWords.map(word => ({
+    const wordCounts = input.learningWords.map((word) => ({
       word,
       pages: countLearningWordEchoes(word, pageTexts, input.language),
     }));
@@ -326,10 +336,10 @@ async function evaluateAvatarStoryQuality(
             type: 'input_text',
             text: createAvatarStoryQCPrompt({
               storyArc: storyResponse.storyArc,
-              pages: sortedPages.map(p => ({ pageNumber: p.pageNumber, text: p.text })),
+              pages: sortedPages.map((p) => ({ pageNumber: p.pageNumber, text: p.text })),
               language: input.language,
               premise: input.premise,
-              cast: input.cast.map(c => ({ name: c.name, role: c.role })),
+              cast: input.cast.map((c) => ({ name: c.name, role: c.role })),
             }),
           },
         ],
@@ -376,7 +386,7 @@ async function evaluateAvatarStoryQuality(
       // launch (flip to enforcing only after Railway data validates the
       // distribution — every new trigger is a silent extra generation).
       premiseTruth: qc.premiseTruth,
-      pageIssues: qc.pages.filter(p => p.issue).length,
+      pageIssues: qc.pages.filter((p) => p.issue).length,
       childNameCheck,
       childNameEchoes,
       childNameInLanding,
@@ -395,7 +405,9 @@ async function evaluateAvatarStoryQuality(
   };
 }
 
-export async function processStoryGeneration(job: Job<StoryGenerationJob & { singlePageId?: string; titleWasGenerated?: boolean }>) {
+export async function processStoryGeneration(
+  job: Job<StoryGenerationJob & { singlePageId?: string; titleWasGenerated?: boolean }>,
+) {
   // Wrap everything in try-catch to catch early errors
   try {
     // Early validation
@@ -467,7 +479,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
     // pageLength comparison below so the mismatch warn can't fire spuriously,
     // and pageLength is recomputed in the same transaction.
     if (shouldPurgeStaleBridges(book.bookType, book.pages)) {
-      const survivors = book.pages.filter(p => p.source !== 'BRIDGE');
+      const survivors = book.pages.filter((p) => p.source !== 'BRIDGE');
       await prisma.$transaction(async (tx) => {
         await tx.page.deleteMany({ where: { bookId, source: 'BRIDGE' } });
         for (let i = 0; i < survivors.length; i++) {
@@ -479,7 +491,11 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
         await tx.book.update({ where: { id: bookId }, data: { pageLength: survivors.length } });
       });
       logger.info(
-        { bookId, purgedBridges: book.pages.length - survivors.length, remainingPages: survivors.length },
+        {
+          bookId,
+          purgedBridges: book.pages.length - survivors.length,
+          remainingPages: survivors.length,
+        },
         'Purged stale bridge pages before story generation',
       );
       book.pages = survivors.map((p, i) => ({ ...p, index: i, pageNumber: i + 1 }));
@@ -494,31 +510,37 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
     }
 
     // Diagnostic logging for debugging text assignment issues
-    logger.info({
-      bookId,
-      totalPages: book.pages.length,
-      coverAssetId: book.coverAssetId,
-      storyPagesCount: storyPages.length,
-      expectedPageLength: book.pageLength,
-      actualPageLength: book.pages.length,
-      storyPageDetails: storyPages.map(p => ({
-        id: p.id,
-        index: p.index,
-        pageNumber: p.pageNumber,
-        assetId: p.assetId,
-        hasExistingText: !!p.text
-      }))
-    }, 'Story generation page analysis');
+    logger.info(
+      {
+        bookId,
+        totalPages: book.pages.length,
+        coverAssetId: book.coverAssetId,
+        storyPagesCount: storyPages.length,
+        expectedPageLength: book.pageLength,
+        actualPageLength: book.pages.length,
+        storyPageDetails: storyPages.map((p) => ({
+          id: p.id,
+          index: p.index,
+          pageNumber: p.pageNumber,
+          assetId: p.assetId,
+          hasExistingText: !!p.text,
+        })),
+      },
+      'Story generation page analysis',
+    );
 
     // Validate page count
     if (storyPages.length !== book.pageLength) {
-      logger.warn({
-        bookId,
-        storyPagesCount: storyPages.length,
-        expectedStoryPages: book.pageLength,
-        bookPageLength: book.pageLength,
-        totalPagesInBook: book.pages.length
-      }, 'Page count mismatch - story pages vs expected');
+      logger.warn(
+        {
+          bookId,
+          storyPagesCount: storyPages.length,
+          expectedStoryPages: book.pageLength,
+          bookPageLength: book.pageLength,
+          totalPagesInBook: book.pages.length,
+        },
+        'Page count mismatch - story pages vs expected',
+      );
     }
 
     // Parse additional characters from JSON string (if present)
@@ -568,7 +590,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
           logger.info(
             {
               bookId,
-              namedCharacters: mergedCharacters.filter(c => c.name).length,
+              namedCharacters: mergedCharacters.filter((c) => c.name).length,
               consumedAnswers: merge.consumedQuestionIds.length,
             },
             'resolveCast: merged capture answers + childName into character identity',
@@ -590,7 +612,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
     // A failed join keeps the answer as a fact line — the parent's tap must
     // never be silently dropped.
     const confirmedFacts = buildConfirmedFacts(
-      captureQuestions.filter(q => !consumedQuestionIds.has(q.id)),
+      captureQuestions.filter((q) => !consumedQuestionIds.has(q.id)),
     );
 
     // appearsOnPages is creation-order-positional; remap per character to the
@@ -601,9 +623,13 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
     // AVATAR_STORY: the roster has no asset stamps (there are no photos) —
     // resolveCastEntries would drop everyone. The cast reaches the prompt via
     // buildAvatarCastForPrompt below instead.
-    const charactersInPhotos = !isAvatarStory && mergedCharacters.length
-      ? resolveCastEntries(mergedCharacters, storyPages.map(p => p.assetId))
-      : [];
+    const charactersInPhotos =
+      !isAvatarStory && mergedCharacters.length
+        ? resolveCastEntries(
+            mergedCharacters,
+            storyPages.map((p) => p.assetId),
+          )
+        : [];
 
     // BRIDGE_PAGES_ENABLED: request bridges only when the flag is on AND a
     // grounded roster exists (identity-less books get no bridges — there is
@@ -629,7 +655,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       learningWords: (() => {
         const raw = book.learningWords as { word?: string }[] | null;
         const words = (raw ?? [])
-          .map(w => (typeof w?.word === 'string' ? w.word.trim() : ''))
+          .map((w) => (typeof w?.word === 'string' ? w.word.trim() : ''))
           .filter(Boolean)
           .slice(0, 4);
         return words.length > 0 ? words : undefined;
@@ -668,7 +694,8 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       ? {
           bookTitle: book.title || 'My Special Story',
           pageCount: storyPages.length,
-          premise: book.eventSummary?.trim() || book.theme?.trim() || 'a wonderful adventure together',
+          premise:
+            book.eventSummary?.trim() || book.theme?.trim() || 'a wonderful adventure together',
           cast: buildAvatarCastForPrompt(mergedCharacters),
           childName: book.childName || undefined,
           tone: book.tone || undefined,
@@ -739,7 +766,10 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
         throw new Error('OpenAI returned empty response');
       }
 
-      logger.info({ bookId, isRegen: !!qcFeedback, rawResponse: rawResult.substring(0, 500) }, 'Raw OpenAI response received');
+      logger.info(
+        { bookId, isRegen: !!qcFeedback, rawResponse: rawResult.substring(0, 500) },
+        'Raw OpenAI response received',
+      );
 
       // Defensive: strip markdown code block wrapping if present
       let cleanedResult = rawResult.trim();
@@ -750,13 +780,18 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       try {
         return JSON.parse(cleanedResult) as StoryResponse;
       } catch (parseError) {
-        logger.error({
-          bookId,
-          parseError: parseError instanceof Error ? parseError.message : 'Unknown parse error',
-          rawResponseLength: rawResult.length,
-          rawResponseFirst500: rawResult.substring(0, 500),
-        }, 'Failed to parse OpenAI response');
-        throw new Error(`Invalid JSON response from OpenAI: ${parseError instanceof Error ? parseError.message : 'unknown error'}`);
+        logger.error(
+          {
+            bookId,
+            parseError: parseError instanceof Error ? parseError.message : 'Unknown parse error',
+            rawResponseLength: rawResult.length,
+            rawResponseFirst500: rawResult.substring(0, 500),
+          },
+          'Failed to parse OpenAI response',
+        );
+        throw new Error(
+          `Invalid JSON response from OpenAI: ${parseError instanceof Error ? parseError.message : 'unknown error'}`,
+        );
       }
     };
 
@@ -769,7 +804,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       if (bridgeCap === 0) return [];
       const validation = validateBridgePages(response.bridgePages, {
         photoCount: storyPages.length,
-        rosterCharacterIds: charactersInPhotos.map(c => c.characterId),
+        rosterCharacterIds: charactersInPhotos.map((c) => c.characterId),
       });
       if ((response.bridgePages?.length ?? 0) > 0 || validation.dropped.length > 0) {
         logger.info(
@@ -798,7 +833,10 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
       if (!verdict.passed) {
         qcPassed = false;
         if (Date.now() - jobStartedAt < STORY_QC_TIME_BUDGET_MS) {
-          logger.warn({ bookId, feedback: verdict.feedback }, 'Story QC failed — regenerating once with corrections');
+          logger.warn(
+            { bookId, feedback: verdict.feedback },
+            'Story QC failed — regenerating once with corrections',
+          );
           regenerated = true;
           // Back to 'story' so the story stage emits a mid-flight signal —
           // this write is also what keeps the UI's stall clock honest.
@@ -806,14 +844,20 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
           storyResponse = await generateStory(verdict.feedback);
           acceptedBridges = validateBridges(storyResponse);
         } else {
-          logger.warn({ bookId, feedback: verdict.feedback }, 'Story QC failed but time budget exhausted — accepting draft');
+          logger.warn(
+            { bookId, feedback: verdict.feedback },
+            'Story QC failed but time budget exhausted — accepting draft',
+          );
         }
       }
     } catch (qcError) {
-      logger.warn({
-        bookId,
-        error: qcError instanceof Error ? qcError.message : 'Unknown QC error',
-      }, 'Story QC errored — accepting draft without review');
+      logger.warn(
+        {
+          bookId,
+          error: qcError instanceof Error ? qcError.message : 'Unknown QC error',
+        },
+        'Story QC errored — accepting draft without review',
+      );
     }
 
     // Prepare update data (not promises yet)
@@ -831,7 +875,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
     // AVATAR_STORY: validate-or-degrade each page's scene before persisting.
     // A malformed scene never fails the job — the page renders from text.
     const rosterIdsForScenes = isAvatarStory
-      ? (avatarInput!.cast.map(c => c.characterId) ?? [])
+      ? (avatarInput!.cast.map((c) => c.characterId) ?? [])
       : [];
 
     try {
@@ -839,51 +883,61 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
 
       // Validate that all expected pages are present in response
       const expectedPageNumbers = storyPages.map((_, i) => i + 1);
-      const receivedPageNumbers = storyResponse.pages?.map(p => p.pageNumber) || [];
-      const missingPages = expectedPageNumbers.filter(p => !receivedPageNumbers.includes(p));
+      const receivedPageNumbers = storyResponse.pages?.map((p) => p.pageNumber) || [];
+      const missingPages = expectedPageNumbers.filter((p) => !receivedPageNumbers.includes(p));
 
       if (missingPages.length > 0) {
-        logger.warn({
-          bookId,
-          missingPages,
-          expectedCount: expectedPageNumbers.length,
-          receivedCount: receivedPageNumbers.length
-        }, 'Some pages missing from OpenAI response');
+        logger.warn(
+          {
+            bookId,
+            missingPages,
+            expectedCount: expectedPageNumbers.length,
+            receivedCount: receivedPageNumbers.length,
+          },
+          'Some pages missing from OpenAI response',
+        );
       }
 
       // Prepare update data for all story pages
       pageUpdates = storyPages.map((page, index) => {
         const storyPosition = index + 1; // 1-based position
-        const content = storyResponse.pages?.find(p => p.pageNumber === storyPosition);
+        const content = storyResponse.pages?.find((p) => p.pageNumber === storyPosition);
 
         if (!content) {
-          logger.warn({
-            bookId,
-            pageId: page.id,
-            storyPosition,
-            pageNumber: page.pageNumber
-          }, 'No content generated for this page - using defaults');
+          logger.warn(
+            {
+              bookId,
+              pageId: page.id,
+              storyPosition,
+              pageNumber: page.pageNumber,
+            },
+            'No content generated for this page - using defaults',
+          );
         }
 
         // Fix for empty string bug: check if text exists AND is not empty after trim
         const trimmedText = content?.text?.trim() || '';
-        const finalText = trimmedText.length > 0 ? trimmedText : `[Page ${storyPosition} text pending]`;
+        const finalText =
+          trimmedText.length > 0 ? trimmedText : `[Page ${storyPosition} text pending]`;
 
         // Normalize empty string illustrationNotes to null
         const notes = content?.illustrationNotes?.trim() || null;
 
-        logger.info({
-          bookId,
-          pageId: page.id,
-          pageNumber: page.pageNumber,
-          index: page.index,
-          storyPosition,
-          finalTextLength: finalText.length,
-          hadContent: !!content,
-          usedFallback: !content || trimmedText.length === 0,
-          textPreview: finalText.substring(0, 50),
-          hasIllustrationNotes: !!notes
-        }, 'Prepared page update');
+        logger.info(
+          {
+            bookId,
+            pageId: page.id,
+            pageNumber: page.pageNumber,
+            index: page.index,
+            storyPosition,
+            finalTextLength: finalText.length,
+            hadContent: !!content,
+            usedFallback: !content || trimmedText.length === 0,
+            textPreview: finalText.substring(0, 50),
+            hasIllustrationNotes: !!notes,
+          },
+          'Prepared page update',
+        );
 
         // AVATAR_STORY: carry the validated scene along (photo books: undefined).
         const rawScene = isAvatarStory
@@ -907,20 +961,26 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
         };
       });
     } catch (mappingError) {
-      logger.error({
-        bookId,
-        error: mappingError instanceof Error ? mappingError.message : 'Unknown error',
-        responsePageCount: storyResponse.pages?.length,
-      }, 'Failed to map story response onto pages');
+      logger.error(
+        {
+          bookId,
+          error: mappingError instanceof Error ? mappingError.message : 'Unknown error',
+          responsePageCount: storyResponse.pages?.length,
+        },
+        'Failed to map story response onto pages',
+      );
       throw mappingError;
     }
 
-    logger.info({
-      bookId,
-      totalPageUpdates: pageUpdates.length,
-      expectedStoryPages: storyPages.length,
-      matches: pageUpdates.length === storyPages.length
-    }, 'Executing batch page updates via transaction');
+    logger.info(
+      {
+        bookId,
+        totalPageUpdates: pageUpdates.length,
+        expectedStoryPages: storyPages.length,
+        matches: pageUpdates.length === storyPages.length,
+      },
+      'Executing batch page updates via transaction',
+    );
 
     try {
       // Use $transaction with a callback to execute updates sequentially
@@ -952,7 +1012,10 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
         // Book.pageLength truthful. No-op (zero extra writes) when no bridges
         // were accepted — the flag-off path is byte-identical to before.
         if (acceptedBridges.length > 0) {
-          const plan = planPageSequence(storyPages.map(p => p.id), acceptedBridges);
+          const plan = planPageSequence(
+            storyPages.map((p) => p.id),
+            acceptedBridges,
+          );
           for (const entry of plan) {
             if (entry.kind === 'photo') {
               await tx.page.update({
@@ -989,18 +1052,24 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
 
         return updateResults;
       });
-      logger.info({
-        bookId,
-        successfulUpdates: results.length,
-        insertedBridges: acceptedBridges.length,
-        totalExpected: storyPages.length
-      }, 'Batch update completed');
+      logger.info(
+        {
+          bookId,
+          successfulUpdates: results.length,
+          insertedBridges: acceptedBridges.length,
+          totalExpected: storyPages.length,
+        },
+        'Batch update completed',
+      );
     } catch (error) {
-      logger.error({
-        bookId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        updateCount: pageUpdates.length
-      }, 'Batch update failed');
+      logger.error(
+        {
+          bookId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          updateCount: pageUpdates.length,
+        },
+        'Batch update failed',
+      );
       throw error;
     }
 
@@ -1013,54 +1082,66 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
         id: true,
         pageNumber: true,
         index: true,
-        text: true
+        text: true,
       },
-      orderBy: { index: 'asc' }
+      orderBy: { index: 'asc' },
     });
 
-    const pagesWithoutText = pagesAfterUpdate.filter(p => !p.text || p.text.trim().length === 0);
+    const pagesWithoutText = pagesAfterUpdate.filter((p) => !p.text || p.text.trim().length === 0);
 
     if (pagesWithoutText.length > 0) {
-      logger.error({
-        bookId,
-        totalStoryPages: pagesAfterUpdate.length,
-        pagesWithoutText: pagesWithoutText.length,
-        missingPageNumbers: pagesWithoutText.map(p => p.pageNumber),
-        missingPageIndices: pagesWithoutText.map(p => p.index),
-        pageUpdatesCreated: pageUpdates.length,
-        expectedStoryPages: storyPages.length,
-      }, 'CRITICAL: Some pages missing text after batch update - applying fallback');
+      logger.error(
+        {
+          bookId,
+          totalStoryPages: pagesAfterUpdate.length,
+          pagesWithoutText: pagesWithoutText.length,
+          missingPageNumbers: pagesWithoutText.map((p) => p.pageNumber),
+          missingPageIndices: pagesWithoutText.map((p) => p.index),
+          pageUpdatesCreated: pageUpdates.length,
+          expectedStoryPages: storyPages.length,
+        },
+        'CRITICAL: Some pages missing text after batch update - applying fallback',
+      );
 
       // Fix pages that didn't get text
       const fixPromises = pagesWithoutText.map((page) => {
         const fallbackText = `[Page ${page.pageNumber} text pending - please regenerate]`;
-        logger.warn({
-          bookId,
-          pageId: page.id,
-          pageNumber: page.pageNumber,
-          fallbackText
-        }, 'Applying fallback text to page that was missed');
+        logger.warn(
+          {
+            bookId,
+            pageId: page.id,
+            pageNumber: page.pageNumber,
+            fallbackText,
+          },
+          'Applying fallback text to page that was missed',
+        );
 
         return prisma.page.update({
           where: { id: page.id },
           data: {
             text: fallbackText,
-            textConfirmed: false
-          }
+            textConfirmed: false,
+          },
         });
       });
 
       await Promise.all(fixPromises);
-      logger.info({
-        bookId,
-        fixedPages: fixPromises.length
-      }, 'Applied fallback text to pages that were missed');
+      logger.info(
+        {
+          bookId,
+          fixedPages: fixPromises.length,
+        },
+        'Applied fallback text to pages that were missed',
+      );
     } else {
-      logger.info({
-        bookId,
-        totalStoryPages: pagesAfterUpdate.length,
-        allPagesHaveText: true
-      }, 'Verification passed: All story pages have text');
+      logger.info(
+        {
+          bookId,
+          totalStoryPages: pagesAfterUpdate.length,
+          allPagesHaveText: true,
+        },
+        'Verification passed: All story pages have text',
+      );
     }
 
     // Persist the model's title when the book only had a placeholder
@@ -1091,7 +1172,12 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
         name: 'story_ready',
         userId: book.userId,
         bookId,
-        props: { regenerated, qcPassed, bridgePages: acceptedBridges.length, bookType: book.bookType },
+        props: {
+          regenerated,
+          qcPassed,
+          bridgePages: acceptedBridges.length,
+          bookType: book.bookType,
+        },
       },
       logger,
     );
@@ -1122,38 +1208,50 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
         );
         logger.info({ bookId }, 'Auto-chained into illustration via character extraction');
       } catch (chainError) {
-        logger.error({
-          bookId,
-          error: chainError instanceof Error ? chainError.message : 'Unknown error',
-        }, 'Auto-chain enqueue failed — reverting to STORY_READY for manual illustration');
-        await prisma.book.update({
-          where: { id: bookId, status: 'ILLUSTRATING' },
-          data: { status: 'STORY_READY' },
-        }).catch(() => {});
+        logger.error(
+          {
+            bookId,
+            error: chainError instanceof Error ? chainError.message : 'Unknown error',
+          },
+          'Auto-chain enqueue failed — reverting to STORY_READY for manual illustration',
+        );
+        await prisma.book
+          .update({
+            where: { id: bookId, status: 'ILLUSTRATING' },
+            data: { status: 'STORY_READY' },
+          })
+          .catch(() => {});
       }
     }
 
-    logger.info({
-      bookId,
-      pagesUpdated: pageUpdates.length,
-      totalStoryPages: storyPages.length,
-      autoChained: book.autoIllustrate,
-      allPagesHaveText: pageUpdates.length === storyPages.length
-    }, 'Story generation completed');
+    logger.info(
+      {
+        bookId,
+        pagesUpdated: pageUpdates.length,
+        totalStoryPages: storyPages.length,
+        autoChained: book.autoIllustrate,
+        allPagesHaveText: pageUpdates.length === storyPages.length,
+      },
+      'Story generation completed',
+    );
     return { success: true, pagesUpdated: pageUpdates.length };
-
   } catch (error: any) {
-    logger.error({
-      error: error.message,
-      bookId: job?.data?.bookId
-    }, 'Story generation failed');
+    logger.error(
+      {
+        error: error.message,
+        bookId: job?.data?.bookId,
+      },
+      'Story generation failed',
+    );
 
     // Update book status to failed if we have a bookId
     if (job?.data?.bookId) {
-      await prisma.book.update({
-        where: { id: job.data.bookId },
-        data: { status: 'FAILED', generationPhase: null },
-      }).catch(() => {}); // Ignore errors when updating status
+      await prisma.book
+        .update({
+          where: { id: job.data.bookId },
+          data: { status: 'FAILED', generationPhase: null },
+        })
+        .catch(() => {}); // Ignore errors when updating status
     }
 
     throw error;
@@ -1185,24 +1283,31 @@ async function processSinglePageTextGeneration(
 
   if (!book) throw new Error('Book not found');
 
-  const targetPage = book.pages.find(p => p.id === pageId);
+  const targetPage = book.pages.find((p) => p.id === pageId);
   if (!targetPage) throw new Error('Target page not found');
 
   // AVATAR_STORY (X6d): pages have no photos by design — the rewrite runs
   // from the premise, the cast, and this page's stored scene instead.
   const isAvatarStory = book.bookType === 'AVATAR_STORY';
-  const photoUrl = targetPage.asset?.url || targetPage.asset?.thumbnailUrl || targetPage.originalImageUrl;
+  const photoUrl =
+    targetPage.asset?.url || targetPage.asset?.thumbnailUrl || targetPage.originalImageUrl;
   if (!photoUrl && !isAvatarStory) throw new Error('Target page has no photo');
 
   // Get all story pages for context
   const storyPages = book.pages;
-  const targetIndex = storyPages.findIndex(p => p.id === pageId);
+  const targetIndex = storyPages.findIndex((p) => p.id === pageId);
 
   const prevPages = storyPages.slice(Math.max(0, targetIndex - 2), targetIndex);
   const nextPages = storyPages.slice(targetIndex + 1, targetIndex + 3);
 
-  const prevContext = prevPages.filter(p => p.text).map(p => `Page ${p.pageNumber}: "${p.text}"`).join('\n');
-  const nextContext = nextPages.filter(p => p.text).map(p => `Page ${p.pageNumber}: "${p.text}"`).join('\n');
+  const prevContext = prevPages
+    .filter((p) => p.text)
+    .map((p) => `Page ${p.pageNumber}: "${p.text}"`)
+    .join('\n');
+  const nextContext = nextPages
+    .filter((p) => p.text)
+    .map((p) => `Page ${p.pageNumber}: "${p.text}"`)
+    .join('\n');
 
   // Parse additional characters
   let characterInfo = '';
@@ -1210,11 +1315,16 @@ async function processSinglePageTextGeneration(
     characterInfo = `The main character is named "${book.childName}".`;
     if (book.additionalCharacters) {
       try {
-        const chars = JSON.parse(book.additionalCharacters) as Array<{ name: string; relationship: string }>;
+        const chars = JSON.parse(book.additionalCharacters) as Array<{
+          name: string;
+          relationship: string;
+        }>;
         if (chars.length > 0) {
-          characterInfo += ` Other characters: ${chars.map(c => `"${c.name}" (${c.relationship})`).join(', ')}.`;
+          characterInfo += ` Other characters: ${chars.map((c) => `"${c.name}" (${c.relationship})`).join(', ')}.`;
         }
-      } catch { /* ignore parse errors */ }
+      } catch {
+        /* ignore parse errors */
+      }
     }
   }
 
@@ -1236,7 +1346,10 @@ async function processSinglePageTextGeneration(
       childName: book.childName,
     });
     consumedQuestionIds = new Set(merge.consumedQuestionIds);
-    cast = resolveCastEntries(merge.characters, storyPages.map(p => p.assetId));
+    cast = resolveCastEntries(
+      merge.characters,
+      storyPages.map((p) => p.assetId),
+    );
   }
   // AVATAR_STORY: the roster has no asset stamps, so resolveCastEntries
   // drops everyone — read the stored roster directly instead.
@@ -1244,17 +1357,19 @@ async function processSinglePageTextGeneration(
   const castInfo = isAvatarStory
     ? avatarCast.length > 0
       ? `The cast of this story (picked by the parent): ${avatarCast
-          .map(c => `"${c.name}" (${c.role.replace(/_/g, ' ')})`)
+          .map((c) => `"${c.name}" (${c.role.replace(/_/g, ' ')})`)
           .join(', ')}. NEVER invent a new character or proper name.`
       : ''
     : cast.length > 0
       ? `People in this book's photos: ${cast
-          .map(c => `"${c.name}" (${c.role.replace(/_/g, ' ')})`)
-          .join(', ')}. NEVER invent a proper name — for unnamed people use the warm relationship word a toddler would say ("Grandma", "Daddy"); for unnamed pets use "the dog" / "the cat".`
+          .map((c) => `"${c.name}" (${c.role.replace(/_/g, ' ')})`)
+          .join(
+            ', ',
+          )}. NEVER invent a proper name — for unnamed people use the warm relationship word a toddler would say ("Grandma", "Daddy"); for unnamed pets use "the dog" / "the cat".`
       : '';
 
   const confirmedFacts = buildConfirmedFacts(
-    captureQuestions.filter(q => !consumedQuestionIds.has(q.id)),
+    captureQuestions.filter((q) => !consumedQuestionIds.has(q.id)),
   );
   // Exactly ONE experience-context block, eventSummary superseding theme —
   // same condition as full generation. AVATAR_STORY: eventSummary holds the
@@ -1267,7 +1382,7 @@ async function processSinglePageTextGeneration(
       ? [
           `## What actually happened (confirmed by the parent — the story must feel TRUE to this):`,
           `- "${book.eventSummary}"`,
-          ...confirmedFacts.map(f => `- Parent confirmed: ${f}`),
+          ...confirmedFacts.map((f) => `- Parent confirmed: ${f}`),
         ].join('\n')
       : book.theme
         ? `## Story context from the parent:\n"${book.theme}"`
@@ -1280,17 +1395,21 @@ async function processSinglePageTextGeneration(
 
   const storedAnalysis = targetPage.analysis as StoredPageAnalysis | null;
   // Stale analysis (photo was swapped since the perception pass) is dropped.
-  const freshAnalysis = storedAnalysis && storedAnalysis.assetId === targetPage.assetId ? storedAnalysis : null;
+  const freshAnalysis =
+    storedAnalysis && storedAnalysis.assetId === targetPage.assetId ? storedAnalysis : null;
   const analysisLine = freshAnalysis
     ? `WHAT'S HERE in this page's photo (raw notes, NOT the story): ${freshAnalysis.setting}; ${freshAnalysis.action}; ${freshAnalysis.emotion}.${
-        freshAnalysis.eventSignals?.length ? ` Signals: ${freshAnalysis.eventSignals.join(', ')}.` : ''
+        freshAnalysis.eventSignals?.length
+          ? ` Signals: ${freshAnalysis.eventSignals.join(', ')}.`
+          : ''
       } ARC ROLE: ${freshAnalysis.narrativeRole}.`
     : '';
 
   const language = book.language || 'en';
-  const languageInstruction = language === 'ja'
-    ? 'Write the story text in Japanese (hiragana preferred for young children). Use simple, warm language.'
-    : 'Write the story text in English.';
+  const languageInstruction =
+    language === 'ja'
+      ? 'Write the story text in Japanese (hiragana preferred for young children). Use simple, warm language.'
+      : 'Write the story text in English.';
 
   const promptText = [
     `You are writing page ${targetPage.pageNumber} of a children's picture book titled "${book.title || 'My Special Story'}".`,
@@ -1300,7 +1419,9 @@ async function processSinglePageTextGeneration(
     '',
     ...(moodContext ? [moodContext, ''] : []),
     ...(eventContext ? [eventContext, ''] : []),
-    prevContext ? `## Story so far (previous pages):\n${prevContext}` : '## This is near the beginning of the story.',
+    prevContext
+      ? `## Story so far (previous pages):\n${prevContext}`
+      : '## This is near the beginning of the story.',
     '',
     `## Your task:`,
     isAvatarStory
@@ -1308,10 +1429,14 @@ async function processSinglePageTextGeneration(
       : `Write story text for page ${targetPage.pageNumber} based on the photo provided. Write 2-4 sentences (max 50 words). The text should feel warm, playful, and natural when read aloud to a toddler.`,
     ...(analysisLine ? [analysisLine] : []),
     ...(isAvatarStory && targetPage.bridgeScene
-      ? [`THIS PAGE'S SCENE (what the illustration will show): ${JSON.stringify(targetPage.bridgeScene)}`]
+      ? [
+          `THIS PAGE'S SCENE (what the illustration will show): ${JSON.stringify(targetPage.bridgeScene)}`,
+        ]
       : []),
     '',
-    nextContext ? `## What comes after (for continuity):\n${nextContext}` : '## This is near the end of the story.',
+    nextContext
+      ? `## What comes after (for continuity):\n${nextContext}`
+      : '## This is near the end of the story.',
     '',
     `Also provide brief illustrationNotes describing any visual effects or mood for the illustrator, or null if the photo speaks for itself.`,
   ].join('\n');
@@ -1322,7 +1447,10 @@ async function processSinglePageTextGeneration(
     type: 'object',
     properties: {
       text: { type: 'string', description: 'Story text (2-4 sentences, max 50 words)' },
-      illustrationNotes: { type: ['string', 'null'], description: 'Visual notes for illustrator, or null' },
+      illustrationNotes: {
+        type: ['string', 'null'],
+        description: 'Visual notes for illustrator, or null',
+      },
     },
     required: ['text', 'illustrationNotes'],
     additionalProperties: false,
@@ -1366,6 +1494,9 @@ async function processSinglePageTextGeneration(
     },
   });
 
-  logger.info({ bookId, pageId, textLength: parsed.text.length }, 'Single-page text generation completed');
+  logger.info(
+    { bookId, pageId, textLength: parsed.text.length },
+    'Single-page text generation completed',
+  );
   return { success: true, pageId, text: parsed.text };
 }

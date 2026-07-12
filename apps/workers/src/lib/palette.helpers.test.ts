@@ -112,14 +112,8 @@ describe('meanDelta', () => {
 
 describe('isNearIdentity', () => {
   it('accepts tiny corrections and rejects visible ones', () => {
-    expect(
-      isNearIdentity({ multipliers: [1.005, 1, 0.999], offsets: [0.2, 0, -0.4] }),
-    ).toBe(true);
-    expect(
-      isNearIdentity({ multipliers: [1.1, 1, 1], offsets: [0, 0, 0] }),
-    ).toBe(false);
-    expect(
-      isNearIdentity({ multipliers: [1, 1, 1], offsets: [3, 0, 0] }),
-    ).toBe(false);
+    expect(isNearIdentity({ multipliers: [1.005, 1, 0.999], offsets: [0.2, 0, -0.4] })).toBe(true);
+    expect(isNearIdentity({ multipliers: [1.1, 1, 1], offsets: [0, 0, 0] })).toBe(false);
+    expect(isNearIdentity({ multipliers: [1, 1, 1], offsets: [3, 0, 0] })).toBe(false);
   });
 });

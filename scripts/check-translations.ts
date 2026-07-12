@@ -41,8 +41,8 @@ function loadLocale(locale: string): NestedRecord {
 }
 
 // Discover all locale files
-const localeFiles = fs.readdirSync(MESSAGES_DIR).filter(f => f.endsWith('.json'));
-const locales = localeFiles.map(f => f.replace('.json', ''));
+const localeFiles = fs.readdirSync(MESSAGES_DIR).filter((f) => f.endsWith('.json'));
+const locales = localeFiles.map((f) => f.replace('.json', ''));
 
 if (!locales.includes(REFERENCE_LOCALE)) {
   console.error(`Reference locale "${REFERENCE_LOCALE}.json" not found in ${MESSAGES_DIR}`);
@@ -59,8 +59,8 @@ for (const locale of locales) {
 
   const localeKeys = collectKeys(loadLocale(locale));
 
-  const missing = [...referenceKeys].filter(k => !localeKeys.has(k));
-  const extra = [...localeKeys].filter(k => !referenceKeys.has(k));
+  const missing = [...referenceKeys].filter((k) => !localeKeys.has(k));
+  const extra = [...localeKeys].filter((k) => !referenceKeys.has(k));
 
   if (missing.length === 0 && extra.length === 0) {
     console.log(`✓ ${locale}.json — all ${localeKeys.size} keys match`);

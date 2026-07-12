@@ -31,9 +31,9 @@ export function computeBookStatus(
 ): 'COMPLETED' | 'PARTIAL' | 'FAILED' {
   const { storyPages } = categorizePages(pages, coverAssetId);
 
-  const pagesWithText = pages.filter(p => p.text && p.text.trim().length > 0);
-  const storyPagesWithText = storyPages.filter(p => p.text && p.text.trim().length > 0);
-  const pagesWithIllustrations = pages.filter(p => p.generatedImageUrl);
+  const pagesWithText = pages.filter((p) => p.text && p.text.trim().length > 0);
+  const storyPagesWithText = storyPages.filter((p) => p.text && p.text.trim().length > 0);
+  const pagesWithIllustrations = pages.filter((p) => p.generatedImageUrl);
 
   const totalPages = pages.length;
   const textComplete = storyPagesWithText.length === storyPages.length;

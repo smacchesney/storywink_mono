@@ -65,9 +65,7 @@ export class GeminiProvider implements IllustrationProvider {
       },
     });
 
-    const imagePart = result?.candidates?.[0]?.content?.parts?.find(
-      (part: any) => part.inlineData,
-    );
+    const imagePart = result?.candidates?.[0]?.content?.parts?.find((part: any) => part.inlineData);
 
     if (imagePart?.inlineData?.data) {
       return { imageBase64: imagePart.inlineData.data };
@@ -75,7 +73,8 @@ export class GeminiProvider implements IllustrationProvider {
 
     logger.warn({ provider: 'gemini' }, 'Gemini response contained no image data');
     return {
-      blockedReason: 'Image generation failed or blocked by content policy (no image data in response).',
+      blockedReason:
+        'Image generation failed or blocked by content policy (no image data in response).',
     };
   }
 }

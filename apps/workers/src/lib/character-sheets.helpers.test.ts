@@ -47,12 +47,12 @@ describe('selectSheetCharacters', () => {
     });
 
     const selected = selectSheetCharacters([friend, grandma, main]);
-    expect(selected.map(c => c.characterId)).toEqual(['child_1', 'adult_1']);
+    expect(selected.map((c) => c.characterId)).toEqual(['child_1', 'adult_1']);
   });
 
   it('accepts roles starting with "main" (free-form role strings)', () => {
     const main = makeCharacter({ characterId: 'child_9', role: 'main character' });
-    expect(selectSheetCharacters([main]).map(c => c.characterId)).toEqual(['child_9']);
+    expect(selectSheetCharacters([main]).map((c) => c.characterId)).toEqual(['child_9']);
   });
 
   it('never drops the main child in favor of a higher photo count', () => {
@@ -81,7 +81,7 @@ describe('selectSheetCharacters', () => {
       appearsOnAssetIds: [],
     });
     const main = makeCharacter({ characterId: 'child_1', role: 'main_child' });
-    expect(selectSheetCharacters([ghost, main]).map(c => c.characterId)).toEqual(['child_1']);
+    expect(selectSheetCharacters([ghost, main]).map((c) => c.characterId)).toEqual(['child_1']);
   });
 
   it('falls back to appearsOnPages counting when assetId stamps are absent', () => {
@@ -97,7 +97,11 @@ describe('selectSheetCharacters', () => {
 });
 
 describe('characterReferences keying and reuse', () => {
-  const entry = (characterId: string, artStyle: string, url = `https://x/${characterId}-${artStyle}.png`): CharacterReferenceEntry => ({
+  const entry = (
+    characterId: string,
+    artStyle: string,
+    url = `https://x/${characterId}-${artStyle}.png`,
+  ): CharacterReferenceEntry => ({
     characterId,
     artStyle,
     url,
@@ -130,9 +134,9 @@ describe('characterReferences keying and reuse', () => {
     const fresher = entry('child_1', 'kawaii', 'https://x/child_1-kawaii-v2.png');
     entries = upsertCharacterReference(entries, fresher);
     expect(entries).toHaveLength(2);
-    expect(entries.find(e => e.artStyle === 'kawaii')?.url).toContain('v2');
+    expect(entries.find((e) => e.artStyle === 'kawaii')?.url).toContain('v2');
     // Flip back to vignette: the original entry is still there.
-    expect(entries.find(e => e.artStyle === 'vignette')).toBeDefined();
+    expect(entries.find((e) => e.artStyle === 'vignette')).toBeDefined();
   });
 
   it('sheetRefsForStyle filters by style and resolves names from the identity', () => {
@@ -159,10 +163,22 @@ describe('characterReferences keying and reuse', () => {
 
 describe('resolveCharacterPhotoUrls', () => {
   const pages = [
-    { assetId: 'a1', asset: { url: 'https://res.cloudinary.com/d/image/upload/p1.jpg', thumbnailUrl: null } },
-    { assetId: 'a2', asset: { url: null, thumbnailUrl: 'https://res.cloudinary.com/d/image/upload/p2-thumb.jpg' } },
-    { assetId: 'a3', asset: { url: 'https://res.cloudinary.com/d/image/upload/p3.HEIC', thumbnailUrl: null } },
-    { assetId: 'a4', asset: { url: 'https://res.cloudinary.com/d/image/upload/p4.jpg', thumbnailUrl: null } },
+    {
+      assetId: 'a1',
+      asset: { url: 'https://res.cloudinary.com/d/image/upload/p1.jpg', thumbnailUrl: null },
+    },
+    {
+      assetId: 'a2',
+      asset: { url: null, thumbnailUrl: 'https://res.cloudinary.com/d/image/upload/p2-thumb.jpg' },
+    },
+    {
+      assetId: 'a3',
+      asset: { url: 'https://res.cloudinary.com/d/image/upload/p3.HEIC', thumbnailUrl: null },
+    },
+    {
+      assetId: 'a4',
+      asset: { url: 'https://res.cloudinary.com/d/image/upload/p4.jpg', thumbnailUrl: null },
+    },
   ];
 
   it('resolves via appearsOnAssetIds with vision normalization and HEIC conversion', () => {

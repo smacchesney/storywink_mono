@@ -66,11 +66,7 @@ export async function processAvatarRendition(job: Job<AvatarRenditionJobData>): 
   try {
     // Promotion fast path: byte-copy the book's validated sheet.
     if (job.data.copyFromSheetUrl) {
-      const copied = await copySheetIntoAvatarFolder(
-        avatarId,
-        artStyle,
-        job.data.copyFromSheetUrl,
-      );
+      const copied = await copySheetIntoAvatarFolder(avatarId, artStyle, job.data.copyFromSheetUrl);
       await prisma.avatarRendition.update({
         where: { id: rendition.id },
         data: {
@@ -89,9 +85,7 @@ export async function processAvatarRendition(job: Job<AvatarRenditionJobData>): 
     }
 
     // Source images: staged photos first, else a prior validated sheet.
-    const photoUrls = avatar.photos
-      .map((p) => p.asset?.url)
-      .filter((url): url is string => !!url);
+    const photoUrls = avatar.photos.map((p) => p.asset?.url).filter((url): url is string => !!url);
     const fallbackSheet = avatar.renditions.find(
       (r) => r.status === 'READY' && r.turnaroundSheetUrl && r.artStyle !== artStyle,
     )?.turnaroundSheetUrl;

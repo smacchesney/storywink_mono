@@ -7,8 +7,12 @@ describe('pickRenditionSheet', () => {
   const pendingBare = { status: 'PENDING', turnaroundSheetUrl: null };
 
   it('READY always wins, for both book types', () => {
-    expect(pickRenditionSheet([pendingWithSheet, ready], 'AVATAR_STORY')).toBe('https://x/ready.png');
-    expect(pickRenditionSheet([pendingWithSheet, ready], 'PHOTO_STORY')).toBe('https://x/ready.png');
+    expect(pickRenditionSheet([pendingWithSheet, ready], 'AVATAR_STORY')).toBe(
+      'https://x/ready.png',
+    );
+    expect(pickRenditionSheet([pendingWithSheet, ready], 'PHOTO_STORY')).toBe(
+      'https://x/ready.png',
+    );
   });
 
   it('a mid-redraw leftover sheet anchors AVATAR_STORY books only', () => {

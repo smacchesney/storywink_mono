@@ -92,10 +92,10 @@ Straight lift-and-shift from current worker lines ~400–458. Reads `GOOGLE_API_
   ```ts
   const response = await client.images.edit({
     model: 'gpt-image-2',
-    image: [contentImageFile, ...styleRefFiles],  // content photo first, style refs after
+    image: [contentImageFile, ...styleRefFiles], // content photo first, style refs after
     prompt,
     size: '2048x2048',
-    quality: process.env.OPENAI_IMAGE_QUALITY ?? 'high',    // low | medium | high | auto
+    quality: process.env.OPENAI_IMAGE_QUALITY ?? 'high', // low | medium | high | auto
     // Thinking mode: controlled by OPENAI_THINKING=true|false
     // At time of writing, SDK surface for thinking is tentative; if the param
     // name shifts post-release, resolve by checking the installed SDK types.
@@ -110,12 +110,12 @@ Straight lift-and-shift from current worker lines ~400–458. Reads `GOOGLE_API_
 
 ### New environment variables
 
-| Var | Values | Default | Scope |
-|---|---|---|---|
-| `ILLUSTRATION_PROVIDER` | `gemini` \| `openai` | `gemini` | workers service |
-| `OPENAI_API_KEY` | secret | — | workers service (required when provider=openai) |
-| `OPENAI_IMAGE_QUALITY` | `low` \| `medium` \| `high` \| `auto` | `high` | workers service |
-| `OPENAI_THINKING` | `true` \| `false` | `false` | workers service |
+| Var                     | Values                                | Default  | Scope                                           |
+| ----------------------- | ------------------------------------- | -------- | ----------------------------------------------- |
+| `ILLUSTRATION_PROVIDER` | `gemini` \| `openai`                  | `gemini` | workers service                                 |
+| `OPENAI_API_KEY`        | secret                                | —        | workers service (required when provider=openai) |
+| `OPENAI_IMAGE_QUALITY`  | `low` \| `medium` \| `high` \| `auto` | `high`   | workers service                                 |
+| `OPENAI_THINKING`       | `true` \| `false`                     | `false`  | workers service                                 |
 
 Validation: at worker startup, if `ILLUSTRATION_PROVIDER=openai` and `OPENAI_API_KEY` is missing, throw immediately with a clear message — fail fast, don't wait for the first job.
 
@@ -131,14 +131,14 @@ Job arrives → fetch content image → fetch style refs → build prompt
 
 ## Error Handling
 
-| Scenario | Current (Gemini) | New (OpenAI) | Worker behavior |
-|---|---|---|---|
-| Network / 5xx / timeout | throws, transient | throws, transient | BullMQ retries |
-| Rate limit (429) | throws, transient | throws, transient | BullMQ retries |
-| Content policy block | empty response → return `{blockedReason}` | 400 `moderation_blocked` → return `{blockedReason}` | Content-policy retry loop (3x), then FLAGGED |
-| Missing image data | return `{blockedReason}` | return `{blockedReason}` | Same as above |
-| Invalid API key | throws | throws | Job fails, not retried (non-transient error message) |
-| Quota exhausted | throws, transient per current patterns | `insufficient_quota` → throw non-transient | Fail fast — retrying won't help |
+| Scenario                | Current (Gemini)                          | New (OpenAI)                                        | Worker behavior                                      |
+| ----------------------- | ----------------------------------------- | --------------------------------------------------- | ---------------------------------------------------- |
+| Network / 5xx / timeout | throws, transient                         | throws, transient                                   | BullMQ retries                                       |
+| Rate limit (429)        | throws, transient                         | throws, transient                                   | BullMQ retries                                       |
+| Content policy block    | empty response → return `{blockedReason}` | 400 `moderation_blocked` → return `{blockedReason}` | Content-policy retry loop (3x), then FLAGGED         |
+| Missing image data      | return `{blockedReason}`                  | return `{blockedReason}`                            | Same as above                                        |
+| Invalid API key         | throws                                    | throws                                              | Job fails, not retried (non-transient error message) |
+| Quota exhausted         | throws, transient per current patterns    | `insufficient_quota` → throw non-transient          | Fail fast — retrying won't help                      |
 
 ## Testing
 
@@ -155,11 +155,11 @@ Job arrives → fetch content image → fetch style refs → build prompt
 
 ## Cost Estimate (per book, 10 story pages + 1 cover = 11 API calls)
 
-| Provider | Per-image (2K high) | Per-book |
-|---|---|---|
-| Gemini 3.1 Flash Image (current) | ~$0.08 | ~$0.88 |
-| gpt-image-2 (standard mode) | ~$0.42 | ~$4.60 |
-| gpt-image-2 (thinking mode) | ~$0.60+ | ~$6.60+ |
+| Provider                         | Per-image (2K high) | Per-book |
+| -------------------------------- | ------------------- | -------- |
+| Gemini 3.1 Flash Image (current) | ~$0.08              | ~$0.88   |
+| gpt-image-2 (standard mode)      | ~$0.42              | ~$4.60   |
+| gpt-image-2 (thinking mode)      | ~$0.60+             | ~$6.60+  |
 
 ## Open Questions / Risks
 

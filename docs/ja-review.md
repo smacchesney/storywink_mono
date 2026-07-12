@@ -1,6 +1,7 @@
 # Japanese copy needing native review
 
 Append-only. One line per key: `namespace.key` — why it needs a native check.
+
 - `progress.usuallyReady` — time-promise phrasing ("within 15 minutes of starting"); check the counter/reading for 15ふん and overall softness.
 - `progress.tabWorking` — browser tab title while generating; check it reads naturally truncated in a tab strip.
 - `progress.tabReady` — browser tab title on completion; exclamation register check.

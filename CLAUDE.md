@@ -55,10 +55,11 @@ Available exports: main, `/constants`, `/schemas`, `/utils`, `/types`, `/redis`,
 - Always question my assumptions - I may be incorrect or misunderstanding.
 - Keep solutions simple. Only make changes directly requested.
 - When making UI / UX changes, use playwright MCP to verify the quality of the UI changes, and ensure consistency with brand guidelines. Save screenshots in .screenshots folder.
-- The USP of this app is simplicity and intuitive UX for users. We need to hyper-focus on this in EVERYTHING we do. 
+- The USP of this app is simplicity and intuitive UX for users. We need to hyper-focus on this in EVERYTHING we do.
 
 ## Additional Documentation
 
 See `docs/` folder for detailed technical documentation:
+
 - `docs/print-on-demand.md` - Lulu API, Stripe, PDF generation
 - `docs/architecture-details.md` - Text overlay, illustration handling, data flow

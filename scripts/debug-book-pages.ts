@@ -48,10 +48,10 @@ async function debugBookPages(bookId: string) {
   });
 
   console.log('\n=== ANALYSIS ===');
-  const titlePages = book.pages.filter(p => p.isTitlePage);
-  const storyPages = book.pages.filter(p => !p.isTitlePage);
-  const pagesWithText = book.pages.filter(p => p.text && p.text.trim());
-  const pagesWithoutText = book.pages.filter(p => !p.text || !p.text.trim());
+  const titlePages = book.pages.filter((p) => p.isTitlePage);
+  const storyPages = book.pages.filter((p) => !p.isTitlePage);
+  const pagesWithText = book.pages.filter((p) => p.text && p.text.trim());
+  const pagesWithoutText = book.pages.filter((p) => !p.text || !p.text.trim());
 
   console.log(`Title Pages: ${titlePages.length} (should be 1)`);
   console.log(`Story Pages: ${storyPages.length} (should be ${book.pageLength - 1})`);
@@ -60,7 +60,7 @@ async function debugBookPages(bookId: string) {
 
   if (pagesWithoutText.length > 0) {
     console.log('\nPages missing text:');
-    pagesWithoutText.forEach(p => {
+    pagesWithoutText.forEach((p) => {
       console.log(`  - Page ${p.pageNumber} (index ${p.index}, isTitlePage: ${p.isTitlePage})`);
     });
   }

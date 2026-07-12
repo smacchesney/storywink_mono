@@ -51,22 +51,18 @@ export function characterPhotoCount(character: CharacterDescription): number {
  * appearsOnAssetIds count. Characters without any resolvable photo are
  * skipped — a sheet needs ground-truth pixels.
  */
-export function selectSheetCharacters(
-  characters: CharacterDescription[],
-): CharacterDescription[] {
-  const withPhotos = characters.filter(c => characterPhotoCount(c) > 0);
+export function selectSheetCharacters(characters: CharacterDescription[]): CharacterDescription[] {
+  const withPhotos = characters.filter((c) => characterPhotoCount(c) > 0);
 
   const main =
-    withPhotos.find(c => c.role === 'main_child') ??
-    withPhotos.find(c => c.role.startsWith('main'));
+    withPhotos.find((c) => c.role === 'main_child') ??
+    withPhotos.find((c) => c.role.startsWith('main'));
 
   const byPhotoCount = withPhotos
-    .filter(c => c !== main)
+    .filter((c) => c !== main)
     .sort((a, b) => characterPhotoCount(b) - characterPhotoCount(a));
 
-  const selected = [main, byPhotoCount[0]].filter(
-    (c): c is CharacterDescription => Boolean(c),
-  );
+  const selected = [main, byPhotoCount[0]].filter((c): c is CharacterDescription => Boolean(c));
   return selected.slice(0, MAX_SHEETS_PER_BOOK);
 }
 
@@ -94,7 +90,7 @@ export function upsertCharacterReference(
 ): CharacterReferenceEntry[] {
   return [
     ...entries.filter(
-      e => !(e.characterId === entry.characterId && e.artStyle === entry.artStyle),
+      (e) => !(e.characterId === entry.characterId && e.artStyle === entry.artStyle),
     ),
     entry,
   ];
@@ -112,12 +108,11 @@ export function sheetRefsForStyle(
 ): CharacterSheetRef[] {
   if (!artStyle) return [];
   return parseCharacterReferences(referencesJson)
-    .filter(e => e.artStyle === artStyle)
+    .filter((e) => e.artStyle === artStyle)
     .slice(0, MAX_SHEETS_PER_BOOK)
-    .map(e => ({
+    .map((e) => ({
       characterId: e.characterId,
-      name:
-        identity?.characters?.find(c => c.characterId === e.characterId)?.name ?? null,
+      name: identity?.characters?.find((c) => c.characterId === e.characterId)?.name ?? null,
       url: e.url,
     }));
 }
@@ -143,7 +138,7 @@ export function resolveCharacterPhotoUrls(
   if (character.appearsOnAssetIds?.some(Boolean)) {
     const assetIds = [...new Set(character.appearsOnAssetIds.filter(Boolean))];
     for (const assetId of assetIds) {
-      const page = pages.find(p => p.assetId === assetId);
+      const page = pages.find((p) => p.assetId === assetId);
       const url = page?.asset?.url || page?.asset?.thumbnailUrl;
       if (url) rawUrls.push(url);
     }
@@ -157,5 +152,5 @@ export function resolveCharacterPhotoUrls(
 
   return [...new Set(rawUrls)]
     .slice(0, max)
-    .map(url => optimizeCloudinaryUrlForVision(convertHeicToJpeg(url)));
+    .map((url) => optimizeCloudinaryUrlForVision(convertHeicToJpeg(url)));
 }

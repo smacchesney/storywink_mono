@@ -20,7 +20,9 @@ describe('extractCloudinaryPublicId', () => {
 
   it('extracts from a plain upload response URL (originals via /api/upload)', () => {
     expect(
-      extractCloudinaryPublicId(`${CLOUD}/image/upload/v1712345678/user_cm9xka1/uploads/abc123.jpg`),
+      extractCloudinaryPublicId(
+        `${CLOUD}/image/upload/v1712345678/user_cm9xka1/uploads/abc123.jpg`,
+      ),
     ).toBe('user_cm9xka1/uploads/abc123');
   });
 
@@ -34,7 +36,9 @@ describe('extractCloudinaryPublicId', () => {
 
   it('extracts from a character sheet URL (storywink/<bookId>/refs)', () => {
     expect(
-      extractCloudinaryPublicId(`${CLOUD}/image/upload/v1712345678/storywink/cm9book1/refs/sheet1.png`),
+      extractCloudinaryPublicId(
+        `${CLOUD}/image/upload/v1712345678/storywink/cm9book1/refs/sheet1.png`,
+      ),
     ).toBe('storywink/cm9book1/refs/sheet1');
   });
 
@@ -74,7 +78,9 @@ describe('extractCloudinaryPublicId', () => {
 
   it('handles a single comma-free transformation segment', () => {
     expect(
-      extractCloudinaryPublicId(`${CLOUD}/image/upload/f_jpg/v1712345678/user_cm9xka1/uploads/a.heic`),
+      extractCloudinaryPublicId(
+        `${CLOUD}/image/upload/f_jpg/v1712345678/user_cm9xka1/uploads/a.heic`,
+      ),
     ).toBe('user_cm9xka1/uploads/a');
   });
 
@@ -104,7 +110,9 @@ describe('extractCloudinaryPublicId', () => {
   });
 
   it('handles a versioned public id with no folder', () => {
-    expect(extractCloudinaryPublicId(`${CLOUD}/image/upload/v1571218330/sample.jpg`)).toBe('sample');
+    expect(extractCloudinaryPublicId(`${CLOUD}/image/upload/v1571218330/sample.jpg`)).toBe(
+      'sample',
+    );
   });
 
   it('does not treat a folder named like a version as the version marker twice', () => {
@@ -132,18 +140,24 @@ describe('extractCloudinaryPublicId', () => {
   });
 
   it('supports private and authenticated delivery types', () => {
-    expect(extractCloudinaryPublicId(`${CLOUD}/image/private/v123/folder/img.jpg`)).toBe('folder/img');
+    expect(extractCloudinaryPublicId(`${CLOUD}/image/private/v123/folder/img.jpg`)).toBe(
+      'folder/img',
+    );
     expect(extractCloudinaryPublicId(`${CLOUD}/image/authenticated/v123/folder/img.jpg`)).toBe(
       'folder/img',
     );
   });
 
   it('keeps the extension for raw resources (part of the public id)', () => {
-    expect(extractCloudinaryPublicId(`${CLOUD}/raw/upload/v123/docs/book.pdf`)).toBe('docs/book.pdf');
+    expect(extractCloudinaryPublicId(`${CLOUD}/raw/upload/v123/docs/book.pdf`)).toBe(
+      'docs/book.pdf',
+    );
   });
 
   it('extracts video public ids', () => {
-    expect(extractCloudinaryPublicId(`${CLOUD}/video/upload/v123/clips/intro.mp4`)).toBe('clips/intro');
+    expect(extractCloudinaryPublicId(`${CLOUD}/video/upload/v123/clips/intro.mp4`)).toBe(
+      'clips/intro',
+    );
   });
 
   // -- rejections ---------------------------------------------------------------
@@ -168,7 +182,9 @@ describe('extractCloudinaryPublicId', () => {
     expect(extractCloudinaryPublicId('')).toBeNull();
     expect(extractCloudinaryPublicId('   ')).toBeNull();
     expect(extractCloudinaryPublicId('not-a-url')).toBeNull();
-    expect(extractCloudinaryPublicId('ftp://res.cloudinary.com/demo/image/upload/v1/a.jpg')).toBeNull();
+    expect(
+      extractCloudinaryPublicId('ftp://res.cloudinary.com/demo/image/upload/v1/a.jpg'),
+    ).toBeNull();
   });
 
   it('returns null for unknown resource types and too-short paths', () => {
@@ -180,8 +196,18 @@ describe('extractCloudinaryPublicId', () => {
 describe('extractCharacterReferenceUrls', () => {
   it('reads urls from well-formed sheet entries', () => {
     const json = [
-      { characterId: 'char_1', artStyle: 'vignette', url: `${CLOUD}/image/upload/v1/storywink/b/refs/s1.png`, validatedAt: '2026-01-01' },
-      { characterId: 'char_2', artStyle: 'vignette', url: `${CLOUD}/image/upload/v1/storywink/b/refs/s2.png`, validatedAt: '2026-01-01' },
+      {
+        characterId: 'char_1',
+        artStyle: 'vignette',
+        url: `${CLOUD}/image/upload/v1/storywink/b/refs/s1.png`,
+        validatedAt: '2026-01-01',
+      },
+      {
+        characterId: 'char_2',
+        artStyle: 'vignette',
+        url: `${CLOUD}/image/upload/v1/storywink/b/refs/s2.png`,
+        validatedAt: '2026-01-01',
+      },
     ];
     expect(extractCharacterReferenceUrls(json)).toHaveLength(2);
   });
@@ -204,7 +230,12 @@ describe('collectBookGeneratedPublicIds', () => {
       ],
       coverImageUrl: `${CLOUD}/image/upload/v1/storywink/bk1/generated/cover.png`,
       characterReferences: [
-        { characterId: 'c1', artStyle: 'vignette', url: `${CLOUD}/image/upload/v1/storywink/bk1/refs/s1.png`, validatedAt: 'x' },
+        {
+          characterId: 'c1',
+          artStyle: 'vignette',
+          url: `${CLOUD}/image/upload/v1/storywink/bk1/refs/s1.png`,
+          validatedAt: 'x',
+        },
       ],
     };
     expect(collectBookGeneratedPublicIds(book).sort()).toEqual([
@@ -271,15 +302,26 @@ describe('isDraftSweepCandidate', () => {
   });
 
   it('never flags non-DRAFT books, however old', () => {
-    for (const status of ['GENERATING', 'ILLUSTRATING', 'COMPLETED', 'PARTIAL', 'FAILED', 'STORY_READY']) {
+    for (const status of [
+      'GENERATING',
+      'ILLUSTRATING',
+      'COMPLETED',
+      'PARTIAL',
+      'FAILED',
+      'STORY_READY',
+    ]) {
       expect(isDraftSweepCandidate({ status, updatedAt: daysAgo(400) }, now, 90)).toBe(false);
     }
   });
 
   it('refuses nonsensical retention windows', () => {
     expect(isDraftSweepCandidate({ status: 'DRAFT', updatedAt: daysAgo(400) }, now, 0)).toBe(false);
-    expect(isDraftSweepCandidate({ status: 'DRAFT', updatedAt: daysAgo(400) }, now, -5)).toBe(false);
-    expect(isDraftSweepCandidate({ status: 'DRAFT', updatedAt: daysAgo(400) }, now, NaN)).toBe(false);
+    expect(isDraftSweepCandidate({ status: 'DRAFT', updatedAt: daysAgo(400) }, now, -5)).toBe(
+      false,
+    );
+    expect(isDraftSweepCandidate({ status: 'DRAFT', updatedAt: daysAgo(400) }, now, NaN)).toBe(
+      false,
+    );
   });
 });
 
@@ -296,12 +338,12 @@ describe('assetCleanupJobSchema', () => {
   });
 
   it('rejects unknown reasons and malformed ids', () => {
-    expect(
-      assetCleanupJobSchema.safeParse({ publicIds: ['a'], reason: 'because' }).success,
-    ).toBe(false);
-    expect(assetCleanupJobSchema.safeParse({ publicIds: [''], reason: 'book_deleted' }).success).toBe(
+    expect(assetCleanupJobSchema.safeParse({ publicIds: ['a'], reason: 'because' }).success).toBe(
       false,
     );
+    expect(
+      assetCleanupJobSchema.safeParse({ publicIds: [''], reason: 'book_deleted' }).success,
+    ).toBe(false);
     expect(assetCleanupJobSchema.safeParse({ reason: 'book_deleted' }).success).toBe(false);
   });
 });
@@ -348,7 +390,7 @@ describe('avatar folder safety (X6)', () => {
             'https://res.cloudinary.com/storywink/image/upload/v1/storywink/avatars/av1/portrait.png',
         },
         { turnaroundSheetUrl: null, portraitUrl: null },
-      ])
+      ]),
     ).toEqual(['storywink/avatars/av1/sheet', 'storywink/avatars/av1/portrait']);
   });
 });

@@ -76,7 +76,7 @@ async function retryFailedOrder() {
       {
         attempts: 3,
         backoff: { type: 'exponential', delay: 60000 }, // 1 min, 2 min, 4 min
-      }
+      },
     );
 
     console.log('✓ Fulfillment job queued');

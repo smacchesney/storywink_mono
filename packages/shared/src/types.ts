@@ -13,10 +13,17 @@ export interface User {
 /**
  * Book project types
  */
-export type BookStatus = "DRAFT" | "GENERATING" | "STORY_READY" | "ILLUSTRATING" | "COMPLETED" | "FAILED" | "PARTIAL";
+export type BookStatus =
+  | 'DRAFT'
+  | 'GENERATING'
+  | 'STORY_READY'
+  | 'ILLUSTRATING'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'PARTIAL';
 
 /** PHOTO_STORY = made from uploaded photos; AVATAR_STORY = invented adventure starring account avatars (X6d). */
-export type BookType = "PHOTO_STORY" | "AVATAR_STORY";
+export type BookType = 'PHOTO_STORY' | 'AVATAR_STORY';
 
 /**
  * Additional character in the story (e.g., parent, sibling)
@@ -56,7 +63,7 @@ export interface Book {
 /**
  * Page model
  */
-export type PageType = "SINGLE" | "SPREAD";
+export type PageType = 'SINGLE' | 'SPREAD';
 
 export interface Page {
   id: string;
@@ -103,13 +110,13 @@ export interface ApiResponse<T> {
 }
 
 // Type for a Page including minimal Asset info needed for Storyboard AND Canvas
-export type StoryboardPage = Page & { 
+export type StoryboardPage = Page & {
   asset?: Pick<Asset, 'id' | 'url' | 'thumbnailUrl'> | null;
 };
 
 // Type for Book data including pages with updated StoryboardPage type
-export type BookWithStoryboardPages = Book & { 
-  pages: StoryboardPage[]; 
+export type BookWithStoryboardPages = Book & {
+  pages: StoryboardPage[];
 };
 
 /**

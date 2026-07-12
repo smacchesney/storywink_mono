@@ -131,10 +131,10 @@ export class LuluApiClient {
       throw new Error(`Failed to get Lulu access token: ${response.status} ${errorText}`);
     }
 
-    const data = await response.json() as LuluToken;
+    const data = (await response.json()) as LuluToken;
 
     this.accessToken = data.access_token;
-    this.tokenExpiresAt = Date.now() + (data.expires_in * 1000);
+    this.tokenExpiresAt = Date.now() + data.expires_in * 1000;
 
     console.log(`[Lulu] Obtained access token (expires in ${data.expires_in}s)`);
     return this.accessToken;
@@ -143,16 +143,13 @@ export class LuluApiClient {
   /**
    * Make an authenticated request to the Lulu API.
    */
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = await this.getAccessToken();
 
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       ...options,
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
         ...options.headers,
       },
@@ -191,15 +188,17 @@ export class LuluApiClient {
     const requestBody: LuluCreatePrintJobRequest = {
       contact_email: params.contactEmail,
       external_id: params.externalId,
-      line_items: [{
-        printable_normalization: {
-          cover: { source_url: params.coverPdfUrl },
-          interior: { source_url: params.interiorPdfUrl },
-          pod_package_id: params.podPackageId || LULU_CONFIG.DEFAULT_POD_PACKAGE,
+      line_items: [
+        {
+          printable_normalization: {
+            cover: { source_url: params.coverPdfUrl },
+            interior: { source_url: params.interiorPdfUrl },
+            pod_package_id: params.podPackageId || LULU_CONFIG.DEFAULT_POD_PACKAGE,
+          },
+          quantity: params.quantity,
+          title: params.bookTitle,
         },
-        quantity: params.quantity,
-        title: params.bookTitle,
-      }],
+      ],
       shipping_address: {
         name: params.shippingAddress.name,
         street1: params.shippingAddress.street1,
@@ -215,13 +214,10 @@ export class LuluApiClient {
 
     console.log('[Lulu] Creating print job:', JSON.stringify(requestBody, null, 2));
 
-    return this.request<LuluPrintJob>(
-      '/print-jobs/',
-      {
-        method: 'POST',
-        body: JSON.stringify(requestBody),
-      }
-    );
+    return this.request<LuluPrintJob>('/print-jobs/', {
+      method: 'POST',
+      body: JSON.stringify(requestBody),
+    });
   }
 
   /**

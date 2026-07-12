@@ -73,7 +73,11 @@ describe('resolveCoverImageUrl', () => {
 
 describe('generateCoverHtml', () => {
   it('embeds the cover image and branding when a URL is present', () => {
-    const html = generateCoverHtml('https://res.cloudinary.com/x/image/upload/v1/cover.png', 'My Book', '');
+    const html = generateCoverHtml(
+      'https://res.cloudinary.com/x/image/upload/v1/cover.png',
+      'My Book',
+      '',
+    );
     expect(html).toContain('Storywin');
     expect(html).toContain('k.ai');
     // Print optimization applied to Cloudinary URLs.

@@ -39,7 +39,10 @@ export interface PhotoAnalysisJob {
  */
 export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
   const { bookId, userId, refresh } = job.data;
-  logger.info({ bookId, userId, jobId: job.id, refresh: !!refresh }, 'Starting photo perception pass');
+  logger.info(
+    { bookId, userId, jobId: job.id, refresh: !!refresh },
+    'Starting photo perception pass',
+  );
 
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OpenAI API key not configured');
@@ -92,7 +95,7 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
   // otherwise desync every appearsOnPages / pageAnalysis position: the
   // vision call only receives imaged pages, so numbering must match exactly
   // what the model sees.
-  const photoPages = book.pages.filter(p => p.assetId != null);
+  const photoPages = book.pages.filter((p) => p.assetId != null);
   if (!photoPages.length) throw new Error('Book has no photo pages');
 
   const input: PhotoAnalysisInput = {
@@ -100,7 +103,7 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
     additionalCharacters,
     artStyle: book.artStyle || 'vignette',
     language: book.language || 'en',
-    priorCharacters: priorIdentity?.characters?.map(c => ({
+    priorCharacters: priorIdentity?.characters?.map((c) => ({
       characterId: c.characterId,
       role: c.role,
       name: c.name,
@@ -161,11 +164,11 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
   // the parent reorders photos; the stamps let consumers remap to the
   // current order (remapCharacterPages in @storywink/shared).
   const assetIdByPosition = new Map<number, string | null>(
-    input.storyPages.map(p => [p.pageNumber, p.assetId]),
+    input.storyPages.map((p) => [p.pageNumber, p.assetId]),
   );
-  const stampedCharacters = analysis.characters.map(c => ({
+  const stampedCharacters = analysis.characters.map((c) => ({
     ...c,
-    appearsOnAssetIds: c.appearsOnPages.map(n => assetIdByPosition.get(n) ?? null),
+    appearsOnAssetIds: c.appearsOnPages.map((n) => assetIdByPosition.get(n) ?? null),
   }));
 
   // Persist per-page analysis, stamped with the page's current assetId so
@@ -174,7 +177,7 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
     // Same positional convention as the vision input: photo pages only.
     for (let i = 0; i < photoPages.length; i++) {
       const page = photoPages[i];
-      const pageAnalysis = analysis.pageAnalysis.find(a => a.pageNumber === i + 1);
+      const pageAnalysis = analysis.pageAnalysis.find((a) => a.pageNumber === i + 1);
       if (!pageAnalysis) continue;
       await tx.page.update({
         where: { id: page.id },
@@ -193,8 +196,9 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
     });
 
     const isDraftRefresh = refresh && current?.status === 'DRAFT';
-    const existingQuestions = (current?.captureQuestions as { answer?: string | null }[] | null) ?? [];
-    const hasAnswers = existingQuestions.some(q => q.answer && q.answer.trim());
+    const existingQuestions =
+      (current?.captureQuestions as { answer?: string | null }[] | null) ?? [];
+    const hasAnswers = existingQuestions.some((q) => q.answer && q.answer.trim());
 
     await tx.book.update({
       where: { id: bookId },
@@ -213,11 +217,9 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
           ? { eventSummary: analysis.eventSummary }
           : {}),
         ...(!current?.captureQuestions || (isDraftRefresh && !hasAnswers)
-          ? { captureQuestions: analysis.captureQuestions.map(q => ({ ...q, answer: null })) }
+          ? { captureQuestions: analysis.captureQuestions.map((q) => ({ ...q, answer: null })) }
           : {}),
-        ...(current?.title?.trim()
-          ? {}
-          : { title: analysis.suggestedTitle.trim().slice(0, 100) }),
+        ...(current?.title?.trim() ? {} : { title: analysis.suggestedTitle.trim().slice(0, 100) }),
       },
     });
   });

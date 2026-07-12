@@ -12,10 +12,14 @@ const bookId = process.argv[2];
 const pageIds = process.argv.slice(3);
 
 if (!bookId || pageIds.length === 0) {
-  console.error('Usage: npx tsx scripts/retry-failed-illustrations.ts <bookId> <pageId1> <pageId2> ...');
+  console.error(
+    'Usage: npx tsx scripts/retry-failed-illustrations.ts <bookId> <pageId1> <pageId2> ...',
+  );
   console.error('');
   console.error('To retry all failed pages for book cmh50jkn10044r10diijrjdq7:');
-  console.error('npx tsx scripts/retry-failed-illustrations.ts cmh50jkn10044r10diijrjdq7 cmh50jknq0049r10d6atahwv7 cmh50jknq004ar10dr24ksk0c cmh50jknq004br10dmuekvtli cmh50jknq004dr10ddc6wz4k4');
+  console.error(
+    'npx tsx scripts/retry-failed-illustrations.ts cmh50jkn10044r10diijrjdq7 cmh50jknq0049r10d6atahwv7 cmh50jknq004ar10dr24ksk0c cmh50jknq004br10dmuekvtli cmh50jknq004dr10ddc6wz4k4',
+  );
   process.exit(1);
 }
 
@@ -29,12 +33,12 @@ async function resetFailedPages() {
       where: {
         bookId,
         id: { in: pageIds },
-        moderationStatus: 'FAILED'
+        moderationStatus: 'FAILED',
       },
       data: {
         moderationStatus: 'PENDING',
-        moderationReason: null
-      }
+        moderationReason: null,
+      },
     });
 
     console.log(`✓ Reset ${result.count} pages to PENDING status`);
@@ -43,27 +47,28 @@ async function resetFailedPages() {
     const pages = await prisma.page.findMany({
       where: {
         bookId,
-        id: { in: pageIds }
+        id: { in: pageIds },
       },
       select: {
         id: true,
         pageNumber: true,
         moderationStatus: true,
         text: true,
-        isTitlePage: true
+        isTitlePage: true,
       },
-      orderBy: { pageNumber: 'asc' }
+      orderBy: { pageNumber: 'asc' },
     });
 
     console.log('\nUpdated pages:');
-    pages.forEach(p => {
-      console.log(`  Page ${p.pageNumber}: ${p.moderationStatus} (${p.isTitlePage ? 'title' : 'story'}, ${p.text?.length || 0} chars)`);
+    pages.forEach((p) => {
+      console.log(
+        `  Page ${p.pageNumber}: ${p.moderationStatus} (${p.isTitlePage ? 'title' : 'story'}, ${p.text?.length || 0} chars)`,
+      );
     });
 
     console.log('\n✓ Pages reset successfully!');
     console.log('\nNext step: Trigger illustration generation via the API or web UI');
     console.log('The pages are now ready to be reprocessed by the current worker deployment.');
-
   } catch (error) {
     console.error('Error resetting pages:', error);
     process.exit(1);

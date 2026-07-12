@@ -1,6 +1,7 @@
 // Application constants
 export const APP_NAME = 'Storywink.ai';
-export const APP_DESCRIPTION = 'Transform your photos into personalized, illustrated children\'s storybooks with AI.';
+export const APP_DESCRIPTION =
+  "Transform your photos into personalized, illustrated children's storybooks with AI.";
 
 // API endpoints
 export const API_ENDPOINTS = {
@@ -69,15 +70,8 @@ export const PAGE_TEXT = {
 } as const;
 
 // Story mood options (canonical source — used by UI, schemas, and prompt)
-export const STORY_MOODS = [
-  'adventurous',
-  'silly',
-  'sweet',
-  'brave',
-  'dreamy',
-  'curious',
-] as const;
-export type StoryMood = typeof STORY_MOODS[number];
+export const STORY_MOODS = ['adventurous', 'silly', 'sweet', 'brave', 'dreamy', 'curious'] as const;
+export type StoryMood = (typeof STORY_MOODS)[number];
 
 export const STORY_MOOD_LABELS: Record<StoryMood, { en: string; ja: string }> = {
   adventurous: { en: 'Adventurous', ja: 'ぼうけん' },

@@ -92,7 +92,7 @@ export function getAllShippingTiers(): ShippingTier[] {
 export function buildStripeShippingOptions(): Array<{
   shipping_rate_data: Stripe.Checkout.SessionCreateParams.ShippingOption.ShippingRateData;
 }> {
-  return getAllShippingTiers().map(tier => ({
+  return getAllShippingTiers().map((tier) => ({
     shipping_rate_data: {
       type: 'fixed_amount' as const,
       fixed_amount: {
@@ -116,9 +116,7 @@ export function buildStripeShippingOptions(): Array<{
  * Get shipping tiers available for a specific country.
  */
 export function getShippingTiersForCountry(countryCode: string): ShippingTier[] {
-  return getAllShippingTiers().filter(tier =>
-    tier.countries.includes(countryCode.toUpperCase())
-  );
+  return getAllShippingTiers().filter((tier) => tier.countries.includes(countryCode.toUpperCase()));
 }
 
 /**

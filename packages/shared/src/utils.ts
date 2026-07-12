@@ -17,9 +17,9 @@ export function isTitlePage(pageAssetId: string | null, bookCoverAssetId: string
  */
 export function categorizePages<T extends { assetId: string | null }>(
   pages: T[],
-  bookCoverAssetId: string | null
+  bookCoverAssetId: string | null,
 ): { storyPages: T[]; coverPages: T[] } {
-  const coverPages = pages.filter(page => isTitlePage(page.assetId, bookCoverAssetId));
+  const coverPages = pages.filter((page) => isTitlePage(page.assetId, bookCoverAssetId));
 
   return { storyPages: pages, coverPages };
 }
@@ -28,10 +28,10 @@ export function categorizePages<T extends { assetId: string | null }>(
  * Gets the title page from a list of pages
  */
 export function getTitlePage<T extends { assetId: string | null }>(
-  pages: T[], 
-  bookCoverAssetId: string | null
+  pages: T[],
+  bookCoverAssetId: string | null,
 ): T | null {
-  return pages.find(page => isTitlePage(page.assetId, bookCoverAssetId)) || null;
+  return pages.find((page) => isTitlePage(page.assetId, bookCoverAssetId)) || null;
 }
 
 /**
@@ -91,7 +91,7 @@ export function optimizeCloudinaryUrl(
     skipOptimization?: boolean;
     /** Additional transformations to prepend (e.g., 'c_fill,w_200,h_200') */
     additionalTransforms?: string;
-  }
+  },
 ): string {
   if (!url) return '';
   if (options?.skipOptimization) return url;
@@ -134,11 +134,10 @@ export const coolifyImageUrl = optimizeCloudinaryUrl;
  */
 export function calculatePrintedPageCount(
   totalDbPages: number,
-  options?: { padToMultipleOf4?: boolean; collagePages?: number }
+  options?: { padToMultipleOf4?: boolean; collagePages?: number },
 ): number {
   const storyPhotos = Math.max(0, totalDbPages); // all photos are story pages
-  const rawCount =
-    2 + storyPhotos * 2 + Math.max(0, options?.collagePages ?? 0); // dedication + ending + pairs + collage
+  const rawCount = 2 + storyPhotos * 2 + Math.max(0, options?.collagePages ?? 0); // dedication + ending + pairs + collage
 
   if (options?.padToMultipleOf4) {
     return Math.ceil(rawCount / 4) * 4;

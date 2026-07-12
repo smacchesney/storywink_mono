@@ -151,8 +151,18 @@ export function collageSubline(createdAt: Date | string, language: string): stri
   const d = new Date(createdAt);
   if (language === 'ja') return `${d.getFullYear()}年${d.getMonth() + 1}月`;
   const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
   return `${months[d.getMonth()]} ${d.getFullYear()}`;
 }

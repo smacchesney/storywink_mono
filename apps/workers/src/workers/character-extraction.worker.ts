@@ -1,6 +1,11 @@
 import { Job, FlowProducer } from 'bullmq';
 import prisma from '../database/index.js';
-import { CharacterExtractionJob, CharacterIdentity, CharacterSheetRef, QUEUE_NAMES } from '@storywink/shared';
+import {
+  CharacterExtractionJob,
+  CharacterIdentity,
+  CharacterSheetRef,
+  QUEUE_NAMES,
+} from '@storywink/shared';
 import { characterSheetsEnabled, ensureCharacterSheets } from '../lib/character-sheets.js';
 import OpenAI from 'openai';
 import { createBullMQConnection } from '@storywink/shared/redis';
@@ -14,7 +19,11 @@ import {
   STYLE_TRANSLATION_REFRESH_SYSTEM_PROMPT,
   STYLE_TRANSLATION_REFRESH_SCHEMA,
 } from '@storywink/shared/prompts/character-identity';
-import { optimizeCloudinaryUrlForVision, convertHeicToJpeg, remapCharacterPages } from '@storywink/shared/utils';
+import {
+  optimizeCloudinaryUrlForVision,
+  convertHeicToJpeg,
+  remapCharacterPages,
+} from '@storywink/shared/utils';
 import { mergeCastNames, CaptureAnswerLike } from '../lib/resolveCast.js';
 import { mergeLinkedAvatarSheets } from '../lib/avatar-sheets.js';
 import { bridgePagesEnabled } from '../lib/bridge-pages.js';
@@ -80,7 +89,10 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
       // each avatar was first drawn in; refresh it for THIS book's style via
       // the same cheap text-only call the remap path uses. Failure degrades
       // to the stale prose — the on-style rendition sheets carry identity.
-      if (characterIdentity?.characters?.length && characterIdentity.extractedForStyle !== artStyle) {
+      if (
+        characterIdentity?.characters?.length &&
+        characterIdentity.extractedForStyle !== artStyle
+      ) {
         const refreshed = await refreshStyleTranslations(characterIdentity, artStyle, bookId);
         if (refreshed) {
           characterIdentity = refreshed;
@@ -92,7 +104,10 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
             });
           } catch (persistError) {
             logger.warn(
-              { bookId, error: persistError instanceof Error ? persistError.message : 'Unknown error' },
+              {
+                bookId,
+                error: persistError instanceof Error ? persistError.message : 'Unknown error',
+              },
               'Avatar-story style refresh persist failed — continuing with in-memory identity',
             );
           }
@@ -128,7 +143,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
             data: { characterIdentity: existingIdentity as any },
           });
           logger.info(
-            { bookId, namedCharacters: merge.characters.filter(c => c.name).length },
+            { bookId, namedCharacters: merge.characters.filter((c) => c.name).length },
             'Re-applied capture-answer merge to character identity before reuse',
           );
         } catch (mergeError) {
@@ -147,7 +162,10 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
     // a swapped/removed photo makes remap return null and we re-extract.
     const remappedIdentity =
       existingIdentity?.characters?.length && storyPages.length > 0
-        ? remapCharacterPages(existingIdentity, storyPages.map(p => p.assetId))
+        ? remapCharacterPages(
+            existingIdentity,
+            storyPages.map((p) => p.assetId),
+          )
         : null;
 
     if (remappedIdentity) {
@@ -209,7 +227,14 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         logger,
       });
 
-      await createIllustrationFlow(bookId, userId, characterIdentity, pageIds, characterSheets, recovery);
+      await createIllustrationFlow(
+        bookId,
+        userId,
+        characterIdentity,
+        pageIds,
+        characterSheets,
+        recovery,
+      );
       return { success: true, characterCount: characterIdentity.characters.length, reused: true };
     }
 
@@ -226,7 +251,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
     // 4. Build prompt. Positional numbering runs over PHOTO pages only
     // (assetId != null): bridge rows have no photo, and numbering them would
     // desync every appearsOnPages position the model echoes back.
-    const photoPages = storyPages.filter(p => p.assetId != null);
+    const photoPages = storyPages.filter((p) => p.assetId != null);
     const extractionInput: CharacterExtractionInput = {
       childName: book.childName,
       additionalCharacters,
@@ -289,9 +314,9 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         characterIdentity = {
           ...parsedIdentity,
           extractedForStyle: artStyle,
-          characters: (parsedIdentity.characters ?? []).map(c => ({
+          characters: (parsedIdentity.characters ?? []).map((c) => ({
             ...c,
-            appearsOnAssetIds: c.appearsOnPages.map(n => photoPages[n - 1]?.assetId ?? null),
+            appearsOnAssetIds: c.appearsOnPages.map((n) => photoPages[n - 1]?.assetId ?? null),
           })),
         };
 
@@ -304,7 +329,10 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         // stamp was just taken from photoPages ⊆ storyPages) — but degrade to
         // the unmapped identity anyway.
         characterIdentity =
-          remapCharacterPages(characterIdentity, storyPages.map(p => p.assetId)) ?? characterIdentity;
+          remapCharacterPages(
+            characterIdentity,
+            storyPages.map((p) => p.assetId),
+          ) ?? characterIdentity;
 
         // Fresh extractions mint new characterIds, so chip answers rarely
         // join here — but the merge still stamps main_child's name with its
@@ -324,18 +352,24 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
           data: { characterIdentity: characterIdentity as any },
         });
 
-        logger.info({
-          bookId,
-          characterCount: characterIdentity!.characters.length,
-        }, 'Character identity extraction completed');
+        logger.info(
+          {
+            bookId,
+            characterCount: characterIdentity!.characters.length,
+          },
+          'Character identity extraction completed',
+        );
       }
     }
   } catch (error) {
     // Log but don't throw — we proceed with null characterIdentity (graceful degradation)
-    logger.error({
-      bookId,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }, 'Character identity extraction failed — proceeding without character identity');
+    logger.error(
+      {
+        bookId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      'Character identity extraction failed — proceeding without character identity',
+    );
   }
 
   // 8. Ensure character sheets (fresh-extraction path; the remap path above
@@ -378,7 +412,14 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
 
   // 9. Create the illustration FlowProducer flow
   // This runs regardless of whether extraction succeeded (graceful degradation)
-  await createIllustrationFlow(bookId, userId, characterIdentity, pageIds, characterSheets, recovery);
+  await createIllustrationFlow(
+    bookId,
+    userId,
+    characterIdentity,
+    pageIds,
+    characterSheets,
+    recovery,
+  );
 
   return { success: true, characterCount: characterIdentity?.characters?.length ?? 0 };
 }
@@ -402,7 +443,7 @@ async function refreshStyleTranslations(
 
   try {
     const promptText = createStyleTranslationRefreshPrompt(
-      identity.characters.map(c => ({
+      identity.characters.map((c) => ({
         characterId: c.characterId,
         role: c.role,
         name: c.name,
@@ -437,18 +478,23 @@ async function refreshStyleTranslations(
       translations: Array<{ characterId: string; styleTranslation: string }>;
     };
     const translationById = new Map(
-      parsed.translations.map(t => [t.characterId, t.styleTranslation]),
+      parsed.translations.map((t) => [t.characterId, t.styleTranslation]),
     );
 
     logger.info(
-      { bookId, artStyle, refreshedCount: translationById.size, characterCount: identity.characters.length },
+      {
+        bookId,
+        artStyle,
+        refreshedCount: translationById.size,
+        characterCount: identity.characters.length,
+      },
       'Refreshed styleTranslation strings for new art style',
     );
 
     return {
       ...identity,
       extractedForStyle: artStyle,
-      characters: identity.characters.map(c => ({
+      characters: identity.characters.map((c) => ({
         ...c,
         styleTranslation: translationById.get(c.characterId) ?? c.styleTranslation,
       })),
@@ -529,11 +575,14 @@ async function createIllustrationFlow(
     const requestedIds = new Set(pageIds);
     pagesToProcess = book.pages.filter((page) => requestedIds.has(page.id));
 
-    logger.info({
-      bookId,
-      requestedPageIds: pageIds,
-      matchedPages: pagesToProcess.length,
-    }, 'Filtering to explicitly requested pageIds');
+    logger.info(
+      {
+        bookId,
+        requestedPageIds: pageIds,
+        matchedPages: pagesToProcess.length,
+      },
+      'Filtering to explicitly requested pageIds',
+    );
   } else {
     // No specific pages requested — use existing smart retry / first-run logic
     const isRetry = book.status === 'PARTIAL' || book.status === 'FAILED';
@@ -555,13 +604,17 @@ async function createIllustrationFlow(
         return true;
       });
 
-      logger.info({
-        bookId,
-        totalPages: book.pages.length,
-        pagesToRetry: pagesToProcess.length,
-        skippedOk: book.pages.filter(p => p.moderationStatus === 'OK' && p.generatedImageUrl).length,
-        skippedFlagged: book.pages.filter(p => p.moderationStatus === 'FLAGGED').length,
-      }, 'Smart retry - filtering to failed/missing pages only');
+      logger.info(
+        {
+          bookId,
+          totalPages: book.pages.length,
+          pagesToRetry: pagesToProcess.length,
+          skippedOk: book.pages.filter((p) => p.moderationStatus === 'OK' && p.generatedImageUrl)
+            .length,
+          skippedFlagged: book.pages.filter((p) => p.moderationStatus === 'FLAGGED').length,
+        },
+        'Smart retry - filtering to failed/missing pages only',
+      );
     } else {
       // For first-time illustration, filter to pages that have text ready
       pagesToProcess = book.pages.filter((p) => {
@@ -637,13 +690,16 @@ async function createIllustrationFlow(
       children: pageChildren,
     });
 
-    logger.info({
-      bookId,
-      childJobCount: pageChildren.length,
-      flowJobId: flow.job.id,
-      hasCharacterIdentity: !!characterIdentity,
-      characterSheetCount: characterSheets?.length ?? 0,
-    }, 'Created illustration flow from character extraction worker');
+    logger.info(
+      {
+        bookId,
+        childJobCount: pageChildren.length,
+        flowJobId: flow.job.id,
+        hasCharacterIdentity: !!characterIdentity,
+        characterSheetCount: characterSheets?.length ?? 0,
+      },
+      'Created illustration flow from character extraction worker',
+    );
 
     // Renders are now in flight — the wait screen can start counting pages.
     await setGenerationPhase(bookId, 'illustrating');

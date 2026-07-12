@@ -9,7 +9,7 @@ import {
 
 function promptText(input: AvatarStoryGenerationInput): string {
   return createAvatarStoryPrompt(input)
-    .map(part => ('text' in part ? part.text : '[IMAGE]'))
+    .map((part) => ('text' in part ? part.text : '[IMAGE]'))
     .join('\n');
 }
 
@@ -30,7 +30,7 @@ const baseInput: AvatarStoryGenerationInput = {
 describe('createAvatarStoryPrompt — structure', () => {
   it('emits text parts only — no image placeholders, no storyboard', () => {
     const parts = createAvatarStoryPrompt(baseInput);
-    expect(parts.every(p => 'text' in p)).toBe(true);
+    expect(parts.every((p) => 'text' in p)).toBe(true);
     const text = promptText(baseInput);
     expect(text).not.toContain('Storyboard');
     expect(text).not.toContain('No Image Provided');
@@ -85,7 +85,12 @@ describe('createAvatarStoryPrompt — cast rendering', () => {
     const text = promptText({
       ...baseInput,
       cast: [
-        { characterId: 'avatar_1', name: 'Emma', role: 'main_child', description: 'curly brown hair, yellow raincoat' },
+        {
+          characterId: 'avatar_1',
+          name: 'Emma',
+          role: 'main_child',
+          description: 'curly brown hair, yellow raincoat',
+        },
       ],
     });
     expect(text).toContain('Appearance: curly brown hair, yellow raincoat.');
@@ -148,7 +153,8 @@ describe('STORY_RESPONSE_SCHEMA_AVATAR', () => {
   });
 
   it('has no outfitFrom (no adjacent photo exists) and no bridgePages', () => {
-    const sceneProps = STORY_RESPONSE_SCHEMA_AVATAR.properties.pages.items.properties.scene.properties;
+    const sceneProps =
+      STORY_RESPONSE_SCHEMA_AVATAR.properties.pages.items.properties.scene.properties;
     expect('outfitFrom' in sceneProps).toBe(false);
     expect('bridgePages' in STORY_RESPONSE_SCHEMA_AVATAR.properties).toBe(false);
   });

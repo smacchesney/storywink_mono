@@ -41,7 +41,7 @@ export function resolveCoverImageUrl(bookData: BookWithPages): {
 export function generateCoverHtml(
   titlePageImageUrl: string | null | undefined,
   bookTitle: string,
-  fontFace: string
+  fontFace: string,
 ): string {
   const containerStyle = `
     width: ${COVER_WIDTH_IN}in;

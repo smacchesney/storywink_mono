@@ -45,7 +45,7 @@ export interface InteriorPage {
 /** Full-bleed illustration page. */
 export function generateIllustrationPageHtml(
   page: Page,
-  imageUrlTransform?: ImageUrlTransform
+  imageUrlTransform?: ImageUrlTransform,
 ): string {
   const pageStyle = `
     width: ${PAGE_WIDTH_WITH_BLEED_IN}in;
@@ -104,7 +104,7 @@ export function generateTextPageHtml(page: Page, language: string): string {
     .map((seg) =>
       seg.emphasized
         ? `<strong style="color: #F76C5E; font-weight: 700;">${escapeHtml(seg.text)}</strong>`
-        : escapeHtml(seg.text)
+        : escapeHtml(seg.text),
     )
     .join('');
 
@@ -123,7 +123,7 @@ export function generateDedicationPageHtml(
   childName: string | null,
   bookTitle: string,
   language: string,
-  imageUrlTransform?: ImageUrlTransform
+  imageUrlTransform?: ImageUrlTransform,
 ): string {
   const displayName = escapeHtml(childName || bookTitle || 'You');
   const texts = PAGE_TEXT[language as keyof typeof PAGE_TEXT] || PAGE_TEXT.en;
@@ -188,7 +188,7 @@ export function generateEndingPageHtml(
   childName: string | null,
   bookTitle: string,
   language: string,
-  imageUrlTransform?: ImageUrlTransform
+  imageUrlTransform?: ImageUrlTransform,
 ): string {
   const displayName = escapeHtml(childName || bookTitle || 'You');
   const texts = PAGE_TEXT[language as keyof typeof PAGE_TEXT] || PAGE_TEXT.en;
@@ -339,7 +339,7 @@ export interface AssembleInteriorOptions {
  */
 export function assembleInteriorPages(
   bookData: BookWithPages,
-  options?: AssembleInteriorOptions
+  options?: AssembleInteriorOptions,
 ): InteriorPage[] {
   const {
     titlePage,
@@ -365,12 +365,21 @@ export function assembleInteriorPages(
   // Dedication page (recto).
   pages.push({
     kind: 'dedication',
-    html: generateDedicationPageHtml(bookData.childName, bookData.title, language, imageUrlTransform),
+    html: generateDedicationPageHtml(
+      bookData.childName,
+      bookData.title,
+      language,
+      imageUrlTransform,
+    ),
   });
 
   // Story pages: text (verso) + illustration (recto) pairs.
   for (const page of sortedPages) {
-    pages.push({ kind: 'text', html: generateTextPageHtml(page, language), pageNumber: page.pageNumber });
+    pages.push({
+      kind: 'text',
+      html: generateTextPageHtml(page, language),
+      pageNumber: page.pageNumber,
+    });
     pages.push({
       kind: 'illustration',
       html: generateIllustrationPageHtml(page, imageUrlTransform),

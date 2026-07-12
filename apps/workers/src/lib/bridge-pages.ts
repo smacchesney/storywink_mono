@@ -32,7 +32,7 @@ export function shouldPurgeStaleBridges(
   bookType: string | null | undefined,
   pages: { source: string }[],
 ): boolean {
-  return bookType !== 'AVATAR_STORY' && pages.some(p => p.source === 'BRIDGE');
+  return bookType !== 'AVATAR_STORY' && pages.some((p) => p.source === 'BRIDGE');
 }
 
 /**
@@ -96,7 +96,11 @@ export function validateBridgePages(
     }
     const bridge = parsed.data;
 
-    if (!Number.isInteger(bridge.afterPhotoPage) || bridge.afterPhotoPage < 1 || bridge.afterPhotoPage > opts.photoCount) {
+    if (
+      !Number.isInteger(bridge.afterPhotoPage) ||
+      bridge.afterPhotoPage < 1 ||
+      bridge.afterPhotoPage > opts.photoCount
+    ) {
       dropped.push({ reason: 'bad-gap', afterPhotoPage: bridge.afterPhotoPage });
       continue;
     }
@@ -104,7 +108,7 @@ export function validateBridgePages(
       dropped.push({ reason: 'no-roster', afterPhotoPage: bridge.afterPhotoPage });
       continue;
     }
-    if (!bridge.scene.charactersPresent.every(id => roster.has(id))) {
+    if (!bridge.scene.charactersPresent.every((id) => roster.has(id))) {
       dropped.push({ reason: 'unknown-character', afterPhotoPage: bridge.afterPhotoPage });
       continue;
     }
@@ -186,12 +190,12 @@ export function resolveBridgeAnchor(
   outfitFrom: 'previous' | 'next' = 'previous',
 ): AnchorCandidate | null {
   const photos = pages
-    .filter(p => p.source === 'PHOTO' && !!p.assetUrl)
+    .filter((p) => p.source === 'PHOTO' && !!p.assetUrl)
     .sort((a, b) => a.pageNumber - b.pageNumber);
   if (photos.length === 0) return null;
 
-  const preceding = photos.filter(p => p.pageNumber < bridgePageNumber);
-  const following = photos.filter(p => p.pageNumber > bridgePageNumber);
+  const preceding = photos.filter((p) => p.pageNumber < bridgePageNumber);
+  const following = photos.filter((p) => p.pageNumber > bridgePageNumber);
 
   if (outfitFrom === 'next') {
     return following[0] ?? preceding[preceding.length - 1] ?? null;

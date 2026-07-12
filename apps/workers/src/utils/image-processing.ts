@@ -28,12 +28,12 @@ const LULU_PRINT_SIZE_PX = 2625;
  */
 export async function upscaleForPrint(
   imageBuffer: Buffer,
-  targetSize: number = LULU_PRINT_SIZE_PX
+  targetSize: number = LULU_PRINT_SIZE_PX,
 ): Promise<Buffer> {
   return sharp(imageBuffer)
     .resize(targetSize, targetSize, {
-      kernel: 'lanczos3',  // Best quality for upscaling
-      fit: 'fill',         // Exact dimensions (image is already 1:1)
+      kernel: 'lanczos3', // Best quality for upscaling
+      fit: 'fill', // Exact dimensions (image is already 1:1)
     })
     .png({ quality: 100 })
     .toBuffer();
@@ -50,9 +50,8 @@ function loadFont(): opentype.Font {
 
   try {
     // Handle both ESM and CommonJS module paths
-    const currentDir = typeof __dirname !== 'undefined'
-      ? __dirname
-      : dirname(fileURLToPath(import.meta.url));
+    const currentDir =
+      typeof __dirname !== 'undefined' ? __dirname : dirname(fileURLToPath(import.meta.url));
 
     const fontPath = join(currentDir, '../assets/fonts/Excalifont.ttf');
 
@@ -103,7 +102,7 @@ function textToSvgPath(
   text: string,
   x: number,
   y: number,
-  fontSize: number
+  fontSize: number,
 ): string {
   const path = font.getPath(text, x, y, fontSize);
   return path.toPathData(2); // 2 decimal places precision
@@ -136,9 +135,8 @@ export async function addLogoToTitlePage(imageBuffer: Buffer): Promise<Buffer> {
   const mascotTextGap = Math.round(mascotHeight * 0.15); // Gap between mascot and text
 
   // Load and resize mascot image
-  const currentDir = typeof __dirname !== 'undefined'
-    ? __dirname
-    : dirname(fileURLToPath(import.meta.url));
+  const currentDir =
+    typeof __dirname !== 'undefined' ? __dirname : dirname(fileURLToPath(import.meta.url));
   const mascotPath = join(currentDir, '../assets/images/mascot.png');
 
   let mascotBuffer: Buffer;
@@ -184,8 +182,7 @@ export async function addLogoToTitlePage(imageBuffer: Buffer): Promise<Buffer> {
     <path d="${path2Data}" fill="${CORAL_COLOR}"/>
   </svg>`;
 
-  const textBuffer = await sharp(Buffer.from(textSvg))
-    .toBuffer();
+  const textBuffer = await sharp(Buffer.from(textSvg)).toBuffer();
 
   // Composite everything onto the original image
   return sharp(imageBuffer)

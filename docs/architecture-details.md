@@ -30,13 +30,13 @@ When a book is set to auto-illustrate (the `autoIllustrate` flag on `Book`), the
 
 ## Models
 
-| Job | Provider | Model |
-|-----|----------|-------|
-| Story generation | OpenAI Responses API | `gpt-5.5` |
-| Character extraction | OpenAI | `gpt-5-mini` |
-| Illustration QC / finalize | OpenAI | `gpt-5-mini` |
-| Story QC (upcoming) | OpenAI | `gpt-5-mini` |
-| Illustration generation | Google `@google/genai` | `gemini-3.1-flash-image-preview` |
+| Job                        | Provider               | Model                            |
+| -------------------------- | ---------------------- | -------------------------------- |
+| Story generation           | OpenAI Responses API   | `gpt-5.5`                        |
+| Character extraction       | OpenAI                 | `gpt-5-mini`                     |
+| Illustration QC / finalize | OpenAI                 | `gpt-5-mini`                     |
+| Story QC (upcoming)        | OpenAI                 | `gpt-5-mini`                     |
+| Illustration generation    | Google `@google/genai` | `gemini-3.1-flash-image-preview` |
 
 ## Art Styles
 
@@ -53,6 +53,7 @@ Each style provides interior and cover prompt builders plus `referenceImageUrls[
 Story text renders on its own pages, never composited onto illustrations. Title pages use AI-generated artistic text; the only image compositing left is the title-page logo stamp (opentype.js + sharp) in `apps/workers/src/utils/image-processing.ts`.
 
 ### Where text renders
+
 - **Print + PDF export**: `generateTextPageHtml` in `packages/pdf/src/pages.ts` — a white page with centered story text (Andika for en, Zen Maru Gothic for ja), verso text / recto illustration pairs. User strings are HTML-escaped via `packages/pdf/src/escape.ts`.
 - **On-screen flipbook**: `buildDisplayPages` in `apps/web/src/components/book/display-pages.ts` — spread layout mirrors print (text page + illustration page); portrait layout combines square art + a text strip on one page.
 
@@ -61,6 +62,7 @@ The old text-overlay system (story text composited onto the illustration at yPos
 ## Illustration Failure Handling
 
 ### Page Moderation Status
+
 - **PENDING**: Not yet processed
 - **OK**: Illustration generated successfully
 - **FLAGGED**: Blocked by the image model's content policy — permanent, cannot retry
@@ -68,22 +70,24 @@ The old text-overlay system (story text composited onto the illustration at yPos
 
 ### Error Classification
 
-| Error Type | Page Status | BullMQ Retry | User Can Retry |
-|------------|-------------|--------------|----------------|
-| Content policy (safety/copyright) | `FLAGGED` | No | No |
-| Transient (network/timeout/503) | Unchanged | Yes (up to 5x) | Yes |
-| Permanent error on last attempt | `FAILED` | No | Yes |
+| Error Type                        | Page Status | BullMQ Retry   | User Can Retry |
+| --------------------------------- | ----------- | -------------- | -------------- |
+| Content policy (safety/copyright) | `FLAGGED`   | No             | No             |
+| Transient (network/timeout/503)   | Unchanged   | Yes (up to 5x) | Yes            |
+| Permanent error on last attempt   | `FAILED`    | No             | Yes            |
 
 **Transient Errors** (auto-retry): `fetch failed`, `ETIMEDOUT`, `ECONNRESET`, `503`, `rate limit`, `429`
 
 **Content Policy Errors** (no retry): `safety`, `blocked`, `content policy`, `copyright`
 
 ### Smart Retry (User-Initiated)
+
 1. Pages with `OK` status → SKIPPED
 2. Pages with `FLAGGED` status → SKIPPED
 3. Pages with `FAILED` status → RETRIED
 
 ### Key Files
+
 - `apps/web/src/app/api/generate/illustrations/route.ts` — Smart retry logic
 - `apps/workers/src/workers/illustration-generation.worker.ts` — Error classification
 
@@ -104,6 +108,7 @@ The old text-overlay system (story text composited onto the illustration at yPos
 ## Cloudinary Image Optimization
 
 All images use `f_auto,q_auto` transformations:
+
 - **f_auto**: WebP/AVIF/JPEG based on browser (30-50% smaller)
 - **q_auto**: Intelligent compression (20-40% smaller)
 - **PDF export**: Uses `q_auto:best` for print quality
@@ -113,6 +118,7 @@ All images use `f_auto,q_auto` transformations:
 ## AI Prompt Architecture
 
 Prompts centralized in `/packages/shared/src/prompts/`:
+
 - `story.ts` — `gpt-5.5` story prompts; generates `illustrationNotes` for dynamic effects
 - `illustration.ts` — Gemini prompts with multi-image style transfer
 - `styles.ts` — Style library with `referenceImageUrls[]` arrays (vignette / origami / kawaii)

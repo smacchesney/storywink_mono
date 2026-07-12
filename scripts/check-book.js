@@ -11,8 +11,8 @@ async function main() {
       title: true,
       status: true,
       createdAt: true,
-      updatedAt: true
-    }
+      updatedAt: true,
+    },
   });
 
   console.log('='.repeat(80));
@@ -32,14 +32,14 @@ async function main() {
       generatedImageUrl: true,
       moderationStatus: true,
       createdAt: true,
-      updatedAt: true
-    }
+      updatedAt: true,
+    },
   });
 
   console.log('='.repeat(80));
   console.log('PAGES:');
   console.log('='.repeat(80));
-  pages.forEach(page => {
+  pages.forEach((page) => {
     console.log(`Page ${page.pageNumber}:`);
     console.log(`  - ID: ${page.id}`);
     console.log(`  - Has Generated Image: ${!!page.generatedImageUrl}`);
@@ -51,7 +51,7 @@ async function main() {
   console.log('='.repeat(80));
   console.log('SUMMARY:');
   console.log('='.repeat(80));
-  const withImages = pages.filter(p => p.generatedImageUrl).length;
+  const withImages = pages.filter((p) => p.generatedImageUrl).length;
   console.log(`Total Pages: ${pages.length}`);
   console.log(`Pages with Generated Images: ${withImages}`);
   console.log(`Book Status: ${book?.status || 'unknown'}`);

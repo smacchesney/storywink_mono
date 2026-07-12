@@ -22,7 +22,7 @@ import { resolveLogger } from './logger.js';
  */
 export async function generateLuluCover(
   bookData: BookWithPages,
-  options: GenerateLuluCoverOptions
+  options: GenerateLuluCoverOptions,
 ): Promise<Buffer> {
   const log = resolveLogger(options.logger);
   log.info({ bookId: bookData.id }, 'Starting Lulu cover PDF generation...');
@@ -52,8 +52,13 @@ export async function generateLuluCover(
   } catch (error: unknown) {
     const err = error as Error;
     log.error(
-      { bookId: bookData.id, errorMessage: err.message, errorStack: err.stack, errorName: err.name },
-      'Error during cover PDF generation'
+      {
+        bookId: bookData.id,
+        errorMessage: err.message,
+        errorStack: err.stack,
+        errorName: err.name,
+      },
+      'Error during cover PDF generation',
     );
     throw new Error(`Failed to generate cover PDF: ${err.message}`);
   }

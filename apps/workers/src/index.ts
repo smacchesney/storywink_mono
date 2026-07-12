@@ -36,8 +36,14 @@ if (result.error) {
 }
 
 // Verify critical environment variables are loaded
-const requiredEnvVars = ['REDIS_URL', 'GOOGLE_API_KEY', 'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'];
-const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+const requiredEnvVars = [
+  'REDIS_URL',
+  'GOOGLE_API_KEY',
+  'CLOUDINARY_CLOUD_NAME',
+  'CLOUDINARY_API_KEY',
+  'CLOUDINARY_API_SECRET',
+];
+const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
 
 if (missingVars.length > 0) {
   console.error('Missing required environment variables:', missingVars);
@@ -95,10 +101,7 @@ import { REAPER_INTERVAL_MS } from './workers/book-reaper.helpers.js';
 import { processLuluStatusPoll } from './workers/lulu-status-poll.worker.js';
 import { LULU_POLL_INTERVAL_MS } from './workers/lulu-status-poll.helpers.js';
 import { processAssetCleanup } from './workers/asset-cleanup.worker.js';
-import {
-  DRAFT_SWEEP_JOB_NAME,
-  DRAFT_SWEEP_INTERVAL_MS,
-} from './workers/asset-cleanup.helpers.js';
+import { DRAFT_SWEEP_JOB_NAME, DRAFT_SWEEP_INTERVAL_MS } from './workers/asset-cleanup.helpers.js';
 import { getIllustrator } from './lib/illustrators/index.js';
 
 // CRITICAL: Pre-load and validate STYLE_LIBRARY before processing any jobs
@@ -120,16 +123,23 @@ function validateStyleLibrary() {
       console.error(`[Startup] FATAL: Style "${key}" missing referenceImageUrls`);
       process.exit(1);
     }
-    console.log(`[Startup] ✓ Style "${key}" loaded with ${value.referenceImageUrls.length} reference images`);
+    console.log(
+      `[Startup] ✓ Style "${key}" loaded with ${value.referenceImageUrls.length} reference images`,
+    );
   }
 
-  console.log(`[Startup] ✓ STYLE_LIBRARY validated successfully (${Object.keys(STYLE_LIBRARY).length} styles)`);
+  console.log(
+    `[Startup] ✓ STYLE_LIBRARY validated successfully (${Object.keys(STYLE_LIBRARY).length} styles)`,
+  );
 }
 
 // Run validation immediately at module load
 validateStyleLibrary();
 console.log('[Startup] styles module URL:', import.meta.url);
-console.log('[Startup] referenceImageUrls count:', STYLE_LIBRARY.vignette?.referenceImageUrls.length);
+console.log(
+  '[Startup] referenceImageUrls count:',
+  STYLE_LIBRARY.vignette?.referenceImageUrls.length,
+);
 
 // ============================================================================
 // DIAGNOSTIC: Deep freeze STYLE_LIBRARY to detect mutations
@@ -143,7 +153,7 @@ function deepFreeze(obj: any): void {
   Object.freeze(obj);
 
   // Recursively freeze all nested objects
-  Object.values(obj).forEach(value => {
+  Object.values(obj).forEach((value) => {
     if (typeof value === 'object' && value !== null) {
       deepFreeze(value);
     }
@@ -187,12 +197,18 @@ console.log('='.repeat(80));
 const STORY_CONCURRENCY = parseInt(process.env.STORY_CONCURRENCY || '2', 10);
 const ILLUSTRATION_CONCURRENCY = parseInt(process.env.ILLUSTRATION_CONCURRENCY || '3', 10);
 const FINALIZE_CONCURRENCY = parseInt(process.env.FINALIZE_CONCURRENCY || '2', 10);
-const PRINT_FULFILLMENT_CONCURRENCY = parseInt(process.env.PRINT_FULFILLMENT_CONCURRENCY || '1', 10);
+const PRINT_FULFILLMENT_CONCURRENCY = parseInt(
+  process.env.PRINT_FULFILLMENT_CONCURRENCY || '1',
+  10,
+);
 // Default 2 (was 1): character sheet generation (CHARACTER_SHEETS_ENABLED)
 // can put up to ~60s of image-gen work into this stage, and a single lane
 // would head-of-line block book B's whole illustration pipeline behind
 // book A's sheets. Env-overridable like ILLUSTRATION_CONCURRENCY.
-const CHARACTER_EXTRACTION_CONCURRENCY = parseInt(process.env.CHARACTER_EXTRACTION_CONCURRENCY || '2', 10);
+const CHARACTER_EXTRACTION_CONCURRENCY = parseInt(
+  process.env.CHARACTER_EXTRACTION_CONCURRENCY || '2',
+  10,
+);
 
 console.log(`[Startup] Concurrency settings:`);
 console.log(`  - Story: ${STORY_CONCURRENCY}`);
@@ -202,15 +218,11 @@ console.log(`  - Print Fulfillment: ${PRINT_FULFILLMENT_CONCURRENCY}`);
 console.log(`  - Character Extraction: ${CHARACTER_EXTRACTION_CONCURRENCY}`);
 
 // Create workers
-const storyWorker = new Worker(
-  QUEUE_NAMES.STORY_GENERATION,
-  processStoryGeneration,
-  {
-    connection: redis,
-    concurrency: STORY_CONCURRENCY,
-    lockDuration: 300000, // 5 minutes for multi-image vision API calls
-  }
-);
+const storyWorker = new Worker(QUEUE_NAMES.STORY_GENERATION, processStoryGeneration, {
+  connection: redis,
+  concurrency: STORY_CONCURRENCY,
+  lockDuration: 300000, // 5 minutes for multi-image vision API calls
+});
 
 const illustrationWorker = new Worker(
   QUEUE_NAMES.ILLUSTRATION_GENERATION,
@@ -218,29 +230,21 @@ const illustrationWorker = new Worker(
   {
     connection: redis,
     concurrency: ILLUSTRATION_CONCURRENCY,
-    lockDuration: 300000,  // 5 minutes (handles 100s+ API + upload times safely)
-    maxStalledCount: 0,    // Disable auto-retry on stall (prevents duplicate processing)
-  }
+    lockDuration: 300000, // 5 minutes (handles 100s+ API + upload times safely)
+    maxStalledCount: 0, // Disable auto-retry on stall (prevents duplicate processing)
+  },
 );
 
-const finalizeWorker = new Worker(
-  QUEUE_NAMES.BOOK_FINALIZE,
-  processBookFinalize,
-  {
-    connection: redis,
-    concurrency: FINALIZE_CONCURRENCY,
-  }
-);
+const finalizeWorker = new Worker(QUEUE_NAMES.BOOK_FINALIZE, processBookFinalize, {
+  connection: redis,
+  concurrency: FINALIZE_CONCURRENCY,
+});
 
-const printFulfillmentWorker = new Worker(
-  QUEUE_NAMES.PRINT_FULFILLMENT,
-  processPrintFulfillment,
-  {
-    connection: redis,
-    concurrency: PRINT_FULFILLMENT_CONCURRENCY,
-    lockDuration: 600000, // 10 minutes for PDF generation + upload + Lulu submission
-  }
-);
+const printFulfillmentWorker = new Worker(QUEUE_NAMES.PRINT_FULFILLMENT, processPrintFulfillment, {
+  connection: redis,
+  concurrency: PRINT_FULFILLMENT_CONCURRENCY,
+  lockDuration: 600000, // 10 minutes for PDF generation + upload + Lulu submission
+});
 
 const characterExtractionWorker = new Worker(
   QUEUE_NAMES.CHARACTER_EXTRACTION,
@@ -249,56 +253,36 @@ const characterExtractionWorker = new Worker(
     connection: redis,
     concurrency: CHARACTER_EXTRACTION_CONCURRENCY,
     lockDuration: 300000, // 5 minutes for multi-image vision analysis
-  }
+  },
 );
 
-const photoAnalysisWorker = new Worker(
-  QUEUE_NAMES.PHOTO_ANALYSIS,
-  processPhotoAnalysis,
-  {
-    connection: redis,
-    concurrency: parseInt(process.env.PHOTO_ANALYSIS_CONCURRENCY || '2', 10),
-    lockDuration: 300000, // 5 minutes for multi-image vision analysis
-  }
-);
+const photoAnalysisWorker = new Worker(QUEUE_NAMES.PHOTO_ANALYSIS, processPhotoAnalysis, {
+  connection: redis,
+  concurrency: parseInt(process.env.PHOTO_ANALYSIS_CONCURRENCY || '2', 10),
+  lockDuration: 300000, // 5 minutes for multi-image vision analysis
+});
 
-const avatarRenditionWorker = new Worker(
-  QUEUE_NAMES.AVATAR_RENDITION,
-  processAvatarRendition,
-  {
-    connection: redis,
-    concurrency: parseInt(process.env.AVATAR_RENDITION_CONCURRENCY || '2', 10),
-    lockDuration: 300000, // 5 minutes: extraction + up to 2 sheet rounds + validation
-  }
-);
+const avatarRenditionWorker = new Worker(QUEUE_NAMES.AVATAR_RENDITION, processAvatarRendition, {
+  connection: redis,
+  concurrency: parseInt(process.env.AVATAR_RENDITION_CONCURRENCY || '2', 10),
+  lockDuration: 300000, // 5 minutes: extraction + up to 2 sheet rounds + validation
+});
 
-const bookReaperWorker = new Worker(
-  QUEUE_NAMES.BOOK_REAPER,
-  processBookReaper,
-  {
-    connection: redis,
-    concurrency: 1, // sweeps must never overlap
-  }
-);
+const bookReaperWorker = new Worker(QUEUE_NAMES.BOOK_REAPER, processBookReaper, {
+  connection: redis,
+  concurrency: 1, // sweeps must never overlap
+});
 
-const luluStatusPollWorker = new Worker(
-  QUEUE_NAMES.LULU_STATUS_POLL,
-  processLuluStatusPoll,
-  {
-    connection: redis,
-    concurrency: 1, // sweeps must never overlap
-  }
-);
+const luluStatusPollWorker = new Worker(QUEUE_NAMES.LULU_STATUS_POLL, processLuluStatusPoll, {
+  connection: redis,
+  concurrency: 1, // sweeps must never overlap
+});
 
-const assetCleanupWorker = new Worker(
-  QUEUE_NAMES.ASSET_CLEANUP,
-  processAssetCleanup,
-  {
-    connection: redis,
-    concurrency: 1, // serializes the draft sweep with deletion jobs
-    lockDuration: 300000, // 5 minutes: large accounts mean many Admin API calls
-  }
-);
+const assetCleanupWorker = new Worker(QUEUE_NAMES.ASSET_CLEANUP, processAssetCleanup, {
+  connection: redis,
+  concurrency: 1, // serializes the draft sweep with deletion jobs
+  lockDuration: 300000, // 5 minutes: large accounts mean many Admin API calls
+});
 
 // Repeatable schedule for the stuck-book reaper. upsertJobScheduler is
 // idempotent across restarts/redeploys (same scheduler id replaces the old
@@ -316,7 +300,7 @@ bookReaperQueue
         removeOnComplete: { count: 24 },
         removeOnFail: { count: 50 },
       },
-    }
+    },
   )
   .then(() => {
     logger.info({ everyMs: REAPER_INTERVAL_MS }, 'Book reaper sweep scheduled');
@@ -342,7 +326,7 @@ luluStatusPollQueue
         removeOnComplete: { count: 24 },
         removeOnFail: { count: 50 },
       },
-    }
+    },
   )
   .then(() => {
     logger.info({ everyMs: LULU_POLL_INTERVAL_MS }, 'Lulu status poll scheduled');
@@ -370,7 +354,7 @@ assetCleanupQueue
         removeOnComplete: { count: 24 },
         removeOnFail: { count: 50 },
       },
-    }
+    },
   )
   .then(() => {
     logger.info({ everyMs: DRAFT_SWEEP_INTERVAL_MS }, 'Draft retention sweep scheduled');
@@ -414,13 +398,13 @@ storyWorker.on('failed', (job, err) => {
 });
 
 illustrationWorker.on('active', (job) => {
-  console.log(`[IllustrationWorker] Job ${job.id} started:`)
-  console.log(`  - Instance ID: ${INSTANCE_ID}`)
-  console.log(`  - Process PID: ${process.pid}`)
-  console.log(`  - Book: ${job.data.bookId}`)
-  console.log(`  - Page: ${job.data.pageNumber}`)
-  console.log(`  - Style: ${job.data.artStyle || 'unknown'}`)
-  console.log(`  - Parent Job: ${job.parent?.id || 'None'}`)
+  console.log(`[IllustrationWorker] Job ${job.id} started:`);
+  console.log(`  - Instance ID: ${INSTANCE_ID}`);
+  console.log(`  - Process PID: ${process.pid}`);
+  console.log(`  - Book: ${job.data.bookId}`);
+  console.log(`  - Page: ${job.data.pageNumber}`);
+  console.log(`  - Style: ${job.data.artStyle || 'unknown'}`);
+  console.log(`  - Parent Job: ${job.parent?.id || 'None'}`);
 });
 
 illustrationWorker.on('progress', (job, progress) => {
@@ -428,40 +412,55 @@ illustrationWorker.on('progress', (job, progress) => {
 });
 
 illustrationWorker.on('completed', (job) => {
-  logger.info({ 
-    jobId: job.id, 
-    pageId: job.data.pageId,
-    pageNumber: job.data.pageNumber,
-    bookId: job.data.bookId,
-    parentJobId: job.parent?.id
-  }, 'Illustration generation completed');
-  console.log(`[IllustrationWorker] Completed job ${job.id}:`)
-  console.log(`  - Book: ${job.data.bookId}`)
-  console.log(`  - Page: ${job.data.pageNumber}`)
-  console.log(`  - Parent Job: ${job.parent?.id || 'None'}`)
+  logger.info(
+    {
+      jobId: job.id,
+      pageId: job.data.pageId,
+      pageNumber: job.data.pageNumber,
+      bookId: job.data.bookId,
+      parentJobId: job.parent?.id,
+    },
+    'Illustration generation completed',
+  );
+  console.log(`[IllustrationWorker] Completed job ${job.id}:`);
+  console.log(`  - Book: ${job.data.bookId}`);
+  console.log(`  - Page: ${job.data.pageNumber}`);
+  console.log(`  - Parent Job: ${job.parent?.id || 'None'}`);
 });
 
 illustrationWorker.on('failed', (job, err) => {
-  const failureStage = (err.message.includes('Gemini') || err.message.includes('Google') ||
-                        err.message.includes('OpenAI') || err.message.includes('gpt-image')) ? 'ai_generation' :
-                      err.message.includes('Cloudinary') ? 'image_upload' :
-                      err.message.includes('fetch') ? 'image_fetch' :
-                      err.message.includes('database') ? 'database_update' :
-                      err.message.includes('referenceImageUrl') ? 'style_library_lookup' : 'unknown';
+  const failureStage =
+    err.message.includes('Gemini') ||
+    err.message.includes('Google') ||
+    err.message.includes('OpenAI') ||
+    err.message.includes('gpt-image')
+      ? 'ai_generation'
+      : err.message.includes('Cloudinary')
+        ? 'image_upload'
+        : err.message.includes('fetch')
+          ? 'image_fetch'
+          : err.message.includes('database')
+            ? 'database_update'
+            : err.message.includes('referenceImageUrl')
+              ? 'style_library_lookup'
+              : 'unknown';
 
-  logger.error({
-    jobId: job?.id,
-    error: err.message,
-    errorStack: err.stack,
-    pageId: job?.data?.pageId,
-    pageNumber: job?.data?.pageNumber,
-    bookId: job?.data?.bookId,
-    parentJobId: job?.parent?.id,
-    attempts: job?.attemptsMade,
-    maxAttempts: job?.opts?.attempts,
-    failureStage,
-    willRetry: (job?.attemptsMade || 0) < (job?.opts?.attempts || 1)
-  }, 'Illustration generation failed');
+  logger.error(
+    {
+      jobId: job?.id,
+      error: err.message,
+      errorStack: err.stack,
+      pageId: job?.data?.pageId,
+      pageNumber: job?.data?.pageNumber,
+      bookId: job?.data?.bookId,
+      parentJobId: job?.parent?.id,
+      attempts: job?.attemptsMade,
+      maxAttempts: job?.opts?.attempts,
+      failureStage,
+      willRetry: (job?.attemptsMade || 0) < (job?.opts?.attempts || 1),
+    },
+    'Illustration generation failed',
+  );
 
   Sentry.captureException(err, {
     tags: { worker: 'illustration-generation', jobId: job?.id, failureStage },
@@ -519,12 +518,15 @@ finalizeWorker.on('completed', (job) => {
 });
 
 finalizeWorker.on('failed', (job, err) => {
-  logger.error({
-    jobId: job?.id,
-    error: err.message,
-    bookId: job?.data?.bookId,
-    attempts: job?.attemptsMade
-  }, 'Book finalization failed');
+  logger.error(
+    {
+      jobId: job?.id,
+      error: err.message,
+      bookId: job?.data?.bookId,
+      attempts: job?.attemptsMade,
+    },
+    'Book finalization failed',
+  );
   Sentry.captureException(err, {
     tags: { worker: 'book-finalize', jobId: job?.id },
     extra: { bookId: job?.data?.bookId, attempts: job?.attemptsMade },
@@ -557,22 +559,30 @@ printFulfillmentWorker.on('progress', (job, progress) => {
 });
 
 printFulfillmentWorker.on('completed', (job) => {
-  logger.info({
-    jobId: job.id,
-    printOrderId: job.data.printOrderId,
-    bookId: job.data.bookId,
-  }, 'Print fulfillment completed');
-  console.log(`[PrintFulfillmentWorker] Completed job ${job.id} for order ${job.data.printOrderId}`);
+  logger.info(
+    {
+      jobId: job.id,
+      printOrderId: job.data.printOrderId,
+      bookId: job.data.bookId,
+    },
+    'Print fulfillment completed',
+  );
+  console.log(
+    `[PrintFulfillmentWorker] Completed job ${job.id} for order ${job.data.printOrderId}`,
+  );
 });
 
 printFulfillmentWorker.on('failed', (job, err) => {
-  logger.error({
-    jobId: job?.id,
-    error: err.message,
-    printOrderId: job?.data?.printOrderId,
-    bookId: job?.data?.bookId,
-    attempts: job?.attemptsMade
-  }, 'Print fulfillment failed');
+  logger.error(
+    {
+      jobId: job?.id,
+      error: err.message,
+      printOrderId: job?.data?.printOrderId,
+      bookId: job?.data?.bookId,
+      attempts: job?.attemptsMade,
+    },
+    'Print fulfillment failed',
+  );
   Sentry.captureException(err, {
     tags: { worker: 'print-fulfillment', jobId: job?.id },
     extra: {
@@ -605,21 +615,27 @@ characterExtractionWorker.on('active', (job) => {
 });
 
 characterExtractionWorker.on('completed', (job) => {
-  logger.info({
-    jobId: job.id,
-    bookId: job.data.bookId,
-    characterCount: job.returnvalue?.characterCount ?? 0,
-  }, 'Character extraction completed');
+  logger.info(
+    {
+      jobId: job.id,
+      bookId: job.data.bookId,
+      characterCount: job.returnvalue?.characterCount ?? 0,
+    },
+    'Character extraction completed',
+  );
   console.log(`[CharacterExtractionWorker] Completed job ${job.id} for book ${job.data.bookId}`);
 });
 
 characterExtractionWorker.on('failed', (job, err) => {
-  logger.error({
-    jobId: job?.id,
-    error: err.message,
-    bookId: job?.data?.bookId,
-    attempts: job?.attemptsMade,
-  }, 'Character extraction failed');
+  logger.error(
+    {
+      jobId: job?.id,
+      error: err.message,
+      bookId: job?.data?.bookId,
+      attempts: job?.attemptsMade,
+    },
+    'Character extraction failed',
+  );
   Sentry.captureException(err, {
     tags: { worker: 'character-extraction', jobId: job?.id },
     extra: { bookId: job?.data?.bookId, attempts: job?.attemptsMade },
@@ -647,17 +663,23 @@ avatarRenditionWorker.on('completed', (job) => {
 });
 
 avatarRenditionWorker.on('failed', (job, err) => {
-  logger.error({ jobId: job?.id, queue: 'avatar-rendition', error: err?.message }, 'Avatar rendition job failed');
+  logger.error(
+    { jobId: job?.id, queue: 'avatar-rendition', error: err?.message },
+    'Avatar rendition job failed',
+  );
 });
 
 photoAnalysisWorker.on('failed', (job, err) => {
   // Non-fatal for the book: story generation degrades gracefully without analysis.
-  logger.error({
-    jobId: job?.id,
-    bookId: job?.data?.bookId,
-    error: err.message,
-    attempts: job?.attemptsMade,
-  }, 'Photo perception pass failed');
+  logger.error(
+    {
+      jobId: job?.id,
+      bookId: job?.data?.bookId,
+      error: err.message,
+      attempts: job?.attemptsMade,
+    },
+    'Photo perception pass failed',
+  );
 });
 
 // Book Reaper Worker event handlers
@@ -684,7 +706,10 @@ luluStatusPollWorker.on('failed', (job, err) => {
 
 // Asset Cleanup Worker event handlers
 assetCleanupWorker.on('completed', (job) => {
-  logger.info({ jobId: job.id, jobName: job.name, result: job.returnvalue }, 'Asset cleanup job completed');
+  logger.info(
+    { jobId: job.id, jobName: job.name, result: job.returnvalue },
+    'Asset cleanup job completed',
+  );
 });
 
 assetCleanupWorker.on('failed', (job, err) => {

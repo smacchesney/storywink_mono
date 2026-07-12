@@ -47,7 +47,7 @@ describe('createAvatarStoryQCPrompt', () => {
 
   it('keeps premiseTruth OUT of the fail conditions (log-only)', () => {
     const prompt = createAvatarStoryQCPrompt(baseInput);
-    const failLine = prompt.split('\n').find(l => l.startsWith('If ANY of these fail'));
+    const failLine = prompt.split('\n').find((l) => l.startsWith('If ANY of these fail'));
     expect(failLine).toBeDefined();
     expect(failLine).not.toContain('premiseTruth');
     expect(failLine).toContain('arcCoherence < 6');

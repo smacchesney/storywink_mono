@@ -1,20 +1,34 @@
 import { Job, FlowProducer } from 'bullmq';
 import * as Sentry from '@sentry/node';
 import prisma from '../database/index.js';
-import { BookFinalizeJob, CharacterIdentity, BookQCResult, CharacterSheetRef, CoverQCResult } from '@storywink/shared/types';
+import {
+  BookFinalizeJob,
+  CharacterIdentity,
+  BookQCResult,
+  CharacterSheetRef,
+  CoverQCResult,
+} from '@storywink/shared/types';
 import { QUEUE_NAMES } from '@storywink/shared/constants';
 import { categorizePages, isTitlePage } from '@storywink/shared/utils';
 import { createBullMQConnection } from '@storywink/shared/redis';
 import OpenAI from 'openai';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
-import { createQCPrompt, QC_SYSTEM_PROMPT, QC_RESPONSE_SCHEMA } from '@storywink/shared/prompts/quality-check';
+import {
+  createQCPrompt,
+  QC_SYSTEM_PROMPT,
+  QC_RESPONSE_SCHEMA,
+} from '@storywink/shared/prompts/quality-check';
 import { isValidStyle } from '@storywink/shared/prompts/styles';
 import { trackEvent } from '@storywink/shared';
 import { computeBookStatus } from '../lib/computeBookStatus.js';
 import { mapQcResultsToPages, RawQcPageResult } from '../lib/qc-mapping.js';
 import { characterSheetsEnabled, sheetRefsForStyle } from '../lib/character-sheets.js';
 import { mergeLinkedAvatarSheets } from '../lib/avatar-sheets.js';
-import { escalationModel, illustrationEscalationEnabled, shouldEscalate } from '../lib/escalation.js';
+import {
+  escalationModel,
+  illustrationEscalationEnabled,
+  shouldEscalate,
+} from '../lib/escalation.js';
 import { maybeSendReadyEmail } from '../lib/email.js';
 import { normalizeBookPalette, paletteNormalizeEnabled } from '../lib/palette.js';
 import { generateAndStoreCover } from '../lib/cover-generation.js';
@@ -64,9 +78,12 @@ async function runQualityCheck(
     return null;
   }
 
-  const illustratedPages = pages.filter(p => p.generatedImageUrl);
+  const illustratedPages = pages.filter((p) => p.generatedImageUrl);
   if (illustratedPages.length < 2) {
-    logger.info({ bookId, pageCount: illustratedPages.length }, 'Skipping QC: fewer than 2 illustrated pages');
+    logger.info(
+      { bookId, pageCount: illustratedPages.length },
+      'Skipping QC: fewer than 2 illustrated pages',
+    );
     return null;
   }
 
@@ -74,7 +91,9 @@ async function runQualityCheck(
     { bookId, pageCount: illustratedPages.length, sheetCount: sheets.length, hasCover: !!cover },
     'Running quality check on illustrations',
   );
-  console.log(`[BookFinalize/QC] Running QC on ${illustratedPages.length} illustrations for book ${bookId}`);
+  console.log(
+    `[BookFinalize/QC] Running QC on ${illustratedPages.length} illustrations for book ${bookId}`,
+  );
 
   // Build image content parts from URLs directly (no base64 fetching)
   const contentParts: Array<
@@ -182,9 +201,7 @@ async function runQualityCheck(
     );
   }
 
-  const failedPageIds = mappedResults
-    .filter(r => !r.passed)
-    .map(r => r.pageId);
+  const failedPageIds = mappedResults.filter((r) => !r.passed).map((r) => r.pageId);
 
   const bookQCResult: BookQCResult = {
     passed: qcResult.passed && failedPageIds.length === 0,
@@ -197,13 +214,16 @@ async function runQualityCheck(
     coverResult: cover ? (qcResult.coverResult ?? null) : null,
   };
 
-  logger.info({
-    bookId,
-    passed: bookQCResult.passed,
-    failedCount: failedPageIds.length,
-    totalChecked: mappedResults.length,
-    summary: bookQCResult.summary,
-  }, 'QC check completed');
+  logger.info(
+    {
+      bookId,
+      passed: bookQCResult.passed,
+      failedCount: failedPageIds.length,
+      totalChecked: mappedResults.length,
+      summary: bookQCResult.summary,
+    },
+    'QC check completed',
+  );
 
   console.log(`[BookFinalize/QC] QC result for book ${bookId}:`);
   console.log(`  - Passed: ${bookQCResult.passed}`);
@@ -212,7 +232,9 @@ async function runQualityCheck(
 
   for (const pr of mappedResults) {
     if (!pr.passed) {
-      console.log(`  - Page ${pr.pageNumber} FAILED (char: ${pr.characterConsistencyScore}, style: ${pr.styleConsistencyScore}, overall: ${pr.overallScore})`);
+      console.log(
+        `  - Page ${pr.pageNumber} FAILED (char: ${pr.characterConsistencyScore}, style: ${pr.styleConsistencyScore}, overall: ${pr.overallScore})`,
+      );
       console.log(`    Issues: ${pr.issues.join('; ')}`);
       if (pr.suggestedPromptAdditions) {
         console.log(`    Feedback: ${pr.suggestedPromptAdditions.substring(0, 200)}`);
@@ -258,7 +280,10 @@ async function regenerateCoverFromQc(
     );
 
     if (!book.artStyle || !isValidStyle(book.artStyle)) {
-      logger.warn({ bookId: book.id, artStyle: book.artStyle }, 'Cover regen skipped: invalid art style');
+      logger.warn(
+        { bookId: book.id, artStyle: book.artStyle },
+        'Cover regen skipped: invalid art style',
+      );
       return;
     }
 
@@ -266,8 +291,8 @@ async function regenerateCoverFromQc(
     // column identifies the cover page instead.
     const isAvatarBook = book.bookType === 'AVATAR_STORY';
     const titlePage = isAvatarBook
-      ? book.pages.find(p => p.isTitlePage === true)
-      : book.pages.find(p => isTitlePage(p.assetId, book.coverAssetId));
+      ? book.pages.find((p) => p.isTitlePage === true)
+      : book.pages.find((p) => isTitlePage(p.assetId, book.coverAssetId));
     if (!titlePage?.text) {
       logger.warn({ bookId: book.id }, 'Cover regen skipped: no title page with text');
       return;
@@ -279,7 +304,10 @@ async function regenerateCoverFromQc(
     let contentImage;
     if (isAvatarBook) {
       if (!titlePage.generatedImageUrl) {
-        logger.warn({ bookId: book.id }, 'Cover regen skipped: avatar title page has no interior render');
+        logger.warn(
+          { bookId: book.id },
+          'Cover regen skipped: avatar title page has no interior render',
+        );
         return;
       }
       contentImage = await fetchImageInput(
@@ -349,9 +377,15 @@ async function regenerateCoverFromQc(
     });
 
     if ('coverUrl' in outcome) {
-      logger.info({ bookId: book.id, coverUrl: outcome.coverUrl }, 'Cover regenerated after QC failure');
+      logger.info(
+        { bookId: book.id, coverUrl: outcome.coverUrl },
+        'Cover regenerated after QC failure',
+      );
     } else {
-      logger.warn({ bookId: book.id, reason: outcome.blockedReason }, 'Cover regen blocked — keeping existing cover');
+      logger.warn(
+        { bookId: book.id, reason: outcome.blockedReason },
+        'Cover regen blocked — keeping existing cover',
+      );
     }
   } catch (error: any) {
     logger.error(
@@ -366,7 +400,9 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
   const qcRound = job.data.qcRound || 0;
 
   logger.info({ bookId, userId, jobId: job.id, qcRound }, 'Starting book finalization');
-  console.log(`[BookFinalize] Starting finalization for book ${bookId} (job: ${job.id}, qcRound: ${qcRound})`);
+  console.log(
+    `[BookFinalize] Starting finalization for book ${bookId} (job: ${job.id}, qcRound: ${qcRound})`,
+  );
 
   try {
     // Get book with all pages
@@ -389,52 +425,61 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
     const pagesWithText = book.pages.filter((p: any) => p.text && p.text.trim().length > 0);
     const storyPagesWithText = storyPages.filter((p: any) => p.text && p.text.trim().length > 0);
     const pagesWithIllustrations = book.pages.filter((p: any) => p.generatedImageUrl);
-    const pagesWithFailedModeration = book.pages.filter((p: any) => p.moderationStatus === 'FAILED');
+    const pagesWithFailedModeration = book.pages.filter(
+      (p: any) => p.moderationStatus === 'FAILED',
+    );
 
     const totalPages = book.pages.length;
     const textComplete = storyPagesWithText.length === storyPages.length;
     const illustrationsComplete = pagesWithIllustrations.length === totalPages;
 
-    logger.info({
-      bookId,
-      totalPages,
-      coverPages: coverPages.length,
-      storyPages: storyPages.length,
-      pagesWithText: pagesWithText.length,
-      storyPagesWithText: storyPagesWithText.length,
-      pagesWithIllustrations: pagesWithIllustrations.length,
-      pagesWithFailedModeration: pagesWithFailedModeration.length,
-      textComplete,
-      illustrationsComplete,
-      qcRound,
-    }, 'Book completion status analysis');
+    logger.info(
+      {
+        bookId,
+        totalPages,
+        coverPages: coverPages.length,
+        storyPages: storyPages.length,
+        pagesWithText: pagesWithText.length,
+        storyPagesWithText: storyPagesWithText.length,
+        pagesWithIllustrations: pagesWithIllustrations.length,
+        pagesWithFailedModeration: pagesWithFailedModeration.length,
+        textComplete,
+        illustrationsComplete,
+        qcRound,
+      },
+      'Book completion status analysis',
+    );
 
-    console.log(`[BookFinalize] Book ${bookId} analysis:`)
-    console.log(`  - Total Pages: ${totalPages} (${coverPages.length} cover, ${storyPages.length} story)`)
-    console.log(`  - Story Pages with Text: ${storyPagesWithText.length}/${storyPages.length}`)
-    console.log(`  - Pages with Illustrations: ${pagesWithIllustrations.length}/${totalPages}`)
-    console.log(`  - Text Complete: ${textComplete}`)
-    console.log(`  - Illustrations Complete: ${illustrationsComplete}`)
+    console.log(`[BookFinalize] Book ${bookId} analysis:`);
+    console.log(
+      `  - Total Pages: ${totalPages} (${coverPages.length} cover, ${storyPages.length} story)`,
+    );
+    console.log(`  - Story Pages with Text: ${storyPagesWithText.length}/${storyPages.length}`);
+    console.log(`  - Pages with Illustrations: ${pagesWithIllustrations.length}/${totalPages}`);
+    console.log(`  - Text Complete: ${textComplete}`);
+    console.log(`  - Illustrations Complete: ${illustrationsComplete}`);
 
     // Detailed page analysis
-    console.log(`[BookFinalize] Detailed page analysis:`)
+    console.log(`[BookFinalize] Detailed page analysis:`);
     book.pages.forEach((page: any) => {
       const isActualTitlePage = isTitlePage(page.assetId, book.coverAssetId);
-      console.log(`  - Page ${page.pageNumber}:`)
-      console.log(`    - ID: ${page.id}`)
-      console.log(`    - Asset ID: ${page.assetId}`)
-      console.log(`    - Cover Asset ID: ${book.coverAssetId}`)
-      console.log(`    - Is Title Page (DB): ${page.isTitlePage}`)
-      console.log(`    - Is Title Page (Logic): ${isActualTitlePage}`)
-      console.log(`    - Has Text: ${!!page.text} (${page.text?.length || 0} chars)`)
-      console.log(`    - Has Illustration: ${!!page.generatedImageUrl}`)
-      console.log(`    - Moderation Status: ${page.moderationStatus || 'N/A'}`)
+      console.log(`  - Page ${page.pageNumber}:`);
+      console.log(`    - ID: ${page.id}`);
+      console.log(`    - Asset ID: ${page.assetId}`);
+      console.log(`    - Cover Asset ID: ${book.coverAssetId}`);
+      console.log(`    - Is Title Page (DB): ${page.isTitlePage}`);
+      console.log(`    - Is Title Page (Logic): ${isActualTitlePage}`);
+      console.log(`    - Has Text: ${!!page.text} (${page.text?.length || 0} chars)`);
+      console.log(`    - Has Illustration: ${!!page.generatedImageUrl}`);
+      console.log(`    - Moderation Status: ${page.moderationStatus || 'N/A'}`);
     });
 
     const finalStatus = computeBookStatus(book.pages, book.coverAssetId);
 
     if (finalStatus === 'COMPLETED' && !textComplete && illustrationsComplete) {
-      console.log(`[BookFinalize] All illustrations complete, treating as COMPLETED despite missing text on some pages`);
+      console.log(
+        `[BookFinalize] All illustrations complete, treating as COMPLETED despite missing text on some pages`,
+      );
     }
 
     // ========================================================================
@@ -445,7 +490,10 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
     // ========================================================================
     const isScopedRun = Boolean(job.data.scopedPageIds?.length);
     if (isScopedRun) {
-      logger.info({ bookId, scopedPageIds: job.data.scopedPageIds }, 'Scoped illustration run — skipping book-wide QC');
+      logger.info(
+        { bookId, scopedPageIds: job.data.scopedPageIds },
+        'Scoped illustration run — skipping book-wide QC',
+      );
     }
     if (finalStatus === 'COMPLETED' && qcRound < MAX_QC_ROUNDS && !isScopedRun) {
       try {
@@ -537,7 +585,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
                 : book.pages.find((p: any) => isTitlePage(p.assetId, book.coverAssetId));
             await prisma.illustrationQcResult.createMany({
               data: [
-                ...qcResult.pageResults.map(r => ({
+                ...qcResult.pageResults.map((r) => ({
                   bookId,
                   pageId: r.pageId,
                   target: 'page',
@@ -593,9 +641,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
         const titlePageRequeued = Boolean(
           qcResult &&
             !qcResult.passed &&
-            book.pages.some(
-              (p: any) => p.isTitlePage && qcResult.failedPageIds.includes(p.id),
-            ),
+            book.pages.some((p: any) => p.isTitlePage && qcResult.failedPageIds.includes(p.id)),
         );
         if (
           coverForQc &&
@@ -624,20 +670,25 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
             ? escalationModel()
             : null;
 
-          logger.info({
-            bookId,
-            qcRound: nextRound,
-            failedPages: qcResult.failedPageIds.length,
-            ...(escalationModelId ? { escalationModel: escalationModelId } : {}),
-          }, 'QC failed — re-queuing failed pages for re-illustration');
+          logger.info(
+            {
+              bookId,
+              qcRound: nextRound,
+              failedPages: qcResult.failedPageIds.length,
+              ...(escalationModelId ? { escalationModel: escalationModelId } : {}),
+            },
+            'QC failed — re-queuing failed pages for re-illustration',
+          );
 
-          console.log(`[BookFinalize/QC] QC round ${nextRound} failed for book ${bookId} — re-queuing ${qcResult.failedPageIds.length} pages`);
+          console.log(
+            `[BookFinalize/QC] QC round ${nextRound} failed for book ${bookId} — re-queuing ${qcResult.failedPageIds.length} pages`,
+          );
 
           // Build re-illustration jobs for failed pages
           const failedPagesData = book.pages
             .filter((p: any) => qcResult.failedPageIds.includes(p.id))
             .map((p: any) => {
-              const pageResult = qcResult.pageResults.find(r => r.pageId === p.id);
+              const pageResult = qcResult.pageResults.find((r) => r.pageId === p.id);
               return {
                 page: p,
                 qcFeedback: pageResult?.suggestedPromptAdditions || null,
@@ -713,7 +764,12 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
               queueName: QUEUE_NAMES.BOOK_FINALIZE,
               // The sheet snapshot rides forward so round 2 judges and
               // re-renders against the same stack round 1 used.
-              data: { bookId, userId, qcRound: nextRound, ...(sheets.length ? { characterSheets: sheets } : {}) },
+              data: {
+                bookId,
+                userId,
+                qcRound: nextRound,
+                ...(sheets.length ? { characterSheets: sheets } : {}),
+              },
               opts: {
                 removeOnComplete: { count: 100 },
                 removeOnFail: { count: 500 },
@@ -721,14 +777,19 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
               children: pageChildren,
             });
 
-            logger.info({
-              bookId,
-              qcRound: nextRound,
-              reIllustrateCount: pageChildren.length,
-              flowJobId: flow.job.id,
-            }, 'Created QC re-illustration flow');
+            logger.info(
+              {
+                bookId,
+                qcRound: nextRound,
+                reIllustrateCount: pageChildren.length,
+                flowJobId: flow.job.id,
+              },
+              'Created QC re-illustration flow',
+            );
 
-            console.log(`[BookFinalize/QC] Re-illustration flow created for book ${bookId} (QC round ${nextRound})`);
+            console.log(
+              `[BookFinalize/QC] Re-illustration flow created for book ${bookId} (QC round ${nextRound})`,
+            );
             console.log(`  - Re-illustrating: ${pageChildren.length} pages`);
             console.log(`  - Flow Job ID: ${flow.job.id}`);
 
@@ -763,19 +824,28 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
 
         // QC passed or couldn't run — proceed with normal completion
         if (qcResult?.passed) {
-          console.log(`[BookFinalize/QC] QC passed for book ${bookId} — proceeding with completion`);
+          console.log(
+            `[BookFinalize/QC] QC passed for book ${bookId} — proceeding with completion`,
+          );
         }
       } catch (qcError: any) {
         // QC failure should not block book completion
-        logger.error({
-          bookId,
-          error: qcError.message,
-          stack: qcError.stack,
-        }, 'QC check failed — proceeding with normal completion');
-        console.error(`[BookFinalize/QC] QC error for book ${bookId}: ${qcError.message} — proceeding with completion`);
+        logger.error(
+          {
+            bookId,
+            error: qcError.message,
+            stack: qcError.stack,
+          },
+          'QC check failed — proceeding with normal completion',
+        );
+        console.error(
+          `[BookFinalize/QC] QC error for book ${bookId}: ${qcError.message} — proceeding with completion`,
+        );
       }
     } else if (finalStatus === 'COMPLETED' && qcRound >= MAX_QC_ROUNDS) {
-      console.log(`[BookFinalize/QC] Max QC rounds (${MAX_QC_ROUNDS}) reached for book ${bookId} — accepting current quality`);
+      console.log(
+        `[BookFinalize/QC] Max QC rounds (${MAX_QC_ROUNDS}) reached for book ${bookId} — accepting current quality`,
+      );
     }
 
     // PALETTE_NORMALIZE_ENABLED: with the QC gate cleared and no requeue
@@ -842,7 +912,10 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
         message: notification.message,
       },
     });
-    logger.info({ bookId, userId, type: `BOOK_${finalStatus}` }, 'Created notification for book completion');
+    logger.info(
+      { bookId, userId, type: `BOOK_${finalStatus}` },
+      'Created notification for book completion',
+    );
 
     // READY_EMAIL_ENABLED: one email per book (COMPLETED and PARTIAL
     // variants; FAILED never mails). Idempotent via an AppEvent guard and
@@ -876,17 +949,22 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
       logger,
     );
 
-    logger.info({
-      bookId,
-      finalStatus,
-      totalPages,
-      pagesWithText: pagesWithText.length,
-      pagesWithIllustrations: pagesWithIllustrations.length,
-      qcRound,
-      jobId: job.id
-    }, 'Book finalization completed');
+    logger.info(
+      {
+        bookId,
+        finalStatus,
+        totalPages,
+        pagesWithText: pagesWithText.length,
+        pagesWithIllustrations: pagesWithIllustrations.length,
+        qcRound,
+        jobId: job.id,
+      },
+      'Book finalization completed',
+    );
 
-    console.log(`[BookFinalize] Finalization completed for book ${bookId} with status: ${finalStatus}`);
+    console.log(
+      `[BookFinalize] Finalization completed for book ${bookId} with status: ${finalStatus}`,
+    );
 
     return {
       success: true,
@@ -896,7 +974,6 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
       pagesWithIllustrations: pagesWithIllustrations.length,
       qcRound,
     };
-
   } catch (error: any) {
     logger.error({ bookId, error: error.message, qcRound }, 'Book finalization failed');
     Sentry.captureException(error, {
@@ -905,10 +982,12 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
     });
 
     // Update book status to failed
-    await prisma.book.update({
-      where: { id: bookId },
-      data: { status: 'FAILED', generationPhase: null },
-    }).catch(() => {}); // Ignore errors when updating status
+    await prisma.book
+      .update({
+        where: { id: bookId },
+        data: { status: 'FAILED', generationPhase: null },
+      })
+      .catch(() => {}); // Ignore errors when updating status
 
     throw error;
   }

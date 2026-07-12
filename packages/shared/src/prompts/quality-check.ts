@@ -39,22 +39,26 @@ export function createQCPrompt(
   characterIdentity: CharacterIdentity | null,
   pageCount: number,
   language: string = 'en',
-  options: QCPromptOptions = {}
+  options: QCPromptOptions = {},
 ): string {
   const sheetCount = options.sheetCount ?? 0;
   const characterSection = characterIdentity
-    ? `Expected characters (canonical reference):\n${characterIdentity.characters.map(c => {
-        const traits = c.physicalTraits;
-        const features = traits.distinguishingFeatures.length > 0
-          ? ` Features: ${traits.distinguishingFeatures.join(', ')}.`
-          : '';
-        return `- ${c.name || c.characterId} (${c.role}): ${traits.hairColor} ${traits.hairStyle} hair, ${traits.skinTone} skin, ${traits.bodyBuild}.${features} Style: ${c.styleTranslation}`;
-      }).join('\n')}`
+    ? `Expected characters (canonical reference):\n${characterIdentity.characters
+        .map((c) => {
+          const traits = c.physicalTraits;
+          const features =
+            traits.distinguishingFeatures.length > 0
+              ? ` Features: ${traits.distinguishingFeatures.join(', ')}.`
+              : '';
+          return `- ${c.name || c.characterId} (${c.role}): ${traits.hairColor} ${traits.hairStyle} hair, ${traits.skinTone} skin, ${traits.bodyBuild}.${features} Style: ${c.styleTranslation}`;
+        })
+        .join('\n')}`
     : 'No character reference available — evaluate based on internal consistency only.';
 
-  const sheetSection = sheetCount > 0
-    ? `\nBefore the pages, ${sheetCount === 1 ? 'one image labeled "REFERENCE SHEET" is' : `${sheetCount} images labeled "REFERENCE SHEET" are`} provided: validated 2x2 turnaround grid(s) of the main character(s). These sheets are the GROUND TRUTH for character consistency — score each page's characters against the sheet (face, hair, skin tone, proportions), not merely against the other pages. Do NOT score the reference sheets themselves and do NOT include them in "pageResults".\n`
-    : '';
+  const sheetSection =
+    sheetCount > 0
+      ? `\nBefore the pages, ${sheetCount === 1 ? 'one image labeled "REFERENCE SHEET" is' : `${sheetCount} images labeled "REFERENCE SHEET" are`} provided: validated 2x2 turnaround grid(s) of the main character(s). These sheets are the GROUND TRUTH for character consistency — score each page's characters against the sheet (face, hair, skin tone, proportions), not merely against the other pages. Do NOT score the reference sheets themselves and do NOT include them in "pageResults".\n`
+      : '';
 
   const coverSection = options.cover
     ? `\nOne image labeled "COVER" is provided: the book's generated cover. Score it in "coverResult" (NOT in "pageResults") using this COVER RUBRIC VARIANT:
@@ -66,11 +70,12 @@ The cover PASSES only if titleMatches is true AND overall score >= 6 AND charact
     : '';
 
   const bridgeOrdinals = options.bridgePageOrdinals ?? [];
-  const bridgeSection = bridgeOrdinals.length > 0
-    ? `\nPage${bridgeOrdinals.length === 1 ? '' : 's'} ${bridgeOrdinals.map(n => `PAGE ${n}`).join(', ')} ${bridgeOrdinals.length === 1 ? 'was' : 'were'} generated WITHOUT a source photo (app-authored bridge pages). For ${bridgeOrdinals.length === 1 ? 'this page' : 'these pages'}:
+  const bridgeSection =
+    bridgeOrdinals.length > 0
+      ? `\nPage${bridgeOrdinals.length === 1 ? '' : 's'} ${bridgeOrdinals.map((n) => `PAGE ${n}`).join(', ')} ${bridgeOrdinals.length === 1 ? 'was' : 'were'} generated WITHOUT a source photo (app-authored bridge pages). For ${bridgeOrdinals.length === 1 ? 'this page' : 'these pages'}:
 - Judge character consistency STRICTLY against the canonical description${sheetCount > 0 ? ' and the REFERENCE SHEET' : ''} and against the adjacent pages — with no photo behind it, any drift here is pure model error.
 - ALSO FAIL the page if it is a near-duplicate of a neighboring page's composition (same pose, same framing, same moment) — a bridge page must depict its own new moment, not restate the neighboring illustration.\n`
-    : '';
+      : '';
 
   return `Evaluate these ${pageCount} children's book illustrations for quality and consistency.
 
@@ -123,7 +128,15 @@ export const QC_RESPONSE_SCHEMA = {
         issues: { type: 'array', items: { type: 'string' } },
         suggestedPromptAdditions: { type: ['string', 'null'] },
       },
-      required: ['passed', 'titleMatches', 'characterConsistencyScore', 'styleConsistencyScore', 'overallScore', 'issues', 'suggestedPromptAdditions'],
+      required: [
+        'passed',
+        'titleMatches',
+        'characterConsistencyScore',
+        'styleConsistencyScore',
+        'overallScore',
+        'issues',
+        'suggestedPromptAdditions',
+      ],
       additionalProperties: false,
     },
     pageResults: {
@@ -139,7 +152,15 @@ export const QC_RESPONSE_SCHEMA = {
           issues: { type: 'array', items: { type: 'string' } },
           suggestedPromptAdditions: { type: ['string', 'null'] },
         },
-        required: ['pageNumber', 'passed', 'characterConsistencyScore', 'styleConsistencyScore', 'overallScore', 'issues', 'suggestedPromptAdditions'],
+        required: [
+          'pageNumber',
+          'passed',
+          'characterConsistencyScore',
+          'styleConsistencyScore',
+          'overallScore',
+          'issues',
+          'suggestedPromptAdditions',
+        ],
         additionalProperties: false,
       },
     },
