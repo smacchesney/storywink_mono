@@ -27,12 +27,29 @@ RUN npm ci
 FROM base AS builder
 WORKDIR /app
 
-# Accept build arguments for Next.js public environment variables
+# Accept build arguments for Next.js public environment variables.
+# Docker only receives Railway variables that are DECLARED here — an
+# undeclared NEXT_PUBLIC_* is silently absent from the client bundle
+# (that gap kept the character library dark on the first flag flip).
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ARG NEXT_PUBLIC_AVATARS_ENABLED
+ARG NEXT_PUBLIC_COLLAGE_PAGES_ENABLED
+ARG AVATARS_ENABLED
+ARG COLLAGE_PAGES_ENABLED
+ARG CHARACTER_SHEETS_ENABLED
+ARG BRIDGE_PAGES_ENABLED
 ARG RAILWAY_GIT_COMMIT_SHA
 
-# Set environment variables for build time
+# Set environment variables for build time. The server-side flags ride along
+# so any route Next statically evaluates at build bakes the SAME answer the
+# runtime env gives (their runtime values still come from Railway directly).
 ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ENV NEXT_PUBLIC_AVATARS_ENABLED=$NEXT_PUBLIC_AVATARS_ENABLED
+ENV NEXT_PUBLIC_COLLAGE_PAGES_ENABLED=$NEXT_PUBLIC_COLLAGE_PAGES_ENABLED
+ENV AVATARS_ENABLED=$AVATARS_ENABLED
+ENV COLLAGE_PAGES_ENABLED=$COLLAGE_PAGES_ENABLED
+ENV CHARACTER_SHEETS_ENABLED=$CHARACTER_SHEETS_ENABLED
+ENV BRIDGE_PAGES_ENABLED=$BRIDGE_PAGES_ENABLED
 
 # Copy node_modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
