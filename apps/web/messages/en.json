@@ -475,7 +475,8 @@
     "creatingBatch": "Drawing your characters…",
     "stillUploading": "Finishing {count, plural, one {1 photo} other {# photos}}…",
     "capFull": "You've reached your character limit for now.",
-    "someFailed": "Made {made}, but {missed} didn’t work — you can try those again.",
+    "someFailed": "Made {made}, but {missed} didn't work — you can try those again.",
+    "drawingsNeedRetry": "Your characters are here, but the drawings need another go — tap Draw again on each card.",
     "capStopped": "We made the first {count} — that's the character cap for now.",
     "detectionExpired": "That took a little while — let's look at the photos again.",
     "back": "Back",
@@ -535,7 +536,7 @@
     "creating": "Getting started…",
     "createTrouble": "That did not go through — please try again",
     "shelfCta": "Make a story together",
-    "loadTrouble": "Your characters didn’t come along — one more try?",
+    "loadTrouble": "Your characters didn't come along — one more try?",
     "loadRetry": "Try again",
     "castNeedsPerson": "Add at least one person — pets and toys join in beside them",
     "createNotReady": "A drawing changed just now — check your cast and try once more"

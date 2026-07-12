@@ -8,9 +8,13 @@ import {
 } from './photo-analysis.js';
 
 describe('batch caps', () => {
-  it('are the tunable constants the owner set (10 photos / 6 subjects)', () => {
-    expect(MAX_BATCH_PHOTOS).toBe(10);
-    expect(MAX_BATCH_SUBJECTS).toBe(6);
+  // Relational pins, not value mirrors: the owner retunes the constants; what
+  // must never break is their SHAPE and that dependents track them. (The web
+  // request schema tracking MAX_BATCH_PHOTOS is pinned in avatar-batch.test.ts.)
+  it('are positive integers with photos ≥ subjects (each subject needs a photo)', () => {
+    expect(Number.isInteger(MAX_BATCH_PHOTOS) && MAX_BATCH_PHOTOS > 0).toBe(true);
+    expect(Number.isInteger(MAX_BATCH_SUBJECTS) && MAX_BATCH_SUBJECTS > 0).toBe(true);
+    expect(MAX_BATCH_PHOTOS).toBeGreaterThanOrEqual(MAX_BATCH_SUBJECTS);
   });
 });
 
@@ -83,7 +87,8 @@ describe('SUBJECT_DETECTION_RESPONSE_SCHEMA', () => {
 });
 
 describe('SUBJECT_DETECTION_SYSTEM_PROMPT', () => {
-  it('exists and frames the roster task', () => {
-    expect(SUBJECT_DETECTION_SYSTEM_PROMPT.length).toBeGreaterThan(40);
+  it('frames the roster task: subjects described for an illustrator who never saw them', () => {
+    expect(SUBJECT_DETECTION_SYSTEM_PROMPT).toMatch(/person, pet, and beloved toy/);
+    expect(SUBJECT_DETECTION_SYSTEM_PROMPT).toMatch(/illustrator who has never seen them/);
   });
 });

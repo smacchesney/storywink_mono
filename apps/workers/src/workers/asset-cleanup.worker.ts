@@ -1,7 +1,14 @@
 import { Job, Queue } from 'bullmq';
 import { v2 as cloudinary } from 'cloudinary';
 import prisma from '../database/index.js';
-import { QUEUE_NAMES } from '@storywink/shared/constants';
+import {
+  QUEUE_NAMES,
+  AVATAR_DETECTION_EVENT,
+  AVATAR_DETECTION_CONSUMED_EVENT,
+  DETECTION_TTL_MS,
+  DETECTION_SWEEP_GRACE_MS,
+  DETECTION_REAP_HORIZON_MS,
+} from '@storywink/shared/constants';
 import { createBullMQConnection } from '@storywink/shared/redis';
 import {
   trackEvent,
@@ -11,6 +18,7 @@ import {
   bookGeneratedFolderPrefix,
   isSafeCloudinaryPrefix,
   excludeSharedAssetIds,
+  deletableStagedAssetIds,
   isDraftSweepCandidate,
   chunkPublicIds,
   ASSET_CLEANUP_PENDING_EVENT,
@@ -324,6 +332,174 @@ async function reconcilePendingCleanups(now: Date): Promise<number> {
   return requeued;
 }
 
+const DETECTION_SWEEP_BATCH_SIZE = 200;
+
+/**
+ * Global backstop for the batch studio's retention promise. The web routes
+ * strip subject PII at redemption/expiry and sweep the CALLING user's expired
+ * rows on each detect — but a user who detects once and never returns leaves
+ * AI-derived descriptions of children (and background strangers) in
+ * AppEvent.props forever, plus staged photos attached to nothing. This pass
+ * rides the same repeatable sweep as the draft reaper, in two phases:
+ *
+ * 1. PII STRIP (always, TTL+grace): full-PII rows become {assetIds}-only
+ *    tombstones. The privacy promise never waits on the enforce flag.
+ * 2. PHOTO REAP (only when ASSET_CLEANUP_ENFORCE, TTL+24h horizon):
+ *    tombstones old enough that no open studio session can straddle them get
+ *    their unattached photos destroyed and their rows deleted. In dry-run the
+ *    tombstones are the durable record a later enforced pass reaps from —
+ *    deleting rows while the jobs dry-run would strand the bytes forever.
+ *
+ * The reference guard (deletableStagedAssetIds — shared with the web reaper)
+ * spares any photo a book page, cover, or avatar still points at; ids that
+ * also appear in a NEWER detection row of the same user are spared for the
+ * in-flight re-detect case (protection re-read as the last step before
+ * destruction). Enqueue-before-delete, per the house pattern.
+ */
+async function sweepExpiredDetectionEvents(now: Date): Promise<number> {
+  const assetIdsOf = (props: unknown): string[] => {
+    const ids = (props as { assetIds?: unknown } | null)?.assetIds;
+    return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : [];
+  };
+
+  // Phase 1 — PII strip, ALWAYS (no enforcement gate: this is a DB update,
+  // not byte destruction). Full-PII rows past TTL+grace become {assetIds}
+  // tombstones, exactly like the batch route's consume/expiry strip.
+  const stripCutoff = new Date(now.getTime() - DETECTION_TTL_MS - DETECTION_SWEEP_GRACE_MS);
+  const piiRows = await prisma.appEvent.findMany({
+    where: { name: AVATAR_DETECTION_EVENT, createdAt: { lt: stripCutoff } },
+    orderBy: { createdAt: 'asc' },
+    take: DETECTION_SWEEP_BATCH_SIZE,
+    select: { id: true, props: true },
+  });
+  for (const row of piiRows) {
+    // Conditional on the name so a concurrent batch consume never gets
+    // double-written; props differ per row, hence the per-row update.
+    await prisma.appEvent.updateMany({
+      where: { id: row.id, name: AVATAR_DETECTION_EVENT },
+      data: { name: AVATAR_DETECTION_CONSUMED_EVENT, props: { assetIds: assetIdsOf(row.props) } },
+    });
+  }
+  if (piiRows.length > 0) {
+    logger.info({ stripped: piiRows.length }, 'Detection sweep: PII stripped from expired rows');
+  }
+
+  // Phase 2 — photo reap + row deletion, ONLY when byte deletion is enforced.
+  // In dry-run the tombstones (no subject PII, just opaque ids) are the
+  // durable record an enforced pass later reaps from; deleting rows while the
+  // enqueued jobs merely dry-run-log would strand the bytes forever.
+  if (!isCleanupEnforced(process.env.ASSET_CLEANUP_ENFORCE)) {
+    return piiRows.length;
+  }
+
+  // Reap horizon is deliberately much longer than the strip horizon: a
+  // 410-recovery re-detect happens over the SAME staged photos an old
+  // tombstone records, and this sweep cannot see an in-flight request the
+  // way the detect route's own sweep can.
+  const reapCutoff = new Date(now.getTime() - DETECTION_TTL_MS - DETECTION_REAP_HORIZON_MS);
+  const expired = await prisma.appEvent.findMany({
+    where: { name: AVATAR_DETECTION_CONSUMED_EVENT, createdAt: { lt: reapCutoff } },
+    orderBy: { createdAt: 'asc' },
+    take: DETECTION_SWEEP_BATCH_SIZE,
+    select: { id: true, userId: true, props: true },
+  });
+  if (expired.length === 0) return piiRows.length;
+
+  const byUser = new Map<string, string[]>();
+  for (const event of expired) {
+    if (!event.userId) continue;
+    const list = byUser.get(event.userId) ?? [];
+    list.push(...assetIdsOf(event.props));
+    byUser.set(event.userId, list);
+  }
+
+  // A user whose photo reap fails keeps their rows for the next pass — but a
+  // user with nothing to reap (legacy null props) still gets their rows
+  // deleted, which is harmless row hygiene by this point.
+  const failedUsers = new Set<string>();
+
+  const newerRowsProtect = (userId: string) =>
+    prisma.appEvent.findMany({
+      where: {
+        userId,
+        name: { in: [AVATAR_DETECTION_EVENT, AVATAR_DETECTION_CONSUMED_EVENT] },
+        createdAt: { gte: reapCutoff },
+      },
+      select: { props: true },
+    });
+
+  for (const [userId, candidateIds] of byUser) {
+    try {
+      const candidates = [...new Set(candidateIds)];
+      if (candidates.length === 0) continue;
+      const [pageRefs, coverRefs, avatarRefs] = await Promise.all([
+        prisma.page.findMany({ where: { assetId: { in: candidates } }, select: { assetId: true } }),
+        prisma.book.findMany({
+          where: { coverAssetId: { in: candidates } },
+          select: { coverAssetId: true },
+        }),
+        prisma.avatarPhoto.findMany({
+          where: { assetId: { in: candidates } },
+          select: { assetId: true },
+        }),
+      ]);
+      // Re-read the protection set as the LAST thing before destruction: a
+      // re-detect row written after an earlier read must still protect its
+      // photos (the enqueue below is irreversible once the job runs).
+      const liveRows = await newerRowsProtect(userId);
+      const liveProtected = new Set(liveRows.flatMap((row) => assetIdsOf(row.props)));
+      const deletable = deletableStagedAssetIds(
+        candidates.filter((id) => !liveProtected.has(id)),
+        {
+          pageAssetIds: pageRefs.map((p) => p.assetId),
+          coverAssetIds: coverRefs.map((b) => b.coverAssetId),
+          avatarAssetIds: avatarRefs.map((a) => a.assetId),
+        },
+      );
+      if (deletable.length === 0) continue;
+      const assets = await prisma.asset.findMany({
+        where: { id: { in: deletable }, userId },
+        select: { id: true, publicId: true },
+      });
+      if (assets.length === 0) continue;
+      await getAssetCleanupQueue().add(
+        'detection-sweep-cleanup',
+        {
+          publicIds: assets.map((a) => a.publicId),
+          reason: 'detection_expired',
+          userId,
+        } satisfies AssetCleanupJobPayload,
+        {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 15000 },
+          removeOnComplete: { count: 100 },
+          removeOnFail: { count: 500 },
+        },
+      );
+      await prisma.asset.deleteMany({ where: { id: { in: assets.map((a) => a.id) } } });
+      logger.info(
+        { userId, reaped: assets.length },
+        'Detection sweep: reaped orphaned staged photos from an abandoned session',
+      );
+    } catch (error) {
+      // This user's rows stay for the next pass; keep sweeping the others.
+      logger.warn(
+        { userId, error: error instanceof Error ? error.message : String(error) },
+        'Detection sweep: user reap failed — rows retained for retry',
+      );
+      failedUsers.add(userId);
+    }
+  }
+
+  const deletableRowIds = expired
+    .filter((event) => !event.userId || !failedUsers.has(event.userId))
+    .map((event) => event.id);
+  if (deletableRowIds.length > 0) {
+    await prisma.appEvent.deleteMany({ where: { id: { in: deletableRowIds } } });
+  }
+  return piiRows.length + deletableRowIds.length;
+}
+
 /**
  * Weekly draft-retention sweep. DRY-RUN by default: candidates are logged and
  * recorded as 'draft_sweep_candidate' AppEvents (once per book) so the owner
@@ -352,6 +528,22 @@ async function runDraftSweep(job: Job) {
           error: reconcileError instanceof Error ? reconcileError.message : String(reconcileError),
         },
         'Asset cleanup reconcile pass failed — continuing with sweep',
+      );
+    }
+
+    // Batch-studio retention backstop: purge every user's expired detection
+    // rows (subject PII) and reap abandoned staged photos. Never fatal.
+    try {
+      const sweptDetections = await sweepExpiredDetectionEvents(now);
+      if (sweptDetections > 0) {
+        logger.info({ sweptDetections }, 'Detection sweep: expired detection rows purged');
+      }
+    } catch (detectionError) {
+      logger.error(
+        {
+          error: detectionError instanceof Error ? detectionError.message : String(detectionError),
+        },
+        'Detection sweep failed — continuing with draft sweep',
       );
     }
 

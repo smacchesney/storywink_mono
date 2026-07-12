@@ -3,13 +3,15 @@ import OpenAI from 'openai';
 import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
-import { avatarsEnabled, reapUnattachedStagedAssets } from '@/lib/avatars';
+import { avatarsEnabled, assetCleanupEnforced, reapUnattachedStagedAssets } from '@/lib/avatars';
 import { checkRateLimit } from '@/lib/rateLimit';
 import {
   detectRequestSchema,
   AVATAR_DETECTION_EVENT,
   AVATAR_DETECTION_CONSUMED_EVENT,
   DETECTION_TTL_MS,
+  DETECTION_SWEEP_GRACE_MS,
+  DETECTION_REAP_HORIZON_MS,
   type StoredDetection,
 } from '@/lib/avatar-batch';
 import {
@@ -25,28 +27,74 @@ import { optimizeCloudinaryUrlForVision } from '@storywink/shared/utils';
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'gpt-5-mini';
 
 /**
- * Delete this user's expired detection rows and reap the staged photos any
- * abandoned (detect-but-never-create) session left behind. Fire-and-forget
+ * Two-phase retention sweep for this user's detection rows. Fire-and-forget
  * from the request path — a failure here never blocks a detect.
+ *
+ * 1. PII STRIP (always, TTL+grace): full-PII rows become {assetIds}-only
+ *    tombstones. The privacy promise never waits on ASSET_CLEANUP_ENFORCE.
+ * 2. PHOTO REAP (only when byte deletion is enforced, TTL+24h horizon):
+ *    tombstones old enough that no open studio session — this tab, a second
+ *    tab, an overnight 410-recovery — can still be using their photos get
+ *    reaped and deleted. `protectedAssetIds` (the CURRENT request's photos)
+ *    and ids in any row newer than the horizon are spared regardless.
+ *
+ * The grace margin keeps a row mid-redeem in /api/avatars/batch invisible to
+ * phase 1; the workers' weekly sweep applies the same two phases globally.
  */
-async function sweepExpiredDetections(dbUserId: string): Promise<void> {
+async function sweepExpiredDetections(
+  dbUserId: string,
+  protectedAssetIds: string[],
+): Promise<void> {
   try {
-    const cutoff = new Date(Date.now() - DETECTION_TTL_MS);
-    const expired = await prisma.appEvent.findMany({
-      where: {
-        userId: dbUserId,
-        name: { in: [AVATAR_DETECTION_EVENT, AVATAR_DETECTION_CONSUMED_EVENT] },
-        createdAt: { lt: cutoff },
-      },
-      select: { id: true, name: true, props: true },
+    const stripCutoff = new Date(Date.now() - DETECTION_TTL_MS - DETECTION_SWEEP_GRACE_MS);
+    const assetIdsOf = (props: unknown): string[] =>
+      (props as StoredDetection | null)?.assetIds?.filter((id) => typeof id === 'string') ?? [];
+
+    const piiRows = await prisma.appEvent.findMany({
+      where: { userId: dbUserId, name: AVATAR_DETECTION_EVENT, createdAt: { lt: stripCutoff } },
+      select: { id: true, props: true },
     });
+    for (const row of piiRows) {
+      // Name-conditional so a concurrent batch consume is never double-written.
+      await prisma.appEvent.updateMany({
+        where: { id: row.id, name: AVATAR_DETECTION_EVENT },
+        data: { name: AVATAR_DETECTION_CONSUMED_EVENT, props: { assetIds: assetIdsOf(row.props) } },
+      });
+    }
+
+    // Byte destruction stays behind the enforce flag: deleting Asset rows
+    // while the cleanup worker dry-runs would strand the photos in Cloudinary
+    // with nothing left to find them by.
+    if (!assetCleanupEnforced()) return;
+
+    const reapCutoff = new Date(Date.now() - DETECTION_TTL_MS - DETECTION_REAP_HORIZON_MS);
+    const [expired, live] = await Promise.all([
+      prisma.appEvent.findMany({
+        where: {
+          userId: dbUserId,
+          name: AVATAR_DETECTION_CONSUMED_EVENT,
+          createdAt: { lt: reapCutoff },
+        },
+        select: { id: true, props: true },
+      }),
+      prisma.appEvent.findMany({
+        where: {
+          userId: dbUserId,
+          name: { in: [AVATAR_DETECTION_EVENT, AVATAR_DETECTION_CONSUMED_EVENT] },
+          createdAt: { gte: reapCutoff },
+        },
+        select: { props: true },
+      }),
+    ]);
     if (expired.length === 0) return;
 
-    // Only UNCONSUMED rows still hold staged photos worth reaping — consumed
-    // rows already released theirs at create time and carry stripped props.
+    const protect = new Set<string>([
+      ...protectedAssetIds,
+      ...live.flatMap((e) => assetIdsOf(e.props)),
+    ]);
     const orphanAssetIds = expired
-      .filter((e) => e.name === AVATAR_DETECTION_EVENT)
-      .flatMap((e) => (e.props as unknown as StoredDetection | null)?.assetIds ?? []);
+      .flatMap((e) => assetIdsOf(e.props))
+      .filter((id) => !protect.has(id));
     await prisma.appEvent.deleteMany({ where: { id: { in: expired.map((e) => e.id) } } });
     if (orphanAssetIds.length > 0) {
       await reapUnattachedStagedAssets(dbUserId, orphanAssetIds);
@@ -69,15 +117,16 @@ export async function POST(request: NextRequest) {
     const { dbUser } = await getAuthenticatedUser();
 
     // A money route (one vision call over up to 10 photos) — cap the burst.
+    // Enforced unconditionally: this is the most expensive single call the
+    // web app exposes, and no legitimate parent detects 20 times an hour.
+    // (checkRateLimit itself fails open if Redis is unreachable.)
     const rl = await checkRateLimit(`avatar-detect:${dbUser.id}`, 20, 3600);
     if (!rl.allowed) {
       logger.warn({ dbUserId: dbUser.id }, 'Rate limit exceeded: avatar detect');
-      if (process.env.RATE_LIMIT_ENFORCE === 'true') {
-        return NextResponse.json(
-          { error: "You're going very quickly. Please wait a little while and try again." },
-          { status: 429 },
-        );
-      }
+      return NextResponse.json(
+        { error: "You're going very quickly. Please wait a little while and try again." },
+        { status: 429 },
+      );
     }
 
     const parsed = detectRequestSchema.safeParse(await request.json().catch(() => null));
@@ -90,7 +139,8 @@ export async function POST(request: NextRequest) {
     // descriptions of everyone in the photos (including background strangers).
     // Delete the rows and reap any staged photos those abandoned sessions left
     // behind — the "we only use photos to draw, then let them go" promise.
-    void sweepExpiredDetections(dbUser.id);
+    // This request's own assetIds are protected from the reap.
+    void sweepExpiredDetections(dbUser.id, assetIds);
 
     // Ownership pin: every photo must be the caller's own upload.
     const owned = await prisma.asset.findMany({

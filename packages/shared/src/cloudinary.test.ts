@@ -7,6 +7,7 @@ import {
   userUploadsFolderPrefix,
   isSafeCloudinaryPrefix,
   excludeSharedAssetIds,
+  deletableStagedAssetIds,
   isDraftSweepCandidate,
   assetCleanupJobSchema,
   chunkPublicIds,
@@ -285,6 +286,50 @@ describe('excludeSharedAssetIds (shared-asset guard)', () => {
 
   it('returns empty when every candidate is shared', () => {
     expect(excludeSharedAssetIds(['a1', 'a2'], ['a1', 'a2', 'a9'])).toEqual([]);
+  });
+});
+
+describe('deletableStagedAssetIds (staged-photo reaper guard)', () => {
+  // Every reference KIND must pin its asset independently — dropping any one
+  // from the union means deleting a parent's photos under a live record.
+  it('spares an asset referenced only by a book page', () => {
+    expect(
+      deletableStagedAssetIds(['a1', 'a2'], {
+        pageAssetIds: ['a1'],
+        coverAssetIds: [],
+        avatarAssetIds: [],
+      }),
+    ).toEqual(['a2']);
+  });
+
+  it('spares an asset referenced only by a book cover', () => {
+    expect(
+      deletableStagedAssetIds(['a1', 'a2'], {
+        pageAssetIds: [],
+        coverAssetIds: ['a2'],
+        avatarAssetIds: [],
+      }),
+    ).toEqual(['a1']);
+  });
+
+  it('spares an asset referenced only by an avatar (created or staging)', () => {
+    expect(
+      deletableStagedAssetIds(['a1', 'a2'], {
+        pageAssetIds: [],
+        coverAssetIds: [],
+        avatarAssetIds: ['a1'],
+      }),
+    ).toEqual(['a2']);
+  });
+
+  it('an unreferenced asset is deletable; duplicates and null-ish refs are handled', () => {
+    expect(
+      deletableStagedAssetIds(['a1', 'a1', null, undefined], {
+        pageAssetIds: [null],
+        coverAssetIds: [undefined],
+        avatarAssetIds: [''],
+      }),
+    ).toEqual(['a1']);
   });
 });
 

@@ -244,6 +244,31 @@ export function excludeSharedAssetIds(
   return [...deletable];
 }
 
+/** Every DB reference kind that can pin a staged upload photo in place. */
+export interface StagedAssetReferences {
+  pageAssetIds: Iterable<string | null | undefined>;
+  coverAssetIds: Iterable<string | null | undefined>;
+  avatarAssetIds: Iterable<string | null | undefined>;
+}
+
+/**
+ * Which staged batch-studio photos may be deleted: candidates minus every id
+ * a book page, a book cover, or an avatar (created OR still staging) points
+ * at. Both retention reapers (the web routes and the workers sweep) MUST go
+ * through this one filter — dropping any reference kind from the union means
+ * permanently deleting a parent's photos out from under a live record.
+ */
+export function deletableStagedAssetIds(
+  candidateAssetIds: ReadonlyArray<string | null | undefined>,
+  references: StagedAssetReferences,
+): string[] {
+  return excludeSharedAssetIds(candidateAssetIds, [
+    ...references.pageAssetIds,
+    ...references.coverAssetIds,
+    ...references.avatarAssetIds,
+  ]);
+}
+
 // ---------------------------------------------------------------------------
 // Draft-retention sweep
 // ---------------------------------------------------------------------------
@@ -274,6 +299,7 @@ export const ASSET_CLEANUP_REASONS = [
   'draft_expired',
   'avatar_deleted',
   'avatar_approved',
+  'detection_expired',
 ] as const;
 export type AssetCleanupReason = (typeof ASSET_CLEANUP_REASONS)[number];
 

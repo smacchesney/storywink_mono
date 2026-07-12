@@ -30,10 +30,38 @@ export interface MatteResult {
    * the figure itself was eaten.
    */
   backgroundRatio: number;
+  /**
+   * Pixels in the largest 4-connected foreground component / total foreground
+   * pixels (1 when there is no foreground at all). An intact figure is one
+   * blob (~1.0). A near-white garment on the silhouette that drains to the
+   * border severs the figure into several large pieces or leaves floating
+   * shadow squiggles, and this drops — the "partial figure eaten" signal the
+   * global backgroundRatio cannot see.
+   */
+  largestForegroundShare: number;
 }
 
 const DEFAULT_WHITE_FLOOR = 235;
 const DEFAULT_FEATHER_RADIUS = 1;
+
+/** Accept band for the stored transparent variant (reject → keep white). */
+export const MIN_CUTOUT_BACKGROUND_RATIO = 0.05;
+export const MAX_CUTOUT_BACKGROUND_RATIO = 0.95;
+export const MIN_FOREGROUND_SHARE = 0.9;
+
+/**
+ * Whether a matte is good enough to persist as the transparent cutoutUrl.
+ * Outside the band the fill either found no background (model ignored the
+ * white-background instruction) or ate the figure; a fragmented foreground
+ * means the fill hole-punched through a near-white garment on the silhouette.
+ */
+export function isUsableMatte(result: MatteResult): boolean {
+  return (
+    result.backgroundRatio >= MIN_CUTOUT_BACKGROUND_RATIO &&
+    result.backgroundRatio <= MAX_CUTOUT_BACKGROUND_RATIO &&
+    result.largestForegroundShare >= MIN_FOREGROUND_SHARE
+  );
+}
 
 /**
  * Mutates `data` (RGBA, row-major) in place: border-connected near-white
@@ -93,6 +121,37 @@ export function matteWhiteBackground(
   let backgroundCount = 0;
   for (let p = 0; p < pixelCount; p++) backgroundCount += background[p];
 
+  // Foreground integrity: size of the largest 4-connected non-background
+  // component, reusing the queue buffer (the flood fill above is done with it).
+  const foregroundCount = pixelCount - backgroundCount;
+  let largestComponent = 0;
+  if (foregroundCount > 0) {
+    const visited = new Uint8Array(pixelCount);
+    for (let start = 0; start < pixelCount; start++) {
+      if (background[start] || visited[start]) continue;
+      visited[start] = 1;
+      queue[0] = start;
+      let cHead = 0;
+      let cTail = 1;
+      while (cHead < cTail) {
+        const p = queue[cHead++];
+        const x = p % width;
+        const grow = (q: number) => {
+          if (!background[q] && !visited[q]) {
+            visited[q] = 1;
+            queue[cTail++] = q;
+          }
+        };
+        if (x > 0) grow(p - 1);
+        if (x < width - 1) grow(p + 1);
+        if (p >= width) grow(p - width);
+        if (p < pixelCount - width) grow(p + width);
+      }
+      if (cTail > largestComponent) largestComponent = cTail;
+    }
+  }
+  const largestForegroundShare = foregroundCount === 0 ? 1 : largestComponent / foregroundCount;
+
   // Alpha = 255 * (1 - blurred background mask). With radius 0 this is the
   // hard mask; with radius r, pixels near the boundary get partial alpha on
   // both sides, which reads as a soft anti-aliased cut.
@@ -131,5 +190,5 @@ export function matteWhiteBackground(
     // the blur already yields 0 there; boundary background keeps its partial.
   }
 
-  return { backgroundRatio: backgroundCount / pixelCount };
+  return { backgroundRatio: backgroundCount / pixelCount, largestForegroundShare };
 }

@@ -90,7 +90,11 @@ Each app ships an `.env.example` — that file is the source of truth for the fu
 - `REDIS_URL` — Redis connection (queue enqueue)
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` — Clerk auth
 - `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_*` — image storage
+- `OPENAI_API_KEY` — batch-avatar subject detection (`/api/avatars/detect`)
 - `STRIPE_*`, `LULU_*`, `DROPBOX_*` — payment and print-on-demand
+- Feature-flag pairs (`AVATARS_ENABLED` + `NEXT_PUBLIC_AVATARS_ENABLED`, …) — the
+  `NEXT_PUBLIC_*` halves are baked at build time and must stay declared in
+  `apps/web/Dockerfile` ARGs and `turbo.json` build env
 
 ### Workers (`apps/workers`) — key vars
 

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
 import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
@@ -31,16 +30,15 @@ export async function POST(request: NextRequest) {
   try {
     const { dbUser } = await getAuthenticatedUser();
 
-    // Money route: up to 6 rendition jobs per call.
+    // Money route: up to 6 rendition jobs per call. Enforced unconditionally
+    // (checkRateLimit fails open if Redis is unreachable).
     const rl = await checkRateLimit(`avatar-batch:${dbUser.id}`, 10, 3600);
     if (!rl.allowed) {
       logger.warn({ dbUserId: dbUser.id }, 'Rate limit exceeded: avatar batch');
-      if (process.env.RATE_LIMIT_ENFORCE === 'true') {
-        return NextResponse.json(
-          { error: "You're going very quickly. Please wait a little while and try again." },
-          { status: 429 },
-        );
-      }
+      return NextResponse.json(
+        { error: "You're going very quickly. Please wait a little while and try again." },
+        { status: 429 },
+      );
     }
 
     const parsed = batchRequestSchema.safeParse(await request.json().catch(() => null));
@@ -62,10 +60,19 @@ export async function POST(request: NextRequest) {
     if (detectionEvent.name === AVATAR_DETECTION_CONSUMED_EVENT) {
       return NextResponse.json({ code: 'DETECTION_USED' }, { status: 409 });
     }
+    const stored = detectionEvent.props as unknown as StoredDetection;
     if (Date.now() - detectionEvent.createdAt.getTime() > DETECTION_TTL_MS) {
+      // Strip the subject PII the moment expiry is observed — the retention
+      // promise must not wait for a future sweep. The {assetIds}-only rename
+      // keeps the staged photos discoverable for that sweep while the client
+      // re-detects over them (they are NOT reaped here for exactly that
+      // reason).
+      await prisma.appEvent.updateMany({
+        where: { id: detectionId, name: AVATAR_DETECTION_EVENT },
+        data: { name: AVATAR_DETECTION_CONSUMED_EVENT, props: { assetIds: stored.assetIds } },
+      });
       return NextResponse.json({ code: 'DETECTION_EXPIRED' }, { status: 410 });
     }
-    const stored = detectionEvent.props as unknown as StoredDetection;
     const subjectsById = new Map(stored.subjects.map((s) => [s.subjectId, s]));
 
     // Validate every pick against the stored roster BEFORE consuming.
@@ -85,12 +92,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Single-use redemption: the atomic rename lets exactly ONE request in —
-    // a double-tap cannot mint the whole batch twice. Props are STRIPPED in the
-    // same write so no AI-derived descriptions of children (or non-consenting
-    // background strangers) survive past the create — the retention promise.
+    // a double-tap cannot mint the whole batch twice. Subject PII is STRIPPED
+    // in the same write so no AI-derived descriptions of children (or
+    // non-consenting background strangers) survive past the create — the
+    // retention promise. Only the opaque assetIds remain, so the sweep can
+    // later reap any photo that ended up attached to nothing.
     const consumed = await prisma.appEvent.updateMany({
       where: { id: detectionId, name: AVATAR_DETECTION_EVENT },
-      data: { name: AVATAR_DETECTION_CONSUMED_EVENT, props: Prisma.JsonNull },
+      data: { name: AVATAR_DETECTION_CONSUMED_EVENT, props: { assetIds: stored.assetIds } },
     });
     if (consumed.count === 0) {
       return NextResponse.json({ code: 'DETECTION_USED' }, { status: 409 });
@@ -104,7 +113,9 @@ export async function POST(request: NextRequest) {
     const liveAssetIds = new Set(liveAssets.map((a) => a.id));
 
     const created: Array<{ avatarId: string; displayName: string }> = [];
+    const createdSubjectIds = new Set<string>();
     const failed: Array<{ subjectId: string; reason: string }> = [];
+    let enqueueFailures = 0;
     let stoppedAtCap: number | undefined;
 
     for (const pick of picks) {
@@ -125,7 +136,7 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const displayName = displayNameForPick(pick.name, subject);
+      const displayName = displayNameForPick(pick.name, subject, stored.language);
       try {
         const avatar = await prisma.avatar.create({
           data: {
@@ -145,7 +156,9 @@ export async function POST(request: NextRequest) {
           );
         } catch (queueError) {
           // Never leave PENDING with no job behind it — FAILED offers an
-          // honest "draw again" on the shelf.
+          // honest "draw again" on the shelf. Counted so the client can say
+          // some drawings need another go instead of claiming a clean run.
+          enqueueFailures += 1;
           await prisma.avatarRendition
             .updateMany({
               where: { avatarId: avatar.id, artStyle },
@@ -158,6 +171,7 @@ export async function POST(request: NextRequest) {
           );
         }
         created.push({ avatarId: avatar.id, displayName });
+        createdSubjectIds.add(pick.subjectId);
       } catch (createError) {
         logger.error(
           { subjectId: pick.subjectId, error: createError },
@@ -167,28 +181,50 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Cap race: the pre-check passed but a concurrent create used the last
+    // slot before the loop ran. Nothing was made, so honor the 403 contract
+    // the client already handles (detection NOT burned, stay on confirm) —
+    // restore the consumed row with its original props for the retry.
+    if (created.length === 0 && stoppedAtCap !== undefined) {
+      await prisma.appEvent.updateMany({
+        where: { id: detectionId, name: AVATAR_DETECTION_CONSUMED_EVENT },
+        data: { name: AVATAR_DETECTION_EVENT, props: stored as unknown as object },
+      });
+      return NextResponse.json({ code: 'AVATAR_CAP', cap: stoppedAtCap }, { status: 403 });
+    }
+
     // Retention: staged photos that ended up attached to no avatar (beyond the
     // ≤3/subject cap, or belonging to unselected subjects) are reaped now —
     // reapUnattachedStagedAssets keeps only the ids no page/cover/avatar
     // references, so the created avatars' photos are safe.
     //
-    // ONLY when at least one avatar was created. On a total failure (every pick
-    // errored, or a cap race left created empty) NONE of the assets are
-    // attached, so an unconditional reap would delete EVERY uploaded photo —
-    // irreversibly, and after the detection was already consumed. Leaving them
-    // intact keeps a re-detect over the same set viable.
+    // ONLY when at least one avatar was created (a total failure keeps every
+    // photo so a re-detect over the same set stays viable), and NEVER the
+    // photos of picks that failed or were cap-stopped — their retry story
+    // (free a slot, re-detect) needs those photos alive. Whatever survives
+    // here is reaped by the detection sweeps once the consumed row's
+    // {assetIds} props pass the reap horizon (and byte deletion is enforced).
     if (created.length > 0) {
-      await reapUnattachedStagedAssets(dbUser.id, stored.assetIds);
+      const unresolvedAssetIds = new Set(
+        picks
+          .filter((pick) => !createdSubjectIds.has(pick.subjectId))
+          .flatMap((pick) => subjectAssetIds(subjectsById.get(pick.subjectId)!, stored.assetIds)),
+      );
+      await reapUnattachedStagedAssets(
+        dbUser.id,
+        stored.assetIds.filter((id) => !unresolvedAssetIds.has(id)),
+      );
     }
 
     logger.info(
-      { detectionId, created: created.length, failed: failed.length, stoppedAtCap },
+      { detectionId, created: created.length, failed: failed.length, enqueueFailures, stoppedAtCap },
       'Batch avatar creation finished',
     );
     return NextResponse.json(
       {
         created,
         ...(failed.length > 0 ? { failed } : {}),
+        ...(enqueueFailures > 0 ? { enqueueFailures } : {}),
         ...(stoppedAtCap !== undefined ? { stoppedAtCap } : {}),
       },
       { status: created.length > 0 ? 201 : 200 },

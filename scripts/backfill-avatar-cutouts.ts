@@ -93,6 +93,12 @@ async function main() {
           backoff: { type: 'exponential', delay: 10000 },
           removeOnComplete: true,
           removeOnFail: true,
+          // Backfill yields to live jobs: BullMQ serves non-prioritized adds
+          // (every user-facing enqueue) before ANY prioritized job, so a big
+          // backfill can't back up draw-again/batch renditions for an hour —
+          // which would also trip the route's 10-minute stale-PENDING escape
+          // hatch into duplicate spends.
+          priority: 10,
         },
       );
       console.log(`  enqueued: ${r.avatar.displayName} (${r.artStyle})`);

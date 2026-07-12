@@ -6,7 +6,11 @@ import logger from '@/lib/logger';
 import { NextResponse } from 'next/server';
 import { ensureUser } from '@/lib/db/ensureUser';
 import { Queue } from 'bullmq';
-import { QUEUE_NAMES } from '@storywink/shared/constants';
+import {
+  QUEUE_NAMES,
+  AVATAR_DETECTION_EVENT,
+  AVATAR_DETECTION_CONSUMED_EVENT,
+} from '@storywink/shared/constants';
 import { createBullMQConnection } from '@storywink/shared/redis';
 import {
   collectBookGeneratedPublicIds,
@@ -53,7 +57,7 @@ async function collectUserCloudinaryTargets(dbUserId: string) {
       where: { userId: dbUserId },
       select: {
         id: true,
-        renditions: { select: { turnaroundSheetUrl: true, portraitUrl: true } },
+        renditions: { select: { turnaroundSheetUrl: true, portraitUrl: true, cutoutUrl: true } },
       },
     }),
   ]);
@@ -183,6 +187,19 @@ export async function POST(req: Request) {
             const cloudinaryTargets = dbUser
               ? await collectUserCloudinaryTargets(dbUser.id)
               : null;
+
+            // Right-to-erasure: AppEvent has no relation to User, so the row
+            // cascade never touches it — the batch studio's detection rows
+            // (AI-derived descriptions of children and background strangers,
+            // ≤1h old at most) are purged explicitly with the account.
+            if (dbUser) {
+              await prisma.appEvent.deleteMany({
+                where: {
+                  userId: dbUser.id,
+                  name: { in: [AVATAR_DETECTION_EVENT, AVATAR_DETECTION_CONSUMED_EVENT] },
+                },
+              });
+            }
 
             const deleteResult = await prisma.user.deleteMany({
               where: { clerkId: deletedClerkId },

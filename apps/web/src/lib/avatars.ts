@@ -5,12 +5,18 @@
 import { Queue } from 'bullmq';
 import { QUEUE_NAMES } from '@storywink/shared/constants';
 import { createBullMQConnection } from '@storywink/shared/redis';
-import { excludeSharedAssetIds, type AssetCleanupJobPayload } from '@storywink/shared';
+import { deletableStagedAssetIds, type AssetCleanupJobPayload } from '@storywink/shared';
 import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
 
 export function avatarsEnabled(): boolean {
   return process.env.AVATARS_ENABLED === 'true';
+}
+
+/** Same normalization as the workers' isCleanupEnforced — the two sides must agree. */
+export function assetCleanupEnforced(): boolean {
+  const normalized = (process.env.ASSET_CLEANUP_ENFORCE ?? '').trim().toLowerCase();
+  return normalized === 'true' || normalized === '1';
 }
 
 /**
@@ -34,6 +40,17 @@ export async function reapUnattachedStagedAssets(
     new Set(candidateAssetIds.filter((id) => typeof id === 'string' && id.length)),
   );
   if (ids.length === 0) return;
+  // Byte deletion rides ASSET_CLEANUP_ENFORCE (the cleanup worker dry-runs
+  // without it). Deleting the Asset rows while the bytes survive would strand
+  // the photos in Cloudinary with nothing left to find them by — in dry-run,
+  // leave everything for the detection sweeps' tombstones to reap later.
+  if (!assetCleanupEnforced()) {
+    logger.info(
+      { dbUserId, candidates: ids.length },
+      'reapUnattachedStagedAssets dry-run — photos retained until enforcement',
+    );
+    return;
+  }
   try {
     const [pageRefs, coverRefs, avatarRefs] = await Promise.all([
       prisma.page.findMany({ where: { assetId: { in: ids } }, select: { assetId: true } }),
@@ -43,11 +60,11 @@ export async function reapUnattachedStagedAssets(
       }),
       prisma.avatarPhoto.findMany({ where: { assetId: { in: ids } }, select: { assetId: true } }),
     ]);
-    const deletableAssetIds = excludeSharedAssetIds(ids, [
-      ...pageRefs.map((p) => p.assetId),
-      ...coverRefs.map((b) => b.coverAssetId),
-      ...avatarRefs.map((a) => a.assetId),
-    ]);
+    const deletableAssetIds = deletableStagedAssetIds(ids, {
+      pageAssetIds: pageRefs.map((p) => p.assetId),
+      coverAssetIds: coverRefs.map((b) => b.coverAssetId),
+      avatarAssetIds: avatarRefs.map((a) => a.assetId),
+    });
     if (deletableAssetIds.length === 0) return;
 
     const deletableAssets = await prisma.asset.findMany({
@@ -74,13 +91,9 @@ export async function reapUnattachedStagedAssets(
   }
 }
 
-/** Maps a perception roster role onto the avatar kind for promotion. */
-export function kindForRole(role: string): 'CHILD' | 'ADULT' | 'PET' | 'TOY' {
-  if (role === 'main_child' || role.startsWith('main')) return 'CHILD';
-  if (role === 'pet') return 'PET';
-  if (role === 'companion_object') return 'TOY';
-  return 'ADULT';
-}
+// Pure mapping lives in avatar-batch.ts (testable without this module's
+// bullmq import); re-exported so the promote route's import keeps working.
+export { kindForRole } from '@/lib/avatar-batch';
 
 let cleanupQueue: Queue | null = null;
 /** Lazy singleton — same pattern as the book-deletion route. */

@@ -68,7 +68,9 @@ export function AvatarCard({ avatar, index = 0, onRename, onDrawAgain, onDelete 
       className="relative"
       initial={false}
       animate={{ rotate: tilt }}
-      whileHover={prefersReduced ? undefined : { rotate: 0, scale: 1.06, y: -10 }}
+      // zIndex rides the lift (example-book-selector precedent): without it a
+      // hovered card's grown edges paint UNDER later-DOM neighbours.
+      whileHover={prefersReduced ? undefined : { rotate: 0, scale: 1.06, y: -10, zIndex: 10 }}
       whileTap={prefersReduced ? undefined : { scale: 0.97 }}
       transition={{ type: 'spring', stiffness: 260, damping: 18 }}
     >

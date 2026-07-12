@@ -187,6 +187,7 @@ export function AvatarStudioDialog({ onClose, onCreated }: AvatarStudioDialogPro
       const data = (await res.json()) as {
         created: Array<{ avatarId: string }>;
         failed?: Array<{ subjectId: string; reason: string }>;
+        enqueueFailures?: number;
         stoppedAtCap?: number;
       };
       const { toast } = await import('sonner');
@@ -206,11 +207,20 @@ export function AvatarStudioDialog({ onClose, onCreated }: AvatarStudioDialogPro
       }
 
       // At least one made — report what happened, then close to the shelf.
-      if (data.stoppedAtCap !== undefined) {
-        toast(t('capStopped', { count: data.created.length }));
-      } else if (data.failed && data.failed.length > 0) {
+      // Enqueue failures count as misses too: the avatar exists but its
+      // drawing needs a "draw again", which the shelf card offers. "Made"
+      // must never overstate (cap branch included) and "Made 0" must never
+      // appear next to a shelf showing new cards — that case gets its own
+      // draw-again phrasing.
+      const enqueueMisses = data.enqueueFailures ?? 0;
+      const made = data.created.length - enqueueMisses;
+      const missed = (data.failed?.length ?? 0) + enqueueMisses;
+      if (data.stoppedAtCap !== undefined && made > 0) {
+        toast(t('capStopped', { count: made }));
+      }
+      if (missed > 0) {
         // Partial success is fine, but reported (plan decision).
-        toast(t('someFailed', { made: data.created.length, missed: data.failed.length }));
+        toast(made > 0 ? t('someFailed', { made, missed }) : t('drawingsNeedRetry'));
       }
       onCreated();
       onClose();
@@ -418,11 +428,16 @@ function SubjectCard({
           disabled={!pick.selected}
           placeholder={subject.defaultLabel}
           // Only swallow the card's toggle gesture while selected (the input is
-          // live). On an unselected card the input is disabled and dead — a tap
-          // there must fall through and SELECT the card, not do nothing.
+          // live). On an unselected card the input is disabled — and disabled
+          // controls SUPPRESS click events entirely (they never bubble), so it
+          // also goes pointer-events-none: the tap passes through to the card
+          // div and SELECTS it instead of dead-tapping.
           onClick={pick.selected ? (e) => e.stopPropagation() : undefined}
           onChange={(e) => onName(e.target.value)}
-          className="w-full rounded-lg border border-black/10 px-2 py-1 font-playful text-base text-[#1a1a1a] placeholder:text-gray-400 focus:border-coral focus:outline-none focus:ring-1 focus:ring-coral disabled:bg-transparent"
+          className={cn(
+            'w-full rounded-lg border border-black/10 px-2 py-1 font-playful text-base text-[#1a1a1a] placeholder:text-gray-400 focus:border-coral focus:outline-none focus:ring-1 focus:ring-coral disabled:bg-transparent',
+            !pick.selected && 'pointer-events-none',
+          )}
         />
         <p className="truncate text-xs text-gray-400">{subject.parentDescription}</p>
         <div
@@ -438,6 +453,9 @@ function SubjectCard({
               onClick={() => onKind(kind)}
               className={cn(
                 'rounded-full border px-2 py-0.5 font-playful text-xs transition-colors',
+                // Disabled buttons swallow taps (no bubbling) — pass them
+                // through so tapping a chip on a dimmed card selects the card.
+                !pick.selected && 'pointer-events-none',
                 pick.kind === kind
                   ? 'border-coral bg-coral/10 text-coral'
                   : 'border-black/10 text-gray-400 hover:border-coral/40',

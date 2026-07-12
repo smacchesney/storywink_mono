@@ -32,11 +32,11 @@ import {
 } from '@storywink/shared/prompts/character-identity';
 import { getStyleBible, isValidStyle, STYLE_LIBRARY } from '@storywink/shared/prompts/styles';
 import { optimizeCloudinaryUrlForVision } from '@storywink/shared/utils';
-import { avatarGeneratedFolderPrefix } from '@storywink/shared';
+import { avatarGeneratedFolderPrefix, extractCloudinaryPublicId } from '@storywink/shared';
 import { GeminiProvider } from './illustrators/gemini.js';
 import type { IllustrationProvider } from './illustrators/types.js';
 import { fetchImageInput } from './images.js';
-import { matteWhiteBackground } from './cutout-matte.js';
+import { matteWhiteBackground, isUsableMatte } from './cutout-matte.js';
 import { ANALYSIS_MODEL } from '../config/models.js';
 
 type Logger = pino.Logger;
@@ -44,12 +44,6 @@ type Logger = pino.Logger;
 const STYLE_EXEMPLARS_FOR_SHEET = 2;
 const MAX_SOURCE_PHOTOS = 3;
 const MAX_GENERATION_ROUNDS = 2;
-
-// A matte outside these bounds is degenerate: ~0 means the model ignored the
-// pure-white instruction (nothing to remove), ~1 means the figure itself was
-// flood-filled away. Either way the white original is the honest fallback.
-const MIN_CUTOUT_BACKGROUND_RATIO = 0.05;
-const MAX_CUTOUT_BACKGROUND_RATIO = 0.95;
 
 /** Role string stored on the identity, by avatar kind. */
 export const AVATAR_KIND_ROLES: Record<string, string> = {
@@ -420,6 +414,14 @@ export interface GenerateAvatarCutoutParams {
   subject: CutoutCharacterInput;
   /** The VALIDATED turnaround sheet — the identity anchor, never raw photos. */
   sheetUrl: string;
+  /**
+   * Appended to both cutout public_ids. The cutoutOnly backfill passes a
+   * per-job suffix so a concurrent draw-again (which owns the bare
+   * `cutout_<style>` ids) can never have its just-persisted bytes overwritten
+   * by a slower stale generation — the DB compare-and-set picks the pointer,
+   * and each job's upload lives at its own id.
+   */
+  publicIdSuffix?: string;
   logger: Logger;
 }
 
@@ -434,6 +436,7 @@ export async function generateAvatarCutout(
   params: GenerateAvatarCutoutParams,
 ): Promise<string | null> {
   const { openai, avatarId, artStyle, kind, subject, sheetUrl, logger } = params;
+  const suffix = params.publicIdSuffix ?? '';
   try {
     if (!isValidStyle(artStyle)) throw new Error(`Unknown art style: ${artStyle}`);
 
@@ -460,7 +463,7 @@ export async function generateAvatarCutout(
     }
 
     const whiteBuffer = Buffer.from(output.imageBase64, 'base64');
-    const whiteUrl = await uploadAvatarImage(avatarId, `cutout_${artStyle}`, whiteBuffer, [
+    const whiteUrl = await uploadAvatarImage(avatarId, `cutout_${artStyle}${suffix}`, whiteBuffer, [
       'avatar-cutout',
       avatarId,
       artStyle,
@@ -489,15 +492,12 @@ export async function generateAvatarCutout(
         .ensureAlpha()
         .raw()
         .toBuffer({ resolveWithObject: true });
-      const { backgroundRatio } = matteWhiteBackground(
+      const matte = matteWhiteBackground(
         new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
         info.width,
         info.height,
       );
-      if (
-        backgroundRatio >= MIN_CUTOUT_BACKGROUND_RATIO &&
-        backgroundRatio <= MAX_CUTOUT_BACKGROUND_RATIO
-      ) {
+      if (isUsableMatte(matte)) {
         const png = await sharp(data, {
           raw: { width: info.width, height: info.height, channels: 4 },
         })
@@ -505,16 +505,16 @@ export async function generateAvatarCutout(
           .toBuffer();
         const transparentUrl = await uploadAvatarImage(
           avatarId,
-          `cutout_${artStyle}_t`,
+          `cutout_${artStyle}${suffix}_t`,
           png,
           ['avatar-cutout', avatarId, artStyle],
           'png',
         );
-        logger.info({ avatarId, artStyle, backgroundRatio }, 'Avatar cutout READY (transparent)');
+        logger.info({ avatarId, artStyle, ...matte }, 'Avatar cutout READY (transparent)');
         return transparentUrl;
       }
       logger.warn(
-        { avatarId, artStyle, backgroundRatio },
+        { avatarId, artStyle, ...matte },
         'Cutout matte degenerate — keeping the white variant',
       );
     } catch (matteError) {
@@ -528,6 +528,32 @@ export async function generateAvatarCutout(
     const message = error instanceof Error ? error.message : String(error);
     logger.warn({ avatarId, artStyle, error: message }, 'Avatar cutout failed — card falls back');
     return null;
+  }
+}
+
+/**
+ * Best-effort removal of BOTH cutout variants behind one stored URL — used
+ * when a guarded cutoutUrl write loses to a concurrent redraw, so the loser's
+ * suffixed uploads don't linger as orphans (the avatar folder purge on
+ * deletion remains the backstop). Never throws.
+ */
+export async function destroyCutoutVariants(url: string, logger: Logger): Promise<void> {
+  try {
+    const publicId = extractCloudinaryPublicId(url);
+    if (!publicId) return;
+    const sibling = publicId.endsWith('_t') ? publicId.slice(0, -2) : `${publicId}_t`;
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+    await cloudinary.api.delete_resources([publicId, sibling], {
+      resource_type: 'image',
+      type: 'upload',
+      invalidate: true,
+    });
+  } catch (error) {
+    logger.warn({ url, error: String(error) }, 'Cutout loser cleanup skipped (non-fatal)');
   }
 }
 

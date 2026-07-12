@@ -69,6 +69,33 @@ export const PAGE_TEXT = {
   },
 } as const;
 
+// ---------------------------------------------------------------------------
+// Batch-avatar subject detection (X7) — retention contract
+// ---------------------------------------------------------------------------
+
+/** AppEvent name carrying a persisted detection (full subject PII) in props. */
+export const AVATAR_DETECTION_EVENT = 'avatar_subject_detection';
+/**
+ * AppEvent name after redemption or expiry-strip: props hold ONLY
+ * {assetIds} (opaque ids for the retention sweeps), never subject PII.
+ */
+export const AVATAR_DETECTION_CONSUMED_EVENT = 'avatar_subject_detection_consumed';
+/** How long a stored detection may be redeemed by /api/avatars/batch. */
+export const DETECTION_TTL_MS = 60 * 60 * 1000;
+/**
+ * Sweeps only touch rows older than TTL + grace, so a row a batch freshness
+ * check could still accept is never visible to a concurrent sweep. This is
+ * the PII-STRIP horizon: past it, a detection row keeps only {assetIds}.
+ */
+export const DETECTION_SWEEP_GRACE_MS = 5 * 60 * 1000;
+/**
+ * Photo-reap horizon (past the TTL): staged photos are only destroyed for
+ * rows this old. PII strips at TTL+grace; the photos wait long enough that
+ * no plausibly-open studio session (overnight tab, 410-recovery re-detect)
+ * can have its uploads reaped out from under it by a sweep it cannot see.
+ */
+export const DETECTION_REAP_HORIZON_MS = 24 * 60 * 60 * 1000;
+
 // Story mood options (canonical source — used by UI, schemas, and prompt)
 export const STORY_MOODS = ['adventurous', 'silly', 'sweet', 'brave', 'dreamy', 'curious'] as const;
 export type StoryMood = (typeof STORY_MOODS)[number];

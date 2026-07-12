@@ -16,10 +16,12 @@ import OpenAI from 'openai';
 import pino from 'pino';
 import { PrismaClient } from '@prisma/client';
 import { optimizeCloudinaryUrlForVision } from '@storywink/shared/utils';
+import { extractCloudinaryPublicId } from '@storywink/shared';
 import {
   extractAvatarIdentity,
   generateAvatarSheet,
   generateAvatarCutout,
+  destroyCutoutVariants,
   sheetSubjectForStyle,
   cutoutSubjectForStyle,
   portraitUrlFromSheet,
@@ -83,6 +85,11 @@ export async function processAvatarRendition(job: Job<AvatarRenditionJobData>): 
       return;
     }
     const anchorSheet = existing.turnaroundSheetUrl;
+    // Per-job public_id suffix: a concurrent draw-again owns the bare
+    // cutout_<style> ids, so this job's uploads must live at their own ids —
+    // otherwise the LAST upload owns the bytes every stored URL serves,
+    // and a slow stale backfill would clobber the redraw's fresh cutout.
+    const suffix = `_bf${(job.id ?? 'x').replace(/[^a-zA-Z0-9]/g, '').slice(-12)}`;
     const cutoutUrl = await generateAvatarCutout({
       openai,
       avatarId,
@@ -90,15 +97,22 @@ export async function processAvatarRendition(job: Job<AvatarRenditionJobData>): 
       kind: avatar.kind,
       subject: cutoutSubjectForStyle(identity, artStyle),
       sheetUrl: anchorSheet,
+      publicIdSuffix: suffix,
       logger,
     });
     if (cutoutUrl) {
       // Guard against a "draw again" that redrew this rendition while the
-      // backfill cutout was generating: write ONLY if the sheet is still the
-      // one we anchored to AND no cutout landed meanwhile. A concurrent redraw
-      // (new sheet, or its own fresh cutout) wins — this stale one is dropped.
+      // backfill cutout was generating: write ONLY if the rendition is still
+      // READY on the sheet we anchored to AND no cutout landed meanwhile.
+      // A concurrent redraw (PENDING now, or READY on a new sheet) wins —
+      // this stale one is dropped and its uploads are reaped.
       const written = await prisma.avatarRendition.updateMany({
-        where: { id: existing.id, cutoutUrl: null, turnaroundSheetUrl: anchorSheet },
+        where: {
+          id: existing.id,
+          status: 'READY',
+          cutoutUrl: null,
+          turnaroundSheetUrl: anchorSheet,
+        },
         data: { cutoutUrl },
       });
       if (written.count === 0) {
@@ -106,41 +120,43 @@ export async function processAvatarRendition(job: Job<AvatarRenditionJobData>): 
           { avatarId, artStyle },
           'Cutout-only write skipped — rendition changed under us (redraw won)',
         );
+        await destroyCutoutVariants(cutoutUrl, logger);
       }
     }
     return;
   }
 
+  // Snapshot the pre-redraw cutout so a suffixed one (promotion/backfill
+  // patch) can be reaped once this redraw supersedes it.
+  const priorCutoutUrl = avatar.renditions.find((r) => r.artStyle === artStyle)?.cutoutUrl ?? null;
+
   const rendition = await prisma.avatarRendition.upsert({
     where: { avatarId_artStyle: { avatarId, artStyle } },
     create: { avatarId, artStyle, status: 'PENDING' },
-    update: { status: 'PENDING', error: null },
+    // cutoutUrl clears (the old cutout is invalid once we regenerate), but
+    // turnaroundSheetUrl is deliberately KEPT: the X6 avatar-anchor contract
+    // (avatar-sheets.ts) reads the last good sheet off a PENDING/FAILED
+    // rendition so an AVATAR_STORY re-render never loses its identity anchor
+    // mid-redraw. In-flight cutout patch jobs lose deterministically anyway —
+    // their guarded writes require status READY (see the patch guards below).
+    update: { status: 'PENDING', error: null, cutoutUrl: null },
   });
 
   try {
-    // Promotion fast path: byte-copy the book's validated sheet. The cutout
-    // still generates fresh — the copied sheet is its identity anchor.
+    // Promotion fast path: byte-copy the book's validated sheet and go READY
+    // immediately — pre-X7 this flow was seconds-long and it must stay that
+    // way (the parent just chose to keep a character they can already see).
+    // The cutout generates AFTER, patched in with the same guarded write the
+    // backfill uses, so the card silently upgrades portrait → cutout.
     if (job.data.copyFromSheetUrl) {
       const copied = await copySheetIntoAvatarFolder(avatarId, artStyle, job.data.copyFromSheetUrl);
-      const promoIdentity = avatar.identity as unknown as AvatarIdentity | null;
-      const cutoutUrl = promoIdentity?.character
-        ? await generateAvatarCutout({
-            openai,
-            avatarId,
-            artStyle,
-            kind: avatar.kind,
-            subject: cutoutSubjectForStyle(promoIdentity, artStyle),
-            sheetUrl: copied,
-            logger,
-          })
-        : null;
       await prisma.avatarRendition.update({
         where: { id: rendition.id },
         data: {
           status: 'READY',
           turnaroundSheetUrl: copied,
           portraitUrl: portraitUrlFromSheet(copied),
-          cutoutUrl,
+          cutoutUrl: null,
           provider: 'copy',
           model: 'book-sheet',
           validatedAt: new Date(),
@@ -149,6 +165,42 @@ export async function processAvatarRendition(job: Job<AvatarRenditionJobData>): 
       });
       await prisma.avatar.update({ where: { id: avatarId }, data: { status: 'READY' } });
       logger.info({ avatarId, artStyle }, 'Avatar rendition copied from book sheet');
+
+      // The rendition is already READY — nothing in the garnish phase may
+      // throw into the catch below and flip a usable card to FAILED.
+      try {
+        const promoIdentity = avatar.identity as unknown as AvatarIdentity | null;
+        if (promoIdentity?.character) {
+          const suffix = `_p${(job.id ?? 'x').replace(/[^a-zA-Z0-9]/g, '').slice(-12)}`;
+          const cutoutUrl = await generateAvatarCutout({
+            openai,
+            avatarId,
+            artStyle,
+            kind: avatar.kind,
+            subject: cutoutSubjectForStyle(promoIdentity, artStyle),
+            sheetUrl: copied,
+            publicIdSuffix: suffix,
+            logger,
+          });
+          if (cutoutUrl) {
+            const written = await prisma.avatarRendition.updateMany({
+              where: {
+                id: rendition.id,
+                status: 'READY',
+                cutoutUrl: null,
+                turnaroundSheetUrl: copied,
+              },
+              data: { cutoutUrl },
+            });
+            if (written.count === 0) await destroyCutoutVariants(cutoutUrl, logger);
+          }
+        }
+      } catch (cutoutError) {
+        logger.warn(
+          { avatarId, artStyle, error: String(cutoutError) },
+          'Promotion cutout patch skipped — card keeps the portrait',
+        );
+      }
       return;
     }
 
@@ -221,6 +273,21 @@ export async function processAvatarRendition(job: Job<AvatarRenditionJobData>): 
       data: { status: 'READY' },
     });
     logger.info({ avatarId, artStyle }, 'Avatar rendition READY');
+
+    // A superseded SUFFIXED cutout (from an earlier promotion/backfill patch)
+    // is no longer reachable from any stored URL — reap it. Compared on the
+    // BASE id (trailing _t stripped): destroyCutoutVariants removes BOTH
+    // variants behind a URL, so a same-base prior (e.g. a matte flip from
+    // transparent to white across redraws) must be skipped or the reap would
+    // delete the sibling this redraw just wrote and now serves.
+    if (priorCutoutUrl) {
+      const baseOf = (id: string) => (id.endsWith('_t') ? id.slice(0, -2) : id);
+      const priorId = extractCloudinaryPublicId(priorCutoutUrl);
+      const newId = cutoutUrl ? extractCloudinaryPublicId(cutoutUrl) : null;
+      if (priorId && (!newId || baseOf(priorId) !== baseOf(newId))) {
+        await destroyCutoutVariants(priorCutoutUrl, logger);
+      }
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error({ avatarId, artStyle, error: message }, 'Avatar rendition failed');

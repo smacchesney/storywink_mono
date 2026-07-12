@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import type { DetectedSubject } from '@storywink/shared/prompts/photo-analysis';
+import {
+  MAX_BATCH_PHOTOS,
+  type DetectedSubject,
+} from '@storywink/shared/prompts/photo-analysis';
 import {
   detectRequestSchema,
   batchRequestSchema,
@@ -8,6 +11,8 @@ import {
   displayNameForPick,
   defaultSelected,
   roleForKind,
+  kindForRole,
+  AVATAR_KINDS,
   MAX_ASSETS_PER_SUBJECT,
 } from './avatar-batch';
 
@@ -43,11 +48,23 @@ describe('detectRequestSchema', () => {
       detectRequestSchema.safeParse({ assetIds: [cuid(1)], language: 'ja' }).success,
     ).toBe(true);
     expect(detectRequestSchema.safeParse({ assetIds: [] }).success).toBe(false);
+  });
+
+  it('tracks the shared photo cap, whatever the owner tunes it to', () => {
     expect(
       detectRequestSchema.safeParse({
-        assetIds: Array.from({ length: 11 }, (_, i) => cuid(i)),
+        assetIds: Array.from({ length: MAX_BATCH_PHOTOS }, (_, i) => cuid(i)),
+      }).success,
+    ).toBe(true);
+    expect(
+      detectRequestSchema.safeParse({
+        assetIds: Array.from({ length: MAX_BATCH_PHOTOS + 1 }, (_, i) => cuid(i)),
       }).success,
     ).toBe(false);
+  });
+
+  it('rejects duplicate assetIds — photoIndexes are positional over this list', () => {
+    expect(detectRequestSchema.safeParse({ assetIds: [cuid(1), cuid(1)] }).success).toBe(false);
   });
 });
 
@@ -142,6 +159,12 @@ describe('roleForKind', () => {
     expect(roleForKind('PET')).toBe('pet');
     expect(roleForKind('TOY')).toBe('companion_object');
   });
+
+  it('round-trips with kindForRole for every kind — batch-created avatars must promote back to the same kind', () => {
+    for (const kind of AVATAR_KINDS) {
+      expect(kindForRole(roleForKind(kind))).toBe(kind);
+    }
+  });
 });
 
 describe('subjectAssetIds', () => {
@@ -177,6 +200,11 @@ describe('displayNameForPick', () => {
   it('falls back to the detection defaultLabel, then a kind word', () => {
     expect(displayNameForPick(undefined, subject())).toBe('Grown-up with glasses');
     expect(displayNameForPick('', subject({ defaultLabel: '' }))).toBe('Someone special');
+  });
+
+  it('the static fallback follows the detection language — no English name on a Japanese shelf', () => {
+    expect(displayNameForPick('', subject({ defaultLabel: ' ' }), 'ja')).toBe('たいせつな ひと');
+    expect(displayNameForPick('', subject({ defaultLabel: '' }), 'en')).toBe('Someone special');
   });
 });
 

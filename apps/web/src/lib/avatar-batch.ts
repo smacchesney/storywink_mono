@@ -18,19 +18,28 @@ import { isValidStyle } from '@storywink/shared/prompts/styles';
 /** Staged source photos per batch avatar — the worker reads at most 3 anyway. */
 export const MAX_ASSETS_PER_SUBJECT = 3;
 
-/** How long a stored detection may be redeemed by /api/avatars/batch. */
-export const DETECTION_TTL_MS = 60 * 60 * 1000;
-
-/** AppEvent name carrying a persisted detection in its props. */
-export const AVATAR_DETECTION_EVENT = 'avatar_subject_detection';
-/** AppEvent name after the detection is redeemed (single-use, atomic rename). */
-export const AVATAR_DETECTION_CONSUMED_EVENT = 'avatar_subject_detection_consumed';
+// Retention contract constants live in shared — the workers' global sweep
+// must agree with the routes on names, TTL, and grace to the letter.
+export {
+  AVATAR_DETECTION_EVENT,
+  AVATAR_DETECTION_CONSUMED_EVENT,
+  DETECTION_TTL_MS,
+  DETECTION_SWEEP_GRACE_MS,
+  DETECTION_REAP_HORIZON_MS,
+} from '@storywink/shared/constants';
 
 export const AVATAR_KINDS = ['CHILD', 'ADULT', 'PET', 'TOY'] as const;
 export type AvatarKindString = (typeof AVATAR_KINDS)[number];
 
 export const detectRequestSchema = z.object({
-  assetIds: z.array(z.string().cuid()).min(1).max(MAX_BATCH_PHOTOS),
+  assetIds: z
+    .array(z.string().cuid())
+    .min(1)
+    .max(MAX_BATCH_PHOTOS)
+    // photoIndexes are positional over this exact list — a duplicate would
+    // skew the index→asset mapping, so it is rejected by name here rather
+    // than surfacing as a misleading ownership failure downstream.
+    .refine((ids) => new Set(ids).size === ids.length, 'Duplicate assetIds'),
   language: z.enum(['en', 'ja']).default('en'),
 });
 
@@ -66,7 +75,16 @@ export interface StoredDetection {
   language: string;
 }
 
-/** Forward mapping kind → roster role (inverse of kindForRole in avatars.ts). */
+/**
+ * What a redeemed/expired detection keeps in props: ONLY the staged photo ids
+ * (opaque cuids, no subject PII) so the retention sweeps can later reap any
+ * photo that ended up attached to nothing.
+ */
+export interface ConsumedDetectionProps {
+  assetIds: string[];
+}
+
+/** Forward mapping kind → roster role (inverse of kindForRole below). */
 export function roleForKind(kind: AvatarKindString): string {
   switch (kind) {
     case 'CHILD':
@@ -78,6 +96,18 @@ export function roleForKind(kind: AvatarKindString): string {
     default:
       return 'adult';
   }
+}
+
+/**
+ * Maps a perception roster role onto the avatar kind (promotion path).
+ * Lives here — not in avatars.ts, which pulls in bullmq — so the pure
+ * round-trip contract with roleForKind stays testable.
+ */
+export function kindForRole(role: string): AvatarKindString {
+  if (role === 'main_child' || role.startsWith('main')) return 'CHILD';
+  if (role === 'pet') return 'PET';
+  if (role === 'companion_object') return 'TOY';
+  return 'ADULT';
 }
 
 /**
@@ -129,14 +159,20 @@ export function subjectAssetIds(subject: DetectedSubject, assetIds: string[]): s
 /**
  * The avatar's display name: the parent's typed name wins; otherwise the
  * detection's defaultLabel ("Grown-up with glasses") — renameable later from
- * the shelf kebab; a warm static fallback guards against an empty label.
+ * the shelf kebab; a warm static fallback (in the detection's language — a
+ * Japanese shelf must never grow an English-named character) guards against
+ * an empty label.
  */
-export function displayNameForPick(name: string | undefined, subject: DetectedSubject): string {
+export function displayNameForPick(
+  name: string | undefined,
+  subject: DetectedSubject,
+  language?: string,
+): string {
   const typed = name?.trim();
   if (typed) return typed.slice(0, 50);
   const label = subject.defaultLabel?.trim();
   if (label) return label.slice(0, 50);
-  return 'Someone special';
+  return language === 'ja' ? 'たいせつな ひと' : 'Someone special';
 }
 
 /**
