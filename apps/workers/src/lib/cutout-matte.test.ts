@@ -68,13 +68,7 @@ describe('matteWhiteBackground', () => {
   });
 
   it('feathers the edge: subject pixels adjacent to background get partial alpha', () => {
-    const { data, width, height } = image([
-      'wwwww',
-      'wwwww',
-      'wwrww',
-      'wwwww',
-      'wwwww',
-    ]);
+    const { data, width, height } = image(['wwwww', 'wwwww', 'wwrww', 'wwwww', 'wwwww']);
     matteWhiteBackground(data, width, height, { featherRadius: 1 });
     const center = alphaAt(data, width, 2, 2);
     expect(center).toBeGreaterThan(0);

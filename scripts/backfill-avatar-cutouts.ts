@@ -30,9 +30,7 @@ async function main() {
       avatar: { select: { id: true, userId: true, displayName: true, identity: true } },
     },
   });
-  console.log(
-    `${renditions.length} READY renditions missing a cutout${APPLY ? '' : ' (dry run)'}`,
-  );
+  console.log(`${renditions.length} READY renditions missing a cutout${APPLY ? '' : ' (dry run)'}`);
 
   const actionable = renditions.filter((r) => {
     if (!r.avatar.identity) {

@@ -404,10 +404,7 @@ describe('avatar folder safety (X6)', () => {
             'https://res.cloudinary.com/storywink/image/upload/v1/storywink/avatars/av1/cutout_vignette_t.png',
         },
       ]),
-    ).toEqual([
-      'storywink/avatars/av1/cutout_vignette_t',
-      'storywink/avatars/av1/cutout_vignette',
-    ]);
+    ).toEqual(['storywink/avatars/av1/cutout_vignette_t', 'storywink/avatars/av1/cutout_vignette']);
   });
 
   it('collects both cutout variants from a white-fallback cutout URL', () => {
@@ -420,9 +417,6 @@ describe('avatar folder safety (X6)', () => {
             'https://res.cloudinary.com/storywink/image/upload/v1/storywink/avatars/av1/cutout_vignette.png',
         },
       ]),
-    ).toEqual([
-      'storywink/avatars/av1/cutout_vignette',
-      'storywink/avatars/av1/cutout_vignette_t',
-    ]);
+    ).toEqual(['storywink/avatars/av1/cutout_vignette', 'storywink/avatars/av1/cutout_vignette_t']);
   });
 });
