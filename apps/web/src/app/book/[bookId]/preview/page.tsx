@@ -205,6 +205,9 @@ function BookPreviewContent() {
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_AVATARS_ENABLED !== 'true' || !book) return;
     if (book.status !== BookStatus.COMPLETED) return;
+    // X6d: an avatar-story cast is already on the shelf — never offer to
+    // re-keep a character that came FROM the character library.
+    if (book.bookType === 'AVATAR_STORY') return;
     try {
       if (localStorage.getItem(`keep-character-declined-${book.id}`)) return;
     } catch {

@@ -6,12 +6,156 @@ import logger from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { BookStatus, PageType } from '@prisma/client';
 import { QueueName, getQueue } from '@/lib/queue/index';
+import { avatarsEnabled } from '@/lib/avatars';
+import { isValidStyle } from '@storywink/shared/prompts/styles';
+import {
+  AVATAR_STORY_PAGE_LENGTHS,
+  castComposition,
+  buildAvatarStoryRoster,
+  CastKind,
+  StoredAvatarIdentity,
+} from '@/lib/avatar-story';
 
 // Zod schema for request body validation
 const createBookSchema = z.object({
   assetIds: z.array(z.string().cuid()).min(1, { message: 'At least one asset ID is required.' }).max(23, { message: 'Maximum 23 photos per book.' }),
   language: z.enum(['en', 'ja']).default('en'),
 });
+
+// X6d: avatar-first stories — no photos, a cast of account avatars, a
+// parent-picked spark, and a page count. Dark behind AVATARS_ENABLED.
+const createAvatarBookSchema = z.object({
+  bookType: z.literal('AVATAR_STORY'),
+  avatarIds: z
+    .array(z.string().cuid())
+    .min(1, { message: 'Pick at least one character.' })
+    .max(6, { message: 'Six characters at most.' }),
+  premise: z.string().trim().min(1).max(300),
+  pageLength: z
+    .number()
+    .int()
+    .refine((n): n is (typeof AVATAR_STORY_PAGE_LENGTHS)[number] =>
+      (AVATAR_STORY_PAGE_LENGTHS as readonly number[]).includes(n),
+    ),
+  artStyle: z.string().min(1).max(50),
+  language: z.enum(['en', 'ja']).default('en'),
+});
+
+/**
+ * AVATAR_STORY branch: creates the book, its photo-less bridge-source pages,
+ * and the BookAvatar cast links (characterIds minted in pick order) in one
+ * transaction. No photo-analysis enqueue — there are no photos to perceive.
+ */
+async function createAvatarStoryBook(
+  dbUserId: string,
+  input: z.infer<typeof createAvatarBookSchema>,
+): Promise<NextResponse> {
+  const { avatarIds, premise, pageLength, artStyle, language } = input;
+
+  if (!isValidStyle(artStyle)) {
+    return NextResponse.json({ error: 'Unknown art style.' }, { status: 400 });
+  }
+
+  // Dedupe defensively — double-tapping a card must not mint two roster ids.
+  const uniqueAvatarIds = Array.from(new Set(avatarIds));
+
+  const avatars = await prisma.avatar.findMany({
+    where: { id: { in: uniqueAvatarIds }, userId: dbUserId },
+    include: {
+      renditions: { where: { status: 'READY', artStyle } },
+    },
+  });
+  const avatarById = new Map(avatars.map(a => [a.id, a]));
+
+  if (avatars.length !== uniqueAvatarIds.length) {
+    return NextResponse.json({ error: 'Character not found.' }, { status: 404 });
+  }
+  const notReady = avatars.filter(
+    a => a.status !== 'READY' || !a.renditions[0]?.turnaroundSheetUrl,
+  );
+  if (notReady.length > 0) {
+    // The cast picker prevents this; reaching here means a stale client.
+    return NextResponse.json(
+      { error: 'Every character needs a finished drawing in this style first.' },
+      { status: 409 },
+    );
+  }
+
+  // Preserve pick order — the roster ids and the star follow it.
+  const cast = uniqueAvatarIds.map(id => avatarById.get(id)!);
+  const composition = castComposition(cast.map(a => a.kind as CastKind));
+  if (!composition.ok) {
+    return NextResponse.json(
+      { error: 'A story fits up to 4 people plus 2 pets or toys.' },
+      { status: 400 },
+    );
+  }
+
+  const { characters, childName } = buildAvatarStoryRoster(
+    cast.map(a => ({
+      id: a.id,
+      displayName: a.displayName,
+      kind: a.kind as CastKind,
+      identity: a.identity as StoredAvatarIdentity | null,
+    })),
+  );
+
+  const newBook = await prisma.$transaction(async (tx) => {
+    const book = await tx.book.create({
+      data: {
+        userId: dbUserId,
+        title: '', // model-suggested at story time, same as the photo path
+        status: BookStatus.DRAFT,
+        bookType: 'AVATAR_STORY',
+        pageLength,
+        language,
+        artStyle,
+        childName,
+        eventSummary: premise, // the spark rides the premise seam
+        coverAssetId: null, // no photo cover exists — Book.coverImageUrl is generated
+        autoIllustrate: true,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        characterIdentity: { characters, sceneContext: '' } as any, // Prisma Json column
+      },
+    });
+
+    await tx.page.createMany({
+      data: Array.from({ length: pageLength }, (_, i) => ({
+        bookId: book.id,
+        pageNumber: i + 1,
+        index: i,
+        assetId: null,
+        originalImageUrl: null,
+        pageType: PageType.SINGLE,
+        isTitlePage: i === 0,
+        // Bridge-source rows: photo-less, scene-driven, sheet-anchored — the
+        // story worker fills text + bridgeScene, the illustration worker
+        // renders them via the bridge branch.
+        source: 'BRIDGE' as const,
+      })),
+    });
+
+    await tx.bookAvatar.createMany({
+      data: cast.map((avatar, i) => ({
+        bookId: book.id,
+        avatarId: avatar.id,
+        characterId: `avatar_${i + 1}`,
+      })),
+    });
+
+    return book;
+  });
+
+  logger.info(
+    { dbUserId, bookId: newBook.id, castSize: cast.length, pageLength, artStyle },
+    'API: Avatar-story book created.',
+  );
+
+  return NextResponse.json(
+    { success: true, data: { id: newBook.id, bookId: newBook.id } },
+    { status: 201 },
+  );
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,9 +169,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const body = await req.json().catch(() => null);
+
+    // X6d: the avatar-first branch is discriminated by bookType and dark
+    // behind AVATARS_ENABLED (404s like every other avatar surface).
+    if (body && typeof body === 'object' && body.bookType === 'AVATAR_STORY') {
+      if (!avatarsEnabled()) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      }
+      const parsed = createAvatarBookSchema.safeParse(body);
+      if (!parsed.success) {
+        logger.warn({ clerkId, dbUserId: dbUser.id, issues: parsed.error.issues }, 'API: Invalid avatar-book creation request body.');
+        return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+      }
+      return await createAvatarStoryBook(dbUser.id, parsed.data);
+    }
+
     let validatedData;
     try {
-      const body = await req.json();
       console.log('>>> DEBUG: Book creation request body:', body);
       validatedData = createBookSchema.parse(body);
       logger.info({ clerkId, dbUserId: dbUser.id, assetCount: validatedData.assetIds.length, assetIds: validatedData.assetIds }, 'API: Validated book creation request.');
