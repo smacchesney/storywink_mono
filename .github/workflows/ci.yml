@@ -61,6 +61,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Message parity (en/ja copy gate)
+        run: npm run check-messages
+
       - name: Type-check
         run: npm run check-types
 

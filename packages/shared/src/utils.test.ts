@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isTitlePage,
+  resolveCoverPage,
   categorizePages,
   calculatePrintedPageCount,
   convertHeicToJpeg,
@@ -101,5 +102,39 @@ describe('convertHeicToJpeg', () => {
   it('returns an empty string for null/undefined', () => {
     expect(convertHeicToJpeg(null)).toBe('');
     expect(convertHeicToJpeg(undefined)).toBe('');
+  });
+});
+
+describe('resolveCoverPage', () => {
+  const photoPages = [
+    { id: 'p1', assetId: 'a1', isTitlePage: true },
+    { id: 'p2', assetId: 'a2', isTitlePage: false },
+  ];
+  const avatarPages = [
+    { id: 'p1', assetId: null, isTitlePage: true },
+    { id: 'p2', assetId: null, isTitlePage: false },
+  ];
+
+  it('photo books derive from coverAssetId (pre-X6d semantics)', () => {
+    expect(resolveCoverPage(photoPages, 'a2', 'PHOTO_STORY')?.id).toBe('p2');
+    expect(resolveCoverPage(photoPages, 'a2', null)?.id).toBe('p2');
+  });
+
+  it('photo books with a null coverAssetId resolve to nothing — never the column', () => {
+    expect(resolveCoverPage(photoPages, null, 'PHOTO_STORY')).toBeUndefined();
+  });
+
+  it('avatar books use the persisted isTitlePage column', () => {
+    expect(resolveCoverPage(avatarPages, null, 'AVATAR_STORY')?.id).toBe('p1');
+  });
+
+  it('avatar books never match on assets, even if data is odd', () => {
+    const odd = [{ id: 'px', assetId: 'a9', isTitlePage: false }];
+    expect(resolveCoverPage(odd, 'a9', 'AVATAR_STORY')).toBeUndefined();
+  });
+
+  it('an avatar book whose marker was lost resolves to nothing (degrade, not misfire)', () => {
+    const wiped = avatarPages.map((p) => ({ ...p, isTitlePage: false }));
+    expect(resolveCoverPage(wiped, null, 'AVATAR_STORY')).toBeUndefined();
   });
 });

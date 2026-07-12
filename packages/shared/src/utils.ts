@@ -11,6 +11,28 @@ export function isTitlePage(pageAssetId: string | null, bookCoverAssetId: string
 }
 
 /**
+ * Resolve a book's cover/title page across BOTH book types — the one place
+ * this branch lives (X6d hand-rolled it at five call sites; a missed sixth
+ * caused a cover-wiping bug, hence the consolidation).
+ *
+ * PHOTO_STORY: derived from coverAssetId (pre-X6d semantics, unchanged).
+ * AVATAR_STORY: every page is photo-less, so the derived check can never
+ * match — the persisted Page.isTitlePage column is the anchor.
+ */
+export function resolveCoverPage<
+  T extends { assetId?: string | null; isTitlePage?: boolean | null },
+>(
+  pages: T[],
+  coverAssetId: string | null | undefined,
+  bookType: string | null | undefined,
+): T | undefined {
+  if (bookType === 'AVATAR_STORY') {
+    return pages.find((p) => p.isTitlePage === true);
+  }
+  return pages.find((p) => isTitlePage(p.assetId ?? null, coverAssetId ?? null));
+}
+
+/**
  * Categorizes pages into story pages and cover pages.
  * storyPages includes ALL pages (cover photo participates in the story).
  * coverPages identifies which page(s) provide the cover illustration.

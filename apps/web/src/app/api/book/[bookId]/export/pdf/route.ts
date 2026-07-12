@@ -3,7 +3,7 @@ import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
 import { generateBookPdf } from '@storywink/pdf';
-import { isTitlePage } from '@storywink/shared/utils';
+import { resolveCoverPage } from '@storywink/shared/utils';
 import { Book, Page } from '@prisma/client';
 import { loadWebPdfFonts } from '../pdfFonts';
 import { optimizeForScreen, pdfContentDisposition } from '@/lib/pdf-export';
@@ -63,15 +63,10 @@ export async function GET(
       return NextResponse.json({ error: 'Book not found or access denied' }, { status: 404 });
     }
 
-    // Find cover page for the title page illustration.
-    // AVATAR_STORY (X6d): no photo cover exists (assetId/coverAssetId are
-    // null, so the derived helper never matches) — the persisted
-    // Page.isTitlePage column identifies the cover page instead, and
-    // Book.coverImageUrl below carries the generated painted-title cover.
-    const coverPage =
-      bookData.bookType === 'AVATAR_STORY'
-        ? bookData.pages.find(page => page.isTitlePage)
-        : bookData.pages.find(page => isTitlePage(page.assetId, bookData.coverAssetId));
+    // Find cover page for the title page illustration (shared helper: photo
+    // books derive from coverAssetId; avatar books use the persisted column,
+    // with Book.coverImageUrl below carrying the generated painted-title cover).
+    const coverPage = resolveCoverPage(bookData.pages, bookData.coverAssetId, bookData.bookType);
     // Use coverImageUrl (dedicated cover illustration) if available, otherwise fall back to page illustration
     const titlePageForPdf = coverPage ? {
       ...coverPage,

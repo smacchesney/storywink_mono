@@ -17,7 +17,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 import sharp from 'sharp';
 import type { Logger } from 'pino';
-import { isTitlePage } from '@storywink/shared/utils';
+import { resolveCoverPage } from '@storywink/shared/utils';
 import prisma from '../database/index.js';
 import { fetchImageInput } from './images.js';
 import {
@@ -120,12 +120,7 @@ export async function normalizeBookPalette(params: NormalizeBookPaletteParams): 
       api_secret: process.env.CLOUDINARY_API_SECRET,
     });
 
-    const titlePage =
-      pages.find((p) => isTitlePage(p.assetId, coverAssetId)) ??
-      // Avatar-story books ONLY: no photo cover exists — anchor to the
-      // persisted isTitlePage row. Photo books keep the derived-helper
-      // semantics exactly (bookType-gated like every sibling call site).
-      (params.bookType === 'AVATAR_STORY' ? pages.find((p) => p.isTitlePage === true) : undefined);
+    const titlePage = resolveCoverPage(pages, coverAssetId, params.bookType);
     if (!titlePage?.generatedImageUrl) {
       logger.info({ bookId }, 'Palette normalization skipped: no title-page render to anchor to');
       return;

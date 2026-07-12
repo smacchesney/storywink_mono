@@ -9,7 +9,7 @@ import {
   CoverQCResult,
 } from '@storywink/shared/types';
 import { QUEUE_NAMES } from '@storywink/shared/constants';
-import { categorizePages, isTitlePage } from '@storywink/shared/utils';
+import { categorizePages, isTitlePage, resolveCoverPage } from '@storywink/shared/utils';
 import { createBullMQConnection } from '@storywink/shared/redis';
 import OpenAI from 'openai';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
@@ -287,12 +287,8 @@ async function regenerateCoverFromQc(
       return;
     }
 
-    // AVATAR_STORY books have no coverAssetId — the persisted isTitlePage
-    // column identifies the cover page instead.
     const isAvatarBook = book.bookType === 'AVATAR_STORY';
-    const titlePage = isAvatarBook
-      ? book.pages.find((p) => p.isTitlePage === true)
-      : book.pages.find((p) => isTitlePage(p.assetId, book.coverAssetId));
+    const titlePage = resolveCoverPage(book.pages, book.coverAssetId, book.bookType);
     if (!titlePage?.text) {
       logger.warn({ bookId: book.id }, 'Cover regen skipped: no title page with text');
       return;
@@ -577,12 +573,12 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
             );
             // The cover is rendered by the same job (and provider) as the
             // interior title page, so its attribution comes from the title
-            // page's render-time stamps. Avatar books have no coverAssetId —
-            // the persisted isTitlePage column identifies the page instead.
-            const titlePage =
-              book.bookType === 'AVATAR_STORY'
-                ? book.pages.find((p: any) => p.isTitlePage)
-                : book.pages.find((p: any) => isTitlePage(p.assetId, book.coverAssetId));
+            // page's render-time stamps (shared cover-page resolver).
+            const titlePage = resolveCoverPage(
+              book.pages as { assetId: string | null; isTitlePage?: boolean }[],
+              book.coverAssetId,
+              book.bookType,
+            );
             await prisma.illustrationQcResult.createMany({
               data: [
                 ...qcResult.pageResults.map((r) => ({
