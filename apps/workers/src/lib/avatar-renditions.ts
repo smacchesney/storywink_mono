@@ -15,14 +15,20 @@
 import { v2 as cloudinary } from 'cloudinary';
 import OpenAI from 'openai';
 import pino from 'pino';
+import sharp from 'sharp';
 import {
   createCharacterSheetPrompt,
   createSheetValidationPrompt,
   createAvatarIdentityPrompt,
+  createCharacterCutoutPrompt,
+  createCutoutValidationPrompt,
   SHEET_VALIDATION_SYSTEM_PROMPT,
   SHEET_VALIDATION_RESPONSE_SCHEMA,
+  CUTOUT_VALIDATION_SYSTEM_PROMPT,
+  CUTOUT_VALIDATION_RESPONSE_SCHEMA,
   CHARACTER_IDENTITY_RESPONSE_SCHEMA,
   type SheetCharacterInput,
+  type CutoutCharacterInput,
 } from '@storywink/shared/prompts/character-identity';
 import { getStyleBible, isValidStyle, STYLE_LIBRARY } from '@storywink/shared/prompts/styles';
 import { optimizeCloudinaryUrlForVision } from '@storywink/shared/utils';
@@ -30,6 +36,7 @@ import { avatarGeneratedFolderPrefix } from '@storywink/shared';
 import { GeminiProvider } from './illustrators/gemini.js';
 import type { IllustrationProvider } from './illustrators/types.js';
 import { fetchImageInput } from './images.js';
+import { matteWhiteBackground } from './cutout-matte.js';
 import { ANALYSIS_MODEL } from '../config/models.js';
 
 type Logger = pino.Logger;
@@ -37,6 +44,12 @@ type Logger = pino.Logger;
 const STYLE_EXEMPLARS_FOR_SHEET = 2;
 const MAX_SOURCE_PHOTOS = 3;
 const MAX_GENERATION_ROUNDS = 2;
+
+// A matte outside these bounds is degenerate: ~0 means the model ignored the
+// pure-white instruction (nothing to remove), ~1 means the figure itself was
+// flood-filled away. Either way the white original is the honest fallback.
+const MIN_CUTOUT_BACKGROUND_RATIO = 0.05;
+const MAX_CUTOUT_BACKGROUND_RATIO = 0.95;
 
 /** Role string stored on the identity, by avatar kind. */
 export const AVATAR_KIND_ROLES: Record<string, string> = {
@@ -48,7 +61,7 @@ export const AVATAR_KIND_ROLES: Record<string, string> = {
 
 /** The identity JSON stored on Avatar.identity. */
 export interface AvatarIdentity {
-  character: SheetCharacterInput & { appearsOnPages?: number[] };
+  character: CutoutCharacterInput & { appearsOnPages?: number[] };
   extractedForStyle: string;
 }
 
@@ -106,7 +119,7 @@ export async function extractAvatarIdentity(
   });
 
   const parsed = JSON.parse(response.output_text) as {
-    characters: Array<SheetCharacterInput & { appearsOnPages?: number[] }>;
+    characters: Array<CutoutCharacterInput & { appearsOnPages?: number[] }>;
   };
   const wantedRole = AVATAR_KIND_ROLES[kind] ?? 'adult';
   const character = parsed.characters.find((c) => c.role === wantedRole) ?? parsed.characters[0];
@@ -137,6 +150,17 @@ export function sheetSubjectForStyle(
     ...identity.character,
     styleTranslation:
       'Render this subject faithfully in the target art style while keeping every physical trait above instantly recognizable.',
+  };
+}
+
+/** The cutout subject: the style-corrected sheet subject plus the canonical outfit. */
+export function cutoutSubjectForStyle(
+  identity: AvatarIdentity,
+  artStyle: string,
+): CutoutCharacterInput {
+  return {
+    ...sheetSubjectForStyle(identity, artStyle),
+    typicalClothing: identity.character.typicalClothing ?? null,
   };
 }
 
@@ -268,6 +292,21 @@ async function uploadAvatarSheet(
   artStyle: string,
   buffer: Buffer,
 ): Promise<string> {
+  return uploadAvatarImage(avatarId, `sheet_${artStyle}`, buffer, [
+    'avatar-sheet',
+    avatarId,
+    artStyle,
+  ]);
+}
+
+/** Upload one generated image into the avatar's scoped Cloudinary folder. */
+async function uploadAvatarImage(
+  avatarId: string,
+  publicId: string,
+  buffer: Buffer,
+  tags: string[],
+  format?: string,
+): Promise<string> {
   cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
@@ -278,15 +317,16 @@ async function uploadAvatarSheet(
     const stream = cloudinary.uploader.upload_stream(
       {
         folder,
-        public_id: `sheet_${artStyle}`,
+        public_id: publicId,
         overwrite: true,
         invalidate: true,
         resource_type: 'image',
-        tags: ['avatar-sheet', avatarId, artStyle],
+        tags,
+        ...(format ? { format } : {}),
       },
       (error, result) => {
         if (error || !result?.secure_url) {
-          reject(error ?? new Error('Avatar sheet upload returned no URL'));
+          reject(error ?? new Error(`Avatar image upload returned no URL (${publicId})`));
         } else {
           resolve(result.secure_url);
         }
@@ -354,6 +394,203 @@ async function validateAvatarSheet(params: ValidateAvatarSheetParams): Promise<b
         name: 'sheet_validation',
         strict: true,
         schema: SHEET_VALIDATION_RESPONSE_SCHEMA as unknown as Record<string, unknown>,
+      },
+    },
+  });
+  try {
+    const verdict = JSON.parse(response.output_text) as { passed?: boolean };
+    return verdict.passed === true;
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Waving cutout (X7): sheet-anchored full-body figure on pure white, then
+// in-house background removal. The cutout is GARNISH — its failure never
+// fails the rendition (the card falls back to the portrait crop).
+// ---------------------------------------------------------------------------
+
+export interface GenerateAvatarCutoutParams {
+  openai: OpenAI;
+  avatarId: string;
+  artStyle: string;
+  /** AvatarKind (CHILD | ADULT | PET | TOY) — picks the greeting pose. */
+  kind: string;
+  subject: CutoutCharacterInput;
+  /** The VALIDATED turnaround sheet — the identity anchor, never raw photos. */
+  sheetUrl: string;
+  logger: Logger;
+}
+
+/**
+ * One generation attempt + one validation, no retry loop (plan decision 3).
+ * Stores BOTH variants in the avatar folder: `cutout_<style>` (white, always)
+ * and `cutout_<style>_t` (transparent PNG, when the matte succeeds). Returns
+ * the URL to persist as cutoutUrl — transparent preferred, white as the
+ * fallback — or null on any failure. Never throws.
+ */
+export async function generateAvatarCutout(
+  params: GenerateAvatarCutoutParams,
+): Promise<string | null> {
+  const { openai, avatarId, artStyle, kind, subject, sheetUrl, logger } = params;
+  try {
+    if (!isValidStyle(artStyle)) throw new Error(`Unknown art style: ${artStyle}`);
+
+    const sheet = await fetchImageInput(optimizeCloudinaryUrlForVision(sheetUrl));
+    const styleExemplarUrls = STYLE_LIBRARY[artStyle].referenceImageUrls.slice(
+      0,
+      STYLE_EXEMPLARS_FOR_SHEET,
+    );
+    const styleRefs = await Promise.all(styleExemplarUrls.map((url) => fetchImageInput(url)));
+
+    const prompt = createCharacterCutoutPrompt({
+      character: subject,
+      kind,
+      styleRefCount: styleRefs.length,
+      styleBible: getStyleBible(artStyle),
+    });
+    const output = await getGemini().generate({ contentImage: sheet, styleRefs, prompt });
+    if (!output.imageBase64) {
+      logger.warn(
+        { avatarId, artStyle, blockedReason: output.blockedReason },
+        'Avatar cutout generation returned no image',
+      );
+      return null;
+    }
+
+    const whiteBuffer = Buffer.from(output.imageBase64, 'base64');
+    const whiteUrl = await uploadAvatarImage(avatarId, `cutout_${artStyle}`, whiteBuffer, [
+      'avatar-cutout',
+      avatarId,
+      artStyle,
+    ]);
+
+    const validated = await validateAvatarCutout({
+      openai,
+      subject,
+      kind,
+      sheetUrl,
+      candidateUrl: whiteUrl,
+      styleExemplarUrls,
+      artStyle,
+      logger,
+    });
+    if (!validated) {
+      logger.warn({ avatarId, artStyle }, 'Avatar cutout failed validation — keeping portrait');
+      return null;
+    }
+
+    // In-house background removal (owner decision: no Cloudinary add-on).
+    // A degenerate matte keeps the white original — on the white shelf card
+    // that still reads as a cutout.
+    try {
+      const { data, info } = await sharp(whiteBuffer)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const { backgroundRatio } = matteWhiteBackground(
+        new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
+        info.width,
+        info.height,
+      );
+      if (
+        backgroundRatio >= MIN_CUTOUT_BACKGROUND_RATIO &&
+        backgroundRatio <= MAX_CUTOUT_BACKGROUND_RATIO
+      ) {
+        const png = await sharp(data, {
+          raw: { width: info.width, height: info.height, channels: 4 },
+        })
+          .png()
+          .toBuffer();
+        const transparentUrl = await uploadAvatarImage(
+          avatarId,
+          `cutout_${artStyle}_t`,
+          png,
+          ['avatar-cutout', avatarId, artStyle],
+          'png',
+        );
+        logger.info({ avatarId, artStyle, backgroundRatio }, 'Avatar cutout READY (transparent)');
+        return transparentUrl;
+      }
+      logger.warn(
+        { avatarId, artStyle, backgroundRatio },
+        'Cutout matte degenerate — keeping the white variant',
+      );
+    } catch (matteError) {
+      logger.warn(
+        { avatarId, artStyle, error: String(matteError) },
+        'Cutout background removal failed — keeping the white variant',
+      );
+    }
+    return whiteUrl;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn({ avatarId, artStyle, error: message }, 'Avatar cutout failed — card falls back');
+    return null;
+  }
+}
+
+interface ValidateAvatarCutoutParams {
+  openai: OpenAI;
+  subject: CutoutCharacterInput;
+  kind: string;
+  sheetUrl: string;
+  candidateUrl: string;
+  styleExemplarUrls: string[];
+  artStyle: string;
+  logger: Logger;
+}
+
+/** gpt-5-mini pass/fail sanity check. Fails CLOSED when OPENAI_API_KEY is unset. */
+async function validateAvatarCutout(params: ValidateAvatarCutoutParams): Promise<boolean> {
+  const { openai, subject, kind, sheetUrl, candidateUrl, styleExemplarUrls, artStyle, logger } =
+    params;
+  if (!process.env.OPENAI_API_KEY) {
+    logger.error({}, 'OPENAI_API_KEY missing — avatar cutout validation fails closed');
+    return false;
+  }
+  const prompt = createCutoutValidationPrompt({
+    character: subject,
+    kind,
+    styleRefCount: styleExemplarUrls.length,
+    artStyle,
+  });
+  const response = await openai.responses.create({
+    model: ANALYSIS_MODEL,
+    input: [
+      {
+        role: 'system',
+        content: [{ type: 'input_text', text: CUTOUT_VALIDATION_SYSTEM_PROMPT }],
+      },
+      {
+        role: 'user',
+        content: [
+          { type: 'input_text', text: prompt },
+          {
+            type: 'input_image' as const,
+            image_url: optimizeCloudinaryUrlForVision(sheetUrl),
+            detail: 'high' as const,
+          },
+          {
+            type: 'input_image' as const,
+            image_url: optimizeCloudinaryUrlForVision(candidateUrl),
+            detail: 'high' as const,
+          },
+          ...styleExemplarUrls.map((url) => ({
+            type: 'input_image' as const,
+            image_url: url,
+            detail: 'low' as const,
+          })),
+        ],
+      },
+    ],
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'cutout_validation',
+        strict: true,
+        schema: CUTOUT_VALIDATION_RESPONSE_SCHEMA as unknown as Record<string, unknown>,
       },
     },
   });

@@ -58,6 +58,8 @@ interface PhotoTrayProps {
   bookId?: string;
   /** Tiles already occupying capacity (existing book pages) — counts toward the cap. */
   existingCount?: number;
+  /** Capacity override (default BOOK_CONSTRAINTS.MAX_PHOTOS). The batch studio caps at 10. */
+  maxPhotos?: number;
   /**
    * Called whenever the set of successfully uploaded assets changes.
    * Receives assets in tile order. In /create mode the parent reads this to
@@ -86,6 +88,7 @@ interface PhotoTrayProps {
 export function PhotoTray({
   bookId,
   existingCount = 0,
+  maxPhotos,
   onAssetsChange,
   onBatchSettled,
   onDeleteAsset,
@@ -98,7 +101,7 @@ export function PhotoTray({
   // Track object URLs so we can revoke them on unmount without stale closures.
   const objectUrlsRef = useRef<Set<string>>(new Set());
 
-  const cap = BOOK_CONSTRAINTS.MAX_PHOTOS;
+  const cap = maxPhotos ?? BOOK_CONSTRAINTS.MAX_PHOTOS;
   const usedCount = existingCount + tiles.length;
   const remaining = Math.max(0, cap - usedCount);
 

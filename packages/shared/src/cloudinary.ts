@@ -169,12 +169,20 @@ export function avatarGeneratedFolderPrefix(avatarId: string): string {
 export interface AvatarRenditionContent {
   turnaroundSheetUrl: string | null;
   portraitUrl: string | null;
+  /** Waving cutout (X7). Optional so pre-X7 callers/fixtures keep compiling. */
+  cutoutUrl?: string | null;
 }
 
 /**
- * Public ids of everything generated for an avatar (sheets + portraits across
- * all its renditions). Staged source photos are Asset rows and go through the
- * shared-asset guard separately.
+ * Public ids of everything generated for an avatar (sheets + portraits +
+ * cutouts across all its renditions). Staged source photos are Asset rows and
+ * go through the shared-asset guard separately.
+ *
+ * Cutouts are stored as TWO variants — `cutout_<style>` (white) and
+ * `cutout_<style>_t` (transparent) — but only one URL is persisted, so the
+ * sibling public id is derived here. A derived id that doesn't exist is
+ * harmless (Cloudinary bulk delete ignores unknown ids); missing it would
+ * orphan bytes until the folder-prefix purge.
  */
 export function collectAvatarGeneratedPublicIds(
   renditions: ReadonlyArray<AvatarRenditionContent>,
@@ -184,6 +192,11 @@ export function collectAvatarGeneratedPublicIds(
     for (const url of [rendition.turnaroundSheetUrl, rendition.portraitUrl]) {
       const publicId = extractCloudinaryPublicId(url);
       if (publicId) ids.add(publicId);
+    }
+    const cutoutId = extractCloudinaryPublicId(rendition.cutoutUrl);
+    if (cutoutId) {
+      ids.add(cutoutId);
+      ids.add(cutoutId.endsWith('_t') ? cutoutId.slice(0, -2) : `${cutoutId}_t`);
     }
   }
   return [...ids];

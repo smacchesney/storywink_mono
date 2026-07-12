@@ -30,6 +30,7 @@ export async function GET() {
             status: true,
             turnaroundSheetUrl: true,
             portraitUrl: true,
+            cutoutUrl: true,
             error: true,
           },
         },
