@@ -145,6 +145,8 @@ export function displayNameForPick(name: string | undefined, subject: DetectedSu
  * inaction must never manufacture an avatar of a stranger from a photo
  * background.
  */
-export function defaultSelected(subject: DetectedSubject): boolean {
+export function defaultSelected(
+  subject: Pick<DetectedSubject, 'photoIndexes' | 'isForeground'>,
+): boolean {
   return subject.photoIndexes.length >= 2 || subject.isForeground;
 }
