@@ -18,6 +18,7 @@ export default defineConfig({
       { find: '@storywink/shared/constants', replacement: sharedSrc('constants.ts') },
       { find: '@storywink/shared/types', replacement: sharedSrc('types.ts') },
       { find: '@storywink/shared/prompts/story-check', replacement: sharedSrc('prompts/story-check.ts') },
+      { find: '@storywink/shared/prompts/story', replacement: sharedSrc('prompts/story.ts') },
       { find: '@storywink/shared/prompts/illustration', replacement: sharedSrc('prompts/illustration.ts') },
       { find: '@storywink/shared/prompts/styles', replacement: sharedSrc('prompts/styles.ts') },
       { find: '@storywink/shared/prompts', replacement: sharedSrc('prompts/index.ts') },

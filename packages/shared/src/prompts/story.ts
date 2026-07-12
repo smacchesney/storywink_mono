@@ -539,3 +539,298 @@ export interface StoryResponse {
   /** Present only when STORY_RESPONSE_SCHEMA_WITH_BRIDGES was requested. */
   bridgePages?: StoryBridgePageResponse[];
 }
+
+// ----------------------------------
+// AVATAR STORIES (X6d) — no photos
+// ----------------------------------
+//
+// AVATAR_STORY books have zero photos: the parent picked a cast of account
+// avatars, a premise ("the spark"), and a page count. The model invents the
+// whole adventure and, because the illustrator has no photo for ANY page,
+// must emit a structured scene per page (the BridgeScene contract minus
+// outfitFrom — there is no adjacent photo to copy outfits from; wardrobe
+// comes from each avatar's rendition sheet).
+
+/** Per-page scene for an avatar story — persisted on Page.bridgeScene. */
+export interface AvatarPageScene {
+  location: string;
+  timeOfDay: string;
+  action: string;
+  /** characterIds from the cast roster (avatar_1, avatar_2, ...). */
+  charactersPresent: string[];
+  props: string[];
+}
+
+export interface AvatarStoryPageResponse extends StoryPageResponse {
+  scene: AvatarPageScene;
+}
+
+export interface AvatarStoryResponse {
+  storyArc: StoryArc;
+  suggestedTitle: string;
+  pages: AvatarStoryPageResponse[];
+}
+
+const AVATAR_PAGE_SCENE_SCHEMA = {
+  type: 'object',
+  description:
+    'Structured scene record — the illustrator has NO photo for any page of this book',
+  properties: {
+    location: {
+      type: 'string',
+      description: 'Where this moment happens — keep locations continuous page to page',
+    },
+    timeOfDay: { type: 'string', description: 'e.g. "morning", "golden afternoon"' },
+    action: { type: 'string', description: 'What the characters are DOING in this moment' },
+    charactersPresent: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'characterIds from the cast roster — ONLY ids from the cast',
+    },
+    props: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Concrete objects in the scene (keep recurring props consistent)',
+    },
+  },
+  required: ['location', 'timeOfDay', 'action', 'charactersPresent', 'props'],
+  additionalProperties: false,
+} as const;
+
+/**
+ * Strict-mode response schema for AVATAR_STORY books: the photo contract plus
+ * a REQUIRED structured scene on every page, and no bridgePages (every page
+ * already renders photo-less).
+ */
+export const STORY_RESPONSE_SCHEMA_AVATAR = {
+  type: 'object',
+  properties: {
+    storyArc: STORY_RESPONSE_SCHEMA.properties.storyArc,
+    suggestedTitle: STORY_RESPONSE_SCHEMA.properties.suggestedTitle,
+    pages: {
+      type: 'array',
+      description: 'Story text, illustration notes, and scene for each page',
+      items: {
+        type: 'object',
+        properties: {
+          ...STORY_RESPONSE_SCHEMA.properties.pages.items.properties,
+          scene: AVATAR_PAGE_SCENE_SCHEMA,
+        },
+        required: [...STORY_RESPONSE_SCHEMA.properties.pages.items.required, 'scene'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['storyArc', 'suggestedTitle', 'pages'],
+  additionalProperties: false,
+} as const;
+
+export const AVATAR_STORY_SYSTEM_PROMPT = `You are an expert children's picture-book author for toddlers (ages 2-4). Parents read your stories aloud at bedtime.
+
+THIS BOOK IS DIFFERENT — there are no photos. The parent picked a cast of characters (real people, pets, and beloved toys from the child's life, drawn as storybook characters) and a story spark. You invent the whole adventure:
+- The cast are REAL to this child — their child, their grandma, their dog. Treat them with warmth and truth to their roles, then take them somewhere wonderful.
+- You plan every moment: what happens on each page, where it happens, who is there. Make the page-turn feel inevitable.
+- Every page must advance the STORY — an emotional journey with desire, tension, and resolution.
+
+Your north star: Would a parent want to re-read this 100 times? That requires emotional truth, rhythm, and a refrain worth repeating.`;
+
+export interface AvatarStoryCastMember {
+  /** Per-book roster id (avatar_1, avatar_2, ...) — scenes reference these. */
+  characterId: string;
+  name: string;
+  /** main_child | child | grown-up | pet | companion_object */
+  role: string;
+  /** One-line appearance note (from the avatar's identity), for illustrationNotes wording. */
+  description?: string;
+}
+
+export interface AvatarStoryGenerationInput {
+  bookTitle: string;
+  pageCount: number;
+  /** The parent/child-picked spark — the premise the story must deliver. */
+  premise: string;
+  cast: AvatarStoryCastMember[];
+  childName?: string;
+  tone?: string;
+  language?: string; // "en" | "ja", defaults to "en"
+  suggestTitle?: boolean;
+  qcFeedback?: string;
+  /** Parent-supplied words the child is learning (max 4). Woven 3-4x each. */
+  learningWords?: string[];
+}
+
+/**
+ * Prompt for AVATAR_STORY books. Text-only (no image parts): the premise
+ * replaces the photo storyboard, the cast enters page-less, and the model
+ * plans the page sequence itself — every page must carry a structured scene.
+ */
+export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): StoryPromptPart[] {
+  const parts: StoryPromptPart[] = [];
+
+  parts.push({
+    text: `# Configuration\nBook Title: ${
+      input.bookTitle || 'My Special Story'
+    }\nPage Count: ${input.pageCount}\nReturn EXACTLY ${input.pageCount} pages, numbered 1 to ${input.pageCount}. Page 1 is also the book's cover moment — open with an inviting, iconic scene that promises the adventure.`,
+  });
+
+  // ---------- THE CAST ----------
+  const castLines: string[] = [`# The Cast (picked by the parent — these are the ONLY characters)`];
+  for (const c of input.cast) {
+    const isPet = c.role === 'pet';
+    const isObject = c.role === 'companion_object';
+    const isStar = c.role === 'main_child';
+    const flavor = isStar
+      ? ` — the STAR. The story is theirs: their desire, their peak, their landing. Use their name directly in the story text.`
+      : isPet
+        ? ` — the family's animal companion. Keep them a real animal (sounds, wags, nuzzles), never a talking character.`
+        : isObject
+          ? ` — the child's beloved object. It can be hugged, carried, dropped, lost and found, tucked in; it never walks, talks, or acts on its own. Let it anchor emotional beats.`
+          : ` — give them a real supporting role: involve them in at least one emotional beat (a shared laugh, a steadying hand, a discovery together), and if they are present near the end, include them in the landing.`;
+    const desc = c.description ? ` Appearance: ${c.description}.` : '';
+    castLines.push(`- characterId "${c.characterId}" = ${c.name} (${c.role.replace(/_/g, ' ')})${flavor}${desc}`);
+  }
+  castLines.push(
+    `- Not everyone needs to be on every page — but everyone the parent picked should MATTER to the story.`,
+    `- NEVER invent a new person, pet, or named place. Use ONLY the names given above; the parent chose them.`,
+    `- For relationships, use the warm word a toddler would say ("Grandma", "Daddy", "Auntie") only if it matches the listed role — never invent a proper name.`,
+  );
+  parts.push({ text: castLines.join('\n') });
+
+  // ---------- THE SPARK ----------
+  parts.push({
+    text: [
+      `# The Spark (picked by the parent${input.childName ? ` and ${input.childName}` : ''} — this is the promise of the book)`,
+      `- "${input.premise}"`,
+      `- The story must DELIVER this spark: it sets the desire, shapes the peak, and colors the landing — not a one-line mention. This is a made-up adventure starring real people; invent freely inside the spark's promise.`,
+    ].join('\n'),
+  });
+
+  // ---------- SCENES ----------
+  const sceneInstructions = [
+    `# Scenes (REQUIRED for every page — the illustrator has NO photos):`,
+    `- For EACH page fill "scene": location, timeOfDay, action, charactersPresent, props.`,
+    `- "charactersPresent" lists the characterIds (from The Cast above) actually visible on that page. The star should appear on most pages.`,
+    `- Keep the world CONTINUOUS: locations flow into each other (garden → gate → lane), time of day moves forward, recurring props stay consistent.`,
+    `- Keep scenes concrete and drawable: one clear action per page, simple settings a toddler recognizes.`,
+  ].join('\n');
+
+  const baseInstructions = [
+    `# Instructions & Guiding Principles:`,
+    `- Imagine a parent curled up with their toddler at bedtime, reading aloud. Every sentence should feel warm, playful, and alive in a parent's voice.`,
+    `- Write from the **toddler's perspective** — what they see, feel, touch, hear, and wonder about. Ground every moment in their sensory experience.`,
+    ``,
+    sceneInstructions,
+    ``,
+    `## Narrative Architecture (OPENING → BUILDING → LANDING):`,
+    `- **OPENING** (first ~20% of pages): Establish the child's world AND a small desire or question. What do they want, wonder about, or set out to do? Hook the listener.`,
+    `- **BUILDING** (middle ~60%): The desire meets the world. Each page should ESCALATE — new discoveries, small obstacles, mounting excitement or tenderness. This is where the refrain repeats and evolves.`,
+    `- **LANDING** (final ~20%): The emotional peak resolves into warmth and safety. The last page should feel like a soft exhale — a sentence a parent lingers on before closing the book.`,
+    `- NEVER end with "What a wonderful day" or similar summary statements. Let the accumulated feeling speak for itself.`,
+    ``,
+    `## PAGE-TO-PAGE FLOW (critical):`,
+    `- **Connective device**: choose ONE thread and pull every page through it: a wondering question the child carries, a tiny quest, something the child is collecting or counting, or the refrain itself acting as a heartbeat. Never let pages sit side by side unconnected.`,
+    `- **Hand-off rule**: Every page except the last must END with something that leans into the next page — a sound getting closer, a glance toward something new, a question, a "and then...?" energy. The listener should NEED the page turn.`,
+    `- **Callbacks**: In the LANDING, echo one concrete detail from the OPENING (an object, a sound, the refrain in its softest form). This is what makes a story feel whole instead of a list of moments.`,
+    ``,
+    `## Recurring Refrain (REQUIRED):`,
+    `- Create a short phrase (4-8 words) that echoes through the story at least 3 times.`,
+    `- Vary it slightly each time — change one word, add emphasis, or whisper it the last time.`,
+    `- Great refrains feel like a heartbeat: "Splish, splash, one more splash!" → "Splish, splash, the biggest splash!" → "Splish... splash... goodnight, little splash."`,
+    `- Report this phrase in the "storyArc.refrain" field.`,
+    ``,
+    ...(input.learningWords?.length
+      ? [
+          `## LEARNING WORDS (the parent is teaching these — weave, never force):`,
+          `- The parent says ${input.childName || 'the child'} is learning these words right now: ${input.learningWords
+            .slice(0, 4)
+            .map(w => `"${w}"`)
+            .join(', ')}.`,
+          `- Weave EACH word into the story 3-4 times, naturally — vary the sentence frame each time, exactly like the refrain.`,
+          `- Place at least one occurrence of each word at the END of a sentence in a predictable slot, so the reading parent can pause and let the child say it.`,
+          `- Prefer sentences that also contain ${input.childName ? `"${input.childName}"` : "the child's name"} — words land best next to the child's own name.`,
+          `- At most ONE learning word per page. Never stack two on the same page, never repeat a word twice in one sentence, never bend the story to fit a word — a word that doesn't fit this story is better used 3 times than forced 4.`,
+          `- For each page, report exactly which learning words its text contains in "learningWordsUsed" (verbatim strings from the list above; empty array when none).`,
+          ``,
+        ]
+      : []),
+    `## Voice & Rhythm (critical for read-aloud quality):`,
+    `- **Vary sentence structure**: mix short punchy fragments ("Splish!") with slightly longer flowing sentences. Avoid monotonous Subject-Verb-Object patterns.`,
+    `- **Onomatopoeia and sound words** should feel organic to the scene — rumble, swoosh, crunch, pitter-pat — not forced.`,
+    `- Sentences should have a **musical quality** when read aloud — rhythm matters more than vocabulary.`,
+    `- Use concrete nouns and action verbs. No abstractions. One idea per sentence.`,
+    ``,
+    `## Dialogic Moments:`,
+    `- Include 2-3 questions across the whole book that invite the listening child to participate: "Can you see...?", "What do you think happens next?", "How many splashes was that?"`,
+    `- Place these naturally — never more than one per page, and never on the final page.`,
+    ``,
+    `## Emotional Texture:`,
+    `- Capture the **small moments** that make a toddler's day magical — the wonder of a new texture, the thrill of a puddle, the safety of a parent's hand.`,
+    `- Show emotions through **actions and senses**, not labels: instead of "Kai was happy", write "Kai's eyes go wide. He squeezes Mama's hand tight."`,
+    `- Include **gentle humor** — mild mischief, silly surprises, funny sounds.`,
+    ``,
+    `## Title:`,
+    input.suggestTitle
+      ? `- The parent has NOT chosen a title yet — your "suggestedTitle" WILL become the book's title. Make it short (2-6 words), warm, and specific to this story${input.language === 'ja' ? ', written in Japanese (hiragana/katakana, no kanji)' : ''}. Avoid generic titles like "A Special Day".`
+      : `- The parent chose the title above. Still provide a "suggestedTitle" as an alternative, but the story should honor the existing title.`,
+    ``,
+    ...(input.qcFeedback
+      ? [
+          `## CRITICAL CORRECTIONS (from editorial review of your previous draft):`,
+          `- A previous draft of this story failed editorial review. You MUST address every point below in this rewrite:`,
+          input.qcFeedback.split('\n').map(line => `  ${line}`).join('\n'),
+          ``,
+        ]
+      : []),
+    ...(input.tone
+      ? [
+          `## Story Mood (picked by the parent):`,
+          `- The parent asked for a **"${input.tone}"** telling. Let it steer word choice, pacing, and the energy of the peak. The mood is a promise to the parent, not a garnish.`,
+          ``,
+        ]
+      : []),
+    `## Length:`,
+    `- **2-4 sentences per page, maximum 50 words** (for the ${input.pageCount} pages).`,
+    `  - This 50 word limit is STRICT — text is displayed on its own page but must stay concise for toddler attention spans.`,
+    `  - Vary length across pages for rhythm: some pages deserve a single punchy line, others need a beat more.`,
+  ].join('\n');
+
+  const languageInstruction =
+    input.language === 'ja'
+      ? [
+          `\n## Language — Japanese (日本語):`,
+          `- Write ALL story text ("text" field) in **Japanese**.`,
+          `- Use **hiragana** primarily, as this book is for toddlers (ages 2-4). **No kanji at all.** Katakana is OK for onomatopoeia and foreign words.`,
+          `- Maintain the same warm, playful, read-aloud quality described above, adapted for Japanese.`,
+          `- Use Japanese onomatopoeia naturally (ざぶーん, どきどき, ぴょんぴょん, きらきら, etc.).`,
+          `- Character names should remain as provided (do not transliterate to katakana unless they are clearly non-Japanese names).`,
+          `- For unnamed people, use the warm hiragana relationship word a toddler would say (おばあちゃん、おじいちゃん、おかあさん、おとうさん、おねえちゃん、おにいちゃん、いもうと、おとうと) — NEVER invent a name. For unnamed pets use わんちゃん / ねこちゃん style words.`,
+          `- **Length constraint (replaces the English rule above):** 2-4 sentences per page, **maximum 80 characters** per page.`,
+          `- The "illustrationNotes" and "scene" fields must remain in **English** (the illustration AI only understands English).`,
+        ].join('\n')
+      : '';
+
+  const illustrationNotesInstructions = [
+    `\n- For **each** page, also suggest "illustrationNotes" to dynamically enhance the image with fun effects:`,
+    `  - Focus on **amplifying the specific action in the scene**:`,
+    `    - Movement/Running: motion lines, speed streaks, "ZOOM!", "WHOOSH!"`,
+    `    - Water/Splashing: water droplets, ripples, "SPLASH!", "SPLISH!"`,
+    `    - Eating/Food: "YUM!", "MUNCH!", "CHOMP!", steam wisps, crumbs flying`,
+    `    - Jumping/Flying: arc trails, "BOING!", "WHEEE!"`,
+    `    - Surprise/Discovery: subtle glow, "WOW!", "OOOOH!"`,
+    `    - Hugging/Love: small floating hearts (2-3 max)`,
+    `  - Use sparkles ONLY for actual magic/wonder moments, not as a default effect.`,
+    `  - Match the effect to the specific action - if a kid is eating, suggest food effects, not sparkles.`,
+    `  - **Specifically for illustrationNotes ONLY:** Use visual language (e.g., 'the boy in red', 'the girl with pigtails') instead of character names. The illustration AI doesn't know names.`,
+    `  - If no dynamic effect fits, set "illustrationNotes" to null or empty.`,
+    `\n- Effects must feel playful but natural, blending into the scene without overwhelming it.`,
+    `\n- Final Output:`,
+    `\nReturn ONLY a valid JSON object with a "storyArc" object, a "suggestedTitle" string, AND a "pages" array. Plan the storyArc FIRST (desire, refrain, emotionalPeak, resolution), then write pages that follow that arc.`,
+    `Each page element must have "pageNumber" (number), "text" (string), "illustrationNotes" (string or null), "learningWordsUsed" (array), and "scene" (object).`,
+  ].join('');
+
+  parts.push({
+    text: `${baseInstructions}${languageInstruction}\n${illustrationNotesInstructions}`,
+  });
+
+  return parts;
+}

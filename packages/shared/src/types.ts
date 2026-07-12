@@ -15,6 +15,9 @@ export interface User {
  */
 export type BookStatus = "DRAFT" | "GENERATING" | "STORY_READY" | "ILLUSTRATING" | "COMPLETED" | "FAILED" | "PARTIAL";
 
+/** PHOTO_STORY = made from uploaded photos; AVATAR_STORY = invented adventure starring account avatars (X6d). */
+export type BookType = "PHOTO_STORY" | "AVATAR_STORY";
+
 /**
  * Additional character in the story (e.g., parent, sibling)
  */
@@ -28,6 +31,7 @@ export interface Book {
   userId: string;
   title: string;
   status: BookStatus;
+  bookType?: BookType;
   pageLength: number;
   language: string;
   artStyle?: string | null;

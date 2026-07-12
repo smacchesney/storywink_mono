@@ -97,6 +97,25 @@ export const bridgePageResponseSchema = z.object({
   scene: bridgeSceneSchema,
 });
 
+// ---------------------------------------------------------------------------
+// Avatar stories (X6d)
+// ---------------------------------------------------------------------------
+
+/**
+ * Shape validation for one AVATAR_STORY page scene (story response).
+ * Same contract as bridgeSceneSchema minus outfitFrom — there is no adjacent
+ * photo to copy outfits from; wardrobe comes from the rendition sheets.
+ * The worker validates-or-DEGRADES per page (a malformed scene falls back to
+ * text-only rendering context, never fails the story job).
+ */
+export const avatarPageSceneSchema = z.object({
+  location: z.string().min(1).max(300),
+  timeOfDay: z.string().min(1).max(100),
+  action: z.string().min(1).max(500),
+  charactersPresent: z.array(z.string().min(1).max(100)).max(8),
+  props: z.array(z.string().max(200)).max(10),
+});
+
 // Type exports
 export type CreateBookInput = z.infer<typeof createBookSchema>;
 export type UpdateBookInput = z.infer<typeof updateBookSchema>;

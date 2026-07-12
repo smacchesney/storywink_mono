@@ -123,7 +123,112 @@ export const STORY_QC_THRESHOLDS = {
   // distribution (every new failure trigger is a silent extra generation
   // during the parent's wait).
   minTruthToEvent: 6,
+  // Log-only (X6d): premiseTruth is scored on AVATAR_STORY books and logged,
+  // never enforced — same telemetry-first philosophy as truthToEvent.
+  minPremiseTruth: 6,
 } as const;
+
+// ----------------------------------
+// AVATAR STORIES (X6d) — QC variant
+// ----------------------------------
+//
+// AVATAR_STORY books have no photos, so captionRisk (photo-caption smell) is
+// meaningless and is dropped. In its place the model scores premiseTruth:
+// does the manuscript deliver the parent-picked spark? premiseTruth is
+// LOG-ONLY at launch. The enforced dimensions (arc, rhythm, landing, and the
+// deterministic refrain count in the worker) are unchanged.
+
+export const AVATAR_STORY_QC_SYSTEM_PROMPT =
+  "You are a ruthless children's-book editor reviewing a picture-book manuscript for toddlers (ages 2-4). This is an invented adventure starring the family's own characters — you evaluate narrative arc, read-aloud rhythm, and whether the story delivers the premise the parent picked. You never rewrite the story yourself — you score it and give precise, actionable corrections.";
+
+export interface AvatarStoryQCInput {
+  storyArc: StoryArc;
+  pages: Pick<StoryPageResponse, 'pageNumber' | 'text'>[];
+  language?: string; // "en" | "ja"
+  /** The parent-picked spark the story promised to deliver. */
+  premise: string;
+  /** Cast names+roles, so the editor can spot missing or invented characters. */
+  cast?: { name: string; role: string }[];
+}
+
+export function createAvatarStoryQCPrompt(input: AvatarStoryQCInput): string {
+  const pagesBlock = input.pages
+    .map(p => `--- Page ${p.pageNumber} ---\n${p.text}`)
+    .join('\n');
+
+  const castBlock = input.cast?.length
+    ? `\n# The cast the parent picked\n${input.cast
+        .map(c => `- ${c.name} (${c.role.replace(/_/g, ' ')})`)
+        .join('\n')}\nEvery cast member should matter to the story; no character outside this list may appear.\n`
+    : '';
+
+  return `Review this ${input.pages.length}-page toddler picture-book manuscript. It is an INVENTED adventure (no photos) starring the family's own characters, built on a premise the parent picked.
+
+# Declared story arc
+- Desire: ${input.storyArc.desire}
+- Refrain: ${input.storyArc.refrain}
+- Emotional peak: ${input.storyArc.emotionalPeak}
+- Resolution: ${input.storyArc.resolution}
+
+# The premise the parent picked
+"${input.premise}" — the story promised to deliver this.
+${castBlock}
+# Manuscript
+${pagesBlock}
+--- End Manuscript ---
+
+Score the manuscript:
+
+1. arcCoherence (0-10): Do the pages actually deliver the declared arc — a desire established early, escalation through the middle, an emotional peak, a soft landing? A flat sequence of disconnected moments scores below 5.
+2. readAloudRhythm (0-10): Read it aloud in your head. Varied sentence lengths, musicality, organic sound words score high. Monotonous subject-verb-object chains score below 5.
+3. lastPageLanding (boolean): true only if the final page lands as a soft, warm exhale WITHOUT a summary statement ("What a wonderful day", "それはすてきないちにちでした" and the like are automatic false).
+4. premiseTruth (0-10): Does the manuscript deliver the premise above — its promise shapes the desire, the peak, and the landing? A story that could hang off any premise scores below 5.
+5. Per page, note a specific "issue" (or null): an invented character, a broken hand-off, a page that stalls the story.
+${input.language === 'ja' ? '\n6. The text must be Japanese in hiragana/katakana with NO kanji. Flag any kanji as a page issue.\n' : ''}
+If ANY of these fail (arcCoherence < 6, readAloudRhythm < 6, or lastPageLanding false), write "feedback": a numbered list of specific corrections. Reference page numbers. Say exactly what is wrong and what a fix looks like — do not write replacement text yourself.
+
+BAD feedback:  "Page 3 is weak"
+GOOD feedback: "Page 3 stalls — nothing leans into page 4. End it with a sound getting closer or a question, so the listener needs the page turn."
+
+If everything passes, set "feedback" to null.`;
+}
+
+export const AVATAR_STORY_QC_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    arcCoherence: { type: 'number', description: '0-10' },
+    readAloudRhythm: { type: 'number', description: '0-10' },
+    lastPageLanding: { type: 'boolean' },
+    pages: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          pageNumber: { type: 'number' },
+          issue: { type: ['string', 'null'], description: 'Specific problem on this page, or null' },
+        },
+        required: ['pageNumber', 'issue'],
+        additionalProperties: false,
+      },
+    },
+    premiseTruth: {
+      type: 'number',
+      description: '0-10 — does the manuscript deliver the parent-picked premise',
+    },
+    feedback: { type: ['string', 'null'], description: 'Numbered corrections if failing, else null' },
+  },
+  required: ['arcCoherence', 'readAloudRhythm', 'lastPageLanding', 'pages', 'premiseTruth', 'feedback'],
+  additionalProperties: false,
+} as const;
+
+export interface AvatarStoryQCResponse {
+  arcCoherence: number;
+  readAloudRhythm: number;
+  lastPageLanding: boolean;
+  pages: { pageNumber: number; issue: string | null }[];
+  premiseTruth: number;
+  feedback: string | null;
+}
 
 function normalize(text: string): string {
   return text
