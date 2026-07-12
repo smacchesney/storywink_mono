@@ -171,7 +171,15 @@ export async function POST(request: NextRequest) {
     // ≤3/subject cap, or belonging to unselected subjects) are reaped now —
     // reapUnattachedStagedAssets keeps only the ids no page/cover/avatar
     // references, so the created avatars' photos are safe.
-    await reapUnattachedStagedAssets(dbUser.id, stored.assetIds);
+    //
+    // ONLY when at least one avatar was created. On a total failure (every pick
+    // errored, or a cap race left created empty) NONE of the assets are
+    // attached, so an unconditional reap would delete EVERY uploaded photo —
+    // irreversibly, and after the detection was already consumed. Leaving them
+    // intact keeps a re-detect over the same set viable.
+    if (created.length > 0) {
+      await reapUnattachedStagedAssets(dbUser.id, stored.assetIds);
+    }
 
     logger.info(
       { detectionId, created: created.length, failed: failed.length, stoppedAtCap },

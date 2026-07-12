@@ -190,19 +190,27 @@ export function AvatarStudioDialog({ onClose, onCreated }: AvatarStudioDialogPro
         stoppedAtCap?: number;
       };
       const { toast } = await import('sonner');
+
+      // Zero created: cap-stop with nothing made shows the cap message and
+      // stays on confirm (so a deselect can shrink the batch); anything else is
+      // a real failure. Either way, never fall through to the generic error.
+      if (data.created.length === 0) {
+        if (data.stoppedAtCap !== undefined) {
+          toast(t('capFull'));
+          setStep('confirm');
+        } else {
+          setError(t('createError'));
+          setStep('style');
+        }
+        return;
+      }
+
+      // At least one made — report what happened, then close to the shelf.
       if (data.stoppedAtCap !== undefined) {
-        // Zero-created-at-cap and some-created-then-cap both land here — always
-        // tell the parent what happened instead of a silent close or a loop.
         toast(t('capStopped', { count: data.created.length }));
-      } else if (data.failed && data.failed.length > 0 && data.created.length > 0) {
+      } else if (data.failed && data.failed.length > 0) {
         // Partial success is fine, but reported (plan decision).
         toast(t('someFailed', { made: data.created.length, missed: data.failed.length }));
-      }
-      if (data.created.length === 0) {
-        // Nothing landed and it wasn't the cap — a real failure, stay put.
-        setError(t('createError'));
-        setStep('style');
-        return;
       }
       onCreated();
       onClose();

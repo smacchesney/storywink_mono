@@ -5,11 +5,7 @@
 import { Queue } from 'bullmq';
 import { QUEUE_NAMES } from '@storywink/shared/constants';
 import { createBullMQConnection } from '@storywink/shared/redis';
-import {
-  excludeSharedAssetIds,
-  ASSET_CLEANUP_PENDING_EVENT,
-  type AssetCleanupJobPayload,
-} from '@storywink/shared';
+import { excludeSharedAssetIds, type AssetCleanupJobPayload } from '@storywink/shared';
 import { db as prisma } from '@/lib/db';
 import logger from '@/lib/logger';
 
@@ -22,9 +18,13 @@ export function avatarsEnabled(): boolean {
  * "we only use photos to draw, then let them go" retention promise the
  * confirm screen makes. An asset is deletable only when NO book page/cover
  * and NO avatar (created OR still staging) references it; the shared-asset
- * guard protects photos that also back a book. Best-effort: writes the
- * durable pending marker BEFORE the row/byte deletes (so the reconcile pass
- * can finish an interrupted cleanup) and never throws into the caller.
+ * guard protects photos that also back a book.
+ *
+ * Ordering: ENQUEUE the Cloudinary cleanup BEFORE deleting the Asset rows,
+ * so a crash after enqueue still deletes the bytes (the durable pending
+ * marker the book-delete path relies on is inert here — the reconcile pass
+ * skips userId-only markers). If the enqueue fails the rows stay put, so no
+ * photo is ever orphaned in Cloudinary. Never throws into the caller.
  */
 export async function reapUnattachedStagedAssets(
   dbUserId: string,
@@ -61,17 +61,15 @@ export async function reapUnattachedStagedAssets(
       reason: 'avatar_approved',
       userId: dbUserId,
     };
-    await prisma.appEvent.create({
-      data: { name: ASSET_CLEANUP_PENDING_EVENT, userId: dbUserId, props: { ...payload } },
-    });
-    await prisma.asset.deleteMany({ where: { id: { in: deletableAssets.map((a) => a.id) } } });
+    // Queue the byte deletion first — if it throws we keep the rows and try
+    // again on a later sweep rather than stranding bytes with dead DB pointers.
     await getAvatarCleanupQueue().add('avatar-cleanup', payload, {
       attempts: 3,
       backoff: { type: 'exponential', delay: 15000 },
     });
+    await prisma.asset.deleteMany({ where: { id: { in: deletableAssets.map((a) => a.id) } } });
   } catch (error) {
-    // The pending marker (if written) lets the reconcile pass finish; a total
-    // failure just leaves the photos, which the next sweep can still reap.
+    // A failure just leaves the photos; the next batch/sweep can reap them.
     logger.warn({ dbUserId, error }, 'reapUnattachedStagedAssets failed (non-fatal)');
   }
 }

@@ -83,9 +83,17 @@ async function main() {
         },
         // Deterministic jobId: re-running the script while a prior job is still
         // queued/active is a no-op instead of a double Gemini spend for the
-        // same rendition. (Once the job completes and clears, a re-run can
-        // re-enqueue — but the worker then no-ops on the present cutoutUrl.)
-        { jobId, attempts: 2, backoff: { type: 'exponential', delay: 10000 } },
+        // same rendition. removeOnComplete/Fail delete the job hash the instant
+        // it finishes so a straggler re-run (a cutout that came back null and
+        // is still missing) actually re-enqueues — without these, BullMQ
+        // retains the completed hash forever and silently drops every re-run.
+        {
+          jobId,
+          attempts: 2,
+          backoff: { type: 'exponential', delay: 10000 },
+          removeOnComplete: true,
+          removeOnFail: true,
+        },
       );
       console.log(`  enqueued: ${r.avatar.displayName} (${r.artStyle})`);
     }
