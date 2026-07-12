@@ -228,3 +228,11 @@ Append-only. One line per key: `namespace.key` — why it needs a native check.
 - Whole new `characters.*` namespace (36 keys): the shelf, the studio steps, the keep-this-character card. Register aims child-adjacent but parent-facing; check けす vs 削除 across delete strings and のこす for "keep as a character".
 - `library.charactersTab` — 「キャラクター」 tab chip next to Books.
 - `characters.matchQuestion/matchYes/matchNo/matchLinked` — the setup confirm row linking an account character to a new book; register check on ちがいます (soft decline).
+
+## 2026-07-12 — X6d avatar-first stories (x6d-avatar-stories)
+
+- Whole new `avatarStories.*` namespace (38 keys): the create-page character card, the cast→spark→length flow, and the shelf CTA. Register aims warm parent-facing with child-adjacent story copy; the six spark chips (`sparkRainy`…`sparkDragon`) read aloud to the child, so hiragana-lean phrasing was chosen — check they sound like book titles a parent would say, not app labels.
+- `avatarStories.cardTitle` — 「{name}となかまたちと」 doubles the と; check rhythm (「{name}とおともだちと」 was the runner-up).
+- `avatarStories.length12` — 「ちょうどいい定番」 mixes registers (hiragana + 定番); confirm 定番 reads natural to parents here.
+- `avatarStories.styleDrawing/styleRepairCta` — {style} interpolates the art-style label from `setup.styleVignette` etc.; check particle fit (「みんなを○○で描く」).
+- `avatarStories.castPeopleFull/castCompanionsFull` — soft cap explanations; check the em-dash pause reads naturally or should become 「。」.

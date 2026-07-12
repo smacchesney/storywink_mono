@@ -24,6 +24,7 @@ export default function CharactersPage() {
 
 function CharactersShelf() {
   const t = useTranslations('characters');
+  const tStories = useTranslations('avatarStories');
   const [avatars, setAvatars] = React.useState<AvatarSummary[] | null>(null);
   const [studioOpen, setStudioOpen] = React.useState(false);
 
@@ -103,6 +104,16 @@ function CharactersShelf() {
           <p className="font-playful text-lg text-[#1a1a1a]">{t('emptyTitle')}</p>
           <p className="max-w-xs font-playful text-sm text-gray-500">{t('emptyBody')}</p>
         </div>
+      )}
+
+      {/* X6d: the shelf is a place to START stories, not just storage. */}
+      {avatars?.some((a) => a.status === 'READY' && a.renditions.some((r) => r.status === 'READY')) && (
+        <Link
+          href="/create/characters"
+          className="mb-4 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full bg-coral px-6 py-3 font-playful text-lg text-white shadow-md hover:bg-coral/90"
+        >
+          {tStories('shelfCta')}
+        </Link>
       )}
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
