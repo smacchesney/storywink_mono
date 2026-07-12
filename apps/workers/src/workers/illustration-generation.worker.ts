@@ -314,7 +314,20 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       (characterSheetsEnabled() || process.env.AVATARS_ENABLED === 'true' || isAvatarBook) &&
       job.data.characterSheets?.length
     ) {
-      for (const sheet of job.data.characterSheets) {
+      // AVATAR_STORY: the FIRST fetched sheet becomes image 1 (the render's
+      // content anchor), so the STAR's sheet must lead. The snapshot order
+      // comes from an unordered findMany — reorder deterministically here.
+      let sheetSources = job.data.characterSheets;
+      if (isAvatarBook && sheetSources.length > 1) {
+        const starId = characterIdentity?.characters?.find(c => c.role?.startsWith('main'))?.characterId;
+        if (starId) {
+          sheetSources = [
+            ...sheetSources.filter(s => s.characterId === starId),
+            ...sheetSources.filter(s => s.characterId !== starId),
+          ];
+        }
+      }
+      for (const sheet of sheetSources) {
         try {
           sheetRefs.push(await fetchImageInput(optimizeCloudinaryUrlForVision(sheet.url)));
         } catch (sheetFetchError: any) {
