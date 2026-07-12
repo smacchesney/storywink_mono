@@ -42,7 +42,21 @@ async function main() {
       } else {
         unresolvable++;
       }
-    } catch {
+    } catch (err) {
+      // Rate limit (Cloudinary Admin API, hourly window) is NOT "not found" —
+      // every remaining call this hour would fail too. Stop honestly and let
+      // the caller rerun after the window resets; already-updated rows are
+      // skipped on rerun (width IS NULL filter), so reruns cost nothing extra.
+      const httpCode =
+        (err as { error?: { http_code?: number }; http_code?: number })?.error?.http_code ??
+        (err as { http_code?: number })?.http_code;
+      if (httpCode === 420 || httpCode === 429) {
+        console.warn(
+          `Rate limited by the Cloudinary Admin API after ${updated} updates — ` +
+            `run again in ~1 hour to continue (remaining rows are untouched).`,
+        );
+        break;
+      }
       unresolvable++;
       console.warn(`  not found on Cloudinary: ${asset.publicId}`);
     }
