@@ -239,3 +239,7 @@ Append-only. One line per key: `namespace.key` — why it needs a native check.
 - `avatarStories.castPeopleFull/castCompanionsFull` — soft cap explanations; check the em-dash pause reads naturally or should become 「。」.
 - (review round) `avatarStories.sparkDragon` replaced by 「いちばんゆうかんなおふろタイム」 (the dragon premise contradicted the never-invent-characters rule); `cardLastTime` now 「前回はここからはじめました」; new keys `loadTrouble/loadRetry/castNeedsPerson/createNotReady` and `characters.deleteStarsInStories` — the delete-block copy is the one to scrutinize (削除 vs けす register, and whether 出演中 reads warm enough).
 - (review round 2) ja polish: full-width ？ across `avatarStories`, 「：」 in `cardExplainer`, `styleRepairCta/styleDrawing` now 「みんなを「{style}」のタッチで描く」 (label-safe), `styleMismatchHint` → 「いちど描きなおせば、みんな おそろいになります」, `characters.deleteStarsInStories` rewritten in the shelf's spaced-kana けす register.
+
+## 2026-07-12 — X7 cast page + batch studio (x7-cast-page-batch)
+
+- `characters.cutoutAlt` — alt text for the full-body waving cutout 「こんにちはと てをふる {name}」; check the と-quotative reads naturally for an image description, and register against `portraitAlt` (えほんの キャラクターになった {name}).

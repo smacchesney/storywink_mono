@@ -16,6 +16,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { ArrowLeft, Check } from 'lucide-react';
 import { Storydust } from '@/components/ui/storydust';
+import { optimizeCloudinaryUrl } from '@storywink/shared';
 import { STYLE_LIBRARY, StyleKey, getStylePreviewUrl } from '@storywink/shared/prompts/styles';
 import type { AvatarSummary } from '@/components/characters/AvatarCard';
 import {
@@ -450,7 +451,15 @@ function AvatarStoryFlow() {
               const selected = castIds.includes(avatar.id);
               const isPerson = avatar.kind === 'CHILD' || avatar.kind === 'ADULT';
               const capped = !selected && (isPerson ? peopleFull : companionsFull);
-              const portrait = avatar.renditions.find((r) => r.portraitUrl)?.portraitUrl;
+              // X7: the full-body cutout makes picking the cast feel like
+              // lifting the toys off the shelf; round portrait is the fallback.
+              const readyRendition = avatar.renditions.find(
+                (r) => r.status === 'READY' && (r.cutoutUrl || r.portraitUrl),
+              );
+              const cutout = readyRendition?.cutoutUrl;
+              const portrait =
+                readyRendition?.portraitUrl ??
+                avatar.renditions.find((r) => r.portraitUrl)?.portraitUrl;
               return (
                 <button
                   key={avatar.id}
@@ -471,7 +480,13 @@ function AvatarStoryFlow() {
                       <Check className="h-3.5 w-3.5" />
                     </span>
                   )}
-                  {portrait ? (
+                  {cutout ? (
+                    <img
+                      src={optimizeCloudinaryUrl(cutout, { additionalTransforms: 'c_limit,h_400' })}
+                      alt=""
+                      className="h-24 w-20 object-contain"
+                    />
+                  ) : portrait ? (
                     <img
                       src={portrait}
                       alt=""

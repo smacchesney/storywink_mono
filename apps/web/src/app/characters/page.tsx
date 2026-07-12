@@ -83,7 +83,7 @@ function CharactersShelf() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pb-16 pt-6">
+    <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="font-playful text-2xl text-[#1a1a1a]">{t('title')}</h1>
@@ -122,11 +122,13 @@ function CharactersShelf() {
         </Link>
       )}
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-        {avatars?.map((avatar) => (
+      {/* Tilted cards need breathing room — the y-gap absorbs the hover lift. */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-6 pt-2 md:grid-cols-3 md:gap-x-5">
+        {avatars?.map((avatar, index) => (
           <AvatarCard
             key={avatar.id}
             avatar={avatar}
+            index={index}
             onRename={rename}
             onDrawAgain={drawAgain}
             onDelete={remove}

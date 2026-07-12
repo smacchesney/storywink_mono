@@ -449,6 +449,7 @@
     "emptyTitle": "No characters yet",
     "emptyBody": "Make a book, and we'll offer to keep its star. Or add someone from photos right here.",
     "portraitAlt": "{name}, drawn as a storybook character",
+    "cutoutAlt": "{name}, waving hello",
     "drawing": "Drawing {name}…",
     "drawAgain": "Draw again",
     "rename": "Rename",
