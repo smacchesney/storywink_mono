@@ -427,7 +427,7 @@ export function createCutoutValidationPrompt(input: {
     `Evaluate the candidate cutout:`,
     `1. singleFullBody: Does it show exactly ONE character, once, full body with feet visible — no grid, no panels, no extra views, no second character?`,
     `2. sameCharacter: Is it recognizably the SAME character as on the model sheet (face, hair, skin tone, outfit, distinguishing features)?`,
-    `3. whiteBackground: Is the background plain pure white with no scenery, props, ground line, or cast shadows?`,
+    `3. whiteBackground: Is the background plain pure white with no scenery, props, or colored backdrop? A faint, soft contact shadow directly beneath the figure is acceptable and must NOT fail this check — image models add one reliably and it does not break the cutout.`,
     `4. noTextArtifacts: Is it free of any text, labels, captions, watermarks, and obvious anatomical errors?`,
     `Set passed=true only if ALL four checks pass. Describe any failure precisely in notes.`,
   ].join('\n\n');

@@ -108,6 +108,17 @@ describe('createCutoutValidationPrompt', () => {
     expect(prompt).toMatch(/waving/i);
   });
 
+  it('tolerates a faint contact shadow — the E2E killer of 5/7 good cutouts', () => {
+    const prompt = createCutoutValidationPrompt({
+      character: child,
+      kind: 'CHILD',
+      styleRefCount: 2,
+      artStyle: 'vignette',
+    });
+    expect(prompt).toMatch(/contact shadow .*acceptable/i);
+    expect(prompt).toMatch(/must NOT fail/);
+  });
+
   it('describes the kind-appropriate pose for pets', () => {
     const prompt = createCutoutValidationPrompt({
       character: child,
