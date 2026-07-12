@@ -16,6 +16,7 @@ import {
 } from '@storywink/shared/prompts/character-identity';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg, remapCharacterPages } from '@storywink/shared/utils';
 import { mergeCastNames, CaptureAnswerLike } from '../lib/resolveCast.js';
+import { mergeLinkedAvatarSheets } from '../lib/avatar-sheets.js';
 import { bridgePagesEnabled } from '../lib/bridge-pages.js';
 import { ANALYSIS_MODEL } from '../config/models.js';
 
@@ -61,6 +62,50 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
 
     // 2. Get all pages (including cover page)
     const storyPages = book.pages;
+
+    // AVATAR_STORY (X6d): there are no photos, so neither the vision
+    // extraction nor the remap path can run. The canonical identity was
+    // composed from the linked avatars' identities at creation time; the
+    // sheets join inside createIllustrationFlow (the BookAvatar merge).
+    // Keyed on the DB row, never a flag — an avatar book must render as an
+    // avatar book even after a flag rollback.
+    if (book.bookType === 'AVATAR_STORY') {
+      characterIdentity = (book.characterIdentity as CharacterIdentity | null) ?? null;
+      logger.info(
+        { bookId, characterCount: characterIdentity?.characters?.length ?? 0 },
+        'Avatar-story book — skipping vision extraction, using stored roster',
+      );
+
+      // The avatars' styleTranslation prose was written for whatever style
+      // each avatar was first drawn in; refresh it for THIS book's style via
+      // the same cheap text-only call the remap path uses. Failure degrades
+      // to the stale prose — the on-style rendition sheets carry identity.
+      if (characterIdentity?.characters?.length && characterIdentity.extractedForStyle !== artStyle) {
+        const refreshed = await refreshStyleTranslations(characterIdentity, artStyle, bookId);
+        if (refreshed) {
+          characterIdentity = refreshed;
+          try {
+            await prisma.book.update({
+              where: { id: bookId },
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              data: { characterIdentity: characterIdentity as any },
+            });
+          } catch (persistError) {
+            logger.warn(
+              { bookId, error: persistError instanceof Error ? persistError.message : 'Unknown error' },
+              'Avatar-story style refresh persist failed — continuing with in-memory identity',
+            );
+          }
+        }
+      }
+
+      await createIllustrationFlow(bookId, userId, characterIdentity, pageIds, undefined, recovery);
+      return {
+        success: true,
+        characterCount: characterIdentity?.characters?.length ?? 0,
+        reused: true,
+      };
+    }
 
     // Re-apply the capture-answer merge (same resolveCast helper the story
     // worker uses) BEFORE the reuse branch and BEFORE character sheets: an
@@ -430,54 +475,26 @@ async function createIllustrationFlow(
   characterSheets?: CharacterSheetRef[],
   recovery?: boolean,
 ): Promise<void> {
-  // X6c: account avatars the parent linked to this book override the
-  // per-book sheet for the same roster characterId — the cross-book anchor
-  // beats the one-book sheet, and works even while book sheets are flagged
-  // off. Only READY renditions in the book's own art style join the stack.
-  if (process.env.AVATARS_ENABLED === 'true') {
-    try {
-      const bookForStyle = await prisma.book.findUnique({
-        where: { id: bookId },
-        select: { artStyle: true },
-      });
-      const links = await prisma.bookAvatar.findMany({
-        where: { bookId, avatar: { userId } },
-        include: {
-          avatar: {
-            include: {
-              renditions: {
-                where: { status: 'READY', artStyle: bookForStyle?.artStyle ?? 'vignette' },
-              },
-            },
-          },
-        },
-      });
-      const avatarRefs: CharacterSheetRef[] = [];
-      for (const link of links) {
-        const sheetUrl = link.avatar.renditions[0]?.turnaroundSheetUrl;
-        if (!link.characterId || !sheetUrl) continue;
-        avatarRefs.push({
-          characterId: link.characterId,
-          name: link.avatar.displayName,
-          url: sheetUrl,
-        });
-      }
-      if (avatarRefs.length > 0) {
-        const overridden = new Set(avatarRefs.map((r) => r.characterId));
-        characterSheets = [
-          ...avatarRefs,
-          ...(characterSheets ?? []).filter((r) => !overridden.has(r.characterId)),
-        ];
-        logger.info(
-          { bookId, avatarSheets: avatarRefs.length },
-          'Linked account-avatar sheets joined the reference stack',
-        );
-      }
-    } catch (error) {
-      // Avatar reuse must never block illustration — degrade to book sheets.
-      logger.warn({ bookId, error }, 'Avatar sheet lookup failed; continuing without');
-    }
-  }
+  // Meta needed by two gates below. bookType is DB-row authority: an
+  // AVATAR_STORY book keeps its avatar-sheet stack and its photo-less pages
+  // regardless of what any flag says today.
+  const bookMeta = await prisma.book.findUnique({
+    where: { id: bookId },
+    select: { artStyle: true, bookType: true },
+  });
+  const isAvatarStoryBook = bookMeta?.bookType === 'AVATAR_STORY';
+
+  // X6c/X6d: linked account-avatar sheets join (and override) the per-book
+  // sheet stack — shared with finalize's QC requeue so re-renders keep the
+  // same references (see mergeLinkedAvatarSheets).
+  characterSheets = await mergeLinkedAvatarSheets({
+    bookId,
+    userId,
+    artStyle: bookMeta?.artStyle,
+    bookType: bookMeta?.bookType,
+    base: characterSheets,
+    logger,
+  });
 
   // Re-fetch book to get latest page data
   const book = await prisma.book.findUnique({
@@ -526,7 +543,9 @@ async function createIllustrationFlow(
     // above are still honored — a parent's direct "try drawing again" on an
     // existing bridge row renders fine via the worker's DB-driven branch, and
     // silently dropping it would strand the book in ILLUSTRATING.
-    const includeBridges = bridgePagesEnabled();
+    // AVATAR_STORY: every page is a bridge-source row — they always render,
+    // independent of the bridge flag (the flag gates photo-book bridges).
+    const includeBridges = bridgePagesEnabled() || isAvatarStoryBook;
 
     if (isRetry) {
       pagesToProcess = book.pages.filter((page) => {

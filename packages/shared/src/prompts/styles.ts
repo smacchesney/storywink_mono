@@ -23,6 +23,13 @@ export interface StylePromptContext {
    * reference (cover calls only), otherwise 0/absent.
    */
   interiorRenderCount?: number;
+  /**
+   * Role of image 1 (X6d avatar stories — books with no photos anywhere):
+   * 'photo' (default, byte-identical legacy wording), 'sheet' (a character
+   * turnaround sheet anchors the render), or 'interior' (the approved
+   * interior render of the cover scene anchors the cover repaint).
+   */
+  contentAnchor?: 'photo' | 'sheet' | 'interior';
 }
 
 // ----------------------------------
@@ -62,10 +69,32 @@ export interface StyleDefinition {
 // HELPER: image ordering text
 // ----------------------------------
 
-function imageCountText(refCount: number, sheetCount = 0, interiorRenderCount = 0): string {
+function imageCountText(
+  refCount: number,
+  sheetCount = 0,
+  interiorRenderCount = 0,
+  contentAnchor: 'photo' | 'sheet' | 'interior' = 'photo',
+): string {
+  // AVATAR_STORY pages (X6d): image 1 IS a character sheet — fold it into the
+  // sheet range so the role line stays truthful (sheetCount counts the
+  // ADDITIONAL sheets beyond the anchor).
+  if (contentAnchor === 'sheet') {
+    const sheetTotal = 1 + sheetCount;
+    const total = sheetTotal + interiorRenderCount + refCount;
+    const roles: string[] = [
+      sheetTotal === 1
+        ? `image 1 is a CHARACTER SHEET (2x2 turnaround grid of a character — the canonical reference for face, hair, skin tone, and proportions; it is NOT a scene to copy)`
+        : `images 1-${sheetTotal} are CHARACTER SHEETS (2x2 turnaround grids of the characters — the canonical reference for face, hair, skin tone, and proportions; they are NOT scenes to copy)`,
+    ];
+    roles.push(
+      `the final ${refCount === 1 ? 'image shows' : `${refCount} images show`} the artistic style to apply`,
+    );
+    return `using the ${total} images provided, in this order: ${roles.join('; ')}.`;
+  }
+
   // Legacy shape (no character sheets in the request) — byte-identical to the
   // pre-sheet prompt so behavior with CHARACTER_SHEETS_ENABLED off is unchanged.
-  if (sheetCount === 0 && interiorRenderCount === 0) {
+  if (sheetCount === 0 && interiorRenderCount === 0 && contentAnchor === 'photo') {
     return refCount === 1
       ? `using the two images provided. The first image shows the scene/subjects, the second image shows the artistic style to apply.`
       : `using the ${1 + refCount} images provided. The first image shows the scene/subjects, the following ${refCount} image(s) show the artistic style to apply. Use all style reference images for comprehensive style matching.`;
@@ -76,7 +105,11 @@ function imageCountText(refCount: number, sheetCount = 0, interiorRenderCount = 
   // role by position — the SDKs have no typed reference fields, so this
   // ordering + naming IS the reference mechanism.
   const total = 1 + sheetCount + interiorRenderCount + refCount;
-  const roles: string[] = [`image 1 shows the scene/subjects (this page's photo)`];
+  const roles: string[] = [
+    contentAnchor === 'interior'
+      ? `image 1 is this book's approved interior illustration of this same scene (repaint the SAME scene and people as the cover)`
+      : `image 1 shows the scene/subjects (this page's photo)`,
+  ];
   let next = 2;
   if (sheetCount > 0) {
     const range = sheetCount === 1 ? `image ${next}` : `images ${next}-${next + sheetCount - 1}`;
@@ -135,7 +168,7 @@ function vignetteInteriorPrompt(ctx: StylePromptContext): string {
   const refCount = ctx.referenceImageCount || 1;
 
   const sections = [
-    `Create a children's picture book illustration ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0)}`,
+    `Create a children's picture book illustration ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo')}`,
 
     VIGNETTE_STYLE_BIBLE,
 
@@ -162,7 +195,7 @@ function vignetteCoverPrompt(ctx: StylePromptContext): string {
   const refCount = ctx.referenceImageCount || 1;
 
   const sections = [
-    `Create a children's picture book illustration ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0)}`,
+    `Create a children's picture book illustration ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo')}`,
 
     VIGNETTE_STYLE_BIBLE,
 
@@ -226,7 +259,7 @@ function origamiBaseSections(ctx: StylePromptContext): string[] {
   const refCount = ctx.referenceImageCount || 1;
 
   return [
-    `Create a flat, layered paper-craft illustration ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0)}`,
+    `Create a flat, layered paper-craft illustration ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo')}`,
 
     ORIGAMI_STYLE_BIBLE,
 
@@ -344,7 +377,7 @@ function kawaiiInteriorPrompt(ctx: StylePromptContext): string {
   const refCount = ctx.referenceImageCount || 1;
 
   const sections = [
-    `Create a warm, gentle children's book illustration in a soft storybook style ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0)} The aesthetic combines clean digital illustration with a subtle watercolor/crayon texture, creating a cozy, nurturing feel. The image should be in landscape format (wider than tall) with softly rounded corners.`,
+    `Create a warm, gentle children's book illustration in a soft storybook style ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo')} The aesthetic combines clean digital illustration with a subtle watercolor/crayon texture, creating a cozy, nurturing feel. The image should be in landscape format (wider than tall) with softly rounded corners.`,
 
     ...kawaiiBaseSections(),
 
@@ -383,7 +416,7 @@ function kawaiiCoverPrompt(ctx: StylePromptContext): string {
   const refCount = ctx.referenceImageCount || 1;
 
   const sections = [
-    `Create a warm, gentle children's book COVER illustration in a soft storybook style ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0)} The scene is a focused vignette on a pure white background — NOT a full-bleed scene. Square format.`,
+    `Create a warm, gentle children's book COVER illustration in a soft storybook style ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo')} The scene is a focused vignette on a pure white background — NOT a full-bleed scene. Square format.`,
 
     `Match the exact illustration style shown in the style reference images: soft brush-pen outlines, warm pastel watercolor/crayon texture, rosy blush cheeks on all characters, small dot eyes, cozy warmth. The new illustration must look like it belongs in the same book as these reference images.`,
 

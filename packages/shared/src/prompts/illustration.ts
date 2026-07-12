@@ -1,6 +1,6 @@
 import { StyleKey, getStyleDefinition, StylePromptContext } from './styles.js';
 import { CharacterIdentity } from '../types.js';
-import type { BridgeScene } from './story.js';
+import type { BridgeScene, AvatarPageScene } from './story.js';
 
 // ----------------------------------
 // TYPES
@@ -28,7 +28,16 @@ export interface IllustrationPromptOptions {
    * never a pose to copy — and the identity section filters the roster by
    * scene.charactersPresent instead of appearsOnPages.
    */
-  bridgeScene?: BridgeScene | null;
+  bridgeScene?: BridgeScene | AvatarPageScene | null;
+  /**
+   * AVATAR_STORY (X6d): role of image 1. 'photo' (default) keeps every
+   * existing prompt byte-identical. 'sheet' = a character turnaround sheet
+   * anchors the render (no photo exists anywhere in the book); the scene
+   * comes from bridgeScene (or the page text when the scene failed
+   * validation). 'interior' = the approved interior render of the cover
+   * scene anchors the cover repaint.
+   */
+  contentAnchor?: 'photo' | 'sheet' | 'interior';
 }
 
 // ----------------------------------
@@ -56,6 +65,7 @@ function buildCharacterIdentitySection(
   characterIdentity: CharacterIdentity | null | undefined,
   pageNumber: number | undefined,
   bridgeCharacterIds?: string[] | null,
+  sheetAnchored = false,
 ): string | null {
   if (!characterIdentity?.characters?.length) return null;
 
@@ -85,9 +95,17 @@ function buildCharacterIdentitySection(
   // from the photo there, so claiming "pose ... follow[s] this page's photo"
   // here would reintroduce the exact contradiction the bridge override
   // settles. Photo pages keep the original wording byte-for-byte.
-  const arbitrationTrailer = bridgeFiltered.length
-    ? `Clothing follows this page's photo (image 1); pose and scene composition follow the BRIDGE PAGE instructions:`
-    : `Pose, clothing, and scene composition follow this page's photo:`;
+  // Sheet-anchored pages (X6d): no photo exists at all — clothing and
+  // identity follow the CHARACTER SHEETS, composition follows the scene.
+  const arbitrationTrailer = sheetAnchored
+    ? `Face, hair, skin tone, proportions, and clothing follow the CHARACTER SHEETS; pose and scene composition follow the AVATAR STORY PAGE instructions:`
+    : bridgeFiltered.length
+      ? `Clothing follows this page's photo (image 1); pose and scene composition follow the BRIDGE PAGE instructions:`
+      : `Pose, clothing, and scene composition follow this page's photo:`;
+
+  const clothingPrecedence = sheetAnchored
+    ? `the CHARACTER SHEET takes precedence`
+    : `this page's photo takes precedence`;
 
   const charDescriptions = relevantCharacters
     .map(c => {
@@ -101,7 +119,7 @@ function buildCharacterIdentitySection(
         traits.distinguishingFeatures.length > 0
           ? `  Distinguishing features: ${traits.distinguishingFeatures.join(', ')}`
           : null,
-        `  Typical clothing (this page's photo takes precedence): ${c.typicalClothing}`,
+        `  Typical clothing (${clothingPrecedence}): ${c.typicalClothing}`,
         c.styleTranslation ? `  Style rendering: ${c.styleTranslation}` : null,
       ]
         .filter(Boolean)
@@ -142,6 +160,45 @@ function buildBridgeSceneSection(bridgeScene: BridgeScene | null | undefined): s
     .join(' ');
 }
 
+/**
+ * AVATAR_STORY pages (X6d): the whole book is photo-less; image 1 is a
+ * character turnaround sheet. Like the bridge section, this supersedes the
+ * style bible's SCENE INTERPRETATION reading of image 1 and item 2 of the
+ * PEOPLE - SOURCE HIERARCHY. The scene comes from the story model; when the
+ * scene failed validation, the page text carries the moment instead.
+ */
+function buildAvatarSceneSection(
+  scene: AvatarPageScene | BridgeScene | null | undefined,
+  pageText: string | null,
+): string {
+  const header = `AVATAR STORY PAGE — THIS BOOK HAS NO PHOTOS (this section supersedes the SCENE INTERPRETATION instructions above and item 2 of PEOPLE - SOURCE HIERARCHY): Image 1 is a CHARACTER SHEET, not a scene — nothing of its 2x2 grid layout, neutral poses, or plain background may appear in the illustration. Compose a brand-new scene from the instructions below. People in this scene come ONLY from this scene's cast (the characters described in the CHARACTER IDENTITY section below, when provided); their faces, hair, skin tone, proportions, and outfits follow their CHARACTER SHEETS exactly.`;
+
+  if (!scene) {
+    return [
+      header,
+      `DEPICT the moment this page's story text describes${pageText ? `: "${pageText}"` : '.'}`,
+    ].join(' ');
+  }
+
+  const props = scene.props.filter(p => p.trim());
+  return [
+    header,
+    `DEPICT THIS MOMENT: ${scene.action}`,
+    `Location: ${scene.location}. Time of day: ${scene.timeOfDay}.`,
+    props.length ? `Include these objects: ${props.join(', ')}.` : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+/**
+ * AVATAR_STORY covers: image 1 is the approved interior render of the cover
+ * scene — the cover repaints that scene, with the sheets as identity truth.
+ */
+function buildInteriorAnchorSection(): string {
+  return `COVER ANCHOR (this section supersedes the SCENE INTERPRETATION instructions above and item 2 of PEOPLE - SOURCE HIERARCHY): Image 1 is this book's approved interior illustration of the cover scene — repaint the SAME scene, people, and palette as a cover composition. Identity (face, hair, skin tone, proportions) follows the CHARACTER SHEETS when provided.`;
+}
+
 function buildQCFeedbackSection(qcFeedback: string | null | undefined): string | null {
   if (!qcFeedback) return null;
 
@@ -163,6 +220,7 @@ function buildQCFeedbackSection(qcFeedback: string | null | undefined): string |
  */
 export function createIllustrationPrompt(opts: IllustrationPromptOptions): string {
   const style = getStyleDefinition(opts.style);
+  const contentAnchor = opts.contentAnchor ?? 'photo';
   const ctx: StylePromptContext = {
     bookTitle: opts.bookTitle,
     pageText: opts.pageText,
@@ -171,6 +229,7 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
     language: opts.language,
     characterSheetCount: opts.characterSheetCount ?? 0,
     interiorRenderCount: opts.interiorRenderCount ?? 0,
+    contentAnchor,
   };
 
   // 1. Style-specific prompt (the bulk of the prompt)
@@ -178,14 +237,25 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
     ? style.buildCoverPrompt(ctx)
     : style.buildInteriorPrompt(ctx);
 
-  // 2. Bridge pages: re-role image 1 (adjacent photo = anchor, not the scene)
-  const bridgeSection = buildBridgeSceneSection(opts.bridgeScene);
+  // 2. Re-role image 1 when it is not this page's photo:
+  //    - bridge pages: the ADJACENT photo anchors identity, not the scene
+  //    - avatar-story pages ('sheet'): a character sheet anchors, the scene
+  //      comes from the story model (or the page text)
+  //    - avatar-story covers ('interior'): the approved interior render
+  //      anchors the cover repaint
+  const bridgeSection =
+    contentAnchor === 'sheet'
+      ? buildAvatarSceneSection(opts.bridgeScene, opts.pageText)
+      : contentAnchor === 'interior'
+        ? buildInteriorAnchorSection()
+        : buildBridgeSceneSection(opts.bridgeScene as BridgeScene | null | undefined);
 
   // 3. Cross-cutting: character identity
   const charSection = buildCharacterIdentitySection(
     opts.characterIdentity,
     opts.pageNumber,
     opts.bridgeScene?.charactersPresent ?? null,
+    contentAnchor === 'sheet' || contentAnchor === 'interior',
   );
 
   // 4. Cross-cutting: QC feedback

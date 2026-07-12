@@ -28,12 +28,22 @@ export interface CoverGenerationOptions {
   language: string;
   characterIdentity: CharacterIdentity | null;
   pageNumber: number;
-  /** The title page's source photo (vision-normalized buffer). */
+  /**
+   * Image 1 of the render: the title page's source photo (vision-normalized)
+   * for photo books, or the approved interior render of the cover scene for
+   * AVATAR_STORY books (contentAnchor: 'interior').
+   */
   contentImage: IllustrationImageInput;
   /** Validated character sheets (CHARACTER_SHEETS_ENABLED); empty otherwise. */
   characterSheetRefs: IllustrationImageInput[];
   /** The approved interior title-page render, downscaled for reference use. */
   interiorRenderRef: IllustrationImageInput | null;
+  /**
+   * AVATAR_STORY (X6d): 'interior' re-roles image 1 as the approved interior
+   * render being repainted. Absent/'photo' keeps the photo-book cover prompt
+   * byte-identical.
+   */
+  contentAnchor?: 'photo' | 'interior';
   /**
    * Cover-targeted QC feedback ONLY (finalize's cover regen round). The
    * interior render's qcFeedback must never leak here — it describes a
@@ -104,6 +114,9 @@ export async function generateAndStoreCover(
     qcFeedback,
     characterSheetCount: characterSheetRefs.length,
     interiorRenderCount: interiorRenderRef ? 1 : 0,
+    ...(opts.contentAnchor && opts.contentAnchor !== 'photo'
+      ? { contentAnchor: opts.contentAnchor }
+      : {}),
   };
   const coverTextPrompt = createIllustrationPrompt(coverPromptInput);
 

@@ -13,6 +13,7 @@ import { trackEvent } from '@storywink/shared';
 import { computeBookStatus } from '../lib/computeBookStatus.js';
 import { mapQcResultsToPages, RawQcPageResult } from '../lib/qc-mapping.js';
 import { characterSheetsEnabled, sheetRefsForStyle } from '../lib/character-sheets.js';
+import { mergeLinkedAvatarSheets } from '../lib/avatar-sheets.js';
 import { escalationModel, illustrationEscalationEnabled, shouldEscalate } from '../lib/escalation.js';
 import { maybeSendReadyEmail } from '../lib/email.js';
 import { normalizeBookPalette, paletteNormalizeEnabled } from '../lib/palette.js';
@@ -235,6 +236,7 @@ async function regenerateCoverFromQc(
     artStyle: string | null;
     language: string | null;
     coverAssetId: string | null;
+    bookType?: string | null;
     characterIdentity: unknown;
     pages: Array<{
       assetId: string | null;
@@ -242,6 +244,7 @@ async function regenerateCoverFromQc(
       illustrationNotes: string | null;
       pageNumber: number;
       generatedImageUrl: string | null;
+      isTitlePage?: boolean;
       [key: string]: unknown;
     }>;
   },
@@ -259,25 +262,43 @@ async function regenerateCoverFromQc(
       return;
     }
 
-    const titlePage = book.pages.find(p => isTitlePage(p.assetId, book.coverAssetId));
+    // AVATAR_STORY books have no coverAssetId — the persisted isTitlePage
+    // column identifies the cover page instead.
+    const isAvatarBook = book.bookType === 'AVATAR_STORY';
+    const titlePage = isAvatarBook
+      ? book.pages.find(p => p.isTitlePage === true)
+      : book.pages.find(p => isTitlePage(p.assetId, book.coverAssetId));
     if (!titlePage?.text) {
       logger.warn({ bookId: book.id }, 'Cover regen skipped: no title page with text');
       return;
     }
 
-    const asset = titlePage.assetId
-      ? await prisma.asset.findUnique({ where: { id: titlePage.assetId } })
-      : null;
-    const rawAnchorUrl = asset?.url || asset?.thumbnailUrl;
-    if (!rawAnchorUrl) {
-      logger.warn({ bookId: book.id }, 'Cover regen skipped: title page has no source photo');
-      return;
+    // Photo books anchor to the title photo; avatar books anchor to the
+    // approved interior render of page 1 (same anchor the original cover
+    // render used — there is no photo anywhere in the book).
+    let contentImage;
+    if (isAvatarBook) {
+      if (!titlePage.generatedImageUrl) {
+        logger.warn({ bookId: book.id }, 'Cover regen skipped: avatar title page has no interior render');
+        return;
+      }
+      contentImage = await fetchImageInput(
+        optimizeCloudinaryUrlForVision(titlePage.generatedImageUrl),
+      );
+    } else {
+      const asset = titlePage.assetId
+        ? await prisma.asset.findUnique({ where: { id: titlePage.assetId } })
+        : null;
+      const rawAnchorUrl = asset?.url || asset?.thumbnailUrl;
+      if (!rawAnchorUrl) {
+        logger.warn({ bookId: book.id }, 'Cover regen skipped: title page has no source photo');
+        return;
+      }
+      // Same vision-normalized anchor the original render used.
+      contentImage = await fetchImageInput(
+        optimizeCloudinaryUrlForVision(convertHeicToJpeg(rawAnchorUrl)),
+      );
     }
-
-    // Same vision-normalized anchor the original render used.
-    const contentImage = await fetchImageInput(
-      optimizeCloudinaryUrlForVision(convertHeicToJpeg(rawAnchorUrl)),
-    );
 
     const sheetRefs = [];
     for (const sheet of sheets) {
@@ -291,8 +312,10 @@ async function regenerateCoverFromQc(
       }
     }
 
+    // Avatar books: the interior render IS the content anchor above — a
+    // second copy as a reference would be redundant payload.
     let interiorRenderRef = null;
-    if (titlePage.generatedImageUrl) {
+    if (!isAvatarBook && titlePage.generatedImageUrl) {
       try {
         const interior = await fetchImageInput(
           optimizeCloudinaryUrlForVision(titlePage.generatedImageUrl),
@@ -318,6 +341,7 @@ async function regenerateCoverFromQc(
       contentImage,
       characterSheetRefs: sheetRefs,
       interiorRenderRef,
+      ...(isAvatarBook ? { contentAnchor: 'interior' as const } : {}),
       // This is the one place cover feedback is allowed to flow: it was
       // scored against the cover itself, under the cover rubric.
       qcFeedback: coverResult.suggestedPromptAdditions,
@@ -439,9 +463,21 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
         // truth, and the cover joins the QC pass with its own rubric
         // variant (painted title expected, must match book.title exactly).
         const sheetsEnabled = characterSheetsEnabled();
-        const sheets = sheetsEnabled
-          ? sheetRefsForStyle(book.characterReferences, book.artStyle, characterIdentity)
-          : [];
+        // X6c/X6d: linked account-avatar sheets join the stack here too —
+        // QC re-renders must keep the same reference stack the original
+        // render had (for AVATAR_STORY books they are the ONLY anchor a
+        // re-render can use).
+        const sheets =
+          (await mergeLinkedAvatarSheets({
+            bookId,
+            userId,
+            artStyle: book.artStyle,
+            bookType: book.bookType,
+            base: sheetsEnabled
+              ? sheetRefsForStyle(book.characterReferences, book.artStyle, characterIdentity)
+              : [],
+            logger,
+          })) ?? [];
         // Judge ground truth comes from the render-time lastRenderHadSheet
         // stamps, NOT from Book.characterReferences at finalize time:
         // ensureCharacterSheets' budget-expiry path persists sheets in the

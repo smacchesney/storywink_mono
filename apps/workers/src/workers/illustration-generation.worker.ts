@@ -205,6 +205,13 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       ? (page.bridgeScene as unknown as BridgeScene | null)
       : null;
 
+    // AVATAR_STORY (X6d): the whole book is photo-less — every page is a
+    // bridge-source row, but there is no adjacent photo to anchor to; the
+    // star's character sheet becomes image 1 instead. DB-row keyed
+    // (page.book.bookType), same principle as the bridge branch: rows render
+    // correctly regardless of flag state at render time.
+    const isAvatarBook = page.book.bookType === 'AVATAR_STORY';
+
     // Anchor the generation to the same 2048 vision-normalized URL that
     // extraction and QC see (also converts HEIC, which the raw asset URL may
     // be, and caps a tiny thumbnailUrl fallback from silently anchoring the
@@ -214,8 +221,9 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     // A bridge page has no photo of its own — ALWAYS resolve the anchor from
     // the DB at execution time (nearest preceding PHOTO page's asset, or the
     // nearest following one when the authored scene says outfitFrom='next').
-    // Any anchor in job data would be at most a stale cache.
-    if (isBridgePage) {
+    // Any anchor in job data would be at most a stale cache. Avatar books
+    // skip this entirely: no photo page exists anywhere in the book.
+    if (isBridgePage && !isAvatarBook) {
       const photoPages = await prisma.page.findMany({
         where: { bookId, source: 'PHOTO', assetId: { not: null } },
         orderBy: { pageNumber: 'asc' },
@@ -269,12 +277,12 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
             logger.error({ jobId: job.id, pageId, pageNumber, error: fetchError.message }, 'Failed to fetch content image.');
             throw fetchError;
         }
-    } else {
+    } else if (!isAvatarBook) {
          logger.error({ jobId: job.id, pageId, pageNumber }, 'Original content image URL is missing.');
          throw new Error('Missing originalImageUrl for illustration generation.');
     }
-    
-    if (!contentImageBuffer || !contentImageMimeType) {
+
+    if ((!contentImageBuffer || !contentImageMimeType) && !isAvatarBook) {
         logger.error({ jobId: job.id, pageId, pageNumber }, 'Content image buffer or mime type missing.');
         throw new Error('Content image buffer/mime type missing.');
     }
@@ -300,8 +308,10 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     const sheetRefs: IllustrationImageInput[] = [];
     // Book sheets ride CHARACTER_SHEETS_ENABLED; account-avatar sheets ride
     // AVATARS_ENABLED — either gate admits the snapshot the flow built.
+    // AVATAR_STORY books admit sheets unconditionally: they are the only
+    // identity anchor the render has.
     if (
-      (characterSheetsEnabled() || process.env.AVATARS_ENABLED === 'true') &&
+      (characterSheetsEnabled() || process.env.AVATARS_ENABLED === 'true' || isAvatarBook) &&
       job.data.characterSheets?.length
     ) {
       for (const sheet of job.data.characterSheets) {
@@ -421,6 +431,29 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
 
     console.log(`[IllustrationWorker] Fetched ${styleReferenceBuffers.length} style reference image(s) for page ${pageNumber}`);
 
+    // AVATAR_STORY: no photo exists — the FIRST character sheet becomes the
+    // content image (image 1) and the rest stay reference sheets. A page with
+    // zero sheets cannot render on-model; fail it clearly (page → FAILED,
+    // book → PARTIAL) rather than inventing faces.
+    let sheetAnchored = false;
+    let contentInput: IllustrationImageInput;
+    if (contentImageBuffer && contentImageMimeType) {
+      contentInput = { buffer: contentImageBuffer, mimeType: contentImageMimeType };
+    } else if (isAvatarBook && sheetRefs.length > 0) {
+      contentInput = sheetRefs.shift()!;
+      sheetAnchored = true;
+      console.log(`[IllustrationWorker] Avatar-story page ${pageNumber}: anchoring render to the star's character sheet`);
+    } else {
+      logger.error({ jobId: job.id, pageId, pageNumber, isAvatarBook }, 'No content anchor available for render.');
+      throw new Error(
+        isAvatarBook
+          ? 'Avatar-story page has no character sheet to anchor the render'
+          : 'Content image buffer/mime type missing.',
+      );
+    }
+    // Truthful sheet attribution: the anchor sheet counts even after shift().
+    const renderHadSheet = sheetRefs.length > 0 || sheetAnchored;
+
     // For the primary illustration, always use story-style prompt (isTitlePage: false).
     // Cover pages get a separate cover-style illustration generated afterwards.
     const promptInput: IllustrationPromptOptions = {
@@ -437,7 +470,10 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         characterSheetCount: sheetRefs.length,
         // Bridge pages: re-roles image 1 (anchor photo, not this page's
         // scene) and filters identity by scene.charactersPresent.
+        // Avatar-story pages: re-roles image 1 as a character sheet and
+        // composes the scene from the story model (or the page text).
         bridgeScene,
+        ...(sheetAnchored ? { contentAnchor: 'sheet' as const } : {}),
     };
     
     logger.info({ jobId: job.id, pageId, promptInput }, "Constructed promptInput for createIllustrationPrompt");
@@ -473,7 +509,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
        console.log(`[IllustrationWorker] Calling ${illustrator.name} for page ${pageNumber} with ${styleReferenceBuffers.length} style ref(s)...`);
 
        const illustrationInput: IllustrationInput = {
-         contentImage: { buffer: contentImageBuffer, mimeType: contentImageMimeType },
+         contentImage: contentInput,
          // Ordered between photo and style refs; the prompt's role line
          // (characterSheetCount) names each image by this position.
          ...(sheetRefs.length > 0 ? { characterRefs: sheetRefs } : {}),
@@ -647,8 +683,9 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
                         // sheetRefs is what this render actually conditioned
                         // on (truthful even when a sheet fetch degraded), so
                         // QC ground truth can be derived per render, not from
-                        // Book.characterReferences at finalize time.
-                        lastRenderHadSheet: sheetRefs.length > 0,
+                        // Book.characterReferences at finalize time. The
+                        // avatar-story anchor sheet counts too.
+                        lastRenderHadSheet: renderHadSheet,
                     }
                     : {}),
                 moderationStatus: moderationBlocked ? "FLAGGED" : "OK",
@@ -686,9 +723,15 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         // the character sheet(s) plus the approved interior title-page render
         // as references, so the two renders of the same photo stop diverging.
         const interiorRenderRef =
-          characterSheetsEnabled() && interiorRenderBuffer
+          (characterSheetsEnabled() || isAvatarBook) && interiorRenderBuffer
             ? await resizeForReference(interiorRenderBuffer)
             : null;
+
+        // AVATAR_STORY covers: there is no title photo — the approved
+        // interior render of page 1 anchors the cover repaint, and ALL cast
+        // sheets (including the anchor sheet the interior render used) ride
+        // as identity references.
+        const avatarCoverAnchor = isAvatarBook ? (interiorRenderRef ?? contentInput) : null;
 
         const coverOutcome = await generateAndStoreCover({
           bookId,
@@ -699,9 +742,12 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
           language: language || 'en',
           characterIdentity: characterIdentity || null,
           pageNumber,
-          contentImage: { buffer: contentImageBuffer, mimeType: contentImageMimeType },
-          characterSheetRefs: sheetRefs,
-          interiorRenderRef,
+          contentImage: avatarCoverAnchor ?? { buffer: contentImageBuffer!, mimeType: contentImageMimeType! },
+          characterSheetRefs: isAvatarBook
+            ? [...(sheetAnchored ? [contentInput] : []), ...sheetRefs]
+            : sheetRefs,
+          interiorRenderRef: isAvatarBook ? null : interiorRenderRef,
+          ...(isAvatarBook ? { contentAnchor: 'interior' as const } : {}),
           // QC feedback targets the interior title-page render, not the cover
           // (a different image the QC pass never saw) — never inherit it here.
           // Cover-targeted feedback only flows through finalize's regen round.
