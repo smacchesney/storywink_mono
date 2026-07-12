@@ -9,35 +9,18 @@ import { QueueName, getQueue } from '@/lib/queue/index';
 import { avatarsEnabled } from '@/lib/avatars';
 import { isValidStyle } from '@storywink/shared/prompts/styles';
 import {
-  AVATAR_STORY_PAGE_LENGTHS,
   castComposition,
   buildAvatarStoryRoster,
   CastKind,
   StoredAvatarIdentity,
 } from '@/lib/avatar-story';
+// X6d: avatar-first stories — no photos, a cast of account avatars, a
+// parent-picked spark, and a page count. Dark behind AVATARS_ENABLED.
+import { createAvatarBookSchema } from '@/lib/avatar-story-schema';
 
 // Zod schema for request body validation
 const createBookSchema = z.object({
   assetIds: z.array(z.string().cuid()).min(1, { message: 'At least one asset ID is required.' }).max(23, { message: 'Maximum 23 photos per book.' }),
-  language: z.enum(['en', 'ja']).default('en'),
-});
-
-// X6d: avatar-first stories — no photos, a cast of account avatars, a
-// parent-picked spark, and a page count. Dark behind AVATARS_ENABLED.
-const createAvatarBookSchema = z.object({
-  bookType: z.literal('AVATAR_STORY'),
-  avatarIds: z
-    .array(z.string().cuid())
-    .min(1, { message: 'Pick at least one character.' })
-    .max(6, { message: 'Six characters at most.' }),
-  premise: z.string().trim().min(1).max(300),
-  pageLength: z
-    .number()
-    .int()
-    .refine((n): n is (typeof AVATAR_STORY_PAGE_LENGTHS)[number] =>
-      (AVATAR_STORY_PAGE_LENGTHS as readonly number[]).includes(n),
-    ),
-  artStyle: z.string().min(1).max(50),
   language: z.enum(['en', 'ja']).default('en'),
 });
 

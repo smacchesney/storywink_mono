@@ -211,6 +211,18 @@ export default function SetupPage() {
           return;
         }
 
+        // X6d: this sheet is the PHOTO path's setup — an avatar-story book
+        // must never land on it. A stranded avatar DRAFT (story enqueue
+        // lost) restarts in the character flow; a FAILED one retries from
+        // the preview screen. In-flight statuses already rendered the
+        // shared wait above.
+        if ((book as { bookType?: string }).bookType === 'AVATAR_STORY') {
+          router.replace(
+            book.status === BookStatus.DRAFT ? '/create/characters' : `/book/${bookId}/preview`,
+          );
+          return;
+        }
+
         mergeBook(book);
 
         // Decide whether the librarian strip mounts at all. A stale book or

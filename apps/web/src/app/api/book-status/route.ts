@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
       },
       select: {
         status: true,
+        bookType: true,
         generationPhase: true,
         childName: true,
         pages: {
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest) {
       // can narrate truthfully ("Writing Mika's story…").
       generationPhase: book.generationPhase,
       childName: book.childName,
+      bookType: book.bookType,
       totalPages: book.pages.length,
       pagesWithText: book.pages.filter(p => p.text && p.text.trim().length > 0).length,
       pagesWithIllustrations: book.pages.filter(p => p.generatedImageUrl).length,

@@ -191,8 +191,14 @@ export async function DELETE(
           data: {
             index: i,
             pageNumber: i + 1,
+            // Photo pages re-derive from the cover asset (byte-identical to
+            // before). Photo-less pages (avatar-story rows, bridges) have no
+            // asset to derive from — PRESERVE the persisted marker, or one
+            // delete would wipe the avatar book's only cover anchor.
             isTitlePage:
-              book.coverAssetId !== null && page.assetId === book.coverAssetId,
+              page.assetId !== null
+                ? book.coverAssetId !== null && page.assetId === book.coverAssetId
+                : page.isTitlePage,
           },
         });
       }

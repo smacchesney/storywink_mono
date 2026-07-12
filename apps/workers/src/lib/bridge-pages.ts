@@ -23,6 +23,19 @@ export function bridgePagesEnabled(): boolean {
 }
 
 /**
+ * PURGE-AT-START decision (X6d-aware): stale BRIDGE rows from a previous
+ * story run are purged before regeneration — EXCEPT on AVATAR_STORY books,
+ * where every page is a bridge-source row authored at creation time; purging
+ * them would delete the entire book. Pure and pinned by tests.
+ */
+export function shouldPurgeStaleBridges(
+  bookType: string | null | undefined,
+  pages: { source: string }[],
+): boolean {
+  return bookType !== 'AVATAR_STORY' && pages.some(p => p.source === 'BRIDGE');
+}
+
+/**
  * Hard cap on bridges per book: min(2, 23 - photoCount).
  * 23 total rows keeps the Lulu interior at 2 + 2N <= 48 (saddle-stitch
  * ceiling); create already caps photos at 23, so bridges may only spend the

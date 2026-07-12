@@ -482,7 +482,7 @@
     "matchYes": "Yes, it's them",
     "matchNo": "Not them",
     "matchLinked": "{name} will look just like their character.",
-    "deleteStarsInStories": "{name} stars in a character story — that book needs them. Delete the book first, or keep them both."
+    "deleteStarsInStories": "{name} stars in your character stories — those books need them. Delete the stories first, or keep your character."
   },
   "avatarStories": {
     "cardTitle": "With {name} & friends",

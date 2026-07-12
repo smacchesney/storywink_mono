@@ -50,6 +50,8 @@ export interface NormalizeBookPaletteParams {
   /** Book.artStyle — only used to keep the re-upload's tag set intact. */
   artStyle: string | null;
   coverAssetId: string | null;
+  /** Book.bookType — gates the photo-less title-page fallback (X6d). */
+  bookType?: string | null;
   pages: PalettePage[];
   logger: Logger;
 }
@@ -120,9 +122,10 @@ export async function normalizeBookPalette(params: NormalizeBookPaletteParams): 
 
     const titlePage =
       pages.find(p => isTitlePage(p.assetId, coverAssetId)) ??
-      // Avatar-story books: no photo cover exists — anchor to the persisted
-      // isTitlePage row instead of silently skipping normalization.
-      pages.find(p => p.isTitlePage === true);
+      // Avatar-story books ONLY: no photo cover exists — anchor to the
+      // persisted isTitlePage row. Photo books keep the derived-helper
+      // semantics exactly (bookType-gated like every sibling call site).
+      (params.bookType === 'AVATAR_STORY' ? pages.find(p => p.isTitlePage === true) : undefined);
     if (!titlePage?.generatedImageUrl) {
       logger.info({ bookId }, 'Palette normalization skipped: no title-page render to anchor to');
       return;

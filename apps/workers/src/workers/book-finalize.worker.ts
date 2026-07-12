@@ -463,11 +463,13 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
         // truth, and the cover joins the QC pass with its own rubric
         // variant (painted title expected, must match book.title exactly).
         const sheetsEnabled = characterSheetsEnabled();
-        // X6c/X6d: linked account-avatar sheets join the stack here too —
-        // QC re-renders must keep the same reference stack the original
-        // render had (for AVATAR_STORY books they are the ONLY anchor a
-        // re-render can use).
+        // X6c/X6d: QC re-renders must keep the SAME reference stack the
+        // original renders conditioned on. The flow snapshots it into this
+        // job's data; the DB re-read is only a fallback for pre-snapshot jobs
+        // (a mid-flight "draw again" could otherwise swap the identity anchor
+        // between rounds).
         const sheets =
+          job.data.characterSheets ??
           (await mergeLinkedAvatarSheets({
             bookId,
             userId,
@@ -477,7 +479,8 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
               ? sheetRefsForStyle(book.characterReferences, book.artStyle, characterIdentity)
               : [],
             logger,
-          })) ?? [];
+          })) ??
+          [];
         // Judge ground truth comes from the render-time lastRenderHadSheet
         // stamps, NOT from Book.characterReferences at finalize time:
         // ensureCharacterSheets' budget-expiry path persists sheets in the
@@ -584,7 +587,23 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
         // (qcRound === 0) so a book run can never re-buy the cover twice.
         // Inline (not re-queued): cover failure never blocks or requeues
         // pages, and the finalize lock is long enough for one render.
-        if (coverForQc && qcResult?.coverResult && !qcResult.coverResult.passed && qcRound === 0) {
+        // Skipped when the TITLE PAGE itself is being requeued below — its
+        // successful re-render regenerates the cover anyway, and this regen
+        // would be overwritten uncorrected (one wasted render).
+        const titlePageRequeued = Boolean(
+          qcResult &&
+            !qcResult.passed &&
+            book.pages.some(
+              (p: any) => p.isTitlePage && qcResult.failedPageIds.includes(p.id),
+            ),
+        );
+        if (
+          coverForQc &&
+          qcResult?.coverResult &&
+          !qcResult.coverResult.passed &&
+          qcRound === 0 &&
+          !titlePageRequeued
+        ) {
           await regenerateCoverFromQc(book, sheets, qcResult.coverResult);
         }
 
@@ -692,7 +711,9 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
             const flow = await flowProducer.add({
               name: `finalize-book-${bookId}-qc${nextRound}`,
               queueName: QUEUE_NAMES.BOOK_FINALIZE,
-              data: { bookId, userId, qcRound: nextRound },
+              // The sheet snapshot rides forward so round 2 judges and
+              // re-renders against the same stack round 1 used.
+              data: { bookId, userId, qcRound: nextRound, ...(sheets.length ? { characterSheets: sheets } : {}) },
               opts: {
                 removeOnComplete: { count: 100 },
                 removeOnFail: { count: 500 },
@@ -768,6 +789,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
         bookId,
         artStyle: book.artStyle,
         coverAssetId: book.coverAssetId,
+        bookType: book.bookType,
         pages: book.pages.map((p: any) => ({
           id: p.id,
           pageNumber: p.pageNumber,

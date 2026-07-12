@@ -25,6 +25,8 @@ export interface ProgressSnapshot {
   pagesWithText: number;
   pagesWithIllustrations: number;
   childName: string | null;
+  /** PHOTO_STORY | AVATAR_STORY — avatar books never read photos. */
+  bookType?: string | null;
 }
 
 export interface ProgressHeadline {
@@ -99,5 +101,12 @@ export function resolveProgressHeadline(snapshot: ProgressSnapshot): ProgressHea
     };
   }
   if (pagesWithText > 0) return { key: 'writingStory' };
+  // Avatar-first books have no photos to read — the truthful pre-phase
+  // fallback is the story being written, never 'Reading your photos'.
+  if (snapshot.bookType === 'AVATAR_STORY') {
+    return childName
+      ? { key: 'writingStoryFor', values: { name: childName } }
+      : { key: 'writingStory' };
+  }
   return { key: 'readingPhotos' };
 }

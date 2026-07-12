@@ -58,20 +58,6 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
     });
     if (!avatar) return NextResponse.json({ error: 'Character not found' }, { status: 404 });
 
-    // X6d guard: an avatar starring in avatar-first stories is load-bearing —
-    // deleting it would cascade the BookAvatar links and wipe the rendition
-    // sheets those books need for every re-render. The parent deletes the
-    // books first (or keeps the character); a silent brick is never OK.
-    const starringIn = await prisma.bookAvatar.count({
-      where: { avatarId, book: { bookType: 'AVATAR_STORY' } },
-    });
-    if (starringIn > 0) {
-      return NextResponse.json(
-        { code: 'STARS_IN_STORIES', count: starringIn },
-        { status: 409 },
-      );
-    }
-
     // Staged photos are deletable only when no book page/cover and no other
     // avatar references the same asset.
     const stagedAssetIds = avatar.photos.map((p) => p.assetId);
@@ -111,17 +97,46 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       userId: dbUser.id,
     };
 
-    await prisma.appEvent.create({
+    // X6d guard: an avatar starring in avatar-first stories is load-bearing —
+    // deleting it would cascade the BookAvatar links and wipe the rendition
+    // sheets those books need for every re-render. Fast-path check BEFORE the
+    // cleanup pending marker (a marker for a live avatar must never exist),
+    // then re-checked INSIDE the delete transaction so a concurrent
+    // avatar-book creation can't slip between check and delete. A create that
+    // commits after the delete fails its own FK instead — no orphaned book.
+    const STARS_IN_STORIES = 'STARS_IN_STORIES';
+    const starringIn = await prisma.bookAvatar.count({
+      where: { avatarId, book: { bookType: 'AVATAR_STORY' } },
+    });
+    if (starringIn > 0) {
+      return NextResponse.json({ code: STARS_IN_STORIES }, { status: 409 });
+    }
+
+    const pendingMarker = await prisma.appEvent.create({
       data: {
         name: ASSET_CLEANUP_PENDING_EVENT,
         userId: dbUser.id,
         props: { ...payload },
       },
     });
-    await prisma.$transaction([
-      prisma.avatar.delete({ where: { id: avatarId } }),
-      prisma.asset.deleteMany({ where: { id: { in: deletableAssetIds } } }),
-    ]);
+    try {
+      await prisma.$transaction(async (tx) => {
+        const stillStarring = await tx.bookAvatar.count({
+          where: { avatarId, book: { bookType: 'AVATAR_STORY' } },
+        });
+        if (stillStarring > 0) throw new Error(STARS_IN_STORIES);
+        await tx.avatar.delete({ where: { id: avatarId } });
+        await tx.asset.deleteMany({ where: { id: { in: deletableAssetIds } } });
+      });
+    } catch (txError) {
+      if (txError instanceof Error && txError.message === STARS_IN_STORIES) {
+        // The avatar lives on — the cleanup marker must not survive, or the
+        // reconcile pass would delete a live avatar's Cloudinary bytes.
+        await prisma.appEvent.delete({ where: { id: pendingMarker.id } }).catch(() => {});
+        return NextResponse.json({ code: STARS_IN_STORIES }, { status: 409 });
+      }
+      throw txError;
+    }
 
     try {
       await getAvatarCleanupQueue().add('avatar-cleanup', payload, {

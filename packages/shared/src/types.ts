@@ -142,6 +142,13 @@ export interface BookFinalizeJob {
   qcRound?: number;
   /** Set when the illustration run was scoped (single-page reillustrate / targeted retry): finalize skips the book-wide QC cascade. */
   scopedPageIds?: string[];
+  /**
+   * Snapshot of the reference stack the render children conditioned on,
+   * carried through every QC round so a mid-flight "draw again" can never
+   * swap the identity anchor between rounds. Absent on jobs from before this
+   * field existed — finalize falls back to recomputing from the DB.
+   */
+  characterSheets?: CharacterSheetRef[];
 }
 
 /**

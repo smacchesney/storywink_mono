@@ -81,6 +81,13 @@ function AvatarStoryFlow() {
   // If create succeeded but the story enqueue did not, retry must reuse the
   // SAME book — never mint a duplicate.
   const createdBookIdRef = useRef<string | null>(null);
+  // ...but ONLY while the choices are unchanged: if the parent goes Back and
+  // edits the cast, spark, length, style, or language, the half-created book
+  // no longer matches — forget it (the draft-retention sweep reaps the
+  // orphan) rather than generate a story from stale choices.
+  useEffect(() => {
+    createdBookIdRef.current = null;
+  }, [castIds, sparkKey, customSpark, writingOwn, pageLength, artStyle, language]);
 
   const load = useCallback(async () => {
     const res = await fetch('/api/avatars').catch(() => null);
@@ -99,6 +106,17 @@ function AvatarStoryFlow() {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [load]);
+
+  // Prune phantom cast ids (deleted / no-longer-READY avatars restored from
+  // a stale draft): an invisible id would 404 create in a retry loop the
+  // parent cannot see or fix.
+  useEffect(() => {
+    if (!avatars) return;
+    setCastIds((prev) => {
+      const pruned = prev.filter((id) => avatars.some((a) => a.id === id));
+      return pruned.length === prev.length ? prev : pruned;
+    });
+  }, [avatars]);
 
   // Wizard state survives an accidental browser-back / reload within the
   // session — three steps of picking must never evaporate.
@@ -310,7 +328,12 @@ function AvatarStoryFlow() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookId }),
       });
-      if (storyRes.status !== 202) throw new Error(`generate ${storyRes.status}`);
+      // 202 = enqueued now. 409 = already generating (our first request
+      // landed but its response was lost) — the story is on its way, so
+      // navigating to the wait screen is the right move, not an error.
+      if (storyRes.status !== 202 && storyRes.status !== 409) {
+        throw new Error(`generate ${storyRes.status}`);
+      }
 
       rememberCreatePath('avatars');
       try {

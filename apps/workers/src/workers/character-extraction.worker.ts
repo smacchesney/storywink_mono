@@ -621,7 +621,15 @@ async function createIllustrationFlow(
       // (reaper, book-level retry) set `recovery`: their pageIds only scope
       // the render children, and finalize must still run the book-wide QC
       // pass and palette normalization.
-      data: { bookId, userId, ...(pageIds?.length && !recovery ? { scopedPageIds: pageIds } : {}) },
+      data: {
+        bookId,
+        userId,
+        ...(pageIds?.length && !recovery ? { scopedPageIds: pageIds } : {}),
+        // Same-stack invariant: finalize's QC requeue re-renders must use the
+        // exact reference stack these children conditioned on, not a live
+        // re-read that a mid-flight "draw again" could have swapped.
+        ...(characterSheets?.length ? { characterSheets } : {}),
+      },
       opts: {
         removeOnComplete: { count: 100 },
         removeOnFail: { count: 500 },

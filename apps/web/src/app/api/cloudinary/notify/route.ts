@@ -72,10 +72,16 @@ export async function POST(request: NextRequest) {
     if (bookId) {
       const book = await prisma.book.findUnique({
         where: { id: bookId, userId: dbUser.id },
-        select: { status: true, _count: { select: { pages: true } } }
+        select: { status: true, bookType: true, _count: { select: { pages: true } } }
       });
       if (!book) {
         return NextResponse.json({ error: 'Book not found or permission denied' }, { status: 404 });
+      }
+      // X6d: avatar-story books are photo-less by design — their pages,
+      // roster, and premise are authored from the cast. Attaching photos here
+      // would desync pageLength and invite the photo pipeline in.
+      if (book.bookType === 'AVATAR_STORY') {
+        return NextResponse.json({ error: 'This book is made from characters, not photos' }, { status: 409 });
       }
       bookPageCount = book._count.pages;
       bookStatus = book.status;

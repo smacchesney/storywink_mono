@@ -14,6 +14,34 @@ import type { Logger } from 'pino';
 import type { CharacterSheetRef } from '@storywink/shared';
 import prisma from '../database/index.js';
 
+/**
+ * Pick which rendition's sheet may join the reference stack (pure, tested).
+ *
+ * READY always wins. A non-READY rendition still holding a sheet (a "draw
+ * again" flips the row to PENDING but keeps the last good URL) is accepted
+ * ONLY for AVATAR_STORY books — their re-renders have no other anchor and
+ * must not fail mid-redraw. Photo books (X6c) stay READY-only: the sheet is
+ * an optional consistency boost there, and a stale one is worse than none.
+ */
+export function pickRenditionSheet(
+  renditions: { status: string; turnaroundSheetUrl: string | null }[],
+  bookType: string | null | undefined,
+): string | null {
+  const ready = renditions.find((r) => r.status === 'READY' && r.turnaroundSheetUrl);
+  if (ready) return ready.turnaroundSheetUrl;
+  if (bookType !== 'AVATAR_STORY') return null;
+  return renditions.find((r) => r.turnaroundSheetUrl)?.turnaroundSheetUrl ?? null;
+}
+
+/** Merge core (pure, tested): avatar refs lead and override same-id base refs. */
+export function mergeSheetRefs(
+  avatarRefs: CharacterSheetRef[],
+  base: CharacterSheetRef[] | undefined,
+): CharacterSheetRef[] {
+  const overridden = new Set(avatarRefs.map((r) => r.characterId));
+  return [...avatarRefs, ...(base ?? []).filter((r) => !overridden.has(r.characterId))];
+}
+
 export async function mergeLinkedAvatarSheets(opts: {
   bookId: string;
   userId: string;
@@ -48,9 +76,7 @@ export async function mergeLinkedAvatarSheets(opts: {
 
     const avatarRefs: CharacterSheetRef[] = [];
     for (const link of links) {
-      const rendition =
-        link.avatar.renditions.find((r) => r.status === 'READY') ?? link.avatar.renditions[0];
-      const sheetUrl = rendition?.turnaroundSheetUrl;
+      const sheetUrl = pickRenditionSheet(link.avatar.renditions, bookType);
       if (!link.characterId || !sheetUrl) continue;
       avatarRefs.push({
         characterId: link.characterId,
@@ -61,8 +87,7 @@ export async function mergeLinkedAvatarSheets(opts: {
 
     if (avatarRefs.length === 0) return base;
 
-    const overridden = new Set(avatarRefs.map((r) => r.characterId));
-    const merged = [...avatarRefs, ...(base ?? []).filter((r) => !overridden.has(r.characterId))];
+    const merged = mergeSheetRefs(avatarRefs, base);
     logger.info(
       { bookId, avatarSheets: avatarRefs.length },
       'Linked account-avatar sheets joined the reference stack',

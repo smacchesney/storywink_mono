@@ -12,6 +12,7 @@
  */
 import { avatarPageSceneSchema } from '@storywink/shared/schemas';
 import type { AvatarPageScene, AvatarStoryCastMember } from '@storywink/shared/prompts/story';
+import { STORY_QC_THRESHOLDS, AvatarStoryQCResponse } from '@storywink/shared/prompts/story-check';
 
 /** The loose shape of one Book.characterIdentity roster entry (Json). */
 export interface StoredRosterCharacter {
@@ -59,6 +60,60 @@ export function buildAvatarCastForPrompt(
       role: c.role?.trim() || 'grown-up',
       description: describeCastMember(c),
     }));
+}
+
+/**
+ * The avatar-story QC verdict (pure, pinned by tests): which scores block the
+ * draft and force the single regeneration. premiseTruth is deliberately
+ * ABSENT — it ships LOG-ONLY, same telemetry-first philosophy as every other
+ * new check (an enforcing check is a silent extra generation during the
+ * parent's wait).
+ */
+export function avatarStoryQcProblems(
+  qc: Pick<AvatarStoryQCResponse, 'arcCoherence' | 'readAloudRhythm' | 'lastPageLanding' | 'feedback'>,
+  refrain: string,
+  refrainEchoes: number,
+): string[] {
+  const problems: string[] = [];
+  if (refrainEchoes < STORY_QC_THRESHOLDS.minRefrainEchoes) {
+    problems.push(
+      `The refrain "${refrain}" is only recognizable on ${refrainEchoes} page(s). It must echo (with variation) on at least ${STORY_QC_THRESHOLDS.minRefrainEchoes} pages.`,
+    );
+  }
+  if (qc.arcCoherence < STORY_QC_THRESHOLDS.minArcCoherence) {
+    problems.push(`Arc coherence scored ${qc.arcCoherence}/10 — the pages must actually deliver the declared desire → escalation → peak → soft landing.`);
+  }
+  if (qc.readAloudRhythm < STORY_QC_THRESHOLDS.minReadAloudRhythm) {
+    problems.push(`Read-aloud rhythm scored ${qc.readAloudRhythm}/10 — vary sentence lengths and make it musical when spoken.`);
+  }
+  if (!qc.lastPageLanding) {
+    problems.push('The final page must land as a soft, warm exhale — no summary statements.');
+  }
+  if (problems.length > 0 && qc.feedback) {
+    problems.push(qc.feedback);
+  }
+  return problems;
+}
+
+/**
+ * Deterministic sheet order for avatar-story renders: the FIRST sheet becomes
+ * image 1 (the render's content anchor). Star first when present; everyone
+ * else in roster order (avatar_N is minted in pick order, so a numeric-aware
+ * characterId sort IS the parent's pick order). Without this, the order is
+ * whatever the DB returned — a different anchor per render.
+ */
+export function orderCharacterSheets<T extends { characterId: string }>(
+  sheets: T[],
+  starCharacterId: string | null | undefined,
+): T[] {
+  const byRoster = [...sheets].sort((a, b) =>
+    a.characterId.localeCompare(b.characterId, 'en', { numeric: true }),
+  );
+  if (!starCharacterId) return byRoster;
+  return [
+    ...byRoster.filter(s => s.characterId === starCharacterId),
+    ...byRoster.filter(s => s.characterId !== starCharacterId),
+  ];
 }
 
 /**

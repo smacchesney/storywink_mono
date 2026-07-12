@@ -82,8 +82,8 @@ export async function POST(
       }))
     }, 'API: Page state before reorder');
 
-    // Build a map of pageId → assetId for isTitlePage derivation
-    const pageAssetMap = new Map(currentPages.map(p => [p.id, p.assetId]));
+    // Build a map of pageId → page for isTitlePage derivation
+    const pageById = new Map(currentPages.map(p => [p.id, p]));
     const coverAssetId = bookOwnerCheck.coverAssetId;
 
     // Use a transaction to update all page indices atomically
@@ -99,8 +99,14 @@ export async function POST(
           data: {
             index: page.index,
             pageNumber: page.index + 1,
-            // isTitlePage is based on coverAssetId, not index position
-            isTitlePage: pageAssetMap.get(page.pageId) === coverAssetId && coverAssetId !== null,
+            // Photo pages: derived from coverAssetId, not index position
+            // (byte-identical to before). Photo-less pages (avatar-story
+            // rows, bridges): PRESERVE the persisted marker — recomputing
+            // from a null coverAssetId would wipe the avatar cover anchor.
+            isTitlePage:
+              pageById.get(page.pageId)?.assetId != null
+                ? pageById.get(page.pageId)?.assetId === coverAssetId && coverAssetId !== null
+                : (pageById.get(page.pageId)?.isTitlePage ?? false),
           },
         })
       );

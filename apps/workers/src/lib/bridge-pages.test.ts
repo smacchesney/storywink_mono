@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import type { StoryBridgePageResponse } from '@storywink/shared/prompts/story';
 import {
   bridgePagesEnabled,
+  shouldPurgeStaleBridges,
   bridgeCapForPhotoCount,
   validateBridgePages,
   planPageSequence,
@@ -237,5 +238,24 @@ describe('resolveBridgeAnchor', () => {
 
   it("explicit outfitFrom='previous' matches the default behavior", () => {
     expect(resolveBridgeAnchor(pages, 3, 'previous')?.assetUrl).toBe('u2');
+  });
+});
+
+describe('shouldPurgeStaleBridges (X6d purge gate)', () => {
+  it('purges stale bridge rows on photo books', () => {
+    expect(
+      shouldPurgeStaleBridges('PHOTO_STORY', [{ source: 'PHOTO' }, { source: 'BRIDGE' }]),
+    ).toBe(true);
+  });
+
+  it('NEVER purges avatar-story books — their pages ARE bridge-source rows', () => {
+    expect(
+      shouldPurgeStaleBridges('AVATAR_STORY', [{ source: 'BRIDGE' }, { source: 'BRIDGE' }]),
+    ).toBe(false);
+  });
+
+  it('no bridge rows → nothing to purge', () => {
+    expect(shouldPurgeStaleBridges('PHOTO_STORY', [{ source: 'PHOTO' }])).toBe(false);
+    expect(shouldPurgeStaleBridges(null, [])).toBe(false);
   });
 });

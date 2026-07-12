@@ -43,6 +43,7 @@ export function GenerationProgress({ bookId, reviewFirst, onComplete }: Generati
   const {
     status,
     generationPhase,
+    bookType,
     childName,
     totalPages,
     pagesWithText,
@@ -126,6 +127,7 @@ export function GenerationProgress({ bookId, reviewFirst, onComplete }: Generati
     pagesWithText,
     pagesWithIllustrations,
     childName,
+    bookType,
   });
   const headline = t(headlineSpec.key, headlineSpec.values);
 

@@ -9,6 +9,7 @@ import pino from 'pino';
 import { createIllustrationPrompt, IllustrationPromptOptions } from '@storywink/shared/prompts/illustration';
 import type { BridgeScene } from '@storywink/shared/prompts/story';
 import { resolveBridgeAnchor } from '../lib/bridge-pages.js';
+import { orderCharacterSheets } from '../lib/avatar-story.js';
 // Import STYLE_LIBRARY directly from styles module to avoid barrel export race condition
 import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
@@ -315,17 +316,14 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       job.data.characterSheets?.length
     ) {
       // AVATAR_STORY: the FIRST fetched sheet becomes image 1 (the render's
-      // content anchor), so the STAR's sheet must lead. The snapshot order
-      // comes from an unordered findMany — reorder deterministically here.
+      // content anchor), so the order must be deterministic — star first,
+      // then roster (pick) order; without a star (adult-only cast) roster
+      // order alone decides. The snapshot order comes from an unordered
+      // findMany and must never pick the anchor.
       let sheetSources = job.data.characterSheets;
       if (isAvatarBook && sheetSources.length > 1) {
         const starId = characterIdentity?.characters?.find(c => c.role?.startsWith('main'))?.characterId;
-        if (starId) {
-          sheetSources = [
-            ...sheetSources.filter(s => s.characterId === starId),
-            ...sheetSources.filter(s => s.characterId !== starId),
-          ];
-        }
+        sheetSources = orderCharacterSheets(sheetSources, starId ?? null);
       }
       for (const sheet of sheetSources) {
         try {

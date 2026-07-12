@@ -17,6 +17,7 @@ export interface BookStatusData {
   status: BookStatus | null;
   /** Worker-written pipeline phase (finer than status); null falls back to status-only copy. */
   generationPhase: string | null;
+  bookType: string | null;
   /** The child the book is for — lets the wait screen use their name. */
   childName: string | null;
   totalPages: number;
@@ -74,6 +75,7 @@ export function useBookStatus(
   const [data, setData] = useState<BookStatusData>({
     status: null,
     generationPhase: null,
+    bookType: null,
     childName: null,
     totalPages: 0,
     pagesWithText: 0,
@@ -130,6 +132,7 @@ export function useBookStatus(
         ...prev,
         status,
         generationPhase: json.generationPhase ?? null,
+        bookType: json.bookType ?? null,
         childName: json.childName ?? null,
         totalPages: json.totalPages ?? 0,
         pagesWithText: json.pagesWithText ?? 0,

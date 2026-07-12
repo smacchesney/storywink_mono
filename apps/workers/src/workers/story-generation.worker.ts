@@ -43,6 +43,7 @@ import {
   bridgeCapForPhotoCount,
   validateBridgePages,
   planPageSequence,
+  shouldPurgeStaleBridges,
 } from '../lib/bridge-pages.js';
 import {
   mergeCastNames,
@@ -52,7 +53,7 @@ import {
   ResolvedCastEntry,
   CastCoverageResult,
 } from '../lib/resolveCast.js';
-import { buildAvatarCastForPrompt, extractAvatarScene } from '../lib/avatar-story.js';
+import { buildAvatarCastForPrompt, extractAvatarScene, avatarStoryQcProblems } from '../lib/avatar-story.js';
 import { STORY_MODEL, ANALYSIS_MODEL } from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -296,17 +297,11 @@ async function evaluateAvatarStoryQuality(
   input: AvatarStoryGenerationInput,
   bookId: string,
 ): Promise<{ passed: boolean; feedback: string }> {
-  const problems: string[] = [];
   const sortedPages = [...storyResponse.pages].sort((a, b) => a.pageNumber - b.pageNumber);
   const pageTexts = sortedPages.map(p => p.text || '');
 
   const refrain = storyResponse.storyArc?.refrain || '';
   const echoes = countRefrainEchoes(refrain, pageTexts, input.language);
-  if (echoes < STORY_QC_THRESHOLDS.minRefrainEchoes) {
-    problems.push(
-      `The refrain "${refrain}" is only recognizable on ${echoes} page(s). It must echo (with variation) on at least ${STORY_QC_THRESHOLDS.minRefrainEchoes} pages.`,
-    );
-  }
 
   // LOG-ONLY: learning-word dose, same telemetry as the photo path.
   if (input.learningWords?.length) {
@@ -390,18 +385,9 @@ async function evaluateAvatarStoryQuality(
     'Story QC scores',
   );
 
-  if (qc.arcCoherence < STORY_QC_THRESHOLDS.minArcCoherence) {
-    problems.push(`Arc coherence scored ${qc.arcCoherence}/10 — the pages must actually deliver the declared desire → escalation → peak → soft landing.`);
-  }
-  if (qc.readAloudRhythm < STORY_QC_THRESHOLDS.minReadAloudRhythm) {
-    problems.push(`Read-aloud rhythm scored ${qc.readAloudRhythm}/10 — vary sentence lengths and make it musical when spoken.`);
-  }
-  if (!qc.lastPageLanding) {
-    problems.push('The final page must land as a soft, warm exhale — no summary statements.');
-  }
-  if (problems.length > 0 && qc.feedback) {
-    problems.push(qc.feedback);
-  }
+  // The enforced-dimension verdict is pure and pinned by tests — premiseTruth
+  // stays LOG-ONLY by construction.
+  const problems = avatarStoryQcProblems(qc, refrain, echoes);
 
   return {
     passed: problems.length === 0,
@@ -480,7 +466,7 @@ export async function processStoryGeneration(job: Job<StoryGenerationJob & { sin
     // flag rollback must not survive a regen either. Runs BEFORE the
     // pageLength comparison below so the mismatch warn can't fire spuriously,
     // and pageLength is recomputed in the same transaction.
-    if (!isAvatarStory && book.pages.some(p => p.source === 'BRIDGE')) {
+    if (shouldPurgeStaleBridges(book.bookType, book.pages)) {
       const survivors = book.pages.filter(p => p.source !== 'BRIDGE');
       await prisma.$transaction(async (tx) => {
         await tx.page.deleteMany({ where: { bookId, source: 'BRIDGE' } });
