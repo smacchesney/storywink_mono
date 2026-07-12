@@ -19,7 +19,9 @@ import { optimizeCloudinaryUrlForVision } from '@storywink/shared/utils';
 import {
   extractAvatarIdentity,
   generateAvatarSheet,
+  generateAvatarCutout,
   sheetSubjectForStyle,
+  cutoutSubjectForStyle,
   portraitUrlFromSheet,
   copySheetIntoAvatarFolder,
   type AvatarIdentity,
@@ -39,6 +41,12 @@ export interface AvatarRenditionJobData {
    * of generating anew — the parent keeps exactly the character they saw.
    */
   copyFromSheetUrl?: string;
+  /**
+   * Backfill path (X7): only generate the waving cutout for an already-READY
+   * rendition. The card must never re-enter a working state — no PENDING
+   * flip, no status change, and the cutout silently swaps in when it lands.
+   */
+  cutoutOnly?: boolean;
 }
 
 export async function processAvatarRendition(job: Job<AvatarRenditionJobData>): Promise<void> {
@@ -57,6 +65,41 @@ export async function processAvatarRendition(job: Job<AvatarRenditionJobData>): 
     return;
   }
 
+  // X7 backfill path: cutout only, BEFORE the PENDING upsert — a finished
+  // character must never look re-opened while its cutout draws.
+  if (job.data.cutoutOnly) {
+    const existing = avatar.renditions.find((r) => r.artStyle === artStyle);
+    const identity = avatar.identity as unknown as AvatarIdentity | null;
+    if (!existing || existing.status !== 'READY' || !existing.turnaroundSheetUrl) {
+      logger.warn({ avatarId, artStyle }, 'Cutout-only job without a READY sheet — skipping');
+      return;
+    }
+    if (existing.cutoutUrl) {
+      logger.info({ avatarId, artStyle }, 'Cutout already present — skipping (idempotent)');
+      return;
+    }
+    if (!identity?.character) {
+      logger.warn({ avatarId, artStyle }, 'Cutout-only job without identity — skipping');
+      return;
+    }
+    const cutoutUrl = await generateAvatarCutout({
+      openai,
+      avatarId,
+      artStyle,
+      kind: avatar.kind,
+      subject: cutoutSubjectForStyle(identity, artStyle),
+      sheetUrl: existing.turnaroundSheetUrl,
+      logger,
+    });
+    if (cutoutUrl) {
+      await prisma.avatarRendition.update({
+        where: { id: existing.id },
+        data: { cutoutUrl },
+      });
+    }
+    return;
+  }
+
   const rendition = await prisma.avatarRendition.upsert({
     where: { avatarId_artStyle: { avatarId, artStyle } },
     create: { avatarId, artStyle, status: 'PENDING' },
@@ -64,15 +107,29 @@ export async function processAvatarRendition(job: Job<AvatarRenditionJobData>): 
   });
 
   try {
-    // Promotion fast path: byte-copy the book's validated sheet.
+    // Promotion fast path: byte-copy the book's validated sheet. The cutout
+    // still generates fresh — the copied sheet is its identity anchor.
     if (job.data.copyFromSheetUrl) {
       const copied = await copySheetIntoAvatarFolder(avatarId, artStyle, job.data.copyFromSheetUrl);
+      const promoIdentity = avatar.identity as unknown as AvatarIdentity | null;
+      const cutoutUrl = promoIdentity?.character
+        ? await generateAvatarCutout({
+            openai,
+            avatarId,
+            artStyle,
+            kind: avatar.kind,
+            subject: cutoutSubjectForStyle(promoIdentity, artStyle),
+            sheetUrl: copied,
+            logger,
+          })
+        : null;
       await prisma.avatarRendition.update({
         where: { id: rendition.id },
         data: {
           status: 'READY',
           turnaroundSheetUrl: copied,
           portraitUrl: portraitUrlFromSheet(copied),
+          cutoutUrl,
           provider: 'copy',
           model: 'book-sheet',
           validatedAt: new Date(),
@@ -123,12 +180,25 @@ export async function processAvatarRendition(job: Job<AvatarRenditionJobData>): 
       logger,
     });
 
+    // The waving cutout (X7): sheet-anchored, garnish — null on failure and
+    // the card falls back to the portrait crop. Never fails the rendition.
+    const cutoutUrl = await generateAvatarCutout({
+      openai,
+      avatarId,
+      artStyle,
+      kind: avatar.kind,
+      subject: cutoutSubjectForStyle(identity, artStyle),
+      sheetUrl: result.turnaroundSheetUrl,
+      logger,
+    });
+
     await prisma.avatarRendition.update({
       where: { id: rendition.id },
       data: {
         status: 'READY',
         turnaroundSheetUrl: result.turnaroundSheetUrl,
         portraitUrl: result.portraitUrl,
+        cutoutUrl,
         provider: result.provider,
         model: result.model,
         validatedAt: new Date(),

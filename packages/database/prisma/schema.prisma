@@ -207,6 +207,8 @@ model AvatarRendition {
   status             RenditionStatus @default(PENDING)
   turnaroundSheetUrl String?
   portraitUrl        String?
+  /** Full-body waving cutout (transparent PNG; white-background fallback). Garnish — null when generation failed. */
+  cutoutUrl          String?
   provider           String?
   model              String?
   validatedAt        DateTime?

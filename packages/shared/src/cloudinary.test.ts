@@ -393,4 +393,36 @@ describe('avatar folder safety (X6)', () => {
       ]),
     ).toEqual(['storywink/avatars/av1/sheet', 'storywink/avatars/av1/portrait']);
   });
+
+  it('collects both cutout variants from a transparent cutout URL', () => {
+    expect(
+      collectAvatarGeneratedPublicIds([
+        {
+          turnaroundSheetUrl: null,
+          portraitUrl: null,
+          cutoutUrl:
+            'https://res.cloudinary.com/storywink/image/upload/v1/storywink/avatars/av1/cutout_vignette_t.png',
+        },
+      ]),
+    ).toEqual([
+      'storywink/avatars/av1/cutout_vignette_t',
+      'storywink/avatars/av1/cutout_vignette',
+    ]);
+  });
+
+  it('collects both cutout variants from a white-fallback cutout URL', () => {
+    expect(
+      collectAvatarGeneratedPublicIds([
+        {
+          turnaroundSheetUrl: null,
+          portraitUrl: null,
+          cutoutUrl:
+            'https://res.cloudinary.com/storywink/image/upload/v1/storywink/avatars/av1/cutout_vignette.png',
+        },
+      ]),
+    ).toEqual([
+      'storywink/avatars/av1/cutout_vignette',
+      'storywink/avatars/av1/cutout_vignette_t',
+    ]);
+  });
 });

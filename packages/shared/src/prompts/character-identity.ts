@@ -327,6 +327,133 @@ export const CHARACTER_IDENTITY_RESPONSE_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+// ----------------------------------
+// CHARACTER CUTOUT (waving full-body) GENERATION + VALIDATION
+// ----------------------------------
+
+/**
+ * Character subset for the cutout prompt: the sheet fields plus the canonical
+ * outfit — "their own clothes" is the whole point of the cutout.
+ */
+export interface CutoutCharacterInput extends SheetCharacterInput {
+  typicalClothing?: string | null;
+}
+
+/**
+ * Per-kind greeting poses (owner decision 2026-07-12): people wave, pets get
+ * a happy alert pose, toys sit proudly. Kind is always known at call time.
+ */
+const CUTOUT_POSE_BY_KIND: Record<string, string> = {
+  CHILD:
+    'standing tall, waving hello with one raised hand, the other arm relaxed, with a warm friendly smile',
+  ADULT:
+    'standing tall, waving hello with one raised hand, the other arm relaxed, with a warm friendly smile',
+  PET: 'in a happy, alert greeting pose facing the reader — head up, eyes bright, ears perked, tail mid-wag if they have a tail',
+  TOY: 'sitting proudly facing the reader, upright and huggable, with a cheerful expression',
+};
+
+const CUTOUT_VALIDATION_POSE_BY_KIND: Record<string, string> = {
+  CHILD: 'waving hello at the reader with a friendly smile',
+  ADULT: 'waving hello at the reader with a friendly smile',
+  PET: 'a happy, alert greeting pose facing the reader',
+  TOY: 'sitting proudly facing the reader',
+};
+
+function cutoutPoseFor(kind: string, table: Record<string, string>): string {
+  return table[kind] ?? table.CHILD;
+}
+
+/**
+ * Prompt for generating one full-body "waving cutout" of an avatar — the
+ * large, fun figure on the cast-page card.
+ *
+ * Image order the caller must send: the character's VALIDATED turnaround
+ * sheet first (the identity anchor — never raw photos), then the same style
+ * exemplars the sheet used. Pure white background by design: the worker
+ * removes the background itself afterwards, so anything that is not the
+ * character must be white.
+ */
+export function createCharacterCutoutPrompt(input: {
+  character: CutoutCharacterInput;
+  /** AvatarKind: CHILD | ADULT | PET | TOY — picks the greeting pose. */
+  kind: string;
+  styleRefCount: number;
+  styleBible: string;
+}): string {
+  const { character, kind, styleRefCount, styleBible } = input;
+  const pose = cutoutPoseFor(kind, CUTOUT_POSE_BY_KIND);
+  return [
+    `Create ONE image: a single full-body illustration of ONE character, ` +
+      `using the ${1 + styleRefCount} images provided, in this order: ` +
+      `the first image is the character's model sheet (ground truth for identity); ` +
+      `the final ${styleRefCount === 1 ? 'image shows' : `${styleRefCount} images show`} the artistic style to apply.`,
+    `THE FIGURE: exactly ONE character, ${pose}. Full body from head to feet, both feet fully visible, centered horizontally, occupying about 85% of the frame height.`,
+    character.typicalClothing
+      ? `They wear their own everyday outfit: ${character.typicalClothing}.`
+      : null,
+    sheetCharacterBlock(character),
+    styleBible,
+    `BACKGROUND: plain PURE WHITE (#FFFFFF) everywhere the character is not. No scenery, no props, no ground line, no cast shadows, no vignetting.`,
+    `STRICT RULES: no grid, no panels, no multiple views, no second character, no text, no labels, no captions, no watermarks, no borders — just the one character once, on pure white. Do NOT copy any person, clothing, or pose from the style reference images; they define ONLY the artistic style.`,
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+export const CUTOUT_VALIDATION_SYSTEM_PROMPT =
+  "You are a meticulous art director for children's picture books. You verify that a generated full-body character cutout matches the character's model sheet, greets the reader, and sits on a clean pure-white background.";
+
+/**
+ * Prompt for validating a generated cutout with a vision model.
+ *
+ * Image order the caller must send: the model sheet, then the candidate
+ * cutout, then the style exemplars.
+ */
+export function createCutoutValidationPrompt(input: {
+  character: CutoutCharacterInput;
+  kind: string;
+  styleRefCount: number;
+  artStyle: string;
+}): string {
+  const { character, kind, styleRefCount, artStyle } = input;
+  const pose = cutoutPoseFor(kind, CUTOUT_VALIDATION_POSE_BY_KIND);
+  return [
+    `You are shown ${2 + styleRefCount} images, in this order: ` +
+      `1 character model sheet (2x2 turnaround grid — the identity ground truth), ` +
+      `then 1 candidate full-body cutout, ` +
+      `then ${styleRefCount} art style exemplar image(s) for the "${artStyle}" style.`,
+    sheetCharacterBlock(character),
+    `The candidate should show the character ${pose}.`,
+    `Evaluate the candidate cutout:`,
+    `1. singleFullBody: Does it show exactly ONE character, once, full body with feet visible — no grid, no panels, no extra views, no second character?`,
+    `2. sameCharacter: Is it recognizably the SAME character as on the model sheet (face, hair, skin tone, outfit, distinguishing features)?`,
+    `3. whiteBackground: Is the background plain pure white with no scenery, props, ground line, or cast shadows?`,
+    `4. noTextArtifacts: Is it free of any text, labels, captions, watermarks, and obvious anatomical errors?`,
+    `Set passed=true only if ALL four checks pass. Describe any failure precisely in notes.`,
+  ].join('\n\n');
+}
+
+export const CUTOUT_VALIDATION_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    singleFullBody: { type: 'boolean' },
+    sameCharacter: { type: 'boolean' },
+    whiteBackground: { type: 'boolean' },
+    noTextArtifacts: { type: 'boolean' },
+    passed: { type: 'boolean' },
+    notes: { type: 'string' },
+  },
+  required: [
+    'singleFullBody',
+    'sameCharacter',
+    'whiteBackground',
+    'noTextArtifacts',
+    'passed',
+    'notes',
+  ],
+  additionalProperties: false,
+} as const;
+
 /** Input for single-subject (account avatar) identity extraction. */
 export interface AvatarIdentityPromptInput {
   /** AvatarKind string: CHILD | ADULT | PET | TOY. */

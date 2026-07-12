@@ -52,7 +52,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
     const avatar = await prisma.avatar.findUnique({
       where: { id: avatarId, userId: dbUser.id },
       include: {
-        renditions: { select: { turnaroundSheetUrl: true, portraitUrl: true } },
+        renditions: { select: { turnaroundSheetUrl: true, portraitUrl: true, cutoutUrl: true } },
         photos: { select: { assetId: true } },
       },
     });
