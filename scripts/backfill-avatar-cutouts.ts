@@ -15,11 +15,29 @@
  */
 import { PrismaClient } from '@prisma/client';
 import { Queue } from 'bullmq';
-import { QUEUE_NAMES } from '@storywink/shared/constants';
-import { createBullMQConnection } from '@storywink/shared/redis';
 
 const prisma = new PrismaClient();
 const APPLY = process.argv.includes('--apply');
+
+// Root scripts run CJS, and @storywink/shared exports are ESM-only — so the
+// queue name (QUEUE_NAMES.AVATAR_RENDITION) and the Railway-safe connection
+// shape (createBullMQConnection) are mirrored here instead of imported.
+const AVATAR_RENDITION_QUEUE = 'avatar-rendition';
+
+function bullConnection() {
+  const url = process.env.REDIS_URL;
+  if (!url) throw new Error('REDIS_URL is not set');
+  const parsed = new URL(url);
+  return {
+    host: parsed.hostname,
+    port: Number(parsed.port || 6379),
+    username: parsed.username || undefined,
+    password: parsed.password || undefined,
+    family: 0 as const, // IPv4+IPv6 for Railway private networking
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+  };
+}
 
 async function main() {
   const renditions = await prisma.avatarRendition.findMany({
@@ -49,8 +67,8 @@ async function main() {
     return;
   }
 
-  const queue = new Queue(QUEUE_NAMES.AVATAR_RENDITION, {
-    connection: createBullMQConnection(),
+  const queue = new Queue(AVATAR_RENDITION_QUEUE, {
+    connection: bullConnection(),
   });
   try {
     for (const r of actionable) {
