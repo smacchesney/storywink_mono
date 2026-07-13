@@ -41,12 +41,15 @@ const CLOUDINARY_BASE = 'https://res.cloudinary.com/storywink/image/upload';
 
 /**
  * Card B's generic beat-2 art: a fully synthetic waving-character cutout, no
- * real person. This is the "Child in yellow coat" avatar minted by the X7 E2E
- * run — AI-generated from AI-generated book art — so it is safe to ship as
- * decorative sample art on a public surface.
- * Public id: storywink/avatars/cmrhlwoxl003g6dbhhbr5arle/cutout_vignette_t.png
+ * real person. Provenance: the "Child in yellow coat" avatar minted by the X7
+ * E2E run — AI-generated from AI-generated book art — so it is safe to ship
+ * as decorative sample art on a public surface. Copied out of that avatar's
+ * storywink/avatars/<id>/ folder to a static path the avatar/user deletion
+ * collectors can never reap (they prefix-delete storywink/avatars/<id>/).
+ * The transform serves ~320px instead of the 3MB 2K original; f_auto keeps
+ * the alpha channel (webp/avif both carry it).
  */
-const SYNTHETIC_CUTOUT_URL = `${CLOUDINARY_BASE}/storywink/avatars/cmrhlwoxl003g6dbhhbr5arle/cutout_vignette_t.png`;
+const SYNTHETIC_CUTOUT_URL = `${CLOUDINARY_BASE}/w_320,q_auto,f_auto/storywink/static/x8-chooser-waving-cutout.png`;
 
 const KIND_EMOJI: Record<AvatarSummary['kind'], string> = {
   CHILD: '🧒',
