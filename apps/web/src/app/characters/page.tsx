@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Plus } from 'lucide-react';
@@ -24,10 +24,24 @@ export default function CharactersPage() {
 }
 
 function CharactersShelf() {
+  const router = useRouter();
   const t = useTranslations('characters');
   const tStories = useTranslations('avatarStories');
   const [avatars, setAvatars] = React.useState<AvatarSummary[] | null>(null);
   const [studioOpen, setStudioOpen] = React.useState(false);
+
+  // X8: the create chooser's character path lands here as /characters?add=1.
+  // Open the batch studio once, then strip the param so refresh/back never
+  // re-triggers it. Reading window.location.search (not useSearchParams) keeps
+  // the page out of a Suspense/CSR-bailout boundary at build time.
+  const autoOpenChecked = React.useRef(false);
+  React.useEffect(() => {
+    if (autoOpenChecked.current) return;
+    autoOpenChecked.current = true;
+    if (new URLSearchParams(window.location.search).get('add') !== '1') return;
+    setStudioOpen(true);
+    router.replace('/characters', { scroll: false });
+  }, [router]);
 
   const load = React.useCallback(async () => {
     const res = await fetch('/api/avatars');
