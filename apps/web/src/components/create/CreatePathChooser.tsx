@@ -185,14 +185,17 @@ interface CardShellProps {
   emphasis: 'primary' | 'quiet';
   ringed: boolean;
   prefersReduced: boolean;
+  /** Announced while the card is resolving its destination (the pending hold). */
+  busy?: boolean;
   children: ReactNode;
 }
 
-function CardShell({ onClick, emphasis, ringed, prefersReduced, children }: CardShellProps) {
+function CardShell({ onClick, emphasis, ringed, prefersReduced, busy, children }: CardShellProps) {
   return (
     <motion.button
       type="button"
       onClick={onClick}
+      aria-busy={busy || undefined}
       whileHover={prefersReduced ? undefined : { y: -4, scale: 1.01 }}
       whileTap={prefersReduced ? undefined : { scale: 0.985 }}
       transition={{ type: 'spring', stiffness: 300, damping: 22 }}
@@ -239,6 +242,15 @@ export function CreatePathChooser() {
   // Synchronous double-tap guard — a second tap must lose the race with the
   // first's async hold, so this can't wait for a state commit.
   const navigatingRef = useRef(false);
+  // Unmount guard for the pending-hold loop — mirrors the fetch effect's
+  // cancelled flag so router.push can't fire after the chooser is gone.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // One snapshot on mount (the flag is known-on here).
   useEffect(() => {
@@ -316,6 +328,7 @@ export function CreatePathChooser() {
     while (Date.now() < deadline && snapshotRef.current.phase === 'pending') {
       await sleep(50);
     }
+    if (!mountedRef.current) return;
     const after = snapshotRef.current;
     goAvatars(after.phase === 'resolved' ? characterPathDestination(after.avatars) : '/characters?add=1');
   }, [goAvatars]);
@@ -386,6 +399,7 @@ export function CreatePathChooser() {
           emphasis="quiet"
           ringed={lastPath === 'avatars'}
           prefersReduced={prefersReduced}
+          busy={busyCardB}
         >
           <JourneyStrip
             beats={[
@@ -396,9 +410,11 @@ export function CreatePathChooser() {
           />
           <div className="relative mt-4 min-h-[1.75rem]">
             <AnimatePresence mode="wait" initial={false}>
+              {/* One line in BOTH variants (truncate) so the generic→named swap
+                  can never change the line count — extreme names ellipsize. */}
               <motion.span
                 key={revealKey === 'named' ? 'named' : 'generic'}
-                className={cn(CARD_TITLE_CLASS, 'block')}
+                className={cn(CARD_TITLE_CLASS, 'block max-w-full truncate')}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
