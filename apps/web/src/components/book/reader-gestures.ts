@@ -36,25 +36,36 @@ export function isVerticalScrollGesture(dx: number, dy: number): boolean {
 
 /**
  * Replicates page-flip's isPointOnCorners (Flip.ts): squares of side
- * sqrt(pageW² + blockH²) / 5 at the four corners of the book block. With
+ * sqrt(pageW² + blockH²) / 5 at the corners of the book block. With
  * `disableFlipByClick` the engine still flips clicks inside these squares,
  * so the reader's own edge-tap handler must stay out of them or every corner
  * tap turns two pages.
+ *
+ * Portrait is asymmetric: page-flip's book space is shifted (bounds.left ===
+ * -pageWidth), so the LEFT block corners map to book-middle and the engine
+ * never flips a click there — deferring to it kills the tap entirely. In
+ * portrait only the RIGHT corner squares belong to the engine; the reader owns
+ * the left ones. Landscape/spread keeps the original four-corner behavior.
  */
 export function isOnEngineCorner(
   x: number,
   y: number,
   blockWidth: number,
   blockHeight: number,
-  pageWidth: number
+  pageWidth: number,
+  orientation: 'portrait' | 'landscape'
 ): boolean {
   const operatingDistance = Math.hypot(pageWidth, blockHeight) / 5;
+  const inXBand =
+    orientation === 'portrait'
+      ? x > blockWidth - operatingDistance
+      : x < operatingDistance || x > blockWidth - operatingDistance;
   return (
     x > 0 &&
     y > 0 &&
     x < blockWidth &&
     y < blockHeight &&
-    (x < operatingDistance || x > blockWidth - operatingDistance) &&
+    inXBand &&
     (y < operatingDistance || y > blockHeight - operatingDistance)
   );
 }

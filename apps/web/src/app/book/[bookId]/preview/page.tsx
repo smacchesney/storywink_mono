@@ -452,7 +452,8 @@ function BookPreviewContent() {
           e.clientY - rect.top,
           rect.width,
           rect.height,
-          pageWidth
+          pageWidth,
+          layout === 'portrait' ? 'portrait' : 'landscape'
         )
       ) {
         return;

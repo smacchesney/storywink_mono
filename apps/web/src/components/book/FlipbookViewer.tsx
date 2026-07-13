@@ -12,6 +12,7 @@ import { splitEmphasisSegments } from '@storywink/shared/text-emphasis';
 import { MASCOT_CATS_SITTING } from '@/lib/mascots';
 import { tinyThumbUrl } from '@/lib/cloudinary-loader';
 import BookArtImage from './BookArtImage';
+import { patchFlipPrevPoint } from './pageflip-fixes';
 import {
   buildDisplayPages,
   remapDisplayIndex,
@@ -291,6 +292,10 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
   // from a layout rotation wins over the parent's initialPageNumber (which
   // is still expressed in the previous layout's numbering).
   const handleInit = useCallback(() => {
+     // page-flip's flipPrev lands on a fabricated point that the portrait
+     // guard rejects — every backward flip no-ops until this patch. Runs per
+     // engine instance (incl. the key={layout} remounts). See pageflip-fixes.ts.
+     patchFlipPrevPoint(flipBookInternalRef.current?.pageFlip());
      const pending = pendingInitIndexRef.current;
      pendingInitIndexRef.current = null;
      const target = pending ?? (initialPageNumber ? initialPageNumber - 1 : 0);
