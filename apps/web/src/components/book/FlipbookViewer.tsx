@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle, useMemo } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useState, useCallback, forwardRef, useImperativeHandle, useMemo } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { Page } from '@prisma/client';
 import Image from 'next/image';
@@ -13,6 +13,7 @@ import { MASCOT_CATS_SITTING } from '@/lib/mascots';
 import { tinyThumbUrl } from '@/lib/cloudinary-loader';
 import BookArtImage from './BookArtImage';
 import { patchFlipPrevPoint } from './pageflip-fixes';
+import { calculateBookBox } from './flipbook-layout';
 import {
   buildDisplayPages,
   remapDisplayIndex,
@@ -24,6 +25,10 @@ import {
 // existing importers keep working.
 export { buildDisplayPages, remapDisplayIndex } from './display-pages';
 export type { BookLayout, DisplayPage, BuildDisplayPagesOptions } from './display-pages';
+
+// Breathing room reserved below the measured story text (the strip's py-2 plus
+// a hair) when sizing the art square so the text never touches the picture.
+const STRIP_PAD = 16;
 
 // Mascot URLs
 const DEDICATION_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.58.09_PM_gnknk5.png';
@@ -119,67 +124,11 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
     };
   }, []);
 
-  // Calculate optimal dimensions based on container
-  const calculateBookDimensions = () => {
-    const { width, height } = containerDimensions;
-    const padding = 32; // Total padding to account for
-    const availableWidth = width - padding;
-    const availableHeight = height - padding;
-
-    // Smart adaptive logic for single vs double page view
-    const aspectRatio = width / height;
-    const isExtremeAspectRatio = aspectRatio > 2.5;
-    const hasMinimumHeight = height >= 350;
-    const shouldShowSpread = width >= 640 && hasMinimumHeight && !isExtremeAspectRatio;
-
-    // For single page view (mobile portrait, landscape with limited height)
-    if (!shouldShowSpread) {
-      // Use most of available width/height, maintaining aspect ratio
-      const pageWidth = availableWidth;
-      const pageHeight = availableHeight;
-      // Combined story pages: square illustration on top + text strip below
-      const pageAspectRatio = 0.78;
-
-      let finalWidth = pageWidth;
-      let finalHeight = pageHeight;
-
-      // Adjust to maintain aspect ratio
-      if (pageWidth / pageHeight > pageAspectRatio) {
-        finalWidth = pageHeight * pageAspectRatio;
-      } else {
-        finalHeight = pageWidth / pageAspectRatio;
-      }
-
-      return {
-        width: Math.floor(finalWidth),
-        height: Math.floor(finalHeight),
-        isPortrait: true
-      };
-    }
-
-    // For desktop/tablet (double page spread view)
-    const spreadAspectRatio = 2.0; // Double page spread (two square pages side by side)
-    let spreadWidth = availableWidth;
-    let spreadHeight = availableHeight;
-
-    if (spreadWidth / spreadHeight > spreadAspectRatio) {
-      spreadWidth = spreadHeight * spreadAspectRatio;
-    } else {
-      spreadHeight = spreadWidth / spreadAspectRatio;
-    }
-
-    const pageWidth = Math.floor(spreadWidth / 2);
-    const pageHeight = Math.floor(spreadHeight);
-
-    return {
-      width: pageWidth,
-      height: pageHeight,
-      isPortrait: false
-    };
-  };
-
+  // Optimal book-box dimensions for the container (pure math in ./flipbook-layout)
   const { width: pageWidth, height: pageHeight, isPortrait } =
-    containerDimensions.width > 0 ? calculateBookDimensions() : { width: 0, height: 0, isPortrait: false };
+    containerDimensions.width > 0
+      ? calculateBookBox(containerDimensions)
+      : { width: 0, height: 0, isPortrait: false };
 
   const layout: BookLayout = isPortrait ? 'portrait' : 'spread';
 
@@ -196,6 +145,64 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
       }),
     [pages, childName, bookTitle, language, layout, collagePhotos, collageCreatedAt]
   );
+
+  // Portrait story pages size their art around the MEASURED text height so the
+  // words always fit (a fixed budget clipped real text at 17px). An offscreen
+  // measurer renders each story page's text at the strip's exact width/classes;
+  // useLayoutEffect reads the heights back before paint.
+  const storyBodySize = Math.max(12, Math.min(Math.round(pageWidth * 0.05), 22));
+  const storyMeasurePages = useMemo(
+    () =>
+      layout === 'portrait'
+        ? displayPages.filter(
+            (dp): dp is Extract<DisplayPage<Page>, { type: 'story' }> => dp.type === 'story'
+          )
+        : [],
+    [displayPages, layout]
+  );
+  // Re-measure key: which texts, at what width, in which layout.
+  const storyTextsKey = storyMeasurePages
+    .map((dp) => `${dp.page.id}:${dp.page.text ?? ''}`)
+    .join('|');
+  const [storyTextHeights, setStoryTextHeights] = useState<Record<string, number>>({});
+  const measurerRef = useRef<HTMLDivElement>(null);
+
+  const measureStoryHeights = useCallback(() => {
+    const container = measurerRef.current;
+    if (!container) return;
+    const next: Record<string, number> = {};
+    for (const child of Array.from(container.children)) {
+      const el = child as HTMLElement;
+      const id = el.dataset.pageId;
+      if (id) next[id] = el.offsetHeight;
+    }
+    setStoryTextHeights((prev) => {
+      const keys = Object.keys(next);
+      const same =
+        keys.length === Object.keys(prev).length && keys.every((k) => prev[k] === next[k]);
+      return same ? prev : next;
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (layout !== 'portrait') return;
+    measureStoryHeights();
+  }, [storyTextsKey, pageWidth, layout, measureStoryHeights]);
+
+  // Excalifont's metrics differ from the fallback font — re-measure once it
+  // loads so the first paint's fallback-height estimate is corrected.
+  useEffect(() => {
+    if (layout !== 'portrait') return;
+    const fonts = typeof document !== 'undefined' ? document.fonts : undefined;
+    if (!fonts?.ready) return;
+    let cancelled = false;
+    fonts.ready.then(() => {
+      if (!cancelled) measureStoryHeights();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [storyTextsKey, pageWidth, layout, measureStoryHeights]);
 
   // Warm-window image mounting: pages near the reader (current ± 3) mount
   // their full-resolution art eagerly; pages already loaded never regress to
@@ -592,17 +599,22 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
       const storyFontClass = dp.language === 'ja' ? 'font-japanese' : 'font-playful';
       const imageUrl = dp.page.generatedImageUrl;
       const mountImage = shouldMountImage(index);
+      // Text first: the art square takes whatever height the MEASURED text
+      // leaves (never below 45% of the page). Until the measurer reports back,
+      // fall back to the old fixed budget so first paint is never oversized.
+      const textH = storyTextHeights[dp.page.id];
+      const artSize =
+        textH != null
+          ? Math.max(Math.round(pageHeight * 0.45), Math.min(pageWidth, pageHeight - textH - STRIP_PAD))
+          : Math.max(48, Math.min(pageWidth, pageHeight - 112));
       return (
         <div key={pageKey} className="bg-white rounded-lg overflow-hidden border border-black/15">
           <div className="absolute inset-0 flex flex-col">
-            {/* The art shrinks before the text clips: the square is capped
-                at pageHeight minus 7rem (~4 lines at the 12px floor plus
-                padding), so it letterboxes down instead of squeezing the
-                text strip out. Sized in px from the same measurements the
-                page itself uses — no aspect-ratio/max-height ambiguity. */}
+            {/* Square illustration on top; its width is driven by the measured
+                text height (artSize) so the strip below always fits the words. */}
             <div
               className="relative flex-none mx-auto aspect-square overflow-hidden"
-              style={{ width: Math.max(48, Math.min(pageWidth, pageHeight - 112)) }}
+              style={{ width: artSize }}
             >
               {imageUrl ? (
                 <>
@@ -622,12 +634,13 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
                 renderCookingPlaceholder()
               )}
             </div>
-            {/* Last-resort guard: a pathological long page scrolls inside
-                its strip instead of clipping. Never engages at the normal
-                12-22px range. */}
-            <div className="flex-1 min-h-0 flex items-center justify-center px-[8%] overflow-y-auto [touch-action:pan-y] [overscroll-behavior:contain]">
+            {/* my-auto centers the text when it fits; when it overflows the
+                auto margins collapse and it scrolls FROM THE TOP (never clipped
+                at both ends). With measured art sizing this only engages for
+                pathological text (> ~55% of the page height). */}
+            <div className="flex-1 min-h-0 flex justify-center px-[8%] overflow-y-auto [touch-action:pan-y] [overscroll-behavior:contain]">
               {dp.page.text && dp.page.text.trim() && (
-                <p className={`${storyFontClass} text-[#1a1a1a] text-center leading-snug`}
+                <p className={`${storyFontClass} text-[#1a1a1a] text-center leading-snug my-auto py-2`}
                    style={{ fontSize: `${bodySize}px` }}>
                   {renderStoryText(dp.page)}
                 </p>
@@ -713,6 +726,37 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
       ref={containerRef}
       className={cn("w-full h-full flex items-center justify-center [&_.stf__item]:rounded-lg", className)}
     >
+      {/* Offscreen measurer: each portrait story page's text rendered at the
+          strip's exact usable width (pageWidth minus px-[8%] both sides) and
+          classes, so its height can drive the art square above it. */}
+      {layout === 'portrait' && pageWidth > 0 && storyMeasurePages.length > 0 && (
+        <div
+          ref={measurerRef}
+          aria-hidden
+          style={{
+            position: 'fixed',
+            left: -9999,
+            top: 0,
+            visibility: 'hidden',
+            pointerEvents: 'none',
+            width: Math.round(pageWidth * 0.84),
+          }}
+        >
+          {storyMeasurePages.map((dp) => {
+            const measureFontClass = dp.language === 'ja' ? 'font-japanese' : 'font-playful';
+            return (
+              <p
+                key={dp.page.id}
+                data-page-id={dp.page.id}
+                className={`${measureFontClass} text-[#1a1a1a] text-center leading-snug`}
+                style={{ fontSize: `${storyBodySize}px` }}
+              >
+                {renderStoryText(dp.page)}
+              </p>
+            );
+          })}
+        </div>
+      )}
       {pageWidth > 0 && pageHeight > 0 && (
         <div style={{
           transform: `translateX(${coverOffset}px)`,
