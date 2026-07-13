@@ -304,7 +304,7 @@ export function createSubjectDetectionPrompt(input: SubjectDetectionInput): stri
   const lang = input.language === 'ja' ? 'ja' : 'en';
   return `Analyze all ${input.photoCount} photos provided. They come from one family's camera roll. A parent wants to turn the people, pets, and beloved toys in them into recurring illustrated storybook characters — but only the ones they choose. Your roster is the menu they choose from.
 
-Identify every DISTINCT subject worth offering, at most ${MAX_BATCH_SUBJECTS} (prefer the most-photographed and clearly foreground ones when more qualify):
+Identify every DISTINCT subject worth offering, at most ${MAX_BATCH_SUBJECTS} (when more qualify, prefer people and pets first, then the most-photographed and clearly foreground):
 - every distinct person (children and grown-ups)
 - every animal companion (pet)
 - every distinct beloved toy or cherished object that is clearly the subject of a photo (hugged, carried, posed, or deliberately photographed on its own — not scenery or background clutter)
