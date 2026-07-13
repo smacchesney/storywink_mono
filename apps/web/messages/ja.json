@@ -511,11 +511,6 @@
     "deleteStarsInStories": "{name} は キャラクターのお話に でています。そのお話の絵本に ひつようなので、先に 絵本を けしてから もういちど どうぞ。"
   },
   "avatarStories": {
-    "cardTitle": "{name}となかまたちと",
-    "cardTitleGeneric": "うちのキャラクターたちと",
-    "cardSubtitle": "だれが出るかえらんだら、お話はおまかせ",
-    "cardExplainer": "あたらしくなりました：のこしたキャラクターが、空想のお話の主役になれます。",
-    "cardLastTime": "前回はここからはじめました",
     "castTitle": "だれが出てくるお話？",
     "castHint": "人は4人まで、ペットやおもちゃは2つまで",
     "castPeopleFull": "人はここまで — 4人でいっぱいです",

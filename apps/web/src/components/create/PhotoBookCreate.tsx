@@ -14,7 +14,6 @@ import { BOOK_CONSTRAINTS } from '@storywink/shared';
 import type { BookLanguage } from '@storywink/shared/schemas';
 import PhotoTray, { type PhotoTrayHandle } from '@/components/upload/PhotoTray';
 import type { UploadedAsset } from '@/lib/uploadPhotos';
-import { AvatarStoryCard } from '@/components/create/AvatarStoryCard';
 import { rememberCreatePath } from '@/lib/createPath';
 
 export function PhotoBookCreate() {
@@ -181,11 +180,6 @@ export function PhotoBookCreate() {
           </li>
         </ul>
       </div>
-
-      {/* X6d offer-not-gate: the character-stories card appears beneath the
-          photo flow only when the account has READY characters. The photo
-          path above is untouched — zero new taps. */}
-      <AvatarStoryCard />
 
       {/* Continue — primary coral, enabled once at least one upload has finished */}
       {(hasReady || pendingCount > 0) && (

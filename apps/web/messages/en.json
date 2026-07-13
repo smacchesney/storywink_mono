@@ -511,11 +511,6 @@
     "deleteStarsInStories": "{name} stars in your character stories — those books need them. Delete the stories first, or keep your character."
   },
   "avatarStories": {
-    "cardTitle": "With {name} & friends",
-    "cardTitleGeneric": "With your characters",
-    "cardSubtitle": "Pick who is in it — we make it up together",
-    "cardExplainer": "New: the characters you have kept can star in made-up stories.",
-    "cardLastTime": "Last time you started here",
     "castTitle": "Who is in this story?",
     "castHint": "Up to 4 people, plus 2 pets or toys",
     "castPeopleFull": "That is a full cast — 4 people is the limit",
