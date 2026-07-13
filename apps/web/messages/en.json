@@ -106,7 +106,19 @@
     "tipsTitle": "Photos that make great stories",
     "tipVariety": "Mix different moments — places, faces, little details.",
     "tipArc": "A beginning, a middle, and an end give the story its shape.",
-    "tipSkipDupes": "Skip near-duplicates — one photo per moment is plenty."
+    "tipSkipDupes": "Skip near-duplicates — one photo per moment is plenty.",
+    "pathPhotosTitle": "Make a book from today",
+    "pathPhotosBeat1": "Pick your photos",
+    "pathPhotosBeat2": "We write & draw",
+    "pathPhotosBeat3": "One keepsake book",
+    "pathPhotosChip": "Quickest — great after a real outing",
+    "pathFriendsTitle": "Make story characters",
+    "pathFriendsTitleNamed": "Play with {name} & friends",
+    "pathFriendsBeat1": "Add your people",
+    "pathFriendsBeat2": "They become characters",
+    "pathFriendsBeat3": "Star in story after story",
+    "pathFriendsChip": "Best for making up stories together",
+    "pathLastTime": "You started here last time"
   },
   "upload": {
     "addPhotos": "Add photos",

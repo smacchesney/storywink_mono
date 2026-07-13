@@ -106,7 +106,19 @@
     "tipsTitle": "すてきな おはなしに なる しゃしん",
     "tipVariety": "いろいろな しゅんかんを まぜてみて。ばしょ、かお、ちいさな はっけん。",
     "tipArc": "はじまり・なか・おわりが あると、おはなしが うまれやすく なります。",
-    "tipSkipDupes": "にたような しゃしんは 1まいで じゅうぶんですよ。"
+    "tipSkipDupes": "にたような しゃしんは 1まいで じゅうぶんですよ。",
+    "pathPhotosTitle": "きょうの しゃしんで えほんを つくる",
+    "pathPhotosBeat1": "しゃしんを えらぶ",
+    "pathPhotosBeat2": "おはなしと えは おまかせ",
+    "pathPhotosBeat3": "せかいに ひとつの えほん",
+    "pathPhotosChip": "いちばん はやい・おでかけの あとに ぴったり",
+    "pathFriendsTitle": "ものがたりの キャラクターを つくる",
+    "pathFriendsTitleNamed": "{name}と なかまたちと あそぶ",
+    "pathFriendsBeat1": "かぞくや ペットを とうろく",
+    "pathFriendsBeat2": "キャラクターに へんしん",
+    "pathFriendsBeat3": "なんどでも ものがたりの しゅやくに",
+    "pathFriendsChip": "いっしょに おはなしを つくるのに ぴったり",
+    "pathLastTime": "まえは ここから はじめました"
   },
   "upload": {
     "addPhotos": "写真をついか",

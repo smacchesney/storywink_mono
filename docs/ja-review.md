@@ -250,3 +250,15 @@ Append-only. One line per key: `namespace.key` — why it needs a native check.
 ## 2026-07-13 — X8 create chooser (x8-create-chooser)
 
 - `create.backToChooser` — quiet back link above the extracted photo flow at /create/photos, returning to the /create chooser 「もどる」; only shown when the chooser exists (behind NEXT_PUBLIC_AVATARS_ENABLED). Check もどる matches the back-affordance register used elsewhere (e.g. `setup.goBack`, `avatarStories.back`).
+- `create.pathPhotosTitle` — Card A title on the chooser 「きょうの しゃしんで えほんを つくる」; the fast photo→book path. Check the の-chain reads as an inviting title, not a form label.
+- `create.pathPhotosBeat1` — Card A journey beat 1 「しゃしんを えらぶ」; terse strip label under a photo glyph.
+- `create.pathPhotosBeat2` — Card A journey beat 2 「おはなしと えは おまかせ」; "we write & draw" — check おまかせ carries the reassuring "leave it to us" tone.
+- `create.pathPhotosBeat3` — Card A journey beat 3 「せかいに ひとつの えほん」; "one keepsake book" — check せかいに ひとつ doesn't over-promise vs the English "one keepsake".
+- `create.pathPhotosChip` — Card A "best for" chip 「いちばん はやい・おでかけの あとに ぴったり」; the ・ stands in for the English em dash — confirm it reads as a natural pause, not two disjoint labels.
+- `create.pathFriendsTitle` — Card B generic title 「ものがたりの キャラクターを つくる」; shown until the avatar snapshot resolves. Check register against `avatarStories.cardTitleGeneric`.
+- `create.pathFriendsTitleNamed` — Card B personalized title 「{name}と なかまたちと あそぶ」; {name} is the star character. Doubles と like `avatarStories.cardTitle` — check rhythm and that あそぶ ("play with") fits a create CTA.
+- `create.pathFriendsBeat1` — Card B journey beat 1 「かぞくや ペットを とうろく」; "add your people" widened to family/pets. Check とうろく ("register") isn't too systemy for a warm strip.
+- `create.pathFriendsBeat2` — Card B journey beat 2 「キャラクターに へんしん」; "they become characters" — check へんしん ("transform") reads playful, not literal.
+- `create.pathFriendsBeat3` — Card B journey beat 3 「なんどでも ものがたりの しゅやくに」; "star in story after story" — check しゅやく ("lead role") and なんどでも land warmly.
+- `create.pathFriendsChip` — Card B "best for" chip 「いっしょに おはなしを つくるのに ぴったり」; "best for making up stories together". Check いっしょに…つくる register.
+- `create.pathLastTime` — small coral line on the remembered card 「まえは ここから はじめました」; the returning-user nudge. Check against `avatarStories.cardLastTime` 「前回はここからはじめました」 — this one is spaced-kana, confirm the divergence is intentional or align them.
