@@ -26,9 +26,15 @@ import {
 export { buildDisplayPages, remapDisplayIndex } from './display-pages';
 export type { BookLayout, DisplayPage, BuildDisplayPagesOptions } from './display-pages';
 
-// Breathing room reserved below the measured story text (the strip's py-2 plus
-// a hair) when sizing the art square so the text never touches the picture.
+// Breathing room reserved with the measured story text when sizing the art
+// square: exactly the strip's py-2 (8px above + 8px below the paragraph).
 const STRIP_PAD = 16;
+
+/** Story body font size — ONE formula for both the visible strip and the
+ * offscreen measurer; if they ever diverged, measured heights would lie and
+ * the art square would crowd the text again. */
+const storyBodyFontSize = (pageWidth: number) =>
+  Math.max(12, Math.min(Math.round(pageWidth * 0.05), 22));
 
 // Mascot URLs
 const DEDICATION_MASCOT_URL = 'https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.58.09_PM_gnknk5.png';
@@ -150,7 +156,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
   // words always fit (a fixed budget clipped real text at 17px). An offscreen
   // measurer renders each story page's text at the strip's exact width/classes;
   // useLayoutEffect reads the heights back before paint.
-  const storyBodySize = Math.max(12, Math.min(Math.round(pageWidth * 0.05), 22));
+  const storyBodySize = storyBodyFontSize(pageWidth);
   const storyMeasurePages = useMemo(
     () =>
       layout === 'portrait'
@@ -347,7 +353,7 @@ const FlipbookViewer = forwardRef<FlipbookActions, FlipbookViewerProps>((
   /** Render a single display page */
   const renderDisplayPage = (dp: DisplayPage<Page>, index: number) => {
     // Container-relative font sizes (scale with page width, not viewport)
-    const bodySize = Math.max(12, Math.min(Math.round(pageWidth * 0.05), 22));
+    const bodySize = storyBodyFontSize(pageWidth);
     const smallBodySize = Math.max(11, Math.min(Math.round(pageWidth * 0.045), 18));
     const nameSize = Math.max(16, Math.min(Math.round(pageWidth * 0.07), 30));
     const titleSize = Math.max(18, Math.min(Math.round(pageWidth * 0.08), 32));
