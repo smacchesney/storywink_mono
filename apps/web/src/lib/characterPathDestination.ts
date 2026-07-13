@@ -2,7 +2,7 @@
  * Pure routing decision for the create chooser's character path (X8), plus the
  * "star" pick that names the personalized card. Kept free of React/fetch/Prisma
  * imports so it stays unit-testable — and so the chooser never hand-rolls the
- * usable-avatar filter, which must stay byte-identical to AvatarStoryCard's.
+ * usable-avatar filter, which must match the shelf's READY gate.
  */
 
 export type CharacterPathDestination = '/create/characters' | '/characters?add=1';
@@ -20,7 +20,7 @@ export interface StarLike extends AvatarLike {
 
 /**
  * An avatar is usable iff it is READY and has at least one READY rendition —
- * the exact filter AvatarStoryCard applies before offering a character card.
+ * the same gate the shelf and wizard apply before offering a character.
  */
 export function isUsableAvatar(avatar: AvatarLike): boolean {
   return avatar.status === 'READY' && avatar.renditions.some((r) => r.status === 'READY');
@@ -39,7 +39,7 @@ export function characterPathDestination(avatars: AvatarLike[]): CharacterPathDe
 /**
  * The face the personalized title names: the first CHILD among usable avatars,
  * else the first usable avatar, else null. Generic over the concrete avatar
- * type so the caller keeps `displayName`. Mirrors AvatarStoryCard's star pick.
+ * type so the caller keeps `displayName`.
  */
 export function pickStar<T extends StarLike>(avatars: T[]): T | null {
   const usable = avatars.filter(isUsableAvatar);
