@@ -20,6 +20,7 @@ import { z } from 'zod';
  */
 export const CLIENT_EVENT_NAMES = [
   'create_started',
+  'create_path_chosen',
   'upload_completed',
   'setup_submitted',
   'preview_opened',
