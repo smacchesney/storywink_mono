@@ -339,10 +339,10 @@ export function CreatePathChooser() {
     revealKey === 'named' && resolved ? (
       <FacePile avatars={resolved} />
     ) : revealKey === 'pending' ? (
-      <span
-        aria-hidden
-        className={cn('h-12 w-12 rounded-2xl bg-black/5', !prefersReduced && 'animate-pulse')}
-      />
+      // motion-safe keeps the class identical between SSR and hydration
+      // (useReducedMotion resolves differently on the server and would
+      // mismatch) while still honoring reduce-motion, in CSS.
+      <span aria-hidden className="h-12 w-12 rounded-2xl bg-black/5 motion-safe:animate-pulse" />
     ) : (
       // eslint-disable-next-line @next/next/no-img-element
       <img src={SYNTHETIC_CUTOUT_URL} alt="" className="h-16 w-full object-contain" />
