@@ -93,6 +93,7 @@
   },
   "create": {
     "startCreating": "Start creating",
+    "backToChooser": "Back",
     "photoLimit": "Up to {max} photos per book",
     "continue": "Continue",
     "stillUploading": "Still uploading {count}…",

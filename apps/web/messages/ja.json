@@ -93,6 +93,7 @@
   },
   "create": {
     "startCreating": "さあ、つくろう",
+    "backToChooser": "もどる",
     "photoLimit": "1冊あたり最大{max}枚まで",
     "continue": "つぎへ",
     "stillUploading": "あと{count}枚アップロード中…",
