@@ -43,6 +43,15 @@ describe('createSubjectDetectionPrompt', () => {
     expect(prompt).toMatch(/vignette/);
   });
 
+  it('admits every distinct beloved toy (toys-only batches are real), scenery guard intact', () => {
+    // A parent introducing a child's toy cast uploads N different toys and
+    // expects N characters — the roster must never cap toys at one. The
+    // 2026-07-13 prod batch (6 toys → 1 subject) is the regression this pins.
+    expect(prompt).not.toMatch(/at most one[^.\n]*(toy|object)/i);
+    expect(prompt).toMatch(/every distinct[^.\n]*toy/i);
+    expect(prompt).toMatch(/not scenery/i);
+  });
+
   it('asks for foreground/background separation and photo indexes', () => {
     expect(prompt).toMatch(/isForeground/);
     expect(prompt).toMatch(/photoIndexes/);

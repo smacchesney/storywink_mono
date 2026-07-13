@@ -307,7 +307,9 @@ export function createSubjectDetectionPrompt(input: SubjectDetectionInput): stri
 Identify every DISTINCT subject worth offering, at most ${MAX_BATCH_SUBJECTS} (prefer the most-photographed and clearly foreground ones when more qualify):
 - every distinct person (children and grown-ups)
 - every animal companion (pet)
-- at most one clearly beloved toy or object (hugged, carried, presented — not scenery)
+- every distinct beloved toy or cherished object that is clearly the subject of a photo (hugged, carried, posed, or deliberately photographed on its own — not scenery or background clutter)
+
+A batch may be entirely toys — a parent introducing their child's toy cast one figure at a time. Offer each distinct toy as its own subject; never fold different toys into one.
 
 Include background passersby ONLY when they plausibly belong to the family (recurring across photos or interacting with the children); mark anyone who is not clearly a foreground subject with isForeground=false so the app can leave them unselected.
 
@@ -324,7 +326,7 @@ For EACH subject provide:
 10. photoIndexes: which photos (1-${input.photoCount}) they appear in.
 11. bestPhotoIndex: the single clearest, most frontal photo of them.
 
-Never merge two different people into one subject, and never split one person into two. If NO subject qualifies at all, return an empty subjects array.`;
+Never merge two different subjects (people, pets, or toys) into one, and never split one subject into two. If NO subject qualifies at all, return an empty subjects array.`;
 }
 
 export const SUBJECT_DETECTION_RESPONSE_SCHEMA = {
