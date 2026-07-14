@@ -509,7 +509,13 @@
     "matchYes": "Yes, it's them",
     "matchNo": "Not them",
     "matchLinked": "{name} will look just like their character.",
-    "deleteStarsInStories": "{name} stars in your character stories — those books need them. Delete the stories first, or keep your character."
+    "deleteStarsInStories": "{name} stars in your character stories — those books need them. Delete the stories first, or keep your character.",
+    "styleDrawIn": "Draw {name} in {style}",
+    "styleSwatchWait": "Takes about a minute",
+    "styleDrawn": "Drawn",
+    "styleDrawing": "Drawing…",
+    "styleShowing": "Showing {style}",
+    "styleSheetTitle": "{name}'s styles"
   },
   "avatarStories": {
     "castTitle": "Who is in this story?",
@@ -549,6 +555,7 @@
     "loadTrouble": "Your characters didn't come along — one more try?",
     "loadRetry": "Try again",
     "castNeedsPerson": "Add at least one person — pets and toys join in beside them",
-    "createNotReady": "A drawing changed just now — check your cast and try once more"
+    "createNotReady": "A drawing changed just now — check your cast and try once more",
+    "styleDrawnSummary": "{drawn} of {total} drawn"
   }
 }

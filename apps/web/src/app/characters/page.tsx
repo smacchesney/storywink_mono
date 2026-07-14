@@ -8,7 +8,9 @@ import { toast } from 'sonner';
 import { Plus } from 'lucide-react';
 import AvatarCard, { type AvatarSummary } from '@/components/characters/AvatarCard';
 import AvatarStudioDialog from '@/components/characters/AvatarStudioDialog';
+import { drawAgainStyle } from '@/lib/avatarWardrobe';
 import { MASCOT_CATS_WAVING } from '@/lib/mascots';
+import type { StyleKey } from '@storywink/shared/prompts/styles';
 import Image from 'next/image';
 
 const POLL_MS = 4000;
@@ -75,15 +77,21 @@ function CharactersShelf() {
     void load();
   };
 
-  const drawAgain = async (avatar: AvatarSummary) => {
-    const artStyle = avatar.renditions[0]?.artStyle ?? 'vignette';
-    await fetch(`/api/avatar/${avatar.id}/rendition`, {
+  // C3: redraw the DISPLAYED style (the card passes what it shows); the helper
+  // pins the all-failed fallback chain so this can never redraw an arbitrary row.
+  const drawStyle = async (avatarId: string, artStyle: string) => {
+    await fetch(`/api/avatar/${avatarId}/rendition`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ artStyle }),
     });
     void load();
   };
+
+  const drawAgain = (avatar: AvatarSummary, displayedStyle: StyleKey | null) =>
+    void drawStyle(avatar.id, drawAgainStyle(avatar.renditions, displayedStyle));
+
+  const drawInStyle = (avatar: AvatarSummary, style: StyleKey) => void drawStyle(avatar.id, style);
 
   const remove = async (avatar: AvatarSummary) => {
     if (!window.confirm(t('deleteConfirm', { name: avatar.displayName }))) return;
@@ -127,7 +135,9 @@ function CharactersShelf() {
       )}
 
       {/* X6d: the shelf is a place to START stories, not just storage. */}
-      {avatars?.some((a) => a.status === 'READY' && a.renditions.some((r) => r.status === 'READY')) && (
+      {avatars?.some(
+        (a) => a.status === 'READY' && a.renditions.some((r) => r.status === 'READY'),
+      ) && (
         <Link
           href="/create/characters"
           className="mb-4 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full bg-coral px-6 py-3 font-playful text-lg text-white shadow-md hover:bg-coral/90"
@@ -145,6 +155,7 @@ function CharactersShelf() {
             index={index}
             onRename={rename}
             onDrawAgain={drawAgain}
+            onDrawStyle={drawInStyle}
             onDelete={remove}
           />
         ))}

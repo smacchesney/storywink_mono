@@ -509,7 +509,13 @@
     "matchYes": "はい、そうです",
     "matchNo": "ちがいます",
     "matchLinked": "{name} は キャラクターと おなじ すがたで とうじょうします。",
-    "deleteStarsInStories": "{name} は キャラクターのお話に でています。そのお話の絵本に ひつようなので、先に 絵本を けしてから もういちど どうぞ。"
+    "deleteStarsInStories": "{name} は キャラクターのお話に でています。そのお話の絵本に ひつようなので、先に 絵本を けしてから もういちど どうぞ。",
+    "styleDrawIn": "{name}を「{style}」で かく",
+    "styleSwatchWait": "1ぷんくらいで できます",
+    "styleDrawn": "かきました",
+    "styleDrawing": "かいています…",
+    "styleShowing": "{style}を ひょうじ",
+    "styleSheetTitle": "{name}の スタイル"
   },
   "avatarStories": {
     "castTitle": "だれが出てくるお話？",
@@ -549,6 +555,7 @@
     "loadTrouble": "キャラクターをよみこめませんでした — もういちどためしますか？",
     "loadRetry": "もういちど",
     "castNeedsPerson": "人をひとりはえらんでください — ペットやおもちゃはそのおともに",
-    "createNotReady": "絵がかわったばかりのようです — キャストをたしかめて、もういちどどうぞ"
+    "createNotReady": "絵がかわったばかりのようです — キャストをたしかめて、もういちどどうぞ",
+    "styleDrawnSummary": "{total}のうち {drawn} かきました"
   }
 }
