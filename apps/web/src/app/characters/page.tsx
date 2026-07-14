@@ -79,19 +79,26 @@ function CharactersShelf() {
 
   // C3: redraw the DISPLAYED style (the card passes what it shows); the helper
   // pins the all-failed fallback chain so this can never redraw an arbitrary row.
-  const drawStyle = async (avatarId: string, artStyle: string) => {
-    await fetch(`/api/avatar/${avatarId}/rendition`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ artStyle }),
-    });
-    void load();
+  // Resolves the request outcome so an optimistic caller (the restyle sheet) can
+  // revert: C5 made 429 reachable in prod, and a network throw counts as failure.
+  const drawStyle = async (avatarId: string, artStyle: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/avatar/${avatarId}/rendition`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ artStyle }),
+      });
+      void load();
+      return res.ok;
+    } catch {
+      return false;
+    }
   };
 
   const drawAgain = (avatar: AvatarSummary, displayedStyle: StyleKey | null) =>
     void drawStyle(avatar.id, drawAgainStyle(avatar.renditions, displayedStyle));
 
-  const drawInStyle = (avatar: AvatarSummary, style: StyleKey) => void drawStyle(avatar.id, style);
+  const drawInStyle = (avatar: AvatarSummary, style: StyleKey) => drawStyle(avatar.id, style);
 
   const remove = async (avatar: AvatarSummary) => {
     if (!window.confirm(t('deleteConfirm', { name: avatar.displayName }))) return;

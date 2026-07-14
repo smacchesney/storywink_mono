@@ -33,6 +33,24 @@ export function swatchState(
   return 'failed';
 }
 
+/**
+ * The "…'s styles" sheet row state, reconciling the optimistic just-drew flag
+ * with the polled rendition. A real TERMINAL rendition always wins: once the
+ * 4s poll delivers READY (drawn) or FAILED, that shows even if the row was
+ * tapped — otherwise a stale justDrew would mask it and the row would read
+ * "drawing…" forever. justDrew only bridges the undrawn/absent 0-4s gap before
+ * the PENDING rendition appears, so the tapped row reads "drawing…" instantly
+ * without ever hiding the real result.
+ */
+export function sheetRowState(
+  rendition: { status: WardrobeRendition['status'] } | undefined,
+  justDrew: boolean,
+): SwatchState {
+  const base = swatchState(rendition);
+  if (base === 'drawn' || base === 'failed') return base;
+  return justDrew ? 'drawing' : base;
+}
+
 /** A rendition the card can actually show: READY with a cutout or portrait. */
 function isDisplayable(r: WardrobeRendition): boolean {
   return r.status === 'READY' && Boolean(r.cutoutUrl || r.portraitUrl);

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   swatchState,
+  sheetRowState,
   displayableStyles,
   showSwatchRow,
   defaultDisplayedStyle,
@@ -29,6 +30,37 @@ describe('swatchState', () => {
     expect(swatchState({ status: 'READY' })).toBe('drawn');
     expect(swatchState({ status: 'PENDING' })).toBe('drawing');
     expect(swatchState({ status: 'FAILED' })).toBe('failed');
+  });
+});
+
+describe('sheetRowState', () => {
+  // The core reconciliation: a real TERMINAL rendition always wins over the
+  // optimistic just-drew flag. This is the bug the finding pins — before, a
+  // set justDrew masked the polled READY forever and the row stayed "drawing".
+  it('shows the polled READY (drawn) even while justDrew is still set', () => {
+    expect(sheetRowState({ status: 'READY' }, true)).toBe('drawn');
+  });
+
+  it('shows the polled FAILED even while justDrew is still set', () => {
+    expect(sheetRowState({ status: 'FAILED' }, true)).toBe('failed');
+  });
+
+  it('bridges an undrawn/absent style to drawing while justDrew is set', () => {
+    expect(sheetRowState(undefined, true)).toBe('drawing');
+  });
+
+  it('reverts to undrawn when justDrew clears and no rendition arrived (429 path)', () => {
+    expect(sheetRowState(undefined, false)).toBe('undrawn');
+  });
+
+  it('is drawing for a PENDING rendition regardless of the flag', () => {
+    expect(sheetRowState({ status: 'PENDING' }, true)).toBe('drawing');
+    expect(sheetRowState({ status: 'PENDING' }, false)).toBe('drawing');
+  });
+
+  it('matches swatchState once the flag is clear (no optimism)', () => {
+    expect(sheetRowState({ status: 'READY' }, false)).toBe('drawn');
+    expect(sheetRowState({ status: 'FAILED' }, false)).toBe('failed');
   });
 });
 

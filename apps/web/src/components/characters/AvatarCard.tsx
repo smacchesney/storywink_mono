@@ -14,7 +14,7 @@ import {
 import StorybookFrame from '@/components/ui/storybook-frame';
 import { Storydust } from '@/components/ui/storydust';
 import { styleLabelKey } from '@/lib/styleLabelKey';
-import { displayableStyles, showSwatchRow, swatchState } from '@/lib/avatarWardrobe';
+import { displayableStyles, showSwatchRow, sheetRowState } from '@/lib/avatarWardrobe';
 import { cn } from '@/lib/utils';
 
 export interface AvatarSummary {
@@ -43,8 +43,10 @@ interface AvatarCardProps {
   /**
    * Draws a specific new style from the "…'s styles" sheet. Optional: absent it,
    * the sheet and its kebab entry stay hidden (the sheet is a shelf feature).
+   * Resolves `true` when the enqueue succeeds, `false` on a rejected request
+   * (e.g. the 429 rate limit) so the sheet can revert its optimistic row.
    */
-  onDrawStyle?: (avatar: AvatarSummary, style: StyleKey) => void;
+  onDrawStyle?: (avatar: AvatarSummary, style: StyleKey) => Promise<boolean>;
 }
 
 const KIND_EMOJI: Record<AvatarSummary['kind'], string> = {
@@ -296,13 +298,22 @@ function StyleWardrobeSheet({
 }: {
   avatar: AvatarSummary;
   onClose: () => void;
-  onDraw: (style: StyleKey) => void;
+  onDraw: (style: StyleKey) => Promise<boolean>;
 }) {
   const t = useTranslations('characters');
   const tSetup = useTranslations('setup');
   // Optimistic flip so the tapped row reads "drawing…" instantly; the shelf's
-  // 4s poll then reconciles it to the real PENDING rendition.
+  // 4s poll then reconciles it to the real PENDING rendition. sheetRowState
+  // keeps a real terminal rendition (drawn/failed) winning over this flag, so
+  // it never masks the polled result — it only bridges the undrawn 0-4s gap.
   const [justDrew, setJustDrew] = React.useState<Set<string>>(new Set());
+
+  const removeJustDrew = (style: StyleKey) =>
+    setJustDrew((prev) => {
+      const next = new Set(prev);
+      next.delete(style);
+      return next;
+    });
 
   if (typeof document === 'undefined') return null;
 
@@ -330,7 +341,7 @@ function StyleWardrobeSheet({
         <div className="flex flex-col gap-2">
           {getAllStyleKeys().map((style) => {
             const rendition = avatar.renditions.find((r) => r.artStyle === style);
-            const state = justDrew.has(style) ? 'drawing' : swatchState(rendition);
+            const state = sheetRowState(rendition, justDrew.has(style));
             const label = tSetup(styleLabelKey(style));
             return (
               <div
@@ -364,7 +375,12 @@ function StyleWardrobeSheet({
                         type="button"
                         onClick={() => {
                           setJustDrew((prev) => new Set(prev).add(style));
-                          onDraw(style);
+                          // If the enqueue is rejected (e.g. the 429 rate limit)
+                          // drop the optimistic flip so the row reverts to its
+                          // real state — the Draw CTA — which IS the feedback.
+                          void onDraw(style).then((ok) => {
+                            if (!ok) removeJustDrew(style);
+                          });
                         }}
                         className="self-start rounded-full bg-coral px-3 py-1.5 font-playful text-sm text-white hover:bg-coral/90"
                       >
