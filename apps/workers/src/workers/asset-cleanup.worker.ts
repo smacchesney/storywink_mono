@@ -517,26 +517,24 @@ const STORY_PROPOSAL_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
  */
 async function sweepExpiredStoryProposals(now: Date): Promise<number> {
   const cutoff = new Date(now.getTime() - STORY_PROPOSAL_RETENTION_MS);
-  const rows = await prisma.appEvent.findMany({
+  // Stripping props to {} is identical for every row (unlike the detection
+  // sweep, whose per-row tombstone keeps that row's asset ids), so one set-based
+  // updateMany drains the WHOLE expired backlog in a single query — no
+  // take-batch that sustained load could outrun, silently letting the 30-day
+  // retention promise fall behind. The name tombstone
+  // (story_proposal → story_proposal_stripped) doubles as the already-processed
+  // guard: a stripped row no longer matches name=story_proposal, so there is no
+  // reprocessing and no need for a separate "props not empty" clause. The name
+  // condition still means a row written mid-sweep is never double-stripped, and
+  // the cutoff bounds the write to genuinely expired rows.
+  const { count } = await prisma.appEvent.updateMany({
     where: { name: STORY_PROPOSAL_EVENT, createdAt: { lt: cutoff } },
-    orderBy: { createdAt: 'asc' },
-    take: DETECTION_SWEEP_BATCH_SIZE,
-    select: { id: true },
+    data: { name: STORY_PROPOSAL_STRIPPED_EVENT, props: {} },
   });
-  for (const row of rows) {
-    // Name-conditional so a row written mid-sweep is never double-stripped.
-    await prisma.appEvent.updateMany({
-      where: { id: row.id, name: STORY_PROPOSAL_EVENT },
-      data: { name: STORY_PROPOSAL_STRIPPED_EVENT, props: {} },
-    });
+  if (count > 0) {
+    logger.info({ stripped: count }, 'Story proposal sweep: props stripped from expired rows');
   }
-  if (rows.length > 0) {
-    logger.info(
-      { stripped: rows.length },
-      'Story proposal sweep: props stripped from expired rows',
-    );
-  }
-  return rows.length;
+  return count;
 }
 
 /**
