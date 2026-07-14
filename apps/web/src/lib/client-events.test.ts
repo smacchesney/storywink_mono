@@ -9,6 +9,18 @@ describe('client event allowlist (POST /api/events schema)', () => {
     }
   });
 
+  it('allowlists the four story-helper funnel events (X8 lesson: unallowlisted track() names 400)', () => {
+    for (const name of [
+      'story_helper_shown',
+      'story_helper_accepted',
+      'story_helper_edited',
+      'story_helper_skipped',
+    ]) {
+      expect(CLIENT_EVENT_NAMES).toContain(name);
+      expect(clientEventSchema.safeParse({ name }).success, `expected '${name}' accepted`).toBe(true);
+    }
+  });
+
   it('accepts a full payload with bookId and props', () => {
     const result = clientEventSchema.safeParse({
       name: 'preview_opened',

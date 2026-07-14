@@ -28,6 +28,12 @@ export const CLIENT_EVENT_NAMES = [
   'print_interest',
   'print_cta_view',
   'print_cta_click',
+  // X11 D: story-helper funnel — the "Shape the story" card shown, then its
+  // terminal action (accepted as-is / accepted with edits / skipped).
+  'story_helper_shown',
+  'story_helper_accepted',
+  'story_helper_edited',
+  'story_helper_skipped',
 ] as const;
 
 export type ClientEventName = (typeof CLIENT_EVENT_NAMES)[number];
