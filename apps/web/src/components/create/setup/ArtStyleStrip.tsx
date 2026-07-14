@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React from 'react';
 import Image from 'next/image';
@@ -6,19 +6,13 @@ import { useTranslations } from 'next-intl';
 import { Check } from 'lucide-react';
 import { optimizeCloudinaryUrl } from '@storywink/shared';
 import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
+import { styleLabelKey } from '@/lib/styleLabelKey';
 import { cn } from '@/lib/utils';
 
 interface ArtStyleStripProps {
   value: StyleKey;
   onChange: (style: StyleKey) => void;
 }
-
-// Maps a style key to its setup-namespace label key.
-const LABEL_KEYS: Record<StyleKey, string> = {
-  vignette: 'styleVignette',
-  origami: 'styleOrigami',
-  kawaii: 'styleKawaii',
-};
 
 /**
  * The horizontal 3-thumbnail art-style picker. Reuses STYLE_LIBRARY's first
@@ -32,8 +26,7 @@ export function ArtStyleStrip({ value, onChange }: ArtStyleStripProps) {
     <div className="grid grid-cols-3 gap-2.5">
       {styles.map(([key, def]) => {
         const selected = value === key;
-        const labelKey = LABEL_KEYS[key];
-        const label = labelKey ? t(labelKey) : def.label;
+        const label = t(styleLabelKey(key));
         return (
           <button
             key={key}
@@ -43,7 +36,7 @@ export function ArtStyleStrip({ value, onChange }: ArtStyleStripProps) {
               'relative aspect-square overflow-hidden rounded-xl border transition-all',
               selected
                 ? 'border-coral ring-2 ring-coral ring-offset-1'
-                : 'border-black/10 hover:border-coral/50'
+                : 'border-black/10 hover:border-coral/50',
             )}
             aria-pressed={selected}
           >
