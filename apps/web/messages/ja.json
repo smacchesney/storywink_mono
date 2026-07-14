@@ -556,6 +556,13 @@
     "loadRetry": "もういちど",
     "castNeedsPerson": "人をひとりはえらんでください — ペットやおもちゃはそのおともに",
     "createNotReady": "絵がかわったばかりのようです — キャストをたしかめて、もういちどどうぞ",
-    "styleDrawnSummary": "{total}のうち {drawn} かきました"
+    "styleDrawnSummary": "{total}のうち {drawn} かきました",
+    "helperTitle": "お話をととのえよう",
+    "helperFrom": "あなたのアイデアから：「{premise}」",
+    "helperSounds": "いい感じ！",
+    "helperMore": "ほかのアイデア",
+    "helperEdit": "書きかえる",
+    "helperSkip": "スキップ",
+    "helperThinking": "お話のアイデアを考えています…"
   }
 }

@@ -556,6 +556,13 @@
     "loadRetry": "Try again",
     "castNeedsPerson": "Add at least one person — pets and toys join in beside them",
     "createNotReady": "A drawing changed just now — check your cast and try once more",
-    "styleDrawnSummary": "{drawn} of {total} drawn"
+    "styleDrawnSummary": "{drawn} of {total} drawn",
+    "helperTitle": "Shape the story",
+    "helperFrom": "From your idea: “{premise}”",
+    "helperSounds": "Sounds right",
+    "helperMore": "More ideas",
+    "helperEdit": "Edit",
+    "helperSkip": "Skip",
+    "helperThinking": "Sketching story ideas…"
   }
 }
