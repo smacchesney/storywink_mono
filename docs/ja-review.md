@@ -266,3 +266,7 @@ Append-only. One line per key: `namespace.key` — why it needs a native check.
 ## 2026-07-14 — X11 Track A fork & shelf polish (x11-a)
 
 - `header.myCharacters` — new key for the burger nav row and the Clerk account-menu item that link to the character shelf 「うちのキャラクター」; set verbatim to `characters.title` so the menu word and the page heading always agree. No fresh register question — it reuses copy already reviewed for the page title; the only thing to confirm is that the two must stay in lockstep (if `characters.title` ever changes register, this key changes with it).
+
+## 2026-07-14 — X11 Track B "+ Add someone" in the wizard (x11-b)
+
+- `avatarStories.castDrawing` — the label on an in-flight character's disabled tile in the cast grid 「おえかき中…」; mirrors the shelf's おえかき register (`characters.drawingsNeedRetry`, AvatarCard `drawing`). Check 中 vs ちゅう register against the spaced-kana studio copy, and that the … (three-dot) reads as an ongoing wait, not a truncation.
