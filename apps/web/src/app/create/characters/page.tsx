@@ -14,7 +14,7 @@ import { notFound, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft, Check, Pencil } from 'lucide-react';
 import { Storydust } from '@/components/ui/storydust';
 import { optimizeCloudinaryUrl } from '@storywink/shared';
 import { STYLE_LIBRARY, StyleKey, getStylePreviewUrl } from '@storywink/shared/prompts/styles';
@@ -558,17 +558,21 @@ function AvatarStoryFlow() {
                 value={customSpark}
                 onChange={(e) => setCustomSpark(e.target.value.slice(0, 300))}
                 placeholder={t('sparkPlaceholder')}
-                className="min-h-[44px] w-full max-w-sm rounded-full border-2 border-coral/60 bg-white px-4 py-2 font-playful text-sm text-[#1a1a1a] outline-none placeholder:text-gray-400"
+                className="min-h-[44px] w-full max-w-sm rounded-full border-2 border-coral bg-white px-4 py-2 font-playful text-sm text-[#1a1a1a] outline-none placeholder:text-gray-400"
               />
             ) : (
+              // Clear outlined button, NOT a hero: solid coral fill is the
+              // selected-preset signal and the Next CTA, so a filled/tinted
+              // chip here would read pre-selected and out-shout the presets.
               <button
                 type="button"
                 onClick={() => {
                   setWritingOwn(true);
                   setSparkKey(null);
                 }}
-                className="min-h-[44px] rounded-full border border-dashed border-black/20 bg-white px-4 py-2 font-playful text-sm text-gray-500 hover:border-coral/50"
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-full border-2 border-coral bg-white px-4 py-2 font-playful text-sm text-coral hover:bg-coral/10"
               >
+                <Pencil className="h-3.5 w-3.5" />
                 {t('sparkCustom')}
               </button>
             )}
