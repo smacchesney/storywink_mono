@@ -30,15 +30,15 @@ import {
   CastKind,
 } from '@/lib/avatar-story';
 import { castTileState, isUsableAvatar } from '@/lib/characterPathDestination';
+import { styleLabelKey } from '@/lib/styleLabelKey';
 import { rememberCreatePath } from '@/lib/createPath';
 import logger from '@/lib/logger';
 
 // B2: dynamic + ssr:false keeps the PhotoTray/detect stack out of the wizard's
 // first-load bundle — the studio only mounts when the parent taps "+ Add".
-const AvatarStudioDialog = dynamic(
-  () => import('@/components/characters/AvatarStudioDialog'),
-  { ssr: false },
-);
+const AvatarStudioDialog = dynamic(() => import('@/components/characters/AvatarStudioDialog'), {
+  ssr: false,
+});
 
 const KIND_EMOJI: Record<CastKind, string> = {
   CHILD: '🧒',
@@ -55,13 +55,6 @@ const SPARK_KEYS = [
   'sparkSock',
   'sparkDragon',
 ] as const;
-
-// Style display names live in the setup namespace (ArtStyleStrip precedent).
-const STYLE_LABEL_KEYS: Record<string, string> = {
-  vignette: 'styleVignette',
-  origami: 'styleOrigami',
-  kawaii: 'styleKawaii',
-};
 
 type Step = 'cast' | 'spark' | 'length';
 
@@ -185,7 +178,10 @@ function AvatarStoryFlow() {
       if (draft.sparkKey) setSparkKey(draft.sparkKey);
       if (draft.customSpark) setCustomSpark(draft.customSpark);
       if (draft.writingOwn) setWritingOwn(true);
-      if (draft.pageLength && (AVATAR_STORY_PAGE_LENGTHS as readonly number[]).includes(draft.pageLength)) {
+      if (
+        draft.pageLength &&
+        (AVATAR_STORY_PAGE_LENGTHS as readonly number[]).includes(draft.pageLength)
+      ) {
         setPageLength(draft.pageLength);
       }
       if (draft.language === 'en' || draft.language === 'ja') setLanguage(draft.language);
@@ -371,8 +367,18 @@ function AvatarStoryFlow() {
     return best;
   }, [cast]);
 
-  const styleLabel = (key: StyleKey) =>
-    STYLE_LABEL_KEYS[key] ? tSetup(STYLE_LABEL_KEYS[key]) : STYLE_LIBRARY[key].label;
+  // C4: how many of the cast already have the repair target drawn — makes the
+  // repair CTA's cost ("2 of 3 drawn", so 1 left to draw) legible. Read-only;
+  // the repair flow itself is unchanged.
+  const styleForRepairDrawn = useMemo(
+    () =>
+      cast.filter((a) =>
+        a.renditions.some((r) => r.artStyle === styleForRepair && r.status === 'READY'),
+      ).length,
+    [cast, styleForRepair],
+  );
+
+  const styleLabel = (key: StyleKey) => tSetup(styleLabelKey(key));
 
   const startRepair = async () => {
     setRepairing(true);
@@ -567,9 +573,7 @@ function AvatarStoryFlow() {
         <button
           type="button"
           onClick={() =>
-            step === 'cast'
-              ? router.push('/create')
-              : setStep(step === 'length' ? 'spark' : 'cast')
+            step === 'cast' ? router.push('/create') : setStep(step === 'length' ? 'spark' : 'cast')
           }
           className="flex min-h-[44px] items-center gap-1.5 rounded-full px-3 py-2 font-playful text-sm text-gray-500 hover:text-gray-700"
         >
@@ -721,7 +725,9 @@ function AvatarStoryFlow() {
             </button>
           </div>
 
-          {peopleFull && <p className="mt-3 text-center text-xs text-gray-500">{t('castPeopleFull')}</p>}
+          {peopleFull && (
+            <p className="mt-3 text-center text-xs text-gray-500">{t('castPeopleFull')}</p>
+          )}
           {companionsFull && (
             <p className="mt-1 text-center text-xs text-gray-500">{t('castCompanionsFull')}</p>
           )}
@@ -788,7 +794,11 @@ function AvatarStoryFlow() {
             )}
           </div>
 
-          <StepCta disabled={premise.length === 0} onClick={() => setStep('length')} label={t('next')} />
+          <StepCta
+            disabled={premise.length === 0}
+            onClick={() => setStep('length')}
+            label={t('next')}
+          />
         </>
       )}
 
@@ -808,13 +818,17 @@ function AvatarStoryFlow() {
                   aria-pressed={active}
                   onClick={() => setPageLength(len)}
                   className={`flex min-h-[44px] flex-col items-center rounded-2xl border-2 bg-white px-2 py-4 transition-all ${
-                    active ? 'border-coral ring-2 ring-coral/25' : 'border-black/10 hover:border-coral/50'
+                    active
+                      ? 'border-coral ring-2 ring-coral/25'
+                      : 'border-black/10 hover:border-coral/50'
                   }`}
                 >
                   <span className="font-playful text-base font-semibold text-[#1a1a1a]">
                     {t(`length${len}`)}
                   </span>
-                  <span className="mt-1 text-xs text-gray-500">{t('lengthPages', { count: len })}</span>
+                  <span className="mt-1 text-xs text-gray-500">
+                    {t('lengthPages', { count: len })}
+                  </span>
                 </button>
               );
             })}
@@ -839,7 +853,11 @@ function AvatarStoryFlow() {
                         active ? 'border-coral ring-2 ring-coral ring-offset-1' : 'border-black/10'
                       }`}
                     >
-                      <img src={getStylePreviewUrl(key) ?? ''} alt={styleLabel(key)} className="h-20 w-20 object-cover" />
+                      <img
+                        src={getStylePreviewUrl(key) ?? ''}
+                        alt={styleLabel(key)}
+                        className="h-20 w-20 object-cover"
+                      />
                       <span className="absolute inset-x-0 bottom-0 bg-white/85 py-0.5 text-center font-playful text-[11px] text-[#1a1a1a]">
                         {styleLabel(key)}
                       </span>
@@ -853,7 +871,9 @@ function AvatarStoryFlow() {
           {/* No shared style: one honest repair card, never a dead end. */}
           {sharedStyles.length === 0 && (
             <div className="mx-auto mt-6 w-full max-w-md rounded-2xl border border-coral/15 bg-[#FFF9F5] px-5 py-4 text-center">
-              <p className="font-playful text-sm font-semibold text-[#1a1a1a]">{t('styleMismatch')}</p>
+              <p className="font-playful text-sm font-semibold text-[#1a1a1a]">
+                {t('styleMismatch')}
+              </p>
               <p className="mt-1 text-sm text-gray-600">{t('styleMismatchHint')}</p>
               {repairing ? (
                 <div className="mt-3 flex items-center justify-center gap-2">
@@ -864,6 +884,9 @@ function AvatarStoryFlow() {
                 </div>
               ) : (
                 <>
+                  <p className="mt-2 font-playful text-xs text-gray-500">
+                    {t('styleDrawnSummary', { drawn: styleForRepairDrawn, total: cast.length })}
+                  </p>
                   {repairTrouble && (
                     <p className="mt-2 text-sm text-gray-600">{t('styleRepairRetry')}</p>
                   )}
