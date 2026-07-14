@@ -7,6 +7,7 @@ import {
   prevStep,
   storyProposalSignature,
   sanitizeStoryProposal,
+  finalPremiseFor,
   STORYLINE_MAX,
 } from './story-helper';
 
@@ -139,5 +140,38 @@ describe('sanitizeStoryProposal (D3 post-parse bounds)', () => {
       storyline: '',
       alternates: [],
     });
+  });
+});
+
+describe('finalPremiseFor (X11 accept→preset guard)', () => {
+  it('substitutes the accepted storyline only on the write-your-own path', () => {
+    expect(finalPremiseFor(true, 'a puddle rescue', 'raw spark')).toBe('a puddle rescue');
+  });
+
+  it('trims the accepted storyline before substituting', () => {
+    expect(finalPremiseFor(true, '  a puddle rescue  ', 'raw spark')).toBe('a puddle rescue');
+  });
+
+  it('ignores an abandoned accepted storyline when a PRESET is chosen (the bug)', () => {
+    // Parent wrote custom, accepted a proposal, backed out to spark, then picked
+    // a preset (writingOwn=false). The preset premise must win — never the stale
+    // authored storyline that enterShape never got a chance to clear.
+    expect(finalPremiseFor(false, 'abandoned custom storyline', 'The Lost Balloon')).toBe(
+      'The Lost Balloon',
+    );
+  });
+
+  it('falls back to the raw premise when nothing was accepted (skip / fail-open)', () => {
+    expect(finalPremiseFor(true, '', 'raw spark')).toBe('raw spark');
+    expect(finalPremiseFor(true, '   ', 'raw spark')).toBe('raw spark');
+  });
+
+  it('lets a re-authored storyline substitute again after an accept→preset detour', () => {
+    // preset detour lands on the preset premise …
+    expect(finalPremiseFor(false, 'old accepted', 'A Rainy Day')).toBe('A Rainy Day');
+    // … and switching back to write-your-own and accepting again still substitutes.
+    expect(finalPremiseFor(true, 'freshly re-authored', 'my custom spark')).toBe(
+      'freshly re-authored',
+    );
   });
 });

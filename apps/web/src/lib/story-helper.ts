@@ -71,6 +71,25 @@ export function storyProposalSignature(input: {
   });
 }
 
+/**
+ * D5 (X11 hardening): the premise create() actually sends. The accepted/edited
+ * storyline substitutes for the raw spark ONLY on the write-your-own path. A
+ * parent who authors a spark, accepts a proposal, backs out to the spark step,
+ * and picks a PRESET flips writingOwn to false — and must get the preset, never
+ * the abandoned custom storyline. Gating on writingOwn is the belt that holds
+ * even if the helper state wasn't cleared on the preset tap (the suspenders).
+ * Empty/whitespace accepted text (skip and every fail-open) falls through to the
+ * raw premise exactly as before.
+ */
+export function finalPremiseFor(
+  writingOwn: boolean,
+  acceptedStoryline: string,
+  premise: string,
+): string {
+  const accepted = acceptedStoryline.trim();
+  return writingOwn && accepted ? accepted : premise;
+}
+
 /** Storyline length cap. Enforced here, never in the strict schema. */
 export const STORYLINE_MAX = 280;
 

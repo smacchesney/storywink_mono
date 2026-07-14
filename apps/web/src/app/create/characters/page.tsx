@@ -38,6 +38,7 @@ import {
   stepIndexOf,
   prevStep,
   storyProposalSignature,
+  finalPremiseFor,
   type AvatarStoryStep,
 } from '@/lib/story-helper';
 import { track } from '@/lib/track';
@@ -173,6 +174,7 @@ function AvatarStoryFlow() {
   // re-call has fired, whether story_helper_shown has fired for this proposal,
   // and a step mirror so the 6s fail-open only advances when still on shape.
   const proposalAbortRef = useRef<AbortController | null>(null);
+  const proposalTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const proposalSigRef = useRef<string | null>(null);
   const proposalRecalledRef = useRef(false);
   const shownFiredRef = useRef(false);
@@ -180,6 +182,17 @@ function AvatarStoryFlow() {
   useEffect(() => {
     stepRef.current = step;
   }, [step]);
+
+  // Unmount-only: tear down an in-flight proposal fetch and its 6s abort timer
+  // so neither outlives the wizard (leaving mid-shape must not leak a pending
+  // fetch or a stray timeout). Separate from the repair-poll and arrival-poll
+  // cleanups above — this one owns only the proposal plumbing.
+  useEffect(() => {
+    return () => {
+      proposalAbortRef.current?.abort();
+      if (proposalTimeoutRef.current) clearTimeout(proposalTimeoutRef.current);
+    };
+  }, []);
 
   const load = useCallback(async () => {
     const res = await fetch('/api/avatars').catch(() => null);
@@ -423,6 +436,7 @@ function AvatarStoryFlow() {
     const controller = new AbortController();
     proposalAbortRef.current = controller;
     const timeout = setTimeout(() => controller.abort(), 6000);
+    proposalTimeoutRef.current = timeout;
     if (mode === 'initial') {
       setProposalLoading(true);
       shownFiredRef.current = false;
@@ -445,6 +459,7 @@ function AvatarStoryFlow() {
         }),
       });
       clearTimeout(timeout);
+      if (proposalTimeoutRef.current === timeout) proposalTimeoutRef.current = null;
       if (proposalAbortRef.current === controller) proposalAbortRef.current = null;
       if (!res.ok) throw new Error(`propose ${res.status}`);
       const data = (await res.json()) as { storyline: string; alternates: string[] };
@@ -470,6 +485,7 @@ function AvatarStoryFlow() {
       }
     } catch {
       clearTimeout(timeout);
+      if (proposalTimeoutRef.current === timeout) proposalTimeoutRef.current = null;
       if (proposalAbortRef.current === controller) proposalAbortRef.current = null;
       if (mode === 'initial') {
         setProposalLoading(false);
@@ -685,8 +701,10 @@ function AvatarStoryFlow() {
     setIsCreating(true);
     // D5: the accepted/edited storyline REPLACES the premise (the create schema
     // clamps ≤300); when nothing was accepted — skip or any fail-open — the raw
-    // premise proceeds exactly as today.
-    const finalPremise = acceptedStoryline.trim() || premise;
+    // premise proceeds exactly as today. Gated on writingOwn so a parent who
+    // authored, accepted, then backed out and picked a PRESET gets the preset,
+    // never the abandoned custom storyline (X11: belt half of the two-belt fix).
+    const finalPremise = finalPremiseFor(writingOwn, acceptedStoryline, premise);
     try {
       // Reuse the book from a half-finished attempt (created but the story
       // enqueue did not land) — a retry tap must never mint a duplicate.
@@ -1003,6 +1021,20 @@ function AvatarStoryFlow() {
                   onClick={() => {
                     setSparkKey(key);
                     setWritingOwn(false);
+                    // Leaving the write-your-own path abandons any authored
+                    // storyline: clear it (and the cached proposal + signature)
+                    // so stale authorship can't linger into a preset book, and
+                    // so a later switch back to write-your-own re-enters shape
+                    // fresh via enterShape's signature logic (X11: suspenders
+                    // half of the two-belt fix).
+                    setAcceptedStoryline('');
+                    setProposalOptions(null);
+                    setOptionIndex(0);
+                    setShapeText('');
+                    setShapeEdited(false);
+                    setShapeEditing(false);
+                    proposalSigRef.current = null;
+                    proposalRecalledRef.current = false;
                   }}
                   className={`min-h-[44px] rounded-full border px-4 py-2 font-playful text-sm transition-colors ${
                     active
