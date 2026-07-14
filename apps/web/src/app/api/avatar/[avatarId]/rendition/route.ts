@@ -26,16 +26,20 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const { dbUser } = await getAuthenticatedUser();
 
     // Renditions are a money route (one Gemini sheet + validation each) and
-    // X6d's style-repair fans out one request per cast member — cap the burst.
+    // X6d's style-repair plus X11's per-style wardrobe both fan out requests —
+    // cap the burst. Enforced unconditionally, like the detect route: 30/hr/user
+    // is well above any legitimate parent, and the accepted worst case is ≤30
+    // renders/hr/user. (checkRateLimit itself fails open if Redis is unreachable.)
     const rl = await checkRateLimit(`avatar-rendition:${dbUser.id}`, 30, 3600);
     if (!rl.allowed) {
-      logger.warn({ dbUserId: dbUser.id, remaining: rl.remaining }, 'Rate limit exceeded: avatar rendition');
-      if (process.env.RATE_LIMIT_ENFORCE === 'true') {
-        return NextResponse.json(
-          { error: "You're drawing very quickly. Please wait a little while and try again." },
-          { status: 429 },
-        );
-      }
+      logger.warn(
+        { dbUserId: dbUser.id, remaining: rl.remaining },
+        'Rate limit exceeded: avatar rendition',
+      );
+      return NextResponse.json(
+        { error: "You're drawing very quickly. Please wait a little while and try again." },
+        { status: 429 },
+      );
     }
 
     const parsed = renditionSchema.safeParse(await request.json().catch(() => null));
