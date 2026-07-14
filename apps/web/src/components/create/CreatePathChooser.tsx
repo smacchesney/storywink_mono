@@ -203,7 +203,9 @@ function CardShell({ onClick, emphasis, ringed, prefersReduced, busy, children }
       whileTap={prefersReduced ? undefined : { scale: 0.985 }}
       transition={{ type: 'spring', stiffness: 300, damping: 22 }}
       className={cn(
-        'flex h-full w-full flex-col rounded-2xl border-2 px-5 py-5 text-left transition-colors',
+        // `relative` so the remembered-card pill (absolute, -top-3) has a
+        // reliable containing block — framer's transform is not one.
+        'relative flex h-full w-full flex-col rounded-2xl border-2 px-5 py-5 text-left transition-colors',
         emphasis === 'primary' ? 'bg-[#FFF9F5] shadow-md' : 'bg-white shadow-sm',
         ringed
           ? 'border-coral/50 ring-2 ring-coral/20'
@@ -221,8 +223,17 @@ const CARD_TITLE_CLASS = 'font-playful text-lg font-semibold leading-tight text-
 const CHIP_CLASS =
   'inline-flex max-w-full items-center self-start rounded-full border border-coral/30 bg-white px-3 py-1 text-xs leading-snug text-gray-600';
 
-function LastTime({ children }: { children: ReactNode }) {
-  return <span className="mt-2 text-xs font-medium text-coral">{children}</span>;
+/**
+ * The "you started here last time" badge, pinned straddling the remembered
+ * card's top edge (absolute, so it never adds height — neither card can grow
+ * or reflow its sibling). Sits over the coral ring band by design.
+ */
+function TopEdgePill({ children }: { children: ReactNode }) {
+  return (
+    <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-coral px-3 py-1 text-xs font-medium text-white shadow-sm">
+      {children}
+    </span>
+  );
 }
 
 /* ---- The chooser ---------------------------------------------------------- */
@@ -391,7 +402,7 @@ export function CreatePathChooser() {
           />
           <span className={cn(CARD_TITLE_CLASS, 'mt-4 block')}>{t('pathPhotosTitle')}</span>
           <span className={cn(CHIP_CLASS, 'mt-3')}>{t('pathPhotosChip')}</span>
-          {lastPath === 'photos' && <LastTime>{t('pathLastTime')}</LastTime>}
+          {lastPath === 'photos' && <TopEdgePill>{t('pathLastTime')}</TopEdgePill>}
         </CardShell>
 
         {/* Card B — photos → characters → stories (personalizes to the cast) */}
@@ -438,7 +449,7 @@ export function CreatePathChooser() {
           ) : (
             <span className={cn(CHIP_CLASS, 'mt-3')}>{t('pathFriendsChip')}</span>
           )}
-          {lastPath === 'avatars' && <LastTime>{t('pathLastTime')}</LastTime>}
+          {lastPath === 'avatars' && <TopEdgePill>{t('pathLastTime')}</TopEdgePill>}
         </CardShell>
       </div>
     </div>
