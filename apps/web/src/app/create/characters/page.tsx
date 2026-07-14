@@ -94,6 +94,10 @@ function AvatarStoryFlow() {
   const [repairTrouble, setRepairTrouble] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // When the current live-arrival polling session began. Held in a ref because
+  // the poll effect re-runs on every avatars change, so a local start time would
+  // reset each cycle and never reach the 240s cap. Null while nothing is drawing.
+  const arrivalPollStartRef = useRef<number | null>(null);
   // B4 auto-select bookkeeping. `preStudioIdsRef` snapshots the shelf before
   // the studio opens; the diff after `onCreated` is exactly the characters made
   // this session. Those ids wait in `pendingAutoSelectRef` until their drawing
@@ -215,9 +219,11 @@ function AvatarStoryFlow() {
 
   // As queued characters flip usable, cap-guard them into the cast (B4). Each
   // id is evaluated exactly once; a capped add is dropped silently so the tile
-  // just pops to selectable and the parent chooses.
+  // just pops to selectable and the parent chooses. Only on the cast step: the
+  // repair poll's setAvatars must never silently mutate a cast the parent has
+  // already advanced past (which would also reset createdBookIdRef).
   useEffect(() => {
-    if (!avatars) return;
+    if (step !== 'cast' || !avatars) return;
     const pending = pendingAutoSelectRef.current;
     if (pending.size === 0) return;
     let nextIds = castIdsRef.current;
@@ -229,16 +235,18 @@ function AvatarStoryFlow() {
         continue;
       }
       if (castTileState(a) !== 'selectable') continue; // still drawing — wait
+      // Rebuild the cast per iteration so a second character settling in the
+      // same tick weighs the first one's add — autoSelectAfterCreate recomputes
+      // the resulting composition from currentCast, enforcing ≥1 person / caps.
       const currentCast = nextIds
         .map((cid) => avatars.find((av) => av.id === cid))
         .filter((av): av is AvatarSummary => Boolean(av));
-      const comp = castComposition(currentCast.map((c) => c.kind));
-      if (autoSelectAfterCreate(currentCast, a, comp)) nextIds = [...nextIds, id];
+      if (autoSelectAfterCreate(currentCast, a)) nextIds = [...nextIds, id];
       done.push(id);
     }
     for (const id of done) pending.delete(id);
     if (nextIds !== castIdsRef.current) setCastIds(nextIds);
-  }, [avatars]);
+  }, [step, avatars]);
 
   // A tile that was drawing and is now selectable pops once (B4).
   useEffect(() => {
@@ -260,11 +268,18 @@ function AvatarStoryFlow() {
   }, [avatars]);
 
   // B3 live-arrival poll: every 4s while a character is drawing, but only on the
-  // cast step. Leaving the step, settling, or unmounting tears the interval down
-  // via cleanup. Draft-restore (declared above) runs first.
+  // cast step. Capped at 240s like the repair poll — past four minutes a
+  // rendition is wedged, so stop polling (the "drawing…" tiles may go stale,
+  // which is acceptable). Leaving the step or the last drawing settling resets
+  // the clock; unmounting tears the interval down via cleanup.
   useEffect(() => {
-    if (step !== 'cast' || !avatars) return;
-    if (!avatars.some((a) => a.renditions.some((r) => r.status === 'PENDING'))) return;
+    const drawing = avatars?.some((a) => a.renditions.some((r) => r.status === 'PENDING'));
+    if (step !== 'cast' || !drawing) {
+      arrivalPollStartRef.current = null;
+      return;
+    }
+    if (arrivalPollStartRef.current === null) arrivalPollStartRef.current = Date.now();
+    if (Date.now() - arrivalPollStartRef.current > 240_000) return;
     const id = setInterval(() => void load(), 4000);
     return () => clearInterval(id);
   }, [step, avatars, load]);

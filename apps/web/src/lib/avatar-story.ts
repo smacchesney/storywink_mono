@@ -38,20 +38,18 @@ export function castComposition(kinds: CastKind[]): CastComposition {
 /**
  * Cap-guard for auto-selecting a character the parent created THIS SESSION
  * once its drawing lands (X11 B4). Returns true only when adding `avatar`
- * keeps the composition legal (≤4 people, ≤2 companions) and it is not already
- * in the cast. When it would overflow a cap we return false and stay silent —
- * the tile simply pops to selectable and the parent picks who to swap.
+ * keeps the RESULTING cast composition legal — ≥1 person, ≤4 people, ≤2
+ * companions (all three rules live in castComposition) — and it is not already
+ * in the cast. A lone pet dropped into an empty cast is people-less, so it stays
+ * silent: the tile pops to selectable and the parent picks who joins it. When an
+ * add would overflow a cap we likewise return false and stay silent.
  */
 export function autoSelectAfterCreate(
   cast: { id: string; kind: CastKind }[],
   avatar: { id: string; kind: CastKind },
-  composition: CastComposition,
 ): boolean {
   if (cast.some(c => c.id === avatar.id)) return false;
-  const isPerson = avatar.kind === 'CHILD' || avatar.kind === 'ADULT';
-  return isPerson
-    ? composition.people < MAX_CAST_PEOPLE
-    : composition.companions < MAX_CAST_COMPANIONS;
+  return castComposition([...cast.map(c => c.kind), avatar.kind]).ok;
 }
 
 /** The loose CharacterDescription-shaped JSON stored on Avatar.identity. */
