@@ -13,6 +13,13 @@ export function avatarsEnabled(): boolean {
   return process.env.AVATARS_ENABLED === 'true';
 }
 
+/** X11 D: the story-helper server flag. Gates /api/story/propose ALONGSIDE
+ * avatarsEnabled() — both must be on, default OFF (paired with the client
+ * NEXT_PUBLIC_STORY_HELPER_ENABLED step gate). */
+export function storyHelperEnabled(): boolean {
+  return process.env.STORY_HELPER_ENABLED === 'true';
+}
+
 /** Same normalization as the workers' isCleanupEnforced — the two sides must agree. */
 export function assetCleanupEnforced(): boolean {
   const normalized = (process.env.ASSET_CLEANUP_ENFORCE ?? '').trim().toLowerCase();
