@@ -500,6 +500,45 @@ async function sweepExpiredDetectionEvents(now: Date): Promise<number> {
   return piiRows.length + deletableRowIds.length;
 }
 
+// X11 D8: story-helper proposal retention. The web /api/story/propose route
+// persists the parent's raw spark + the model's storyline under this name for
+// tuning; after 30 days the free text is stripped. Literals duplicated from the
+// route because the shared package is frozen for X11 v1 — they must agree.
+const STORY_PROPOSAL_EVENT = 'story_proposal';
+const STORY_PROPOSAL_STRIPPED_EVENT = 'story_proposal_stripped';
+const STORY_PROPOSAL_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Strip proposal props to `{}` after 30 days, tombstoning the name so a stripped
+ * row never re-matches (the detect PII-strip pattern). This is a DB update, not
+ * byte destruction, so it runs ALWAYS — no ASSET_CLEANUP_ENFORCE gate — like the
+ * detection sweep's phase 1. The row survives (name changed) so the funnel count
+ * is kept; only the parent's words and the storyline text are dropped.
+ */
+async function sweepExpiredStoryProposals(now: Date): Promise<number> {
+  const cutoff = new Date(now.getTime() - STORY_PROPOSAL_RETENTION_MS);
+  const rows = await prisma.appEvent.findMany({
+    where: { name: STORY_PROPOSAL_EVENT, createdAt: { lt: cutoff } },
+    orderBy: { createdAt: 'asc' },
+    take: DETECTION_SWEEP_BATCH_SIZE,
+    select: { id: true },
+  });
+  for (const row of rows) {
+    // Name-conditional so a row written mid-sweep is never double-stripped.
+    await prisma.appEvent.updateMany({
+      where: { id: row.id, name: STORY_PROPOSAL_EVENT },
+      data: { name: STORY_PROPOSAL_STRIPPED_EVENT, props: {} },
+    });
+  }
+  if (rows.length > 0) {
+    logger.info(
+      { stripped: rows.length },
+      'Story proposal sweep: props stripped from expired rows',
+    );
+  }
+  return rows.length;
+}
+
 /**
  * Weekly draft-retention sweep. DRY-RUN by default: candidates are logged and
  * recorded as 'draft_sweep_candidate' AppEvents (once per book) so the owner
@@ -544,6 +583,19 @@ async function runDraftSweep(job: Job) {
           error: detectionError instanceof Error ? detectionError.message : String(detectionError),
         },
         'Detection sweep failed — continuing with draft sweep',
+      );
+    }
+
+    // X11 D8: strip story-helper proposal free text older than 30 days. Never fatal.
+    try {
+      const strippedProposals = await sweepExpiredStoryProposals(now);
+      if (strippedProposals > 0) {
+        logger.info({ strippedProposals }, 'Story proposal sweep: expired proposal props stripped');
+      }
+    } catch (proposalError) {
+      logger.error(
+        { error: proposalError instanceof Error ? proposalError.message : String(proposalError) },
+        'Story proposal sweep failed — continuing with draft sweep',
       );
     }
 
