@@ -32,6 +32,15 @@ import {
 import { castTileState, isUsableAvatar } from '@/lib/characterPathDestination';
 import { styleLabelKey } from '@/lib/styleLabelKey';
 import { rememberCreatePath } from '@/lib/createPath';
+import {
+  helperStepEnabled,
+  avatarStorySteps,
+  stepIndexOf,
+  prevStep,
+  storyProposalSignature,
+  type AvatarStoryStep,
+} from '@/lib/story-helper';
+import { track } from '@/lib/track';
 import logger from '@/lib/logger';
 
 // B2: dynamic + ssr:false keeps the PhotoTray/detect stack out of the wizard's
@@ -56,7 +65,26 @@ const SPARK_KEYS = [
   'sparkDragon',
 ] as const;
 
-type Step = 'cast' | 'spark' | 'length';
+// The "More ideas" pool: trim, drop blanks, drop duplicates, keep order.
+function dedupeNonEmpty(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const trimmed = typeof value === 'string' ? value.trim() : '';
+    if (trimmed && !seen.has(trimmed)) {
+      seen.add(trimmed);
+      out.push(trimmed);
+    }
+  }
+  return out;
+}
+
+type Step = AvatarStoryStep;
+
+// D7: client step gate, default OFF. Baked at build time (Dockerfile ARG +
+// turbo env allowlist), so this is a constant — the whole "Shape the story"
+// path is byte-identically absent when it is false.
+const STORY_HELPER_FLAG = process.env.NEXT_PUBLIC_STORY_HELPER_ENABLED === 'true';
 
 export default function AvatarStoryPage() {
   if (process.env.NEXT_PUBLIC_AVATARS_ENABLED !== 'true') notFound();
@@ -82,6 +110,17 @@ function AvatarStoryFlow() {
   const [sparkKey, setSparkKey] = useState<string | null>(null);
   const [customSpark, setCustomSpark] = useState('');
   const [writingOwn, setWritingOwn] = useState(false);
+  // D1/D4 story helper. `proposalOptions` is the deduped pool the "More ideas"
+  // button cycles ([storyline, ...alternates]); `acceptedStoryline` is the
+  // accepted/edited text that REPLACES the premise at create() ('' = not
+  // accepted, so the raw premise proceeds — skip and every fail-open path).
+  const [proposalOptions, setProposalOptions] = useState<string[] | null>(null);
+  const [proposalLoading, setProposalLoading] = useState(false);
+  const [optionIndex, setOptionIndex] = useState(0);
+  const [shapeText, setShapeText] = useState('');
+  const [shapeEditing, setShapeEditing] = useState(false);
+  const [shapeEdited, setShapeEdited] = useState(false);
+  const [acceptedStoryline, setAcceptedStoryline] = useState('');
   const [pageLength, setPageLength] = useState<AvatarStoryPageLength>(12);
   const [artStyle, setArtStyle] = useState<StyleKey | null>(null);
   const [repairing, setRepairing] = useState(false);
@@ -118,7 +157,29 @@ function AvatarStoryFlow() {
   // orphan) rather than generate a story from stale choices.
   useEffect(() => {
     createdBookIdRef.current = null;
-  }, [castIds, sparkKey, customSpark, writingOwn, pageLength, artStyle, language]);
+  }, [
+    castIds,
+    sparkKey,
+    customSpark,
+    writingOwn,
+    pageLength,
+    artStyle,
+    language,
+    acceptedStoryline,
+  ]);
+
+  // Story-helper async plumbing (D2/D6). The prefetch's abort controller, the
+  // signature the cached proposal belongs to, whether the one exhaustion
+  // re-call has fired, whether story_helper_shown has fired for this proposal,
+  // and a step mirror so the 6s fail-open only advances when still on shape.
+  const proposalAbortRef = useRef<AbortController | null>(null);
+  const proposalSigRef = useRef<string | null>(null);
+  const proposalRecalledRef = useRef(false);
+  const shownFiredRef = useRef(false);
+  const stepRef = useRef<Step>('cast');
+  useEffect(() => {
+    stepRef.current = step;
+  }, [step]);
 
   const load = useCallback(async () => {
     const res = await fetch('/api/avatars').catch(() => null);
@@ -171,6 +232,7 @@ function AvatarStoryFlow() {
         sparkKey?: string | null;
         customSpark?: string;
         writingOwn?: boolean;
+        acceptedStoryline?: string;
         pageLength?: AvatarStoryPageLength;
         language?: 'en' | 'ja';
       };
@@ -178,6 +240,12 @@ function AvatarStoryFlow() {
       if (draft.sparkKey) setSparkKey(draft.sparkKey);
       if (draft.customSpark) setCustomSpark(draft.customSpark);
       if (draft.writingOwn) setWritingOwn(true);
+      // The accepted/edited storyline survives a reload; the live proposal does
+      // not, so a mid-shape reload lands on spark (re-tapping Next re-prefetches).
+      if (draft.acceptedStoryline) {
+        setAcceptedStoryline(draft.acceptedStoryline);
+        setShapeText(draft.acceptedStoryline);
+      }
       if (
         draft.pageLength &&
         (AVATAR_STORY_PAGE_LENGTHS as readonly number[]).includes(draft.pageLength)
@@ -185,7 +253,8 @@ function AvatarStoryFlow() {
         setPageLength(draft.pageLength);
       }
       if (draft.language === 'en' || draft.language === 'ja') setLanguage(draft.language);
-      if (draft.step === 'spark' || draft.step === 'length') setStep(draft.step);
+      if (draft.step === 'length') setStep('length');
+      else if (draft.step === 'spark' || draft.step === 'shape') setStep('spark');
     } catch {
       /* storage unavailable or stale shape — start fresh */
     }
@@ -194,12 +263,21 @@ function AvatarStoryFlow() {
     try {
       sessionStorage.setItem(
         'storywink-avatar-story-draft',
-        JSON.stringify({ step, castIds, sparkKey, customSpark, writingOwn, pageLength, language }),
+        JSON.stringify({
+          step,
+          castIds,
+          sparkKey,
+          customSpark,
+          writingOwn,
+          acceptedStoryline,
+          pageLength,
+          language,
+        }),
       );
     } catch {
       /* storage unavailable — drafting is best-effort */
     }
-  }, [step, castIds, sparkKey, customSpark, writingOwn, pageLength, language]);
+  }, [step, castIds, sparkKey, customSpark, writingOwn, acceptedStoryline, pageLength, language]);
 
   // Keep the ref mirror current so the avatar-arrival effects read the latest
   // cast without re-firing on every selection.
@@ -333,6 +411,166 @@ function AvatarStoryFlow() {
 
   const premise = writingOwn ? customSpark.trim() : sparkKey ? t(sparkKey) : '';
 
+  // D1: 4 steps with the helper, 3 without — decided by writingOwn + the flag
+  // (NOT the typed premise), so the dot count is stable across the spark step.
+  const helperEnabled = helperStepEnabled(writingOwn, STORY_HELPER_FLAG);
+
+  // D2/D6: fire /api/story/propose. `initial` shows the twinkle and fails open
+  // to length on any non-2xx / 404 / 429 / 6s-abort; `append` is the single
+  // "More ideas" re-call and never blocks (it wraps the pool on failure).
+  const runProposal = async (mode: 'initial' | 'append') => {
+    proposalAbortRef.current?.abort();
+    const controller = new AbortController();
+    proposalAbortRef.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    if (mode === 'initial') {
+      setProposalLoading(true);
+      shownFiredRef.current = false;
+    }
+    const firstChildIndex = cast.findIndex((a) => a.kind === 'CHILD');
+    try {
+      const res = await fetch('/api/story/propose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          cast: cast.map((a, i) => ({
+            name: a.displayName,
+            kind: a.kind,
+            isStar: i === firstChildIndex,
+          })),
+          premise,
+          pageLength,
+          language,
+        }),
+      });
+      clearTimeout(timeout);
+      if (proposalAbortRef.current === controller) proposalAbortRef.current = null;
+      if (!res.ok) throw new Error(`propose ${res.status}`);
+      const data = (await res.json()) as { storyline: string; alternates: string[] };
+      const fresh = dedupeNonEmpty([data.storyline, ...(data.alternates ?? [])]);
+      if (fresh.length === 0) throw new Error('empty proposal');
+      if (mode === 'append') {
+        const base = proposalOptions ?? [];
+        const merged = dedupeNonEmpty([...base, ...fresh]);
+        const firstNew = merged.findIndex((o) => !base.includes(o));
+        const idx = firstNew >= 0 ? firstNew : 0;
+        setProposalOptions(merged);
+        setOptionIndex(idx);
+        setShapeText(merged[idx]);
+        setShapeEdited(false);
+        setShapeEditing(false);
+      } else {
+        setProposalOptions(fresh);
+        setOptionIndex(0);
+        setShapeText(fresh[0]);
+        setShapeEdited(false);
+        setShapeEditing(false);
+        setProposalLoading(false);
+      }
+    } catch {
+      clearTimeout(timeout);
+      if (proposalAbortRef.current === controller) proposalAbortRef.current = null;
+      if (mode === 'initial') {
+        setProposalLoading(false);
+        // D6 fail-open: silently continue to length with the RAW premise, but
+        // only if the parent is still waiting on the shape step.
+        if (stepRef.current === 'shape') {
+          setAcceptedStoryline('');
+          setStep('length');
+        }
+      } else if (proposalOptions && proposalOptions.length > 0) {
+        // A "More ideas" re-call must never block a book — wrap to the pool.
+        setOptionIndex(0);
+        setShapeText(proposalOptions[0]);
+        setShapeEdited(false);
+        setShapeEditing(false);
+      }
+    }
+  };
+
+  // Enter the shape step. Reuses a cached proposal (or an in-flight one) for an
+  // unchanged signature (D2); a changed signature drops the stale accepted text
+  // and prefetches fresh. Called from the spark Next tap AND the length back
+  // button, so it is a navigation action, never a step-mount effect.
+  const enterShape = () => {
+    const sig = storyProposalSignature({ premise, castIds, pageLength, language });
+    const cachedForSig =
+      sig === proposalSigRef.current &&
+      (proposalOptions !== null || proposalAbortRef.current !== null);
+    if (cachedForSig) {
+      setStep('shape');
+      return;
+    }
+    if (sig !== proposalSigRef.current) {
+      setAcceptedStoryline('');
+      setProposalOptions(null);
+      setOptionIndex(0);
+      setShapeText('');
+      setShapeEdited(false);
+      setShapeEditing(false);
+      proposalRecalledRef.current = false;
+    }
+    proposalSigRef.current = sig;
+    setStep('shape');
+    void runProposal('initial');
+  };
+
+  const onSparkNext = () => {
+    if (helperEnabled) enterShape();
+    else setStep('length');
+  };
+
+  const skipShape = () => {
+    setAcceptedStoryline('');
+    track('story_helper_skipped');
+    setStep('length');
+  };
+
+  const acceptShape = () => {
+    const text = shapeText.trim().slice(0, 300);
+    if (!text) {
+      skipShape();
+      return;
+    }
+    setAcceptedStoryline(text);
+    track(shapeEdited ? 'story_helper_edited' : 'story_helper_accepted');
+    setStep('length');
+  };
+
+  const moreIdeas = () => {
+    const pool = proposalOptions ?? [];
+    const next = optionIndex + 1;
+    if (next < pool.length) {
+      setOptionIndex(next);
+      setShapeText(pool[next]);
+      setShapeEdited(false);
+      setShapeEditing(false);
+      return;
+    }
+    // Cached ideas exhausted — ONE re-call is allowed, then it wraps.
+    if (!proposalRecalledRef.current && proposalSigRef.current) {
+      proposalRecalledRef.current = true;
+      void runProposal('append');
+      return;
+    }
+    if (pool.length > 0) {
+      setOptionIndex(0);
+      setShapeText(pool[0]);
+      setShapeEdited(false);
+      setShapeEditing(false);
+    }
+  };
+
+  // story_helper_shown fires once per resolved proposal, when the card is
+  // actually on screen (never on a fail-open that never showed a proposal).
+  useEffect(() => {
+    if (step === 'shape' && proposalOptions && !shownFiredRef.current) {
+      shownFiredRef.current = true;
+      track('story_helper_shown');
+    }
+  }, [step, proposalOptions]);
+
   const toggleCast = (avatar: AvatarSummary) => {
     setRepairTrouble(false);
     setCastIds((prev) => {
@@ -445,6 +683,10 @@ function AvatarStoryFlow() {
   const create = async () => {
     if (isCreating || !artStyle || !premise || cast.length === 0) return;
     setIsCreating(true);
+    // D5: the accepted/edited storyline REPLACES the premise (the create schema
+    // clamps ≤300); when nothing was accepted — skip or any fail-open — the raw
+    // premise proceeds exactly as today.
+    const finalPremise = acceptedStoryline.trim() || premise;
     try {
       // Reuse the book from a half-finished attempt (created but the story
       // enqueue did not land) — a retry tap must never mint a duplicate.
@@ -456,7 +698,7 @@ function AvatarStoryFlow() {
           body: JSON.stringify({
             bookType: 'AVATAR_STORY',
             avatarIds: castIds,
-            premise,
+            premise: finalPremise,
             pageLength,
             artStyle,
             language,
@@ -564,7 +806,8 @@ function AvatarStoryFlow() {
     );
   }
 
-  const stepIndex = step === 'cast' ? 0 : step === 'spark' ? 1 : 2;
+  const steps = avatarStorySteps(helperEnabled);
+  const stepIndex = stepIndexOf(step, helperEnabled);
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-150px)] w-full max-w-2xl flex-col px-4 py-8">
@@ -572,16 +815,19 @@ function AvatarStoryFlow() {
       <div className="mb-6 flex items-center justify-between">
         <button
           type="button"
-          onClick={() =>
-            step === 'cast' ? router.push('/create') : setStep(step === 'length' ? 'spark' : 'cast')
-          }
+          onClick={() => {
+            const prev = prevStep(step, helperEnabled);
+            if (prev === null) router.push('/create');
+            else if (prev === 'shape') enterShape();
+            else setStep(prev);
+          }}
           className="flex min-h-[44px] items-center gap-1.5 rounded-full px-3 py-2 font-playful text-sm text-gray-500 hover:text-gray-700"
         >
           <ArrowLeft className="h-4 w-4" />
           {t('back')}
         </button>
         <div className="flex items-center gap-1.5" aria-hidden="true">
-          {[0, 1, 2].map((i) => (
+          {steps.map((_, i) => (
             <span
               key={i}
               className={`h-2 rounded-full transition-all ${
@@ -794,11 +1040,79 @@ function AvatarStoryFlow() {
             )}
           </div>
 
-          <StepCta
-            disabled={premise.length === 0}
-            onClick={() => setStep('length')}
-            label={t('next')}
-          />
+          <StepCta disabled={premise.length === 0} onClick={onSparkNext} label={t('next')} />
+        </>
+      )}
+
+      {step === 'shape' && (
+        <>
+          {/* D4: authorship-first — a quiet header and the parent's OWN words,
+              then their idea grown into a storyline they can accept or edit. */}
+          <h1 className="text-center font-playful text-2xl font-bold text-[#1a1a1a]">
+            {t('helperTitle')}
+          </h1>
+          <p className="mx-auto mt-2 max-w-md text-center text-sm text-gray-500">
+            {t('helperFrom', { premise })}
+          </p>
+
+          {proposalLoading || !proposalOptions ? (
+            <div className="mt-10 flex flex-col items-center justify-center gap-3">
+              <Storydust variant="twinkle" size="card" />
+              <span className="text-working-shimmer font-playful text-sm">
+                {t('helperThinking')}
+              </span>
+            </div>
+          ) : (
+            <>
+              <div className="mx-auto mt-6 w-full max-w-md rounded-2xl border border-coral/15 bg-[#FFF9F5] px-5 py-5">
+                {shapeEditing ? (
+                  <textarea
+                    autoFocus
+                    value={shapeText}
+                    onChange={(e) => {
+                      setShapeText(e.target.value.slice(0, 300));
+                      setShapeEdited(true);
+                    }}
+                    rows={5}
+                    className="w-full resize-none rounded-xl border-2 border-coral bg-white px-3 py-2 font-playful text-sm leading-relaxed text-[#1a1a1a] outline-none"
+                  />
+                ) : (
+                  <p className="font-playful text-base leading-relaxed text-[#1a1a1a]">
+                    {shapeText}
+                  </p>
+                )}
+                {!shapeEditing && (
+                  <button
+                    type="button"
+                    onClick={() => setShapeEditing(true)}
+                    className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 font-playful text-sm text-coral hover:text-coral/80"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    {t('helperEdit')}
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-4 flex items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={moreIdeas}
+                  className="min-h-[44px] font-playful text-sm text-gray-500 underline decoration-dashed underline-offset-4 hover:text-gray-700"
+                >
+                  {t('helperMore')}
+                </button>
+                <button
+                  type="button"
+                  onClick={skipShape}
+                  className="min-h-[44px] font-playful text-sm text-gray-400 hover:text-gray-600"
+                >
+                  {t('helperSkip')}
+                </button>
+              </div>
+
+              <StepCta disabled={false} onClick={acceptShape} label={t('helperSounds')} />
+            </>
+          )}
         </>
       )}
 
