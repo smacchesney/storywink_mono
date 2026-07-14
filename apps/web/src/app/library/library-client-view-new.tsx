@@ -22,7 +22,7 @@ import { showError, showErrorWithRetry } from '@/lib/toast-utils';
 import { resolveCoverImageUrl } from '@/lib/book-display';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { SortDesc } from 'lucide-react';
+import { SortDesc, Users } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScallopEdge } from '@/components/ui/scallop-edge';
 import { STAR5 } from '@/components/ui/storydust';
@@ -290,8 +290,9 @@ export function LibraryClientView() {
           {process.env.NEXT_PUBLIC_AVATARS_ENABLED === 'true' && (
             <Link
               href="/characters"
-              className="flex min-h-[36px] items-center rounded-full border border-black/10 px-3 font-playful text-sm text-gray-600 hover:border-coral/50 hover:text-gray-800"
+              className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border-2 border-coral/40 bg-white px-4 font-playful text-sm text-coral hover:border-coral hover:bg-coral/10 sm:w-auto"
             >
+              <Users className="h-4 w-4" />
               {t('charactersTab')}
             </Link>
           )}
