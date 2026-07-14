@@ -10,11 +10,12 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { notFound, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { ArrowLeft, Check, Pencil } from 'lucide-react';
+import { ArrowLeft, Check, Pencil, Plus } from 'lucide-react';
 import { Storydust } from '@/components/ui/storydust';
 import { optimizeCloudinaryUrl } from '@storywink/shared';
 import { STYLE_LIBRARY, StyleKey, getStylePreviewUrl } from '@storywink/shared/prompts/styles';
@@ -24,10 +25,19 @@ import {
   AvatarStoryPageLength,
   castComposition,
   sharedReadyStyles,
+  autoSelectAfterCreate,
   CastKind,
 } from '@/lib/avatar-story';
+import { castTileState, isUsableAvatar } from '@/lib/characterPathDestination';
 import { rememberCreatePath } from '@/lib/createPath';
 import logger from '@/lib/logger';
+
+// B2: dynamic + ssr:false keeps the PhotoTray/detect stack out of the wizard's
+// first-load bundle — the studio only mounts when the parent taps "+ Add".
+const AvatarStudioDialog = dynamic(
+  () => import('@/components/characters/AvatarStudioDialog'),
+  { ssr: false },
+);
 
 const KIND_EMOJI: Record<CastKind, string> = {
   CHILD: '🧒',
@@ -63,12 +73,17 @@ function AvatarStoryFlow() {
   const router = useRouter();
   const t = useTranslations('avatarStories');
   const tSetup = useTranslations('setup');
+  const tCharacters = useTranslations('characters');
   const locale = useLocale();
 
   const [avatars, setAvatars] = useState<AvatarSummary[] | null>(null);
   const [loadTrouble, setLoadTrouble] = useState(false);
   const [step, setStep] = useState<Step>('cast');
   const [castIds, setCastIds] = useState<string[]>([]);
+  const [studioOpen, setStudioOpen] = useState(false);
+  // Tiles that just flipped drawing→selectable pop once (B4). Under
+  // motion-reduce the animate-in classes drop out and the flip is instant.
+  const [poppedIds, setPoppedIds] = useState<Set<string>>(new Set());
   const [language, setLanguage] = useState<'en' | 'ja'>(locale === 'ja' ? 'ja' : 'en');
   const [sparkKey, setSparkKey] = useState<string | null>(null);
   const [customSpark, setCustomSpark] = useState('');
@@ -79,6 +94,19 @@ function AvatarStoryFlow() {
   const [repairTrouble, setRepairTrouble] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // B4 auto-select bookkeeping. `preStudioIdsRef` snapshots the shelf before
+  // the studio opens; the diff after `onCreated` is exactly the characters made
+  // this session. Those ids wait in `pendingAutoSelectRef` until their drawing
+  // lands, then get cap-guarded into the cast once (evaluated then dropped).
+  const preStudioIdsRef = useRef<Set<string>>(new Set());
+  const pendingAutoSelectRef = useRef<Set<string>>(new Set());
+  const collectCreatedRef = useRef(false);
+  // Latest cast ids, read by the auto-select effect without re-subscribing it to
+  // every selection change (it fires on avatar arrivals only).
+  const castIdsRef = useRef<string[]>([]);
+  // Ids that were drawing on the previous avatars snapshot — used to detect the
+  // drawing→selectable flip for both the pop and the auto-select.
+  const prevDrawingIdsRef = useRef<Set<string>>(new Set());
   // If create succeeded but the story enqueue did not, retry must reuse the
   // SAME book — never mint a duplicate.
   const createdBookIdRef = useRef<string | null>(null);
@@ -98,7 +126,14 @@ function AvatarStoryFlow() {
     }
     setLoadTrouble(false);
     const data = (await res.json()) as { avatars: AvatarSummary[] };
-    setAvatars(data.avatars.filter((a) => a.status === 'READY'));
+    // B3: keep usable avatars AND in-flight ones (a drawing still PENDING) so a
+    // character created here shows up straight away as a "Drawing…" tile —
+    // selectability still gates on isUsableAvatar below.
+    setAvatars(
+      data.avatars.filter(
+        (a) => isUsableAvatar(a) || a.renditions.some((r) => r.status === 'PENDING'),
+      ),
+    );
   }, []);
 
   useEffect(() => {
@@ -160,6 +195,84 @@ function AvatarStoryFlow() {
       /* storage unavailable — drafting is best-effort */
     }
   }, [step, castIds, sparkKey, customSpark, writingOwn, pageLength, language]);
+
+  // Keep the ref mirror current so the avatar-arrival effects read the latest
+  // cast without re-firing on every selection.
+  useEffect(() => {
+    castIdsRef.current = castIds;
+  }, [castIds]);
+
+  // After the studio's onCreated, the ids present now but absent from the
+  // pre-open snapshot are the characters this session made — queue them for
+  // auto-select once their drawing lands.
+  useEffect(() => {
+    if (!avatars || !collectCreatedRef.current) return;
+    collectCreatedRef.current = false;
+    for (const a of avatars) {
+      if (!preStudioIdsRef.current.has(a.id)) pendingAutoSelectRef.current.add(a.id);
+    }
+  }, [avatars]);
+
+  // As queued characters flip usable, cap-guard them into the cast (B4). Each
+  // id is evaluated exactly once; a capped add is dropped silently so the tile
+  // just pops to selectable and the parent chooses.
+  useEffect(() => {
+    if (!avatars) return;
+    const pending = pendingAutoSelectRef.current;
+    if (pending.size === 0) return;
+    let nextIds = castIdsRef.current;
+    const done: string[] = [];
+    for (const id of Array.from(pending)) {
+      const a = avatars.find((av) => av.id === id);
+      if (!a) {
+        done.push(id); // deleted before it settled — stop tracking it
+        continue;
+      }
+      if (castTileState(a) !== 'selectable') continue; // still drawing — wait
+      const currentCast = nextIds
+        .map((cid) => avatars.find((av) => av.id === cid))
+        .filter((av): av is AvatarSummary => Boolean(av));
+      const comp = castComposition(currentCast.map((c) => c.kind));
+      if (autoSelectAfterCreate(currentCast, a, comp)) nextIds = [...nextIds, id];
+      done.push(id);
+    }
+    for (const id of done) pending.delete(id);
+    if (nextIds !== castIdsRef.current) setCastIds(nextIds);
+  }, [avatars]);
+
+  // A tile that was drawing and is now selectable pops once (B4).
+  useEffect(() => {
+    if (!avatars) return;
+    const drawingNow = new Set<string>();
+    const flipped: string[] = [];
+    for (const a of avatars) {
+      if (castTileState(a) === 'drawing') drawingNow.add(a.id);
+      else if (prevDrawingIdsRef.current.has(a.id)) flipped.push(a.id);
+    }
+    prevDrawingIdsRef.current = drawingNow;
+    if (flipped.length) {
+      setPoppedIds((prev) => {
+        const next = new Set(prev);
+        for (const id of flipped) next.add(id);
+        return next;
+      });
+    }
+  }, [avatars]);
+
+  // B3 live-arrival poll: every 4s while a character is drawing, but only on the
+  // cast step. Leaving the step, settling, or unmounting tears the interval down
+  // via cleanup. Draft-restore (declared above) runs first.
+  useEffect(() => {
+    if (step !== 'cast' || !avatars) return;
+    if (!avatars.some((a) => a.renditions.some((r) => r.status === 'PENDING'))) return;
+    const id = setInterval(() => void load(), 4000);
+    return () => clearInterval(id);
+  }, [step, avatars, load]);
+
+  const openStudio = useCallback(() => {
+    preStudioIdsRef.current = new Set((avatars ?? []).map((a) => a.id));
+    setStudioOpen(true);
+  }, [avatars]);
 
   const cast = useMemo(
     () =>
@@ -350,6 +463,18 @@ function AvatarStoryFlow() {
     }
   };
 
+  // One studio instance, shared by the empty state and the "+ Add" tile. It
+  // portals to document.body, so its place in the tree does not matter.
+  const studioNode = studioOpen ? (
+    <AvatarStudioDialog
+      onClose={() => setStudioOpen(false)}
+      onCreated={() => {
+        collectCreatedRef.current = true;
+        void load();
+      }}
+    />
+  ) : null;
+
   if (loadTrouble && avatars === null) {
     return (
       <div className="mx-auto flex min-h-[60vh] w-full max-w-md flex-col items-center justify-center px-4 text-center">
@@ -377,12 +502,23 @@ function AvatarStoryFlow() {
     return (
       <div className="mx-auto flex min-h-[60vh] w-full max-w-md flex-col items-center justify-center px-4 text-center">
         <p className="font-playful text-lg text-[#1a1a1a]">{t('castEmpty')}</p>
+        {/* B5: the primary CTA makes a character right here; the shelf stays
+            reachable as a quiet secondary link. */}
+        <button
+          type="button"
+          onClick={openStudio}
+          className="mt-4 flex min-h-[44px] items-center gap-2 rounded-full bg-coral px-6 py-3 font-playful text-white shadow-md hover:bg-coral/90"
+        >
+          <Plus className="h-4 w-4" />
+          {tCharacters('addSomeone')}
+        </button>
         <Link
           href="/characters"
-          className="mt-4 rounded-full bg-coral px-6 py-3 font-playful text-white shadow-md hover:bg-coral/90"
+          className="mt-3 min-h-[44px] font-playful text-sm text-gray-500 underline decoration-dashed underline-offset-4 hover:text-gray-700"
         >
           {t('castEmptyCta')}
         </Link>
+        {studioNode}
       </div>
     );
   }
@@ -448,9 +584,35 @@ function AvatarStoryFlow() {
 
           <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3">
             {avatars.map((avatar) => {
+              // B3: an in-flight character is a disabled twinkle tile with the
+              // literal "Drawing…" label — selectability gates on isUsableAvatar
+              // (via castTileState), so "why won't it select" answers itself.
+              if (castTileState(avatar) === 'drawing') {
+                return (
+                  <div
+                    key={avatar.id}
+                    aria-disabled="true"
+                    className="relative flex min-h-[44px] flex-col items-center justify-center rounded-2xl border-2 border-black/10 bg-white p-3 opacity-80"
+                  >
+                    <span className="flex h-24 w-20 items-center justify-center">
+                      <Storydust variant="twinkle" size="card" />
+                    </span>
+                    <span className="mt-2 max-w-full truncate font-playful text-sm font-semibold text-[#1a1a1a]">
+                      {avatar.displayName}
+                    </span>
+                    <span className="text-working-shimmer font-playful text-xs">
+                      {t('castDrawing')}
+                    </span>
+                  </div>
+                );
+              }
+
               const selected = castIds.includes(avatar.id);
               const isPerson = avatar.kind === 'CHILD' || avatar.kind === 'ADULT';
               const capped = !selected && (isPerson ? peopleFull : companionsFull);
+              // A tile that just settled from drawing pops once (B4); the class
+              // drops out under motion-reduce, so the flip is instant there.
+              const popped = poppedIds.has(avatar.id);
               // X7: the full-body cutout makes picking the cast feel like
               // lifting the toys off the shelf; round portrait is the fallback.
               const readyRendition = avatar.renditions.find(
@@ -473,7 +635,7 @@ function AvatarStoryFlow() {
                       : capped
                         ? 'border-black/5 opacity-40'
                         : 'border-black/10 hover:border-coral/50'
-                  }`}
+                  } ${popped ? 'motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-300' : ''}`}
                 >
                   {selected && (
                     <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-coral text-white">
@@ -509,6 +671,19 @@ function AvatarStoryFlow() {
                 </button>
               );
             })}
+
+            {/* B1: the "+ Add someone" tile — always the last tile in the grid,
+                matching avatar-tile dimensions (grid-stretch fills the height). */}
+            <button
+              type="button"
+              onClick={openStudio}
+              className="flex min-h-[44px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-black/20 bg-white p-3 text-gray-500 transition-colors hover:border-coral/60 hover:text-coral"
+            >
+              <Plus className="h-7 w-7" />
+              <span className="font-playful text-sm font-semibold">
+                {tCharacters('addSomeone')}
+              </span>
+            </button>
           </div>
 
           {peopleFull && <p className="mt-3 text-center text-xs text-gray-500">{t('castPeopleFull')}</p>}
@@ -685,6 +860,8 @@ function AvatarStoryFlow() {
           />
         </>
       )}
+
+      {studioNode}
     </div>
   );
 }
