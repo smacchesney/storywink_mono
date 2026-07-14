@@ -17,7 +17,9 @@ describe('client event allowlist (POST /api/events schema)', () => {
       'story_helper_skipped',
     ]) {
       expect(CLIENT_EVENT_NAMES).toContain(name);
-      expect(clientEventSchema.safeParse({ name }).success, `expected '${name}' accepted`).toBe(true);
+      expect(clientEventSchema.safeParse({ name }).success, `expected '${name}' accepted`).toBe(
+        true,
+      );
     }
   });
 
@@ -62,8 +64,8 @@ describe('client event allowlist (POST /api/events schema)', () => {
   });
 
   it('rejects a non-cuid bookId', () => {
-    expect(
-      clientEventSchema.safeParse({ name: 'pdf_export', bookId: 'not-a-cuid' }).success,
-    ).toBe(false);
+    expect(clientEventSchema.safeParse({ name: 'pdf_export', bookId: 'not-a-cuid' }).success).toBe(
+      false,
+    );
   });
 });

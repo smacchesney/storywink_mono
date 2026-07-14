@@ -72,7 +72,12 @@ describe('prevStep (back-button routing)', () => {
 });
 
 describe('storyProposalSignature (D2 memo key)', () => {
-  const base = { premise: 'a puddle rescue', castIds: ['a1', 'a2'], pageLength: 12, language: 'en' };
+  const base = {
+    premise: 'a puddle rescue',
+    castIds: ['a1', 'a2'],
+    pageLength: 12,
+    language: 'en',
+  };
 
   it('is stable for identical inputs', () => {
     expect(storyProposalSignature(base)).toBe(storyProposalSignature({ ...base }));
