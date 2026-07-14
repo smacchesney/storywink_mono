@@ -262,3 +262,7 @@ Append-only. One line per key: `namespace.key` — why it needs a native check.
 - `create.pathFriendsBeat3` — Card B journey beat 3 「なんどでも ものがたりの しゅやくに」; "star in story after story" — check しゅやく ("lead role") and なんどでも land warmly.
 - `create.pathFriendsChip` — Card B "best for" chip 「いっしょに おはなしを つくるのに ぴったり」; "best for making up stories together". Check いっしょに…つくる register.
 - `create.pathLastTime` — small coral line on the remembered card 「まえは ここから はじめました」; the returning-user nudge. Check against `avatarStories.cardLastTime` 「前回はここからはじめました」 — this one is spaced-kana, confirm the divergence is intentional or align them.
+
+## 2026-07-14 — X11 Track A fork & shelf polish (x11-a)
+
+- `header.myCharacters` — new key for the burger nav row and the Clerk account-menu item that link to the character shelf 「うちのキャラクター」; set verbatim to `characters.title` so the menu word and the page heading always agree. No fresh register question — it reuses copy already reviewed for the page title; the only thing to confirm is that the two must stay in lockstep (if `characters.title` ever changes register, this key changes with it).

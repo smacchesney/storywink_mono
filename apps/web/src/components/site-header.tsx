@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import Image from "next/image";
-import { MenuIcon, ArrowRight, Globe, Package } from "lucide-react";
+import { MenuIcon, ArrowRight, Globe, Package, Users } from "lucide-react";
 import { useState, useEffect, useRef, useTransition } from "react";
 import { useTranslations, useLocale } from 'next-intl';
 import { NotificationBell } from "@/components/notification-bell";
@@ -66,12 +66,22 @@ function LanguageSwitcher({ className }: { className?: string }) {
   );
 }
 
-/** Clerk user menu with a "My orders" entry — the quiet home for print orders. */
+/** Clerk user menu: "My characters" (flag-gated) + "My orders" — the quiet
+ *  homes for the character shelf and print orders. */
 function UserMenu() {
   const t = useTranslations('orders');
+  const th = useTranslations('header');
+  const avatarsEnabled = process.env.NEXT_PUBLIC_AVATARS_ENABLED === 'true';
   return (
     <UserButton afterSignOutUrl="/">
       <UserButton.MenuItems>
+        {avatarsEnabled && (
+          <UserButton.Link
+            label={th('myCharacters')}
+            labelIcon={<Users className="h-4 w-4" />}
+            href="/characters"
+          />
+        )}
         <UserButton.Link
           label={t('myOrders')}
           labelIcon={<Package className="h-4 w-4" />}
@@ -211,6 +221,14 @@ export function SiteHeader() {
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Link>
               </Button>
+              {process.env.NEXT_PUBLIC_AVATARS_ENABLED === 'true' && (
+                <Button asChild variant="outline" className="font-playful w-fit">
+                  <Link href="/characters" onClick={() => setIsMobileMenuOpen(false)}>
+                    <Users className="h-4 w-4" />
+                    {t('myCharacters')}
+                  </Link>
+                </Button>
+              )}
               <div className="py-2">
                 <UserMenu />
               </div>
