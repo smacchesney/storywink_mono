@@ -26,6 +26,7 @@ import {
   castComposition,
   sharedReadyStyles,
   autoSelectAfterCreate,
+  nextArrivalPollStart,
   CastKind,
 } from '@/lib/avatar-story';
 import { castTileState, isUsableAvatar } from '@/lib/characterPathDestination';
@@ -98,6 +99,10 @@ function AvatarStoryFlow() {
   // the poll effect re-runs on every avatars change, so a local start time would
   // reset each cycle and never reach the 240s cap. Null while nothing is drawing.
   const arrivalPollStartRef = useRef<number | null>(null);
+  // The drawing-avatar ids the poll effect saw last run. A NEW id restamps the
+  // 240s clock (nextArrivalPollStart) so one wedged rendition never starves a
+  // character the parent creates after the cap has expired.
+  const arrivalPollDrawingIdsRef = useRef<ReadonlySet<string>>(new Set());
   // B4 auto-select bookkeeping. `preStudioIdsRef` snapshots the shelf before
   // the studio opens; the diff after `onCreated` is exactly the characters made
   // this session. Those ids wait in `pendingAutoSelectRef` until their drawing
@@ -270,16 +275,31 @@ function AvatarStoryFlow() {
   // B3 live-arrival poll: every 4s while a character is drawing, but only on the
   // cast step. Capped at 240s like the repair poll — past four minutes a
   // rendition is wedged, so stop polling (the "drawing…" tiles may go stale,
-  // which is acceptable). Leaving the step or the last drawing settling resets
-  // the clock; unmounting tears the interval down via cleanup.
+  // which is acceptable). The cap is keyed to the SET of drawing ids via
+  // nextArrivalPollStart: a NEW drawing restamps the clock (a wedged avatar
+  // must not starve a later creation), every drawing settling resets it, the
+  // same set continuing keeps it so the cap can expire. Leaving the step also
+  // resets; unmounting tears the interval down via cleanup.
   useEffect(() => {
-    const drawing = avatars?.some((a) => a.renditions.some((r) => r.status === 'PENDING'));
-    if (step !== 'cast' || !drawing) {
+    const drawingIds: ReadonlySet<string> = new Set(
+      (avatars ?? [])
+        .filter((a) => a.renditions.some((r) => r.status === 'PENDING'))
+        .map((a) => a.id),
+    );
+    if (step !== 'cast') {
       arrivalPollStartRef.current = null;
+      arrivalPollDrawingIdsRef.current = drawingIds;
       return;
     }
-    if (arrivalPollStartRef.current === null) arrivalPollStartRef.current = Date.now();
-    if (Date.now() - arrivalPollStartRef.current > 240_000) return;
+    const startedAt = nextArrivalPollStart(
+      arrivalPollDrawingIdsRef.current,
+      drawingIds,
+      arrivalPollStartRef.current,
+      Date.now(),
+    );
+    arrivalPollStartRef.current = startedAt;
+    arrivalPollDrawingIdsRef.current = drawingIds;
+    if (startedAt === null || Date.now() - startedAt > 240_000) return;
     const id = setInterval(() => void load(), 4000);
     return () => clearInterval(id);
   }, [step, avatars, load]);

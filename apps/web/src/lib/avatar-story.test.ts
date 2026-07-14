@@ -4,6 +4,7 @@ import {
   buildAvatarStoryRoster,
   sharedReadyStyles,
   autoSelectAfterCreate,
+  nextArrivalPollStart,
   MAX_CAST_PEOPLE,
   MAX_CAST_COMPANIONS,
   type CastKind,
@@ -134,6 +135,35 @@ describe('autoSelectAfterCreate', () => {
   it('never double-selects an avatar already in the cast', () => {
     const cast = [member('a', 'CHILD')];
     expect(autoSelectAfterCreate(cast, member('a', 'CHILD'))).toBe(false);
+  });
+});
+
+describe('nextArrivalPollStart', () => {
+  const ids = (...list: string[]) => new Set(list);
+
+  it('resets to null when nothing is drawing', () => {
+    expect(nextArrivalPollStart(ids('x'), ids(), 1_000, 5_000)).toBeNull();
+    expect(nextArrivalPollStart(ids(), ids(), null, 5_000)).toBeNull();
+  });
+
+  it('stamps now when a polling session starts', () => {
+    expect(nextArrivalPollStart(ids(), ids('x'), null, 5_000)).toBe(5_000);
+  });
+
+  it('keeps the running start while the same drawings continue', () => {
+    expect(nextArrivalPollStart(ids('x'), ids('x'), 1_000, 5_000)).toBe(1_000);
+  });
+
+  it('restamps when a NEW drawing appears beside a wedged one', () => {
+    // Regression: avatar x wedged past the 240s cap must not starve a character
+    // the parent creates afterwards — y appearing restarts the clock even though
+    // x never settles (the old pending-hits-zero reset would never fire).
+    const longExpired = 1_000;
+    expect(nextArrivalPollStart(ids('x'), ids('x', 'y'), longExpired, 500_000)).toBe(500_000);
+  });
+
+  it('does not restamp when a drawing settles while others continue', () => {
+    expect(nextArrivalPollStart(ids('x', 'y'), ids('x'), 1_000, 5_000)).toBe(1_000);
   });
 });
 

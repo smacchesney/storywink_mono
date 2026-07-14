@@ -52,6 +52,26 @@ export function autoSelectAfterCreate(
   return castComposition([...cast.map(c => c.kind), avatar.kind]).ok;
 }
 
+/**
+ * When the cast step's live-arrival polling session started. The 240s cap is
+ * keyed to the SET of drawing avatar ids, not to pending-count-hits-zero: a NEW
+ * id appearing restamps the clock, so one wedged rendition never starves a
+ * character the parent creates afterwards. Every drawing settling resets to
+ * null (next drawing starts fresh); the same set continuing keeps the running
+ * start so the cap can actually expire.
+ */
+export function nextArrivalPollStart(
+  prevDrawingIds: ReadonlySet<string>,
+  drawingIds: ReadonlySet<string>,
+  startedAt: number | null,
+  now: number,
+): number | null {
+  if (drawingIds.size === 0) return null;
+  if (startedAt === null) return now;
+  const hasNewDrawing = Array.from(drawingIds).some(id => !prevDrawingIds.has(id));
+  return hasNewDrawing ? now : startedAt;
+}
+
 /** The loose CharacterDescription-shaped JSON stored on Avatar.identity. */
 export interface StoredAvatarIdentity {
   physicalTraits?: {
