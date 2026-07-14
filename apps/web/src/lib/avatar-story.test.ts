@@ -3,8 +3,10 @@ import {
   castComposition,
   buildAvatarStoryRoster,
   sharedReadyStyles,
+  autoSelectAfterCreate,
   MAX_CAST_PEOPLE,
   MAX_CAST_COMPANIONS,
+  type CastKind,
 } from './avatar-story';
 
 describe('castComposition', () => {
@@ -80,6 +82,46 @@ describe('buildAvatarStoryRoster', () => {
     const { characters } = buildAvatarStoryRoster([emma]);
     expect(characters[0].appearsOnPages).toEqual([]);
     expect(characters[0].appearsOnAssetIds).toEqual([]);
+  });
+});
+
+describe('autoSelectAfterCreate', () => {
+  const member = (id: string, kind: CastKind) => ({ id, kind });
+  const comp = (cast: { kind: CastKind }[]) => castComposition(cast.map(c => c.kind));
+
+  it('adds a fresh person to an empty cast', () => {
+    const cast: { id: string; kind: CastKind }[] = [];
+    expect(autoSelectAfterCreate(cast, member('new', 'CHILD'), comp(cast))).toBe(true);
+  });
+
+  it('adds a person while under the 4-person cap', () => {
+    const cast = [member('a', 'CHILD'), member('b', 'ADULT'), member('c', 'ADULT')];
+    expect(autoSelectAfterCreate(cast, member('d', 'ADULT'), comp(cast))).toBe(true);
+  });
+
+  it('skips a 5th person (people cap) so the parent chooses', () => {
+    const cast = [
+      member('a', 'CHILD'),
+      member('b', 'ADULT'),
+      member('c', 'ADULT'),
+      member('d', 'ADULT'),
+    ];
+    expect(autoSelectAfterCreate(cast, member('e', 'ADULT'), comp(cast))).toBe(false);
+  });
+
+  it('adds a companion while under the 2-companion cap', () => {
+    const cast = [member('a', 'CHILD'), member('b', 'PET')];
+    expect(autoSelectAfterCreate(cast, member('c', 'TOY'), comp(cast))).toBe(true);
+  });
+
+  it('skips a 3rd companion (companion cap)', () => {
+    const cast = [member('a', 'CHILD'), member('b', 'PET'), member('c', 'TOY')];
+    expect(autoSelectAfterCreate(cast, member('d', 'PET'), comp(cast))).toBe(false);
+  });
+
+  it('never double-selects an avatar already in the cast', () => {
+    const cast = [member('a', 'CHILD')];
+    expect(autoSelectAfterCreate(cast, member('a', 'CHILD'), comp(cast))).toBe(false);
   });
 });
 

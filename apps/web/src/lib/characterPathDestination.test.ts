@@ -3,6 +3,7 @@ import {
   characterPathDestination,
   pickStar,
   isUsableAvatar,
+  castTileState,
   type AvatarLike,
   type StarLike,
 } from './characterPathDestination';
@@ -20,6 +21,24 @@ describe('isUsableAvatar', () => {
       false,
     );
     expect(isUsableAvatar({ status: 'READY', renditions: [] })).toBe(false);
+  });
+});
+
+describe('castTileState', () => {
+  it('is selectable only when the avatar is usable (READY + a READY rendition)', () => {
+    expect(castTileState({ status: 'READY', renditions: [rend('READY')] })).toBe('selectable');
+    expect(castTileState({ status: 'READY', renditions: [rend('PENDING'), rend('READY')] })).toBe(
+      'selectable',
+    );
+  });
+
+  it('is drawing for an in-flight avatar the parent must wait on', () => {
+    // Fresh batch avatar: DRAFT status, its rendition still PENDING.
+    expect(castTileState({ status: 'DRAFT', renditions: [rend('PENDING')] })).toBe('drawing');
+    // READY status but no READY rendition yet — still drawing.
+    expect(castTileState({ status: 'READY', renditions: [rend('PENDING')] })).toBe('drawing');
+    // A DRAFT with a READY rendition is not yet usable (matches isUsableAvatar).
+    expect(castTileState({ status: 'DRAFT', renditions: [rend('READY')] })).toBe('drawing');
   });
 });
 
