@@ -46,6 +46,14 @@ export interface IllustrationPromptOptions {
 
 const MAX_PROMPT_CHARS = 30000;
 
+/**
+ * The single no-text rule for INTERIOR pages. Assembled LAST so it is the final
+ * instruction the model reads (both avatar and photo paths). Covers are
+ * excluded — they render a bounded title handled by the cover style prompt.
+ */
+const ABSOLUTELY_NO_TEXT_RULE =
+  'ABSOLUTELY NO TEXT: Do not render any letters, words, numbers, captions, labels, speech bubbles, sound effects, or title text anywhere in the image. This is a wordless illustration.';
+
 // ----------------------------------
 // CROSS-CUTTING HELPERS
 // ----------------------------------
@@ -183,19 +191,46 @@ function buildAvatarSceneSection(
   if (!scene) {
     return [
       header,
-      `DEPICT the moment this page's story text describes${pageText ? `: "${pageText}"` : '.'}`,
+      `Compose the moment this page's story text describes (the moment to depict, not caption copy)${
+        pageText ? `: "${pageText}"` : '.'
+      }`,
     ].join(' ');
   }
 
   const props = scene.props.filter((p) => p.trim());
   return [
     header,
-    `DEPICT THIS MOMENT: ${scene.action}`,
-    `Location: ${scene.location}. Time of day: ${scene.timeOfDay}.`,
-    props.length ? `Include these objects: ${props.join(', ')}.` : null,
+    `Compose this moment: ${scene.action}.`,
+    `Set the scene in ${scene.location}, at ${scene.timeOfDay}.`,
+    props.length ? `The following objects should appear in the scene: ${props.join(', ')}.` : null,
   ]
     .filter(Boolean)
     .join(' ');
+}
+
+/**
+ * A5: on avatar-story pages that name a cast, list the EXACT set of characters
+ * so the model draws each exactly once and adds no stray people or creatures.
+ * Names are resolved through the roster — the same list that filters
+ * buildCharacterIdentitySection. Establishing shots (empty charactersPresent)
+ * emit nothing; their header already says "paint the setting only".
+ */
+function buildExactCastSection(
+  characterIdentity: CharacterIdentity | null | undefined,
+  scene: AvatarPageScene | BridgeScene | null | undefined,
+): string | null {
+  if (!scene || scene.charactersPresent.length === 0) return null;
+
+  const present = new Set(scene.charactersPresent);
+  const names = (characterIdentity?.characters ?? [])
+    .filter((c) => present.has(c.characterId))
+    .map((c) => c.name || c.characterId);
+  if (names.length === 0) return null;
+
+  return (
+    `Draw EXACTLY these characters, each exactly once and no more: ${names.join(', ')}. ` +
+    `Do not duplicate any character. Do not add any other people, animals, or creatures unless this scene's objects call for them.`
+  );
 }
 
 /**
@@ -276,10 +311,30 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
         contentAnchor === 'sheet' || contentAnchor === 'interior',
       );
 
-  // 4. Cross-cutting: QC feedback
+  // 4. A5 exact-cast constraint (avatar-story pages only — the only path with a
+  //    structured scene cast; forbids duplicates and stray creatures).
+  const exactCastSection =
+    contentAnchor === 'sheet'
+      ? buildExactCastSection(opts.characterIdentity, opts.bridgeScene)
+      : null;
+
+  // 5. Cross-cutting: QC feedback
   const qcSection = buildQCFeedbackSection(opts.qcFeedback);
 
-  const prompt = [stylePrompt, bridgeSection, charSection, qcSection].filter(Boolean).join(' ');
+  // 6. The no-text rule lands LAST for INTERIOR pages (both avatar and photo
+  //    paths). Covers are excluded — they render a bounded title.
+  const noTextSection = opts.isTitlePage ? null : ABSOLUTELY_NO_TEXT_RULE;
+
+  const prompt = [
+    stylePrompt,
+    bridgeSection,
+    charSection,
+    exactCastSection,
+    qcSection,
+    noTextSection,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return prompt.length > MAX_PROMPT_CHARS
     ? prompt.slice(0, MAX_PROMPT_CHARS - 1) + '\u2026'

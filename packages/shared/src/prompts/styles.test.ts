@@ -60,3 +60,31 @@ describe('cover prompts keep their title treatment', () => {
     });
   }
 });
+
+describe('interiors no longer instruct rendered onomatopoeia text', () => {
+  const ctxWithNotes = { ...ctx, illustrationNotes: 'splashing through a puddle' };
+  for (const styleKey of getAllStyleKeys()) {
+    it(`${styleKey}: DYNAMIC EFFECTS drops the lettering instruction but keeps the effects block`, () => {
+      const interior = STYLE_LIBRARY[styleKey].buildInteriorPrompt(ctxWithNotes);
+      expect(interior).not.toContain('Draw onomatopoeia text');
+      expect(interior).not.toContain('onomatopoeia');
+      expect(interior).toContain('DYNAMIC EFFECTS: Add visual effects to enhance the action.');
+      expect(interior).toContain('under 15% of image area');
+      expect(interior).toContain('Specific effect to add: splashing through a puddle');
+      // the interior no-text sentence moved to the assembler-level rule
+      expect(interior).not.toContain('DO NOT add any text to the image');
+    });
+  }
+});
+
+describe('cover title isolation (no leaked color name)', () => {
+  for (const styleKey of getAllStyleKeys()) {
+    it(`${styleKey}: cover frames the title as a literal, uses hex-only color, no capitalized color name`, () => {
+      const cover = STYLE_LIBRARY[styleKey].buildCoverPrompt(ctx);
+      expect(cover).not.toContain('Coral');
+      expect(cover).toContain('#F76C5E');
+      expect(cover).toContain('Render this exact title text and nothing more:');
+      expect(cover).toContain('The ONLY text in the image is the title above');
+    });
+  }
+});

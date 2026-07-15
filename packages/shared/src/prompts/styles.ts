@@ -32,31 +32,6 @@ export interface StylePromptContext {
   contentAnchor?: 'photo' | 'sheet' | 'interior';
 }
 
-// ----------------------------------
-// LANGUAGE-AWARE ONOMATOPOEIA
-// ----------------------------------
-
-const ONOMATOPOEIA_EXAMPLES: Record<string, { splash: string; zoom: string; munch: string }> = {
-  en: { splash: 'SPLASH!', zoom: 'ZOOM!', munch: 'MUNCH!' },
-  ja: { splash: 'ざぶーん!', zoom: 'びゅーん!', munch: 'もぐもぐ!' },
-};
-
-// Language constraint appended to DYNAMIC EFFECTS when not English
-const ILLUSTRATION_LANGUAGE_CONSTRAINTS: Record<string, string> = {
-  ja: 'All text rendered in the illustration (onomatopoeia, sound effects) MUST be in Japanese script (hiragana/katakana). Do NOT use any English or Latin text.',
-};
-
-function getOnomatopoeiaExamples(language?: string): string {
-  const lang = language && language in ONOMATOPOEIA_EXAMPLES ? language : 'en';
-  const o = ONOMATOPOEIA_EXAMPLES[lang];
-  return `"${o.splash}", "${o.zoom}", "${o.munch}"`;
-}
-
-function getLanguageConstraint(language?: string): string {
-  if (!language || language === 'en') return '';
-  return ILLUSTRATION_LANGUAGE_CONSTRAINTS[language] || '';
-}
-
 export interface StyleDefinition {
   label: string;
   referenceImageUrls: readonly string[];
@@ -177,15 +152,14 @@ function vignetteInteriorPrompt(ctx: StylePromptContext): string {
 
   // Dynamic effects
   if (ctx.illustrationNotes) {
-    const langConstraint = getLanguageConstraint(ctx.language);
     sections.push(
-      `DYNAMIC EFFECTS: Add visual effects to enhance the action. Draw onomatopoeia text (like ${getOnomatopoeiaExamples(ctx.language)}) in the same BLACK PENCIL-SKETCH STYLE shown in the reference images - using black hand-drawn lettering with sketch-like lines and strokes that match the illustration's aesthetic. Keep effects minimal (under 15% of image area) and directly relevant to the scene - avoid generic sparkles unless the scene involves magic or wonder. Do not alter character faces or poses.${langConstraint ? ' ' + langConstraint : ''}`,
+      `DYNAMIC EFFECTS: Add visual effects to enhance the action. Keep effects minimal (under 15% of image area) and directly relevant to the scene - avoid generic sparkles unless the scene involves magic or wonder. Do not alter character faces or poses.`,
       `Specific effect to add: ${ctx.illustrationNotes}`,
     );
   }
 
   sections.push(
-    `COMPOSITION: Fill the entire image canvas with the illustration. No empty space or text areas needed. The illustration should extend to all edges. DO NOT add any text to the image.`,
+    `COMPOSITION: Fill the entire image canvas with the illustration. No empty space or text areas needed. The illustration should extend to all edges.`,
   );
 
   return sections.filter(Boolean).join(' ');
@@ -201,7 +175,7 @@ function vignetteCoverPrompt(ctx: StylePromptContext): string {
 
     PEOPLE_SOURCE_HIERARCHY,
 
-    `Text: Add the title "${ctx.bookTitle}" in a bold, readable hand-drawn font matching the reference images' text style. Use a Coral (#F76C5E) fill color with a black outline/stroke on the lettering. Position naturally without covering important subjects. Size appropriately (5-7% of image height).`,
+    `Title: Render this exact title text and nothing more: "${ctx.bookTitle}". Use a bold, readable hand-drawn font matching the reference images' text style. Position it naturally without covering important subjects, sized appropriately (5-7% of image height). Fill the lettering with #F76C5E and a black outline stroke. The ONLY text in the image is the title above — no subtitles, taglines, color names, or other words.`,
   ];
 
   return sections.filter(Boolean).join(' ');
@@ -272,9 +246,8 @@ function origamiInteriorPrompt(ctx: StylePromptContext): string {
 
   // Dynamic effects in paper-craft style
   if (ctx.illustrationNotes) {
-    const langConstraint = getLanguageConstraint(ctx.language);
     sections.push(
-      `DYNAMIC EFFECTS: Add visual effects to enhance the action. Draw onomatopoeia text (like ${getOnomatopoeiaExamples(ctx.language)}) as flat cut paper letters in the same craft-paper style — chunky angular shapes cut from colored card stock. Keep effects minimal (under 15% of image area) and directly relevant to the scene. Do not alter character faces or poses.${langConstraint ? ' ' + langConstraint : ''}`,
+      `DYNAMIC EFFECTS: Add visual effects to enhance the action. Keep effects minimal (under 15% of image area) and directly relevant to the scene. Do not alter character faces or poses.`,
       `Specific effect to add: ${ctx.illustrationNotes}`,
     );
   }
@@ -284,8 +257,7 @@ function origamiInteriorPrompt(ctx: StylePromptContext): string {
 - Focused vignette — the child and key scene elements form a compact, contained paper-craft set piece
 - Pure white background surrounding the vignette with no additional elements
 - The scene grouping feels natural and balanced, slightly grounded at the bottom
-- Key environment details from the reference photo are included but simplified into flat paper-craft forms
-- DO NOT add any text to the image.`,
+- Key environment details from the reference photo are included but simplified into flat paper-craft forms`,
 
     `Recreate the scene from the reference photo in this paper-craft collage style. The child and their environment should be clearly recognizable from the original photo.`,
   );
@@ -298,13 +270,14 @@ function origamiCoverPrompt(ctx: StylePromptContext): string {
 
   sections.push(
     `TITLE TEXT:
-- Display the title "${ctx.bookTitle}" prominently in the upper portion of the image, above the vignette
-- The title is built as flat paper-craft lettering — chunky, angular block letters cut from thick coral-colored card stock (#F76C5E), consistent with the muted craft-paper aesthetic
-- Each letter is layered: a slightly larger black paper letter sits directly behind the coral letter, creating a thin, uniform black paper border/outline visible around all edges — two sheets of cut paper stacked, black beneath coral
+- Render this exact title text and nothing more: "${ctx.bookTitle}". Display it prominently in the upper portion of the image, above the vignette.
+- The title is built as flat paper-craft lettering — chunky, angular block letters cut from thick card stock, consistent with the muted craft-paper aesthetic
+- Fill the lettering with #F76C5E and a black outline stroke: each letter is layered, with a slightly larger black paper letter sitting directly behind the #F76C5E letter, creating a thin, uniform black paper border visible around all edges — two sheets of cut paper stacked, black beneath the #F76C5E letter
 - This black border is subtle (roughly 2-3mm at scale) but consistent around every letter, giving the title definition and pop against the white background
 - Both layers show visible paper texture and clean-cut edges
 - The letters are physically part of the collage composition — not digitally overlaid
-- Size the title large enough to be easily readable — it is the primary text element on the cover`,
+- Size the title large enough to be easily readable — it is the primary text element on the cover
+- The ONLY text in the image is the title above — no subtitles, taglines, color names, or other words.`,
 
     `COMPOSITION:
 - Pure white background surrounding the entire illustration
@@ -391,9 +364,8 @@ function kawaiiInteriorPrompt(ctx: StylePromptContext): string {
 
   // Dynamic effects
   if (ctx.illustrationNotes) {
-    const langConstraint = getLanguageConstraint(ctx.language);
     sections.push(
-      `DYNAMIC EFFECTS: Add visual effects to enhance the action. Draw onomatopoeia text (like ${getOnomatopoeiaExamples(ctx.language)}) in the same soft brush-pen style — warm, rounded hand-drawn lettering that matches the illustration's cozy aesthetic. Keep effects minimal (under 15% of image area) and directly relevant to the scene. Do not alter character faces or poses.${langConstraint ? ' ' + langConstraint : ''}`,
+      `DYNAMIC EFFECTS: Add visual effects to enhance the action. Keep effects minimal (under 15% of image area) and directly relevant to the scene. Do not alter character faces or poses.`,
       `Specific effect to add: ${ctx.illustrationNotes}`,
     );
   }
@@ -403,8 +375,7 @@ function kawaiiInteriorPrompt(ctx: StylePromptContext): string {
 - Characters are the clear focal point, sized prominently in the frame
 - The scene tells a clear story moment — characters are actively engaged in an activity
 - Balanced composition with environmental details framing the characters
-- Slight rounded-rectangle framing feel to the overall image
-- DO NOT add any text to the image.`,
+- Slight rounded-rectangle framing feel to the overall image`,
 
     `Recreate the scene from the reference photo in this warm storybook illustration style. The illustration should feel like a page from a high-quality children's picture book — cozy, gentle, and full of warmth.`,
   );
@@ -423,11 +394,12 @@ function kawaiiCoverPrompt(ctx: StylePromptContext): string {
     ...kawaiiBaseSections(),
 
     `TITLE TEXT:
-- Display the title "${ctx.bookTitle}" above the illustration
+- Render this exact title text and nothing more: "${ctx.bookTitle}". Display it above the illustration.
 - Rounded, bubbly hand-drawn lettering — like a toddler board book cover
-- Text color is coral (#F76C5E) with a clean black outline around each letter for readability against the white background
+- Fill the lettering with #F76C5E and a black outline stroke around each letter for readability against the white background
 - Letters can vary slightly in size or angle for a playful, hand-stamped feel
-- The title should be modestly sized — readable but not overpowering. The illustration is the hero, the title is a complement.`,
+- The title should be modestly sized — readable but not overpowering. The illustration is the hero, the title is a complement.
+- The ONLY text in the image is the title above — no subtitles, taglines, color names, or other words.`,
 
     `COMPOSITION:
 - Pure white background for the entire image

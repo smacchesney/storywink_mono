@@ -137,6 +137,17 @@ describe('createAvatarStoryPrompt — shared machinery retained', () => {
     expect(text).not.toContain('ARC ROLE');
     expect(text).toContain('the illustrator has NO photos');
   });
+
+  it('keeps illustrationNotes wordless: forbids sound-effect text, no quoted sound-words', () => {
+    const text = promptText(baseInput);
+    expect(text).toContain(
+      'NEVER suggest words, letters, numbers, or sound-effect text in "illustrationNotes"',
+    );
+    expect(text).not.toContain('"ZOOM!"');
+    expect(text).not.toContain('"SPLASH!"');
+    expect(text).not.toContain('"CHOMP!"');
+    expect(text).toContain('motion lines, speed streaks');
+  });
 });
 
 describe('STORY_RESPONSE_SCHEMA_AVATAR', () => {

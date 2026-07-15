@@ -63,28 +63,64 @@ describe('createIllustrationPrompt — sheet anchor (avatar story pages)', () =>
     expect(multi).toContain('images 1-3 are CHARACTER SHEETS');
   });
 
-  it('emits the avatar scene section with the story-authored moment', () => {
+  it('emits the avatar scene section as instructions, not caption labels', () => {
     const prompt = createIllustrationPrompt({
       ...baseOpts,
       contentAnchor: 'sheet',
       bridgeScene: scene,
     });
     expect(prompt).toContain('AVATAR STORY PAGE — THIS BOOK HAS NO PHOTOS');
-    expect(prompt).toContain('DEPICT THIS MOMENT: tiptoeing to the gate under one umbrella');
-    expect(prompt).toContain('Location: the rainy garden. Time of day: morning.');
-    expect(prompt).toContain('Include these objects: red umbrella.');
+    expect(prompt).toContain('Compose this moment: tiptoeing to the gate under one umbrella.');
+    expect(prompt).toContain('Set the scene in the rainy garden, at morning.');
+    expect(prompt).toContain('The following objects should appear in the scene: red umbrella.');
+    // the old colon-prefixed field labels rendered literally as a caption — gone
+    expect(prompt).not.toContain('DEPICT THIS MOMENT');
+    expect(prompt).not.toContain('Include these objects');
     expect(prompt).not.toContain('BRIDGE PAGE —');
   });
 
-  it('falls back to the page text when the scene failed validation', () => {
+  it('falls back to the page text (framed as the moment to depict) when the scene failed validation', () => {
     const prompt = createIllustrationPrompt({
       ...baseOpts,
       contentAnchor: 'sheet',
       bridgeScene: null,
     });
     expect(prompt).toContain(
-      'DEPICT the moment this page\'s story text describes: "Drip, drop! Emma tiptoes to the gate."',
+      'Compose the moment this page\'s story text describes (the moment to depict, not caption copy): "Drip, drop! Emma tiptoes to the gate."',
     );
+    expect(prompt).not.toContain('DEPICT the moment');
+  });
+
+  it('lists the exact cast so each character is drawn once and no strays are added', () => {
+    const prompt = createIllustrationPrompt({
+      ...baseOpts,
+      contentAnchor: 'sheet',
+      bridgeScene: scene,
+    });
+    expect(prompt).toContain(
+      "Draw EXACTLY these characters, each exactly once and no more: Emma. Do not duplicate any character. Do not add any other people, animals, or creatures unless this scene's objects call for them.",
+    );
+  });
+
+  it('omits the exact-cast constraint on establishing shots with no present cast', () => {
+    const prompt = createIllustrationPrompt({
+      ...baseOpts,
+      contentAnchor: 'sheet',
+      bridgeScene: { ...scene, charactersPresent: [] },
+    });
+    expect(prompt).not.toContain('Draw EXACTLY these characters');
+  });
+
+  it('closes the interior prompt with the ABSOLUTELY NO TEXT rule as its final section', () => {
+    const prompt = createIllustrationPrompt({
+      ...baseOpts,
+      contentAnchor: 'sheet',
+      bridgeScene: scene,
+    });
+    expect(prompt).toContain(
+      'ABSOLUTELY NO TEXT: Do not render any letters, words, numbers, captions, labels, speech bubbles, sound effects, or title text anywhere in the image. This is a wordless illustration.',
+    );
+    expect(prompt.endsWith('This is a wordless illustration.')).toBe(true);
   });
 
   it('switches the identity arbitration to the sheets', () => {
@@ -126,6 +162,8 @@ describe('createIllustrationPrompt — interior anchor (avatar story covers)', (
     );
     expect(prompt).toContain('COVER ANCHOR');
     expect(prompt).toContain('repaint the SAME scene, people, and palette as a cover composition');
+    // covers render a bounded title — the interior no-text rule must not apply
+    expect(prompt).not.toContain('ABSOLUTELY NO TEXT');
   });
 });
 

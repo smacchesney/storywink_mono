@@ -165,6 +165,24 @@ describe('createStoryGenerationPrompt — companion objects', () => {
   });
 });
 
+describe('createStoryGenerationPrompt — illustrationNotes stay wordless', () => {
+  const text = promptText(baseInput);
+
+  it('forbids words, letters, or sound-effect text in illustrationNotes', () => {
+    expect(text).toContain(
+      'NEVER suggest words, letters, numbers, or sound-effect text in "illustrationNotes"',
+    );
+  });
+
+  it('no longer offers quoted sound-words as effect examples', () => {
+    expect(text).not.toContain('"ZOOM!"');
+    expect(text).not.toContain('"SPLASH!"');
+    expect(text).not.toContain('"MUNCH!"');
+    expect(text).not.toContain('"BOING!"');
+    expect(text).toContain('motion lines, speed streaks');
+  });
+});
+
 describe('createStoryGenerationPrompt — learning words', () => {
   it('renders the weaving rules with the parent words and the child name', () => {
     const text = promptText({ ...baseInput, learningWords: ['splash', 'umbrella'] });
