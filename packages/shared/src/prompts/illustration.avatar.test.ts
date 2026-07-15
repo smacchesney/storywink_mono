@@ -187,7 +187,40 @@ describe('createIllustrationPrompt — sheet anchor (avatar story pages)', () =>
       bridgeScene: scene,
     });
     expect(prompt).toContain(
-      "Draw EXACTLY these characters, each exactly once and no more: Emma. Do not duplicate any character. Do not add any other people, animals, or creatures unless this scene's objects call for them.",
+      "Draw EXACTLY these characters, each exactly once and no more: Emma. Do not duplicate any character. If two figures look identical, you have drawn the same character twice — draw each character exactly once. Do not add any other people, animals, or creatures unless this scene's objects call for them.",
+    );
+  });
+
+  it('declares that a NAME never implies appearance or species (anti-name-semantics)', () => {
+    const withMap = createIllustrationPrompt({
+      ...baseOpts,
+      contentAnchor: 'sheet',
+      characterSheetCount: 0,
+      bridgeScene: scene,
+      sheetRoster: [{ name: 'Grypho', species: 'a green toy crocodile' }],
+    });
+    expect(withMap).toContain(
+      "A character's NAME is just a label — it never implies appearance or species. Each character's appearance comes ONLY from its numbered character sheet.",
+    );
+    // The stale-roster case drops the name map entirely — the rule must still guard it.
+    const withoutMap = createIllustrationPrompt({
+      ...baseOpts,
+      contentAnchor: 'sheet',
+      bridgeScene: scene,
+    });
+    expect(withoutMap).toContain("A character's NAME is just a label");
+  });
+
+  it('sanitizes stored shouty illustrationNotes on the avatar path too', () => {
+    const prompt = createIllustrationPrompt({
+      ...baseOpts,
+      contentAnchor: 'sheet',
+      bridgeScene: scene,
+      illustrationNotes: 'a big "POOF!" of dust as they land',
+    });
+    expect(prompt).not.toContain('POOF');
+    expect(prompt).toContain(
+      'Specific effect to add: a big sound-effect energy of dust as they land',
     );
   });
 
@@ -264,5 +297,6 @@ describe('createIllustrationPrompt — photo path stays byte-identical', () => {
     );
     expect(prompt).not.toContain('AVATAR STORY PAGE');
     expect(prompt).not.toContain('COVER ANCHOR');
+    expect(prompt).not.toContain("A character's NAME is just a label");
   });
 });

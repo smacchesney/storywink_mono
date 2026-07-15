@@ -85,7 +85,10 @@ function imageCountText(
     roles.push(
       `the final ${refCount === 1 ? 'image shows' : `${refCount} images show`} the artistic style to apply`,
     );
-    return `using the ${total} images provided, in this order: ${roles.join('; ')}.`;
+    // Anti-name-semantics: a griffin was drawn for "Grypho" even WITH the map.
+    // The rule rides the sheet branch unconditionally — it matters most when a
+    // stale roster drops the map and names only appear in the identity block.
+    return `using the ${total} images provided, in this order: ${roles.join('; ')}. A character's NAME is just a label — it never implies appearance or species. Each character's appearance comes ONLY from its numbered character sheet.`;
   }
 
   // Legacy shape (no character sheets in the request) — byte-identical to the
@@ -175,7 +178,7 @@ function vignetteInteriorPrompt(ctx: StylePromptContext): string {
   if (ctx.illustrationNotes) {
     sections.push(
       `DYNAMIC EFFECTS: Add visual effects to enhance the action. Keep effects minimal (under 15% of image area) and directly relevant to the scene - avoid generic sparkles unless the scene involves magic or wonder. Do not alter character faces or poses.`,
-      `Specific effect to add: ${ctx.illustrationNotes}`,
+      `Specific effect to add: ${ctx.illustrationNotes} — expressed purely as a visual effect; if the note names a sound or word, depict its energy with motion or particles, never letters.`,
     );
   }
 
@@ -195,6 +198,8 @@ function vignetteCoverPrompt(ctx: StylePromptContext): string {
     VIGNETTE_STYLE_BIBLE,
 
     PEOPLE_SOURCE_HIERARCHY,
+
+    `Each character appears exactly once — never draw the same character twice.`,
 
     `Title: Render this exact title text and nothing more: "${ctx.bookTitle}". Use a bold, readable hand-drawn font matching the reference images' text style. Position it naturally without covering important subjects, sized appropriately (5-7% of image height). Fill the lettering with #F76C5E and a black outline stroke. The ONLY text in the image is the title above — no subtitles, taglines, color names, or other words.`,
   ];
@@ -269,7 +274,7 @@ function origamiInteriorPrompt(ctx: StylePromptContext): string {
   if (ctx.illustrationNotes) {
     sections.push(
       `DYNAMIC EFFECTS: Add visual effects to enhance the action. Keep effects minimal (under 15% of image area) and directly relevant to the scene. Do not alter character faces or poses.`,
-      `Specific effect to add: ${ctx.illustrationNotes}`,
+      `Specific effect to add: ${ctx.illustrationNotes} — expressed purely as a visual effect; if the note names a sound or word, depict its energy with motion or particles, never letters.`,
     );
   }
 
@@ -290,6 +295,8 @@ function origamiCoverPrompt(ctx: StylePromptContext): string {
   const sections = origamiBaseSections(ctx);
 
   sections.push(
+    `Each character appears exactly once — never draw the same character twice.`,
+
     `TITLE TEXT:
 - Render this exact title text and nothing more: "${ctx.bookTitle}". Display it prominently in the upper portion of the image, above the vignette.
 - The title is built as flat paper-craft lettering — chunky, angular block letters cut from thick card stock, consistent with the muted craft-paper aesthetic
@@ -387,7 +394,7 @@ function kawaiiInteriorPrompt(ctx: StylePromptContext): string {
   if (ctx.illustrationNotes) {
     sections.push(
       `DYNAMIC EFFECTS: Add visual effects to enhance the action. Keep effects minimal (under 15% of image area) and directly relevant to the scene. Do not alter character faces or poses.`,
-      `Specific effect to add: ${ctx.illustrationNotes}`,
+      `Specific effect to add: ${ctx.illustrationNotes} — expressed purely as a visual effect; if the note names a sound or word, depict its energy with motion or particles, never letters.`,
     );
   }
 
@@ -413,6 +420,8 @@ function kawaiiCoverPrompt(ctx: StylePromptContext): string {
     `Match the exact illustration style shown in the style reference images: soft brush-pen outlines, warm pastel watercolor/crayon texture, rosy blush cheeks on all characters, small dot eyes, cozy warmth. The new illustration must look like it belongs in the same book as these reference images.`,
 
     ...kawaiiBaseSections(),
+
+    `Each character appears exactly once — never draw the same character twice.`,
 
     `TITLE TEXT:
 - Render this exact title text and nothing more: "${ctx.bookTitle}". Display it above the illustration.

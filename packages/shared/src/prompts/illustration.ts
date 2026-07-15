@@ -61,6 +61,46 @@ const ABSOLUTELY_NO_TEXT_RULE =
   'ABSOLUTELY NO TEXT: Do not render any letters, words, numbers, captions, labels, speech bubbles, sound effects, or title text anywhere in the image. This is a wordless illustration.';
 
 // ----------------------------------
+// ILLUSTRATION-NOTES SANITIZER
+// ----------------------------------
+
+/** What a shouty token becomes — a wordless stand-in the effect line can act on. */
+const SOUND_WORD_REPLACEMENT = 'sound-effect energy';
+
+/** Quoted spans are shouty when they exclaim ("Peekaboo!") or are ALL-CAPS ("TICKA-TICKA"). */
+function isShoutyToken(inner: string): boolean {
+  const token = inner.trim();
+  if (!/[A-Za-z]/.test(token)) return false;
+  if (token.endsWith('!')) return true;
+  return !/[a-z]/.test(token) && /[A-Z]{2}/.test(token);
+}
+
+/**
+ * Stored illustrationNotes from older books (and story-model disobedience) can
+ * QUOTE sound-words — `tiny "TICKA-TICKA" by its tongue` — which the model
+ * renders as lettering even against the final no-text rule. Deterministically
+ * rewrite shouty tokens (quoted exclamations or ALL-CAPS spans, standalone
+ * ALL-CAPS! words, bare ALL-CAPS hyphen-repeats) into a wordless placeholder
+ * before the notes enter ANY prompt path.
+ */
+export function sanitizeIllustrationNotes(notes: string | null): string | null {
+  if (!notes) return notes;
+  let out = notes;
+  // Quoted shouty tokens: "TICKA-TICKA", “POOF!”, 'Peekaboo!'
+  out = out.replace(/["“”'‘’]([^"“”'‘’]{1,80})["“”'‘’]/g, (match, inner: string) =>
+    isShoutyToken(inner) ? SOUND_WORD_REPLACEMENT : match,
+  );
+  // Standalone ALL-CAPS tokens ending in ! (POOF!), then bare hyphen-repeats (TICKA-TICKA).
+  out = out.replace(/\b[A-Z]{2,}(?:-[A-Z]{2,})*!+/g, SOUND_WORD_REPLACEMENT);
+  out = out.replace(/\b[A-Z]{2,}(?:-[A-Z]{2,})+\b/g, SOUND_WORD_REPLACEMENT);
+  // Tidy: a run of adjacent replacements collapses to one; no doubled spaces.
+  return out
+    .replace(/sound-effect energy(?:[,\s]+sound-effect energy)+/g, SOUND_WORD_REPLACEMENT)
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+// ----------------------------------
 // CROSS-CUTTING HELPERS
 // ----------------------------------
 
@@ -235,7 +275,8 @@ function buildExactCastSection(
 
   return (
     `Draw EXACTLY these characters, each exactly once and no more: ${names.join(', ')}. ` +
-    `Do not duplicate any character. Do not add any other people, animals, or creatures unless this scene's objects call for them.`
+    `Do not duplicate any character. If two figures look identical, you have drawn the same character twice — draw each character exactly once. ` +
+    `Do not add any other people, animals, or creatures unless this scene's objects call for them.`
   );
 }
 
@@ -272,7 +313,7 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
   const ctx: StylePromptContext = {
     bookTitle: opts.bookTitle,
     pageText: opts.pageText,
-    illustrationNotes: opts.illustrationNotes ?? null,
+    illustrationNotes: sanitizeIllustrationNotes(opts.illustrationNotes ?? null),
     referenceImageCount: opts.referenceImageCount || 1,
     language: opts.language,
     characterSheetCount: opts.characterSheetCount ?? 0,

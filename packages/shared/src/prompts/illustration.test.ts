@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createIllustrationPrompt, isMainCharacterRole } from './illustration.js';
+import {
+  createIllustrationPrompt,
+  isMainCharacterRole,
+  sanitizeIllustrationNotes,
+} from './illustration.js';
 import type { CharacterIdentity } from '../types.js';
 
 // buildCharacterIdentitySection is not exported, so we exercise it through the
@@ -107,6 +111,69 @@ describe('main character always included regardless of appearsOnPages', () => {
   it('still includes characters whose appearsOnPages match', () => {
     expect(prompt).toContain('Ben');
     expect(prompt).toContain('jet-black');
+  });
+});
+
+describe('sanitizeIllustrationNotes (stored sound-words must never reach the prompt)', () => {
+  it('rewrites quoted hyphen-repeat sound words (proof: TICKA-TICKA)', () => {
+    expect(sanitizeIllustrationNotes('tiny "TICKA-TICKA" by its tongue')).toBe(
+      'tiny sound-effect energy by its tongue',
+    );
+  });
+
+  it('rewrites quoted shouty exclamations (proof: POOF!)', () => {
+    expect(sanitizeIllustrationNotes('a soft "POOF!" of flour dust')).toBe(
+      'a soft sound-effect energy of flour dust',
+    );
+  });
+
+  it('rewrites quoted exclamations regardless of case (proof: PEEKABOO!)', () => {
+    expect(sanitizeIllustrationNotes('a playful "PEEKABOO!" from behind the curtain')).toBe(
+      'a playful sound-effect energy from behind the curtain',
+    );
+    expect(sanitizeIllustrationNotes('a playful "Peekaboo!" from behind the curtain')).toBe(
+      'a playful sound-effect energy from behind the curtain',
+    );
+  });
+
+  it('rewrites standalone ALL-CAPS! tokens and curly-quoted tokens', () => {
+    expect(sanitizeIllustrationNotes('motion lines, ZOOM!, speed streaks')).toBe(
+      'motion lines, sound-effect energy, speed streaks',
+    );
+    expect(sanitizeIllustrationNotes('tiny “TICKA-TICKA” by its tongue')).toBe(
+      'tiny sound-effect energy by its tongue',
+    );
+  });
+
+  it('collapses a run of adjacent sound words into one replacement', () => {
+    expect(sanitizeIllustrationNotes('"ZOOM!" "WHOOSH!" speed streaks behind the bike')).toBe(
+      'sound-effect energy speed streaks behind the bike',
+    );
+  });
+
+  it('leaves normal notes untouched', () => {
+    const notes = 'gentle steam wisps rising from the pot, warm glow on faces';
+    expect(sanitizeIllustrationNotes(notes)).toBe(notes);
+  });
+
+  it('passes null and empty through', () => {
+    expect(sanitizeIllustrationNotes(null)).toBeNull();
+    expect(sanitizeIllustrationNotes('')).toBe('');
+  });
+});
+
+describe('createIllustrationPrompt sanitizes illustrationNotes (photo path)', () => {
+  it('stored shouty notes never reach the assembled prompt verbatim', () => {
+    const prompt = createIllustrationPrompt({
+      style: 'vignette',
+      pageText: 'Aria spun in the sunshine.',
+      bookTitle: "Aria's Big Day",
+      isTitlePage: false,
+      referenceImageCount: 1,
+      illustrationNotes: 'tiny "TICKA-TICKA" by its tongue',
+    });
+    expect(prompt).not.toContain('TICKA-TICKA');
+    expect(prompt).toContain('Specific effect to add: tiny sound-effect energy by its tongue');
   });
 });
 

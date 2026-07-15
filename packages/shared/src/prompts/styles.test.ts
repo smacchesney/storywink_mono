@@ -74,6 +74,23 @@ describe('interiors no longer instruct rendered onomatopoeia text', () => {
       // the interior no-text sentence moved to the assembler-level rule
       expect(interior).not.toContain('DO NOT add any text to the image');
     });
+
+    it(`${styleKey}: the effect note is bound to a visual-only rendering`, () => {
+      const interior = STYLE_LIBRARY[styleKey].buildInteriorPrompt(ctxWithNotes);
+      expect(interior).toContain(
+        '— expressed purely as a visual effect; if the note names a sound or word, depict its energy with motion or particles, never letters.',
+      );
+    });
+  }
+});
+
+describe('cover prompts forbid duplicate characters', () => {
+  for (const styleKey of getAllStyleKeys()) {
+    it(`${styleKey}: cover carries the exactly-once cast rule`, () => {
+      expect(STYLE_LIBRARY[styleKey].buildCoverPrompt(ctx)).toContain(
+        'Each character appears exactly once — never draw the same character twice.',
+      );
+    });
   }
 });
 
