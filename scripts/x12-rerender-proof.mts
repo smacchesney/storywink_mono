@@ -71,6 +71,14 @@ const PHOTO_BOOK = 'cmr9u9he8000ypo0dy6zm3i4i'; // "Blocks, Balls & Bumblebee", 
 const SCREENSHOTS = path.resolve(process.cwd(), '.screenshots');
 const PROMPT_DIR = path.join(SCREENSHOTS, 'x12-a-prompts');
 
+// Optional output label for a validation re-run (render mode only). With
+// X12_LABEL=v2 the PNG becomes .screenshots/x12-a-v2-<slug>.png and the prompt
+// dump .screenshots/x12-a-prompts/v2-<slug>.txt. Unset preserves the original
+// x12-a-<slug> naming. Output-only; the DB path stays read-only.
+const LABEL = process.env.X12_LABEL || '';
+const pngName = (slug: string) => (LABEL ? `x12-a-${LABEL}-${slug}` : `x12-a-${slug}`);
+const promptName = (slug: string) => (LABEL ? `${LABEL}-${slug}` : `x12-a-${slug}`);
+
 const logger = pino({ level: process.env.LOG_LEVEL || 'warn' });
 
 let generateCalls = 0;
@@ -448,10 +456,10 @@ async function render(targets: string[]) {
   if (needTitleInterior) {
     console.log(`\n[avatar-title-interior] p${titlePage.pageNumber}`);
     const built = await buildAvatarInterior(av, titlePage);
-    savePrompt('x12-a-title-interior', built.prompt);
+    savePrompt(promptName('title-interior'), built.prompt);
     const out = await countedGenerate('avatar-title-interior', built.input);
     if (out.imageBase64) {
-      savePng('x12-a-title-interior', out.imageBase64);
+      savePng(pngName('title-interior'), out.imageBase64);
       titleInteriorBuffer = Buffer.from(out.imageBase64, 'base64');
     } else {
       console.log(`  BLOCKED: ${out.blockedReason}`);
@@ -467,9 +475,9 @@ async function render(targets: string[]) {
       }
       console.log(`\n[avatar-cover]`);
       const built = await buildAvatarCover(av, titlePage, titleInteriorBuffer);
-      savePrompt('x12-a-cover', built.prompt);
+      savePrompt(promptName('cover'), built.prompt);
       const out = await countedGenerate('avatar-cover', built.input);
-      if (out.imageBase64) savePng('x12-a-cover', out.imageBase64);
+      if (out.imageBase64) savePng(pngName('cover'), out.imageBase64);
       else console.log(`  BLOCKED: ${out.blockedReason}`);
       continue;
     }
@@ -483,10 +491,10 @@ async function render(targets: string[]) {
       }
       console.log(`\n[avatar-p${n}]`);
       const built = await buildAvatarInterior(av, page);
-      const base = TAXO[n] ? `x12-a-${TAXO[n]}` : `x12-a-p${n}`;
-      savePrompt(base, built.prompt);
+      const slug = TAXO[n] ?? `p${n}`;
+      savePrompt(promptName(slug), built.prompt);
       const out = await countedGenerate(`avatar-p${n}`, built.input);
-      if (out.imageBase64) savePng(base, out.imageBase64);
+      if (out.imageBase64) savePng(pngName(slug), out.imageBase64);
       else console.log(`  BLOCKED: ${out.blockedReason}`);
       continue;
     }
