@@ -94,3 +94,17 @@ export function drawAgainStyle(
   if (renditions[0]) return renditions[0].artStyle;
   return 'vignette';
 }
+
+/**
+ * Whether "draw again" would redraw a FAILED rendition — the confirm dialog
+ * shows its retry note only then. Resolves the same target `drawAgainStyle`
+ * picks, then asks if that style's rendition is FAILED. Redrawing a displayed
+ * (READY) outfit is never a retry, so no warning fires there.
+ */
+export function redrawTargetIsFailed(
+  renditions: Array<{ artStyle: string; status: WardrobeRendition['status'] }>,
+  displayedStyle: StyleKey | null,
+): boolean {
+  const target = drawAgainStyle(renditions, displayedStyle);
+  return renditions.some((r) => r.artStyle === target && r.status === 'FAILED');
+}

@@ -14,7 +14,12 @@ import {
 import StorybookFrame from '@/components/ui/storybook-frame';
 import { Storydust } from '@/components/ui/storydust';
 import { styleLabelKey } from '@/lib/styleLabelKey';
-import { displayableStyles, showSwatchRow, sheetRowState } from '@/lib/avatarWardrobe';
+import {
+  displayableStyles,
+  showSwatchRow,
+  sheetRowState,
+  redrawTargetIsFailed,
+} from '@/lib/avatarWardrobe';
 import { cn } from '@/lib/utils';
 
 export interface AvatarSummary {
@@ -77,6 +82,7 @@ export function AvatarCard({
   const tSetup = useTranslations('setup');
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [sheetOpen, setSheetOpen] = React.useState(false);
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
   // Which outfit the card is showing. Null until the parent taps a swatch —
   // then it wins as long as it stays displayable, else the deterministic
   // key-order default (displayable[0]) shows.
@@ -99,6 +105,9 @@ export function AvatarCard({
   const portrait = shown?.portraitUrl ?? null;
   const pending = !shown && avatar.renditions.some((r) => r.status === 'PENDING');
   const failed = !shown && !pending && avatar.renditions.some((r) => r.status === 'FAILED');
+  // The confirm dialog warns before a redraw only when the style "draw again"
+  // targets is a FAILED one — redrawing a good outfit gets no warning.
+  const redrawIsRetry = redrawTargetIsFailed(avatar.renditions, activeStyle);
 
   return (
     <motion.div
@@ -150,7 +159,7 @@ export function AvatarCard({
               {failed && (
                 <button
                   type="button"
-                  onClick={() => onDrawAgain(avatar, activeStyle)}
+                  onClick={() => setConfirmOpen(true)}
                   className="rounded-full border border-coral px-3 py-1 font-playful text-sm text-coral hover:bg-coral hover:text-white"
                 >
                   {t('drawAgain')}
@@ -226,7 +235,7 @@ export function AvatarCard({
             label={t('drawAgain')}
             onClick={() => {
               setMenuOpen(false);
-              onDrawAgain(avatar, activeStyle);
+              setConfirmOpen(true);
             }}
           />
           {/* C2: the explicit, labeled entry to the restyle sheet. */}
@@ -257,7 +266,87 @@ export function AvatarCard({
           onDraw={(style) => onDrawStyle(avatar, style)}
         />
       )}
+
+      {confirmOpen && (
+        <DrawAgainConfirm
+          name={avatar.displayName}
+          showRetryNote={redrawIsRetry}
+          onConfirm={() => {
+            setConfirmOpen(false);
+            onDrawAgain(avatar, activeStyle);
+          }}
+          onCancel={() => setConfirmOpen(false)}
+        />
+      )}
     </motion.div>
+  );
+}
+
+/**
+ * Confirm before a paid redraw fires. Portaled to document.body so it escapes
+ * the shelf's `main` (z-10) stacking context and paints over the sticky header
+ * (StyleWardrobeSheet precedent: same z-[80], backdrop, X close). The retry
+ * note shows ONLY when the target rendition previously did not come out.
+ */
+function DrawAgainConfirm({
+  name,
+  showRetryNote,
+  onConfirm,
+  onCancel,
+}: {
+  name: string;
+  showRetryNote: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const t = useTranslations('characters');
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 md:items-center"
+      onClick={onCancel}
+    >
+      <div
+        className="relative flex w-full max-w-sm flex-col gap-3 rounded-t-2xl bg-white p-5 md:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <button
+          type="button"
+          aria-label={t('close')}
+          onClick={onCancel}
+          className="absolute right-3 top-3 rounded-full p-2 text-gray-400 hover:bg-black/5"
+        >
+          <X className="h-5 w-5" />
+        </button>
+        <h2 className="pr-8 font-playful text-xl text-[#1a1a1a]">
+          {t('drawAgainConfirmTitle', { name })}
+        </h2>
+        <p className="font-playful text-sm text-gray-500">{t('drawAgainConfirmBody')}</p>
+        {showRetryNote && (
+          <p className="font-playful text-sm text-coral">{t('drawAgainRetryNote')}</p>
+        )}
+        <div className="mt-1 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-full px-4 py-2 font-playful text-sm text-gray-500 hover:bg-black/5"
+          >
+            {t('close')}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="rounded-full bg-coral px-4 py-2 font-playful text-sm text-white hover:bg-coral/90"
+          >
+            {t('drawAgain')}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

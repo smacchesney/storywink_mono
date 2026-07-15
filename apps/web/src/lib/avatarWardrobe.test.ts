@@ -6,6 +6,7 @@ import {
   showSwatchRow,
   defaultDisplayedStyle,
   drawAgainStyle,
+  redrawTargetIsFailed,
   type WardrobeRendition,
 } from './avatarWardrobe';
 
@@ -134,5 +135,33 @@ describe('drawAgainStyle', () => {
 
   it("falls back to 'vignette' when there are no renditions at all", () => {
     expect(drawAgainStyle([], null)).toBe('vignette');
+  });
+});
+
+describe('redrawTargetIsFailed', () => {
+  // Drives the confirm dialog's conditional retry note: it shows ONLY when the
+  // rendition "draw again" will redraw is a FAILED one.
+  it('is true when nothing is READY and the fallback lands on a FAILED style', () => {
+    expect(redrawTargetIsFailed([r('origami', 'FAILED')], null)).toBe(true);
+  });
+
+  it('is false when the displayed (READY) style is what gets redrawn', () => {
+    expect(redrawTargetIsFailed([r('vignette', 'READY'), r('kawaii', 'READY')], 'kawaii')).toBe(
+      false,
+    );
+  });
+
+  it('is false when redrawing the shown READY style while another style is FAILED', () => {
+    expect(redrawTargetIsFailed([r('vignette', 'READY'), r('kawaii', 'FAILED')], 'vignette')).toBe(
+      false,
+    );
+  });
+
+  it('is false when the fallback target is a PENDING rendition', () => {
+    expect(redrawTargetIsFailed([r('kawaii', 'PENDING')], null)).toBe(false);
+  });
+
+  it("is false when there are no renditions (fallback 'vignette' has no row)", () => {
+    expect(redrawTargetIsFailed([], null)).toBe(false);
   });
 });
