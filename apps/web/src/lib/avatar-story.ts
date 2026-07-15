@@ -78,8 +78,8 @@ export function nextArrivalPollStart(
   return hasNewDrawing ? now : startedAt;
 }
 
-/** The loose CharacterDescription-shaped JSON stored on Avatar.identity. */
-export interface StoredAvatarIdentity {
+/** The loose CharacterDescription-shaped character fields the roster reads. */
+export interface StoredAvatarCharacter {
   /** Extraction-provided "what is this" label ("toy crocodile") — additive,
    *  absent on identities from before the field existed. */
   species?: string | null;
@@ -94,6 +94,26 @@ export interface StoredAvatarIdentity {
   typicalClothing?: string | null;
   styleTranslation?: string | null;
   [key: string]: unknown;
+}
+
+/**
+ * The JSON stored on Avatar.identity. CANONICAL shape — written by every
+ * production path (extractAvatarIdentity, buildIdentityFromDetection, the
+ * promote route) — NESTS the character: { character: {...},
+ * extractedForStyle }. A legacy/flat identity is the character object itself;
+ * unwrapStoredIdentity tolerates both. Never read character fields off this
+ * wrapper directly.
+ */
+export interface StoredAvatarIdentity extends StoredAvatarCharacter {
+  character?: StoredAvatarCharacter | null;
+  extractedForStyle?: string;
+}
+
+/** Nested canonical → the character; legacy flat → the identity itself. */
+function unwrapStoredIdentity(
+  identity: StoredAvatarIdentity | null,
+): StoredAvatarCharacter | null {
+  return identity?.character ?? identity;
 }
 
 export interface CastAvatarInput {
@@ -154,13 +174,17 @@ export function buildAvatarStoryRoster(cast: CastAvatarInput[]): {
   const firstChildIndex = cast.findIndex(a => a.kind === 'CHILD');
   const characters = cast.map((avatar, i) => {
     const isStar = i === firstChildIndex;
-    const traits = avatar.identity?.physicalTraits ?? {};
+    // Unwrap ONCE: the stored identity nests the character (legacy flat
+    // tolerated). Reading fields off the wrapper silently yields undefined —
+    // exactly the bug that shipped placeholder-only rosters.
+    const ident = unwrapStoredIdentity(avatar.identity);
+    const traits = ident?.physicalTraits ?? {};
     return {
       characterId: `avatar_${i + 1}`,
       role: isStar ? 'main_child' : KIND_ROLE_FALLBACK[avatar.kind],
       name: avatar.displayName,
       namedVia: (isStar ? 'childName' : 'chip') as 'chip' | 'childName',
-      species: avatar.identity?.species?.trim() || null,
+      species: ident?.species?.trim() || null,
       physicalTraits: {
         apparentAge: traits.apparentAge?.trim() || KIND_AGE_FALLBACK[avatar.kind],
         hairColor: traits.hairColor?.trim() || 'as shown on the character sheet',
@@ -169,8 +193,8 @@ export function buildAvatarStoryRoster(cast: CastAvatarInput[]): {
         bodyBuild: traits.bodyBuild?.trim() || 'as shown on the character sheet',
         distinguishingFeatures: traits.distinguishingFeatures ?? [],
       },
-      typicalClothing: avatar.identity?.typicalClothing?.trim() || 'as shown on the character sheet',
-      styleTranslation: avatar.identity?.styleTranslation?.trim() || '',
+      typicalClothing: ident?.typicalClothing?.trim() || 'as shown on the character sheet',
+      styleTranslation: ident?.styleTranslation?.trim() || '',
       appearsOnPages: [],
       appearsOnAssetIds: [],
     };

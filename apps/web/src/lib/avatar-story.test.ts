@@ -53,14 +53,21 @@ describe('castComposition', () => {
 });
 
 describe('buildAvatarStoryRoster', () => {
+  // The CANONICAL stored shape: every production writer (extractAvatarIdentity,
+  // buildIdentityFromDetection, the promote route) nests the character —
+  // { character: {...}, extractedForStyle }. Reading it flat is the bug that
+  // shipped placeholder-only rosters to every avatar book.
   const emma = {
     id: 'a1',
     displayName: 'Emma',
     kind: 'CHILD' as const,
     identity: {
-      physicalTraits: { hairColor: 'brown', apparentAge: '3 years' },
-      typicalClothing: 'striped tee',
-      styleTranslation: 'soft pencil',
+      character: {
+        physicalTraits: { hairColor: 'brown', apparentAge: '3 years' },
+        typicalClothing: 'striped tee',
+        styleTranslation: 'soft pencil',
+      },
+      extractedForStyle: 'vignette',
     },
   };
   const grandma = { id: 'a2', displayName: 'Grandma', kind: 'ADULT' as const, identity: null };
@@ -112,13 +119,60 @@ describe('buildAvatarStoryRoster', () => {
       id: 'a5',
       displayName: 'Grypho',
       kind: 'TOY' as const,
-      identity: { species: 'toy crocodile' },
+      identity: { character: { species: 'toy crocodile' }, extractedForStyle: 'vignette' },
     };
     const { characters } = buildAvatarStoryRoster([grypho, emma]);
     expect(characters[0].species).toBe('toy crocodile');
     // Identities without the field (pre-species avatars) stay species-less so
     // the worker's speciesLineFor fallback distillation kicks in.
     expect(characters[1].species).toBeNull();
+  });
+
+  it('nested identity traits flow to the roster (not sheet-pointing placeholders)', () => {
+    // The distillation path depends on these: with placeholders instead of real
+    // traits, speciesLineFor could only ever say "a toy", never "a green toy
+    // crocodile".
+    const beast = {
+      id: 'a6',
+      displayName: 'Beast',
+      kind: 'TOY' as const,
+      identity: {
+        character: {
+          physicalTraits: {
+            apparentAge: 'well-loved',
+            distinguishingFeatures: ['green scaly fabric', 'long crocodile snout'],
+          },
+          typicalClothing: 'none',
+          styleTranslation: 'chunky paper folds',
+        },
+        extractedForStyle: 'origami',
+      },
+    };
+    const { characters } = buildAvatarStoryRoster([beast]);
+    expect(characters[0].physicalTraits.apparentAge).toBe('well-loved');
+    expect(characters[0].physicalTraits.distinguishingFeatures).toEqual([
+      'green scaly fabric',
+      'long crocodile snout',
+    ]);
+    expect(characters[0].typicalClothing).toBe('none');
+    expect(characters[0].styleTranslation).toBe('chunky paper folds');
+  });
+
+  it('tolerates a legacy FLAT identity (character fields at the top level)', () => {
+    const legacy = {
+      id: 'a7',
+      displayName: 'Whiskers',
+      kind: 'PET' as const,
+      identity: {
+        species: 'tabby cat',
+        physicalTraits: { hairColor: 'orange tabby' },
+        typicalClothing: 'red collar',
+      },
+    };
+    const { characters } = buildAvatarStoryRoster([legacy]);
+    expect(characters[0].species).toBe('tabby cat');
+    expect(characters[0].physicalTraits.hairColor).toBe('orange tabby');
+    expect(characters[0].typicalClothing).toBe('red collar');
   });
 });
 
