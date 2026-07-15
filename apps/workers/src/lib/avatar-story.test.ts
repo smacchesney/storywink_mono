@@ -4,6 +4,7 @@ import {
   describeCastMember,
   extractAvatarScene,
   orderCharacterSheets,
+  selectSceneSheets,
   avatarStoryQcProblems,
 } from './avatar-story.js';
 
@@ -139,6 +140,91 @@ describe('orderCharacterSheets', () => {
       'avatar_2',
       'avatar_3',
     ]);
+  });
+});
+
+describe('selectSceneSheets — send only the scene cast, star floor, cap 4', () => {
+  // avatar_1 is the star; avatar_2..avatar_6 are supporting cast.
+  const sheets = [
+    { characterId: 'avatar_4', url: 'd' },
+    { characterId: 'avatar_1', url: 'a' },
+    { characterId: 'avatar_6', url: 'f' },
+    { characterId: 'avatar_2', url: 'b' },
+    { characterId: 'avatar_5', url: 'e' },
+    { characterId: 'avatar_3', url: 'c' },
+  ];
+  const ids = (out: { characterId: string }[]) => out.map((s) => s.characterId);
+
+  it('keeps only the present cast, star first', () => {
+    const out = selectSceneSheets(sheets, {
+      charactersPresent: ['avatar_3', 'avatar_1'],
+      starCharacterId: 'avatar_1',
+    });
+    expect(ids(out)).toEqual(['avatar_1', 'avatar_3']);
+  });
+
+  it('always includes the star as image 1 even when the scene omits it', () => {
+    const out = selectSceneSheets(sheets, {
+      charactersPresent: ['avatar_2', 'avatar_5'],
+      starCharacterId: 'avatar_1',
+    });
+    expect(ids(out)).toEqual(['avatar_1', 'avatar_2', 'avatar_5']);
+  });
+
+  it('an empty cast (establishing shot) sends the star sheet only — never zero', () => {
+    const out = selectSceneSheets(sheets, {
+      charactersPresent: [],
+      starCharacterId: 'avatar_1',
+    });
+    expect(ids(out)).toEqual(['avatar_1']);
+  });
+
+  it('caps at 4 total — star + the first 3 others in deterministic order', () => {
+    const out = selectSceneSheets(sheets, {
+      charactersPresent: ['avatar_6', 'avatar_5', 'avatar_4', 'avatar_3', 'avatar_2'],
+      starCharacterId: 'avatar_1',
+    });
+    expect(ids(out)).toEqual(['avatar_1', 'avatar_2', 'avatar_3', 'avatar_4']);
+    expect(out).toHaveLength(4);
+  });
+
+  it('skips unresolvable present ids that have no sheet, keeping the star floor', () => {
+    const out = selectSceneSheets(sheets, {
+      charactersPresent: ['ghost_9', 'avatar_2'],
+      starCharacterId: 'avatar_1',
+    });
+    expect(ids(out)).toEqual(['avatar_1', 'avatar_2']);
+  });
+
+  it('an empty cast with no star still floors to one sheet (roster-first)', () => {
+    const out = selectSceneSheets(sheets, {
+      charactersPresent: [],
+      starCharacterId: null,
+    });
+    expect(ids(out)).toEqual(['avatar_1']);
+  });
+
+  it('a null scene (validation failed) sends every sheet, ordered, no filter', () => {
+    const out = selectSceneSheets(sheets, {
+      charactersPresent: null,
+      starCharacterId: 'avatar_1',
+    });
+    expect(ids(out)).toEqual([
+      'avatar_1',
+      'avatar_2',
+      'avatar_3',
+      'avatar_4',
+      'avatar_5',
+      'avatar_6',
+    ]);
+  });
+
+  it('present ids resolving to zero sheets, no star → floors to roster-first', () => {
+    const out = selectSceneSheets(sheets, {
+      charactersPresent: ['ghost_1', 'ghost_2'],
+      starCharacterId: null,
+    });
+    expect(ids(out)).toEqual(['avatar_1']);
   });
 });
 

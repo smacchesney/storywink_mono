@@ -124,6 +124,53 @@ export function orderCharacterSheets<T extends { characterId: string }>(
 }
 
 /**
+ * A6: choose which character sheets ride along on ONE interior avatar page.
+ * Sending every cast sheet to every page multiplied the fusion/duplication
+ * surface (Trapjaw×T-Rex, two Kais); this narrows the stack to the scene's
+ * cast while guarding the invariants the render depends on:
+ *
+ * - the star's sheet is ALWAYS present and stays image 1 (the content anchor);
+ * - at most `cap` sheets total (star + up to cap-1 others), chosen in the same
+ *   deterministic star-first roster order orderCharacterSheets already uses;
+ * - never zero — an empty cast (a deliberate establishing shot) or a scene
+ *   whose ids all miss still floors to the single anchor sheet.
+ *
+ * `charactersPresent: null` means the scene failed validation (no cast to
+ * trust) — send every sheet, ordered, so the whole-roster identity section the
+ * prompt falls back to still has its references. Ids that resolve to no sheet
+ * are skipped (the same best-effort resolution the prompt's cast sections use).
+ */
+export function selectSceneSheets<T extends { characterId: string }>(
+  sheets: T[],
+  opts: {
+    charactersPresent: string[] | null;
+    starCharacterId: string | null | undefined;
+    cap?: number;
+  },
+): T[] {
+  const { charactersPresent, starCharacterId, cap = 4 } = opts;
+  const ordered = orderCharacterSheets(sheets, starCharacterId);
+
+  // Scene invalid → no cast to filter by; keep today's all-sheets behavior.
+  if (charactersPresent === null) return ordered;
+
+  const present = new Set(charactersPresent);
+  const starSheets = starCharacterId
+    ? ordered.filter((s) => s.characterId === starCharacterId)
+    : [];
+  const others = ordered.filter(
+    (s) => s.characterId !== starCharacterId && present.has(s.characterId),
+  );
+
+  let selected = [...starSheets, ...others];
+  // Floor: never zero. Fall back to the deterministic first sheet (the star
+  // when it has a sheet, else roster-first) so image 1 always exists.
+  if (selected.length === 0 && ordered.length > 0) selected = [ordered[0]];
+
+  return selected.slice(0, cap);
+}
+
+/**
  * Validate-or-DEGRADE one model-emitted page scene. A malformed scene must
  * never fail the story job — the page simply renders from its text alone.
  * Unknown characterIds are dropped from charactersPresent (the illustrator

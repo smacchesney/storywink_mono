@@ -260,6 +260,14 @@ export interface CharacterDescription {
    * 'chip'/'childName' entries.
    */
   namedVia?: 'chip' | 'childName' | 'fallback';
+  /**
+   * Short plain-language label for WHAT this character is ("young boy", "toy
+   * crocodile", "golden retriever"), so the sheet name-map can bind each grid
+   * to the right character even when the name is misleading ("Grypho" the
+   * croc). Additive/optional: absent on every identity written before this
+   * field existed — consumers fall back to speciesLineFor's distillation.
+   */
+  species?: string | null;
   /** Physical appearance traits extracted from photos */
   physicalTraits: {
     apparentAge: string;

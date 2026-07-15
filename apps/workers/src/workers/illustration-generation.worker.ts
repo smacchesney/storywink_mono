@@ -12,7 +12,8 @@ import {
 } from '@storywink/shared/prompts/illustration';
 import type { BridgeScene } from '@storywink/shared/prompts/story';
 import { resolveBridgeAnchor } from '../lib/bridge-pages.js';
-import { orderCharacterSheets } from '../lib/avatar-story.js';
+import { orderCharacterSheets, selectSceneSheets } from '../lib/avatar-story.js';
+import { speciesLineFor, kindFromRole } from '@storywink/shared/prompts/character-identity';
 // Import STYLE_LIBRARY directly from styles module to avoid barrel export race condition
 import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
@@ -374,6 +375,9 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     // Fetch failures degrade gracefully — a page render must never fail
     // because a reference sheet went missing.
     const sheetRefs: IllustrationImageInput[] = [];
+    // Metadata for each SUCCESSFULLY-fetched sheet, index-aligned with
+    // sheetRefs — the A4 name map must reflect only the sheets actually sent.
+    const fetchedSheetMeta: { characterId: string; name: string | null }[] = [];
     // Book sheets ride CHARACTER_SHEETS_ENABLED; account-avatar sheets ride
     // AVATARS_ENABLED — either gate admits the snapshot the flow built.
     // AVATAR_STORY books admit sheets unconditionally: they are the only
@@ -389,14 +393,24 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       // findMany and must never pick the anchor.
       let sheetSources = job.data.characterSheets;
       if (isAvatarBook && sheetSources.length > 1) {
-        const starId = characterIdentity?.characters?.find((c) =>
-          c.role?.startsWith('main'),
-        )?.characterId;
-        sheetSources = orderCharacterSheets(sheetSources, starId ?? null);
+        const starId =
+          characterIdentity?.characters?.find((c) => c.role?.startsWith('main'))?.characterId ??
+          null;
+        // A6: interior avatar pages ship only the scene's cast (+ the star
+        // floor, cap 4) to shrink the fusion/duplication surface. The title
+        // page is EXEMPT — it feeds the cover, which keeps every sheet
+        // (see the cover call below); filtering it would starve that binding.
+        sheetSources = isTitlePage
+          ? orderCharacterSheets(sheetSources, starId)
+          : selectSceneSheets(sheetSources, {
+              charactersPresent: bridgeScene ? bridgeScene.charactersPresent : null,
+              starCharacterId: starId,
+            });
       }
       for (const sheet of sheetSources) {
         try {
           sheetRefs.push(await fetchImageInput(optimizeCloudinaryUrlForVision(sheet.url)));
+          fetchedSheetMeta.push({ characterId: sheet.characterId, name: sheet.name });
         } catch (sheetFetchError: any) {
           logger.warn(
             {
@@ -565,6 +579,24 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     // Truthful sheet attribution: the anchor sheet counts even after shift().
     const renderHadSheet = sheetRefs.length > 0 || sheetAnchored;
 
+    // A4 name↔sheet map: bind each sheet ACTUALLY SENT (anchor first, then the
+    // remaining refs) to its named character + a compact species phrase, so
+    // the model never guesses which unnamed grid is whom. Sheet-anchored
+    // (avatar) renders only — image 1 is a photo on every other path.
+    // fetchedSheetMeta is still in full sent order (the shift() above popped
+    // sheetRefs, not this list), so its order matches image 1..N.
+    const sheetRoster = sheetAnchored
+      ? fetchedSheetMeta.map((meta) => {
+          const rosterChar = characterIdentity?.characters?.find(
+            (c) => c.characterId === meta.characterId,
+          );
+          return {
+            name: meta.name || rosterChar?.name || meta.characterId,
+            species: speciesLineFor(rosterChar, kindFromRole(rosterChar?.role)),
+          };
+        })
+      : undefined;
+
     // For the primary illustration, always use story-style prompt (isTitlePage: false).
     // Cover pages get a separate cover-style illustration generated afterwards.
     const promptInput: IllustrationPromptOptions = {
@@ -585,6 +617,7 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       // composes the scene from the story model (or the page text).
       bridgeScene,
       ...(sheetAnchored ? { contentAnchor: 'sheet' as const } : {}),
+      ...(sheetRoster ? { sheetRoster } : {}),
     };
 
     logger.info(

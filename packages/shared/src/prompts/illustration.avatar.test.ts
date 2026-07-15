@@ -63,6 +63,66 @@ describe('createIllustrationPrompt — sheet anchor (avatar story pages)', () =>
     expect(multi).toContain('images 1-3 are CHARACTER SHEETS');
   });
 
+  it('binds each sheet to its named character in sent order (A4 name map)', () => {
+    const prompt = createIllustrationPrompt({
+      ...baseOpts,
+      contentAnchor: 'sheet',
+      characterSheetCount: 2,
+      bridgeScene: scene,
+      sheetRoster: [
+        { name: 'Kai', species: 'a young boy' },
+        { name: 'Trapjaw', species: 'a toy dinosaur' },
+        { name: 'Grypho', species: 'a green toy crocodile' },
+      ],
+    });
+    // The role line still names the sheets by range, then binds each by name.
+    expect(prompt).toContain('images 1-3 are CHARACTER SHEETS');
+    expect(prompt).toContain('image 1 = Kai, a young boy');
+    expect(prompt).toContain('image 2 = Trapjaw, a toy dinosaur');
+    expect(prompt).toContain('image 3 = Grypho, a green toy crocodile');
+    // The order Kai → Trapjaw → Grypho must be preserved in the rendered map.
+    expect(prompt.indexOf('image 1 = Kai')).toBeLessThan(prompt.indexOf('image 2 = Trapjaw'));
+    expect(prompt.indexOf('image 2 = Trapjaw')).toBeLessThan(prompt.indexOf('image 3 = Grypho'));
+    // And it tells the model not to swap identities between sheets.
+    expect(prompt).toMatch(/never swap identities/i);
+  });
+
+  it('renders a single-sheet name map (image 1 = …) when only the star rides', () => {
+    const prompt = createIllustrationPrompt({
+      ...baseOpts,
+      contentAnchor: 'sheet',
+      characterSheetCount: 0,
+      bridgeScene: scene,
+      sheetRoster: [{ name: 'Emma', species: 'a young girl' }],
+    });
+    expect(prompt).toContain('image 1 is a CHARACTER SHEET');
+    expect(prompt).toContain('image 1 = Emma, a young girl');
+  });
+
+  it('omits the name map entirely when no sheetRoster is supplied (byte-identical legacy line)', () => {
+    const prompt = createIllustrationPrompt({
+      ...baseOpts,
+      contentAnchor: 'sheet',
+      characterSheetCount: 2,
+      bridgeScene: scene,
+    });
+    expect(prompt).toContain('images 1-3 are CHARACTER SHEETS');
+    expect(prompt).not.toMatch(/image 1 = /);
+    expect(prompt).not.toMatch(/never swap identities/i);
+  });
+
+  it('drops the name map (does not misbind) when the roster length disagrees with the sheet count', () => {
+    const prompt = createIllustrationPrompt({
+      ...baseOpts,
+      contentAnchor: 'sheet',
+      characterSheetCount: 2, // sheetTotal = 3
+      bridgeScene: scene,
+      sheetRoster: [{ name: 'Kai', species: 'a young boy' }], // only 1 — mismatch
+    });
+    expect(prompt).toContain('images 1-3 are CHARACTER SHEETS');
+    expect(prompt).not.toMatch(/image 1 = /);
+  });
+
   it('emits the avatar scene section as instructions, not caption labels', () => {
     const prompt = createIllustrationPrompt({
       ...baseOpts,

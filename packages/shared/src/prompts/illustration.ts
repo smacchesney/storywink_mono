@@ -19,6 +19,12 @@ export interface IllustrationPromptOptions {
   language?: string;
   /** Character sheets sent with the request (between photo and style refs). */
   characterSheetCount?: number;
+  /**
+   * A4: ordered name↔sheet map for the sheet-anchored (avatar) branch — one
+   * entry per sheet actually sent, image 1 first. Computed worker-side
+   * (speciesLineFor); the prompt only renders it. Ignored on non-sheet paths.
+   */
+  sheetRoster?: { name: string; species: string }[];
   /** 1 when the approved interior render rides along as a ref (cover calls). */
   interiorRenderCount?: number;
   /**
@@ -272,6 +278,7 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
     characterSheetCount: opts.characterSheetCount ?? 0,
     interiorRenderCount: opts.interiorRenderCount ?? 0,
     contentAnchor,
+    sheetRoster: opts.sheetRoster,
   };
 
   // 1. Style-specific prompt (the bulk of the prompt)

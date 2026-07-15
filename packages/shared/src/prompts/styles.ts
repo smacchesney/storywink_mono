@@ -30,6 +30,14 @@ export interface StylePromptContext {
    * interior render of the cover scene anchors the cover repaint).
    */
   contentAnchor?: 'photo' | 'sheet' | 'interior';
+  /**
+   * Ordered name↔sheet map for the sheet-anchored (avatar) branch: one entry
+   * per sheet ACTUALLY SENT, in sent order (image 1 first). Renders a per-image
+   * binding (`image 1 = Kai, a young boy; …`) so the model stops guessing which
+   * unnamed grid is whom. Ignored unless its length matches the sheet count;
+   * absent keeps the ordering line byte-identical.
+   */
+  sheetRoster?: { name: string; species: string }[];
 }
 
 export interface StyleDefinition {
@@ -49,6 +57,7 @@ function imageCountText(
   sheetCount = 0,
   interiorRenderCount = 0,
   contentAnchor: 'photo' | 'sheet' | 'interior' = 'photo',
+  sheetRoster?: { name: string; species: string }[],
 ): string {
   // AVATAR_STORY pages (X6d): image 1 IS a character sheet — fold it into the
   // sheet range so the role line stays truthful (sheetCount counts the
@@ -61,6 +70,18 @@ function imageCountText(
         ? `image 1 is a CHARACTER SHEET (2x2 turnaround grid of a character — the canonical reference for face, hair, skin tone, and proportions; it is NOT a scene to copy)`
         : `images 1-${sheetTotal} are CHARACTER SHEETS (2x2 turnaround grids of the characters — the canonical reference for face, hair, skin tone, and proportions; they are NOT scenes to copy)`,
     ];
+    // A4 name↔sheet binding: each grid is unnamed, so the model was letting a
+    // name's semantics ("Grypho") beat the reference. Bind each image to its
+    // character by name. Only when the map matches the sheets sent — a
+    // mismatch would misbind, worse than no map.
+    if (sheetRoster && sheetRoster.length === sheetTotal) {
+      const bindings = sheetRoster
+        .map((s, i) => `image ${i + 1} = ${s.name}, ${s.species}`)
+        .join('; ');
+      roles.push(
+        `each sheet is one specific named character — ${bindings} — so draw each character to match their OWN named sheet and never swap identities between sheets`,
+      );
+    }
     roles.push(
       `the final ${refCount === 1 ? 'image shows' : `${refCount} images show`} the artistic style to apply`,
     );
@@ -143,7 +164,7 @@ function vignetteInteriorPrompt(ctx: StylePromptContext): string {
   const refCount = ctx.referenceImageCount || 1;
 
   const sections = [
-    `Create a children's picture book illustration ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo')}`,
+    `Create a children's picture book illustration ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo', ctx.sheetRoster)}`,
 
     VIGNETTE_STYLE_BIBLE,
 
@@ -169,7 +190,7 @@ function vignetteCoverPrompt(ctx: StylePromptContext): string {
   const refCount = ctx.referenceImageCount || 1;
 
   const sections = [
-    `Create a children's picture book illustration ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo')}`,
+    `Create a children's picture book illustration ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo', ctx.sheetRoster)}`,
 
     VIGNETTE_STYLE_BIBLE,
 
@@ -233,7 +254,7 @@ function origamiBaseSections(ctx: StylePromptContext): string[] {
   const refCount = ctx.referenceImageCount || 1;
 
   return [
-    `Create a flat, layered paper-craft illustration ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo')}`,
+    `Create a flat, layered paper-craft illustration ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo', ctx.sheetRoster)}`,
 
     ORIGAMI_STYLE_BIBLE,
 
@@ -350,7 +371,7 @@ function kawaiiInteriorPrompt(ctx: StylePromptContext): string {
   const refCount = ctx.referenceImageCount || 1;
 
   const sections = [
-    `Create a warm, gentle children's book illustration in a soft storybook style ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo')} The aesthetic combines clean digital illustration with a subtle watercolor/crayon texture, creating a cozy, nurturing feel. The image should be in landscape format (wider than tall) with softly rounded corners.`,
+    `Create a warm, gentle children's book illustration in a soft storybook style ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo', ctx.sheetRoster)} The aesthetic combines clean digital illustration with a subtle watercolor/crayon texture, creating a cozy, nurturing feel. The image should be in landscape format (wider than tall) with softly rounded corners.`,
 
     ...kawaiiBaseSections(),
 
@@ -387,7 +408,7 @@ function kawaiiCoverPrompt(ctx: StylePromptContext): string {
   const refCount = ctx.referenceImageCount || 1;
 
   const sections = [
-    `Create a warm, gentle children's book COVER illustration in a soft storybook style ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo')} The scene is a focused vignette on a pure white background — NOT a full-bleed scene. Square format.`,
+    `Create a warm, gentle children's book COVER illustration in a soft storybook style ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo', ctx.sheetRoster)} The scene is a focused vignette on a pure white background — NOT a full-bleed scene. Square format.`,
 
     `Match the exact illustration style shown in the style reference images: soft brush-pen outlines, warm pastel watercolor/crayon texture, rosy blush cheeks on all characters, small dot eyes, cozy warmth. The new illustration must look like it belongs in the same book as these reference images.`,
 

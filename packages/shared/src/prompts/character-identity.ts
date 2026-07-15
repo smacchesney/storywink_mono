@@ -39,16 +39,17 @@ For EACH distinct person appearing across the photos, AND each animal companion 
 1. **Character ID**: A unique identifier (child_1, adult_1, adult_2, sibling_1, pet_1, etc.)
 2. **Role**: Their role (main_child, parent, sibling, grandparent, friend, pet, etc.)
 3. **Name**: If identifiable from context provided above, otherwise null
-4. **Physical Traits** (be extremely precise — these must match across all illustrations):
+4. **Species / Kind**: a short 2-4 word plain-language label for WHAT this character is — "young boy", "grown woman", "golden retriever dog", "tabby cat". For an animal, name the specific animal; for a person, give age/gender. Null only if genuinely unclear.
+5. **Physical Traits** (be extremely precise — these must match across all illustrations):
    - Apparent age range
    - Hair color (exact shade, e.g. "jet black" not just "dark")
    - Hair style (length, texture, parting, accessories like clips/bands)
    - Skin tone (specific warm/cool description, e.g. "warm golden-brown" not just "tan")
    - Body build relative to age
    - Distinguishing features (glasses, freckles, dimples, birthmarks, ear shape, etc.)
-5. **Typical Clothing**: What they wear across the photos (note if it varies per photo)
-6. **Style Translation**: How this person should be rendered in "${input.artStyle}" style while remaining instantly recognizable. Be specific about materials, construction, colors, and proportions for the target style.
-7. **Pages**: Which page numbers (from the photo sequence 1-${input.storyPages.length}) this person appears in
+6. **Typical Clothing**: What they wear across the photos (note if it varies per photo)
+7. **Style Translation**: How this person should be rendered in "${input.artStyle}" style while remaining instantly recognizable. Be specific about materials, construction, colors, and proportions for the target style.
+8. **Pages**: Which page numbers (from the photo sequence 1-${input.storyPages.length}) this person appears in
 
 For pets, reuse the same fields naturally: hair color/style = fur or coat color and texture, distinguishing features = collar, markings, ear shape, size; typical clothing = collar/harness or "none".
 
@@ -279,6 +280,9 @@ export const CHARACTER_IDENTITY_RESPONSE_SCHEMA = {
           characterId: { type: 'string' },
           role: { type: 'string' },
           name: { type: ['string', 'null'] },
+          // Short "what is this" label for the sheet name-map. Nullable so the
+          // model can leave it blank; strict mode still requires it in `required`.
+          species: { type: ['string', 'null'] },
           physicalTraits: {
             type: 'object',
             properties: {
@@ -313,6 +317,7 @@ export const CHARACTER_IDENTITY_RESPONSE_SCHEMA = {
           'characterId',
           'role',
           'name',
+          'species',
           'physicalTraits',
           'typicalClothing',
           'styleTranslation',
@@ -527,13 +532,190 @@ Extract EXACTLY ONE character entry:
 1. **Character ID**: "avatar_subject"
 2. **Role**: "${subject.role}"
 3. **Name**: "${input.displayName}"
-4. **Physical Traits** (be extremely precise — these must match across every future illustration): apparent age (or apparent age of the object, e.g. "well-loved"); ${subject.traits}
-5. **Typical Clothing**: the most characteristic, NEUTRAL everyday outfit across the photos — this becomes the canonical reference outfit (stories will dress them differently per scene)
-6. **Style Translation**: how to render this ${subject.noun} in "${input.artStyle}" style while staying instantly recognizable — materials, construction, colors, proportions
-7. **Pages**: which photo numbers (1-${input.photoCount}) show the subject (usually all)
+4. **Species / Kind**: a short 2-4 word plain-language label for WHAT this ${subject.noun} is, so an illustrator never misreads the name — name the SPECIFIC animal or object it represents (e.g. "toy crocodile", "stuffed dinosaur", "golden retriever dog"), or for a person give age/gender (e.g. "young boy", "grown woman"). Null only if genuinely unclear.
+5. **Physical Traits** (be extremely precise — these must match across every future illustration): apparent age (or apparent age of the object, e.g. "well-loved"); ${subject.traits}
+6. **Typical Clothing**: the most characteristic, NEUTRAL everyday outfit across the photos — this becomes the canonical reference outfit (stories will dress them differently per scene)
+7. **Style Translation**: how to render this ${subject.noun} in "${input.artStyle}" style while staying instantly recognizable — materials, construction, colors, proportions
+8. **Pages**: which photo numbers (1-${input.photoCount}) show the subject (usually all)
 
 Be ruthlessly specific. Vague descriptions like "brown hair" are insufficient. The illustrator will use YOUR description as the canonical reference for this character in every book the family ever makes.
 
 Also give sceneContext: one short sentence about the settings visible in the photos.`,
   };
+}
+
+// ----------------------------------
+// SPECIES / KIND PHRASE (name↔sheet binding — A4)
+// ----------------------------------
+
+/**
+ * The three kind buckets the sheet name-map speaks: a person, a pet, or a toy.
+ * Coarser than the extraction's AvatarKind (CHILD/ADULT collapse to person) —
+ * the map only needs enough to disambiguate a misleading name.
+ */
+export type AvatarKindPhrase = 'person' | 'pet' | 'toy';
+
+/**
+ * The subset of a stored CharacterDescription that speciesLineFor reads.
+ * Loose + all-optional so a null/partial identity JSON (promotion-era avatars
+ * were sparse) is safe to pass straight through.
+ */
+export interface SpeciesIdentity {
+  /**
+   * Optional extraction-provided species/kind label ("young boy", "toy
+   * crocodile"). Additive — absent on every identity written before this
+   * field existed, which is exactly why speciesLineFor can distill without it.
+   */
+  species?: string | null;
+  physicalTraits?: {
+    distinguishingFeatures?: string[] | null;
+  } | null;
+  typicalClothing?: string | null;
+}
+
+/** Extraction roles → the coarse kind bucket. Anything human stays person. */
+export function kindFromRole(role: string | null | undefined): AvatarKindPhrase {
+  const r = (role ?? '').trim().toLowerCase();
+  if (r === 'pet') return 'pet';
+  if (r === 'companion_object') return 'toy';
+  return 'person';
+}
+
+// Colors and creatures we can recognize inside free-text traits. Deliberately
+// small: the phrase only needs to keep a name like "Grypho" from being drawn
+// as the griffin it sounds like, not to catalogue every animal.
+const SPECIES_COLORS = [
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'blue',
+  'purple',
+  'pink',
+  'brown',
+  'black',
+  'white',
+  'grey',
+  'gray',
+  'tan',
+  'cream',
+  'golden',
+  'beige',
+  'turquoise',
+  'teal',
+  'maroon',
+];
+
+const SPECIES_CREATURES = [
+  'crocodile',
+  'alligator',
+  'dinosaur',
+  'dragon',
+  'dog',
+  'puppy',
+  'cat',
+  'kitten',
+  'bear',
+  'rabbit',
+  'bunny',
+  'elephant',
+  'lion',
+  'tiger',
+  'monkey',
+  'giraffe',
+  'fox',
+  'wolf',
+  'horse',
+  'pony',
+  'pig',
+  'cow',
+  'sheep',
+  'duck',
+  'chicken',
+  'owl',
+  'penguin',
+  'frog',
+  'fish',
+  'shark',
+  'whale',
+  'dolphin',
+  'turtle',
+  'unicorn',
+  'sloth',
+  'koala',
+  'panda',
+  'hedgehog',
+  'hamster',
+  'mouse',
+  'octopus',
+  'crab',
+  'snake',
+  'lizard',
+  'deer',
+  'moose',
+  'llama',
+  'goat',
+  'donkey',
+  'raccoon',
+  'squirrel',
+  'robot',
+];
+
+/** The candidate that appears earliest (by word-boundary match) in the text. */
+function firstWordFrom(haystack: string, candidates: string[]): string | undefined {
+  let best: string | undefined;
+  let bestIndex = Infinity;
+  for (const word of candidates) {
+    const match = new RegExp(`\\b${word}\\b`).exec(haystack);
+    if (match && match.index < bestIndex) {
+      bestIndex = match.index;
+      best = word;
+    }
+  }
+  return best;
+}
+
+function withArticle(phrase: string): string {
+  const trimmed = phrase.trim();
+  return /^an?\s/i.test(trimmed) ? trimmed : `a ${trimmed}`;
+}
+
+/**
+ * A4: a compact, lowercase species/kind phrase for one sheet's name-map entry
+ * (`image 3 = Grypho, a green toy crocodile`) — so the model binds each grid
+ * to the RIGHT character instead of guessing from a misleading name.
+ *
+ * Priority: an explicit `species` (new avatars) wins verbatim. Otherwise
+ * distill from the traits that exist today — a color and a creature noun —
+ * and combine with the kind. When traits are silent it degrades to just the
+ * kind (`a toy`, `a pet`, `a person`), never to nothing.
+ */
+export function speciesLineFor(
+  identity: SpeciesIdentity | null | undefined,
+  kind: AvatarKindPhrase,
+): string {
+  const explicit = identity?.species?.trim();
+  if (explicit) return withArticle(explicit.toLowerCase());
+
+  const haystack = [
+    ...(identity?.physicalTraits?.distinguishingFeatures ?? []),
+    identity?.typicalClothing ?? '',
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  const color = firstWordFrom(haystack, SPECIES_COLORS);
+  const creature = firstWordFrom(haystack, SPECIES_CREATURES);
+
+  if (kind === 'toy') {
+    // The "toy" qualifier always stays — it IS a toy crocodile, not a real one.
+    return ['a', color, 'toy', creature].filter(Boolean).join(' ');
+  }
+  if (kind === 'pet') {
+    if (creature) return ['a', color, creature].filter(Boolean).join(' ');
+    return color ? `a ${color} pet` : 'a pet';
+  }
+  // People are carried by the CHARACTER IDENTITY block and their own sheet;
+  // the map only needs to say "a person" unless extraction gave a species.
+  return 'a person';
 }
