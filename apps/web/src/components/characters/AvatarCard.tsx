@@ -216,9 +216,6 @@ export function AvatarCard({
         )}
 
         <div className="flex items-center gap-1.5 px-1 pb-0.5 pt-1.5">
-          <span aria-hidden className="text-sm">
-            {KIND_EMOJI[avatar.kind]}
-          </span>
           <span className="min-w-0 flex-1 truncate font-playful text-base text-[#1a1a1a]">
             {avatar.displayName}
           </span>

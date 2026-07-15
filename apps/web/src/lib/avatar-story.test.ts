@@ -5,30 +5,50 @@ import {
   sharedReadyStyles,
   autoSelectAfterCreate,
   nextArrivalPollStart,
-  MAX_CAST_PEOPLE,
-  MAX_CAST_COMPANIONS,
+  MAX_CAST,
   type CastKind,
 } from './avatar-story';
 
 describe('castComposition', () => {
-  it('allows up to 4 people plus 2 companions', () => {
-    expect(castComposition(['CHILD', 'ADULT', 'ADULT', 'CHILD', 'PET', 'TOY']).ok).toBe(true);
+  it('accepts a lone person, a lone pet, or a lone toy — one character is enough', () => {
+    expect(castComposition(['CHILD']).ok).toBe(true);
+    expect(castComposition(['PET']).ok).toBe(true);
+    expect(castComposition(['TOY']).ok).toBe(true);
   });
 
-  it('rejects a 5th person and a 3rd companion', () => {
-    expect(castComposition(['CHILD', 'ADULT', 'ADULT', 'ADULT', 'ADULT']).ok).toBe(false);
-    expect(castComposition(['CHILD', 'PET', 'PET', 'TOY']).ok).toBe(false);
+  it('accepts a pets-and-toys-only cast (no person required — the parent decides)', () => {
+    expect(castComposition(['PET', 'TOY']).ok).toBe(true);
+    expect(castComposition(['PET', 'PET', 'TOY']).ok).toBe(true);
   });
 
-  it('rejects an empty cast and a people-less cast', () => {
+  it('accepts five or six people (no people cap)', () => {
+    expect(castComposition(['CHILD', 'ADULT', 'ADULT', 'ADULT', 'ADULT']).ok).toBe(true);
+    expect(castComposition(['CHILD', 'ADULT', 'ADULT', 'ADULT', 'ADULT', 'ADULT']).ok).toBe(true);
+  });
+
+  it('accepts three or more companions up to the total (no companion cap)', () => {
+    expect(castComposition(['CHILD', 'PET', 'PET', 'TOY']).ok).toBe(true);
+    expect(castComposition(['PET', 'PET', 'TOY', 'TOY', 'PET', 'TOY']).ok).toBe(true);
+  });
+
+  it('rejects an empty cast', () => {
     expect(castComposition([]).ok).toBe(false);
-    // Pets stay real animals and toys stay inanimate — someone must be able to act.
-    expect(castComposition(['PET', 'TOY']).ok).toBe(false);
   });
 
-  it('exports the caps the UI mirrors', () => {
-    expect(MAX_CAST_PEOPLE).toBe(4);
-    expect(MAX_CAST_COMPANIONS).toBe(2);
+  it('rejects a cast past the total ceiling (the illustration reference budget)', () => {
+    expect(
+      castComposition(['CHILD', 'ADULT', 'PET', 'TOY', 'PET', 'TOY', 'PET']).ok,
+    ).toBe(false); // 7 > MAX_CAST
+  });
+
+  it('still reports people and companion counts', () => {
+    const c = castComposition(['CHILD', 'ADULT', 'PET', 'TOY']);
+    expect(c.people).toBe(2);
+    expect(c.companions).toBe(2);
+  });
+
+  it('exports the total ceiling the UI and server mirror', () => {
+    expect(MAX_CAST).toBe(6);
   });
 });
 
@@ -94,42 +114,38 @@ describe('autoSelectAfterCreate', () => {
     expect(autoSelectAfterCreate(cast, member('new', 'CHILD'))).toBe(true);
   });
 
-  it('skips a fresh pet dropped into a person-less cast', () => {
-    // Regression: a companion auto-selecting into an empty cast leaves a
-    // people-less cast that castNeedsPerson then blocks — the guard must weigh
-    // the RESULTING composition (≥1 person), not just the companion cap.
+  it('adds a fresh pet dropped into an empty cast (pets-only casts are valid now)', () => {
+    // The person-required floor is gone: a lone companion is a legal cast, so
+    // the character the parent just made auto-selects like any other.
     const cast: { id: string; kind: CastKind }[] = [];
-    expect(autoSelectAfterCreate(cast, member('new', 'PET'))).toBe(false);
+    expect(autoSelectAfterCreate(cast, member('new', 'PET'))).toBe(true);
   });
 
-  it('adds a fresh pet once a person is already cast', () => {
-    const cast = [member('a', 'CHILD')];
-    expect(autoSelectAfterCreate(cast, member('b', 'PET'))).toBe(true);
-  });
-
-  it('adds a person while under the 4-person cap', () => {
-    const cast = [member('a', 'CHILD'), member('b', 'ADULT'), member('c', 'ADULT')];
-    expect(autoSelectAfterCreate(cast, member('d', 'ADULT'))).toBe(true);
-  });
-
-  it('skips a 5th person (people cap) so the parent chooses', () => {
+  it('adds a fresh person past the old 4-person cap', () => {
     const cast = [
       member('a', 'CHILD'),
       member('b', 'ADULT'),
       member('c', 'ADULT'),
       member('d', 'ADULT'),
     ];
-    expect(autoSelectAfterCreate(cast, member('e', 'ADULT'))).toBe(false);
+    expect(autoSelectAfterCreate(cast, member('e', 'ADULT'))).toBe(true); // 5 ≤ MAX_CAST
   });
 
-  it('adds a companion while under the 2-companion cap', () => {
-    const cast = [member('a', 'CHILD'), member('b', 'PET')];
-    expect(autoSelectAfterCreate(cast, member('c', 'TOY'))).toBe(true);
-  });
-
-  it('skips a 3rd companion (companion cap)', () => {
+  it('adds a fresh companion past the old 2-companion cap', () => {
     const cast = [member('a', 'CHILD'), member('b', 'PET'), member('c', 'TOY')];
-    expect(autoSelectAfterCreate(cast, member('d', 'PET'))).toBe(false);
+    expect(autoSelectAfterCreate(cast, member('d', 'PET'))).toBe(true); // 3 companions, total 4
+  });
+
+  it('skips a 7th character (total ceiling) so the parent chooses', () => {
+    const cast = [
+      member('a', 'CHILD'),
+      member('b', 'ADULT'),
+      member('c', 'PET'),
+      member('d', 'TOY'),
+      member('e', 'PET'),
+      member('f', 'TOY'),
+    ]; // 6 — a full cast
+    expect(autoSelectAfterCreate(cast, member('g', 'PET'))).toBe(false);
   });
 
   it('never double-selects an avatar already in the cast', () => {

@@ -244,8 +244,16 @@ export function SiteHeader() {
           </nav>
         </div>
       )}
-      {/* Seamless scalloped cloud edge below the header */}
-      <ScallopEdge className="absolute left-0 right-0 z-30" style={{ bottom: '-20px' }} />
+      {/* Seamless scalloped cloud edge below the header. G6: while the mobile
+          menu is open the scallop would poke a coral sliver through the seam
+          between the bar and the panel, so it hides below md until the menu
+          closes — the open panel then sits flush. isMobileMenuOpen is client
+          state (false on both server render and first hydration), so toggling
+          this class is hydration-safe. */}
+      <ScallopEdge
+        className={`absolute left-0 right-0 z-30 ${isMobileMenuOpen ? 'max-md:hidden' : ''}`}
+        style={{ bottom: '-20px' }}
+      />
     </header>
   );
 } 

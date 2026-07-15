@@ -27,8 +27,10 @@ import {
   sharedReadyStyles,
   autoSelectAfterCreate,
   nextArrivalPollStart,
+  MAX_CAST,
   CastKind,
 } from '@/lib/avatar-story';
+import StorybookFrame from '@/components/ui/storybook-frame';
 import { castTileState, isUsableAvatar } from '@/lib/characterPathDestination';
 import { styleLabelKey } from '@/lib/styleLabelKey';
 import { rememberCreatePath } from '@/lib/createPath';
@@ -404,8 +406,9 @@ function AvatarStoryFlow() {
     [castIds, avatars],
   );
   const composition = castComposition(cast.map((a) => a.kind));
-  const peopleFull = composition.people >= 4;
-  const companionsFull = composition.companions >= 2;
+  // The only cast rule left is the total ceiling (G5): one character is enough,
+  // six is the most the illustration reference budget holds. No kind sub-caps.
+  const castFull = castIds.length >= MAX_CAST;
 
   const sharedStyles = useMemo(
     () => sharedReadyStyles(cast).filter((s): s is StyleKey => s in STYLE_LIBRARY),
@@ -591,9 +594,8 @@ function AvatarStoryFlow() {
     setRepairTrouble(false);
     setCastIds((prev) => {
       if (prev.includes(avatar.id)) return prev.filter((id) => id !== avatar.id);
-      const isPerson = avatar.kind === 'CHILD' || avatar.kind === 'ADULT';
-      if (isPerson && peopleFull) return prev;
-      if (!isPerson && companionsFull) return prev;
+      // G5: only the total ceiling gates a new pick — any kind mix is allowed.
+      if (prev.length >= MAX_CAST) return prev;
       return [...prev, avatar.id];
     });
   };
@@ -911,8 +913,9 @@ function AvatarStoryFlow() {
               }
 
               const selected = castIds.includes(avatar.id);
-              const isPerson = avatar.kind === 'CHILD' || avatar.kind === 'ADULT';
-              const capped = !selected && (isPerson ? peopleFull : companionsFull);
+              // G5: the only gate now is the total ceiling — an unselected tile
+              // is capped once six are already chosen, no matter its kind.
+              const capped = !selected && castFull;
               // A tile that just settled from drawing pops once (B4); the class
               // drops out under motion-reduce, so the flip is instant there.
               const popped = poppedIds.has(avatar.id);
@@ -926,51 +929,61 @@ function AvatarStoryFlow() {
                 readyRendition?.portraitUrl ??
                 avatar.renditions.find((r) => r.portraitUrl)?.portraitUrl;
               return (
+                // G3: the shelf's hand-drawn coral frame (StorybookFrame) wraps
+                // each pickable tile; the coral ring + tint + check badge ride
+                // ON TOP as the selection signal.
                 <button
                   key={avatar.id}
                   type="button"
                   aria-pressed={selected}
                   onClick={() => toggleCast(avatar)}
                   disabled={capped}
-                  className={`relative flex min-h-[44px] flex-col items-center rounded-2xl border-2 bg-white p-3 transition-all ${
+                  className={`group relative min-h-[44px] rounded-lg transition-transform ${
                     selected
-                      ? 'border-coral ring-2 ring-coral/25'
+                      ? 'ring-2 ring-coral/40'
                       : capped
-                        ? 'border-black/5 opacity-40'
-                        : 'border-black/10 hover:border-coral/50'
+                        ? 'opacity-40'
+                        : 'motion-safe:hover:-translate-y-0.5'
                   } ${popped ? 'motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-300' : ''}`}
                 >
-                  {selected && (
-                    <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-coral text-white">
-                      <Check className="h-3.5 w-3.5" />
-                    </span>
-                  )}
-                  {cutout ? (
-                    <img
-                      src={optimizeCloudinaryUrl(cutout, { additionalTransforms: 'c_limit,h_400' })}
-                      alt=""
-                      className="h-24 w-20 object-contain"
-                    />
-                  ) : portrait ? (
-                    <img
-                      src={portrait}
-                      alt=""
-                      className="h-20 w-20 rounded-full bg-[#FFF9F5] object-cover"
-                    />
-                  ) : (
-                    <span
-                      aria-hidden="true"
-                      className="flex h-20 w-20 items-center justify-center rounded-full bg-[#FFF9F5] text-3xl"
-                    >
-                      {KIND_EMOJI[avatar.kind]}
-                    </span>
-                  )}
-                  <span className="mt-2 max-w-full truncate font-playful text-sm font-semibold text-[#1a1a1a]">
-                    {avatar.displayName}
-                  </span>
-                  <span className="text-xs text-gray-400" aria-hidden="true">
-                    {KIND_EMOJI[avatar.kind]}
-                  </span>
+                  <StorybookFrame
+                    className="h-full"
+                    backgroundColor={selected ? '#FFF5F2' : '#FFFFFF'}
+                    showPageCurl={false}
+                  >
+                    <div className="relative flex min-h-[44px] flex-col items-center">
+                      {selected && (
+                        <span className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-coral text-white">
+                          <Check className="h-3.5 w-3.5" />
+                        </span>
+                      )}
+                      {cutout ? (
+                        <img
+                          src={optimizeCloudinaryUrl(cutout, {
+                            additionalTransforms: 'c_limit,h_400',
+                          })}
+                          alt=""
+                          className="h-24 w-20 object-contain"
+                        />
+                      ) : portrait ? (
+                        <img
+                          src={portrait}
+                          alt=""
+                          className="h-20 w-20 rounded-full bg-[#FFF9F5] object-cover"
+                        />
+                      ) : (
+                        <span
+                          aria-hidden="true"
+                          className="flex h-20 w-20 items-center justify-center rounded-full bg-[#FFF9F5] text-3xl"
+                        >
+                          {KIND_EMOJI[avatar.kind]}
+                        </span>
+                      )}
+                      <span className="mt-2 max-w-full truncate font-playful text-sm font-semibold text-[#1a1a1a]">
+                        {avatar.displayName}
+                      </span>
+                    </div>
+                  </StorybookFrame>
                 </button>
               );
             })}
@@ -989,15 +1002,17 @@ function AvatarStoryFlow() {
             </button>
           </div>
 
-          {peopleFull && (
-            <p className="mt-3 text-center text-xs text-gray-500">{t('castPeopleFull')}</p>
-          )}
-          {companionsFull && (
-            <p className="mt-1 text-center text-xs text-gray-500">{t('castCompanionsFull')}</p>
-          )}
-          {castIds.length > 0 && composition.people === 0 && (
-            <p className="mt-3 text-center text-xs text-gray-500">{t('castNeedsPerson')}</p>
-          )}
+          {/* G4: one quiet requirement cue — inviting when nothing is picked,
+              honest when the cast is full. Never both, never a stack. */}
+          {castIds.length === 0 ? (
+            <p className="mt-4 text-center text-xs text-gray-500">{t('castPickToBegin')}</p>
+          ) : castFull ? (
+            <p className="mt-4 text-center text-xs text-gray-500">{t('castFull')}</p>
+          ) : null}
+
+          {/* G4: clearance so the last tile row scrolls fully clear of the
+              sticky Next bar at 375px portrait. */}
+          <div aria-hidden="true" className="h-16" />
 
           <StepCta disabled={!composition.ok} onClick={() => setStep('spark')} label={t('next')} />
         </>
@@ -1280,7 +1295,7 @@ function StepCta({
   label: React.ReactNode;
 }) {
   return (
-    <div className="sticky inset-x-0 bottom-0 z-10 mt-8 pb-2">
+    <div className="sticky inset-x-0 bottom-0 z-10 mt-8 bg-gradient-to-t from-background via-background to-transparent pb-2 pt-6">
       <button
         type="button"
         onClick={onClick}

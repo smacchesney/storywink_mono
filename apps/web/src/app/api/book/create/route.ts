@@ -64,12 +64,16 @@ async function createAvatarStoryBook(
     );
   }
 
-  // Preserve pick order — the roster ids and the star follow it.
+  // Preserve pick order — the roster ids and the star follow it. The cast rule
+  // mirrors the client (castComposition): one character is enough, six is the
+  // ceiling, any mix of people/pets/toys between is the parent's call. The
+  // request schema already bounds avatarIds to 1..6; this is the same floor and
+  // ceiling enforced against the resolved cast (defense in depth).
   const cast = uniqueAvatarIds.map(id => avatarById.get(id)!);
   const composition = castComposition(cast.map(a => a.kind as CastKind));
   if (!composition.ok) {
     return NextResponse.json(
-      { error: 'A story fits up to 4 people plus 2 pets or toys.' },
+      { error: 'A story holds one to six characters.' },
       { status: 400 },
     );
   }

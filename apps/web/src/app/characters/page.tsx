@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { notFound, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Plus } from 'lucide-react';
+import { BookOpen, Plus } from 'lucide-react';
 import AvatarCard, { type AvatarSummary } from '@/components/characters/AvatarCard';
 import AvatarStudioDialog from '@/components/characters/AvatarStudioDialog';
 import { drawAgainStyle } from '@/lib/avatarWardrobe';
@@ -124,24 +124,28 @@ function CharactersShelf() {
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="font-playful text-2xl text-[#1a1a1a]">{t('title')}</h1>
+      {/* G2: mirror the library header treatment — title on its own line at
+          375px, actions beneath; outlined-coral secondary (Books) + solid coral
+          primary (Add someone), consistent 44px heights, no label wrap. */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="whitespace-nowrap font-playful text-2xl text-[#1a1a1a]">{t('title')}</h1>
+        <div className="flex gap-3">
           <Link
             href="/library"
-            className="rounded-full border border-black/10 px-3 py-1 font-playful text-sm text-gray-500 hover:border-coral/50 hover:text-gray-700"
+            className="flex min-h-[44px] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full border-2 border-coral/40 bg-white px-4 font-playful text-sm text-coral hover:border-coral hover:bg-coral/10 sm:flex-none"
           >
+            <BookOpen className="h-4 w-4" />
             {t('booksTab')}
           </Link>
+          <button
+            type="button"
+            onClick={() => setStudioOpen(true)}
+            className="flex min-h-[44px] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-coral px-4 font-playful text-sm text-white hover:bg-coral/90 sm:flex-none"
+          >
+            <Plus className="h-4 w-4" />
+            {t('addSomeone')}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => setStudioOpen(true)}
-          className="flex min-h-[44px] items-center gap-1.5 rounded-full bg-coral px-4 font-playful text-white hover:bg-coral/90"
-        >
-          <Plus className="h-4 w-4" />
-          {t('addSomeone')}
-        </button>
       </div>
 
       {avatars && avatars.length === 0 && (

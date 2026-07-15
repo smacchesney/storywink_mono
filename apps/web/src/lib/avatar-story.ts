@@ -11,9 +11,17 @@
 export const AVATAR_STORY_PAGE_LENGTHS = [8, 12, 16] as const;
 export type AvatarStoryPageLength = (typeof AVATAR_STORY_PAGE_LENGTHS)[number];
 
-/** ≤4 people; pets & toys ride extra object slots (≤2). */
-export const MAX_CAST_PEOPLE = 4;
-export const MAX_CAST_COMPANIONS = 2;
+/**
+ * The whole cast (people + pets + toys) shares one ceiling. It is a technical
+ * bound, not a taste one: the illustration flow feeds ONE character sheet per
+ * cast member into every page render (illustration-generation.worker fetches
+ * each sheet with no slice cap), so cast size is the model's identity-reference
+ * count. Six keeps that budget within a proven range and matches both the
+ * create-route schema (avatarIds.max(6)) and MAX_BATCH_SUBJECTS. Below the
+ * ceiling the parent decides the mix — no people cap, no companion cap, no
+ * person-required floor.
+ */
+export const MAX_CAST = 6;
 
 export type CastKind = 'CHILD' | 'ADULT' | 'PET' | 'TOY';
 
@@ -29,20 +37,18 @@ export function castComposition(kinds: CastKind[]): CastComposition {
   return {
     people,
     companions,
-    // At least one PERSON: the story prompt keeps pets real animals and toys
-    // inanimate, so a people-less cast would have no one who can act at all.
-    ok: people >= 1 && people <= MAX_CAST_PEOPLE && companions <= MAX_CAST_COMPANIONS,
+    // One character is enough and six is the most: any mix in between is the
+    // parent's to choose. A pets-only or toys-only cast is a valid story now.
+    ok: kinds.length >= 1 && kinds.length <= MAX_CAST,
   };
 }
 
 /**
  * Cap-guard for auto-selecting a character the parent created THIS SESSION
  * once its drawing lands (X11 B4). Returns true only when adding `avatar`
- * keeps the RESULTING cast composition legal — ≥1 person, ≤4 people, ≤2
- * companions (all three rules live in castComposition) — and it is not already
- * in the cast. A lone pet dropped into an empty cast is people-less, so it stays
- * silent: the tile pops to selectable and the parent picks who joins it. When an
- * add would overflow a cap we likewise return false and stay silent.
+ * keeps the RESULTING cast within the total ceiling (MAX_CAST) and it is not
+ * already in the cast. A full cast returns false and stays silent: the tile
+ * pops to selectable and the parent chooses who to swap in.
  */
 export function autoSelectAfterCreate(
   cast: { id: string; kind: CastKind }[],
