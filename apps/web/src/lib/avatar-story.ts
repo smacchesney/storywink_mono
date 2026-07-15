@@ -80,6 +80,9 @@ export function nextArrivalPollStart(
 
 /** The loose CharacterDescription-shaped JSON stored on Avatar.identity. */
 export interface StoredAvatarIdentity {
+  /** Extraction-provided "what is this" label ("toy crocodile") — additive,
+   *  absent on identities from before the field existed. */
+  species?: string | null;
   physicalTraits?: {
     apparentAge?: string;
     hairColor?: string;
@@ -105,6 +108,9 @@ export interface RosterCharacter {
   role: string;
   name: string;
   namedVia: 'chip' | 'childName';
+  /** Carried from Avatar.identity so the illustration worker's sheet
+   *  name-map (speciesLineFor) can short-circuit on the explicit label. */
+  species: string | null;
   physicalTraits: {
     apparentAge: string;
     hairColor: string;
@@ -154,6 +160,7 @@ export function buildAvatarStoryRoster(cast: CastAvatarInput[]): {
       role: isStar ? 'main_child' : KIND_ROLE_FALLBACK[avatar.kind],
       name: avatar.displayName,
       namedVia: (isStar ? 'childName' : 'chip') as 'chip' | 'childName',
+      species: avatar.identity?.species?.trim() || null,
       physicalTraits: {
         apparentAge: traits.apparentAge?.trim() || KIND_AGE_FALLBACK[avatar.kind],
         hairColor: traits.hairColor?.trim() || 'as shown on the character sheet',

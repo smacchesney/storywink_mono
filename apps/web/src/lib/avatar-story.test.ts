@@ -104,6 +104,22 @@ describe('buildAvatarStoryRoster', () => {
     expect(characters[0].appearsOnPages).toEqual([]);
     expect(characters[0].appearsOnAssetIds).toEqual([]);
   });
+
+  it('carries the stored species label through to the roster (A4 name↔sheet map)', () => {
+    // Without this, the extraction's species never reaches the render — the
+    // illustration worker reads Book.characterIdentity, which is THIS output.
+    const grypho = {
+      id: 'a5',
+      displayName: 'Grypho',
+      kind: 'TOY' as const,
+      identity: { species: 'toy crocodile' },
+    };
+    const { characters } = buildAvatarStoryRoster([grypho, emma]);
+    expect(characters[0].species).toBe('toy crocodile');
+    // Identities without the field (pre-species avatars) stay species-less so
+    // the worker's speciesLineFor fallback distillation kicks in.
+    expect(characters[1].species).toBeNull();
+  });
 });
 
 describe('autoSelectAfterCreate', () => {

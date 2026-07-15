@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createIllustrationPrompt, IllustrationPromptOptions } from './illustration.js';
+import { speciesLineFor, kindFromRole } from './character-identity.js';
 import type { CharacterIdentity } from '../types.js';
 
 const identity: CharacterIdentity = {
@@ -85,6 +86,34 @@ describe('createIllustrationPrompt — sheet anchor (avatar story pages)', () =>
     expect(prompt.indexOf('image 2 = Trapjaw')).toBeLessThan(prompt.indexOf('image 3 = Grypho'));
     // And it tells the model not to swap identities between sheets.
     expect(prompt).toMatch(/never swap identities/i);
+  });
+
+  it('a roster character with an explicit species renders that phrase in the name map', () => {
+    // End-to-end over the worker's exact composition: a stored species label
+    // short-circuits speciesLineFor and lands verbatim in the binding — the
+    // whole point of threading species through buildAvatarStoryRoster.
+    const grypho = {
+      characterId: 'avatar_2',
+      role: 'companion_object',
+      species: 'toy crocodile',
+      physicalTraits: { distinguishingFeatures: ['green fabric'] },
+      typicalClothing: 'none',
+    };
+    const prompt = createIllustrationPrompt({
+      ...baseOpts,
+      contentAnchor: 'sheet',
+      characterSheetCount: 1,
+      bridgeScene: { ...scene, charactersPresent: ['avatar_1', 'avatar_2'] },
+      sheetRoster: [
+        {
+          name: 'Emma',
+          species: speciesLineFor(identity.characters[0], kindFromRole('main_child')),
+        },
+        { name: 'Grypho', species: speciesLineFor(grypho, kindFromRole(grypho.role)) },
+      ],
+    });
+    expect(prompt).toContain('image 1 = Emma, a person');
+    expect(prompt).toContain('image 2 = Grypho, a toy crocodile');
   });
 
   it('renders a single-sheet name map (image 1 = …) when only the star rides', () => {
