@@ -37,6 +37,10 @@ import { GeminiProvider } from './illustrators/gemini.js';
 import type { IllustrationProvider } from './illustrators/types.js';
 import { fetchImageInput } from './images.js';
 import { matteWhiteBackground, isUsableMatte } from './cutout-matte.js';
+import {
+  parseSheetValidationVerdict,
+  type SheetValidationVerdict,
+} from './avatar-renditions.helpers.js';
 import { ANALYSIS_MODEL } from '../config/models.js';
 
 type Logger = pino.Logger;
@@ -257,7 +261,7 @@ export async function generateAvatarSheet(
       artStyle,
       Buffer.from(output.imageBase64, 'base64'),
     );
-    const validated = await validateAvatarSheet({
+    const verdict = await validateAvatarSheet({
       openai,
       subject,
       sheetUrl,
@@ -266,7 +270,7 @@ export async function generateAvatarSheet(
       artStyle,
       logger,
     });
-    if (validated) {
+    if (verdict.passed) {
       return {
         turnaroundSheetUrl: sheetUrl,
         portraitUrl: portraitUrlFromSheet(sheetUrl),
@@ -276,7 +280,16 @@ export async function generateAvatarSheet(
       };
     }
     lastError = 'sheet failed validation';
-    logger.warn({ avatarId, artStyle, round }, 'Avatar sheet failed validation');
+    logger.warn(
+      {
+        avatarId,
+        artStyle,
+        round,
+        failedAxes: verdict.failedAxes,
+        notes: verdict.notes.slice(0, 300),
+      },
+      'Avatar sheet failed validation',
+    );
   }
   throw new Error(lastError);
 }
@@ -340,12 +353,18 @@ interface ValidateAvatarSheetParams {
   logger: Logger;
 }
 
-/** gpt-5-mini pass/fail. Fails CLOSED when OPENAI_API_KEY is unset (matches books). */
-async function validateAvatarSheet(params: ValidateAvatarSheetParams): Promise<boolean> {
+/**
+ * gpt-5-mini validation. Fails CLOSED when OPENAI_API_KEY is unset (matches
+ * books). Returns the log-shaped verdict (pass/fail + failed axes + notes) so
+ * the caller's failure log names WHY the rubric rejected the sheet.
+ */
+async function validateAvatarSheet(
+  params: ValidateAvatarSheetParams,
+): Promise<SheetValidationVerdict> {
   const { subject, sheetUrl, sourceUrls, styleExemplarUrls, artStyle, logger } = params;
   if (!process.env.OPENAI_API_KEY) {
     logger.error({}, 'OPENAI_API_KEY missing — avatar sheet validation fails closed');
-    return false;
+    return { passed: false, failedAxes: [], notes: 'OPENAI_API_KEY not configured' };
   }
   const prompt = createSheetValidationPrompt({
     character: subject,
@@ -391,12 +410,7 @@ async function validateAvatarSheet(params: ValidateAvatarSheetParams): Promise<b
       },
     },
   });
-  try {
-    const verdict = JSON.parse(response.output_text) as { passed?: boolean };
-    return verdict.passed === true;
-  } catch {
-    return false;
-  }
+  return parseSheetValidationVerdict(response.output_text);
 }
 
 // ---------------------------------------------------------------------------
