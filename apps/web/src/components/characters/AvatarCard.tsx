@@ -3,6 +3,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslations } from 'next-intl';
+import { useAuth } from '@clerk/nextjs';
 import { motion, useReducedMotion } from 'framer-motion';
 import { MoreVertical, X, Check } from 'lucide-react';
 import { optimizeCloudinaryUrl } from '@storywink/shared';
@@ -20,7 +21,10 @@ import {
   sheetRowState,
   redrawTargetIsFailed,
 } from '@/lib/avatarWardrobe';
+import { redrawDialogState } from '@/lib/avatarRedraw';
 import { cn } from '@/lib/utils';
+
+const PHOTO_ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif';
 
 export interface AvatarSummary {
   id: string;
@@ -42,8 +46,15 @@ interface AvatarCardProps {
   /** Shelf position — drives the resting tilt pattern. */
   index?: number;
   onRename: (avatar: AvatarSummary) => void;
-  /** Redraws the DISPLAYED style (C3); the card passes what it is showing. */
-  onDrawAgain: (avatar: AvatarSummary, displayedStyle: StyleKey | null) => void;
+  /**
+   * Redraws the DISPLAYED style (C3); the card passes what it is showing.
+   * Resolves the request outcome: `needsPhoto` (F2) means the worker would have
+   * no source, so the confirm dialog swaps to its fresh-photo state.
+   */
+  onDrawAgain: (
+    avatar: AvatarSummary,
+    displayedStyle: StyleKey | null,
+  ) => Promise<{ needsPhoto?: boolean }>;
   onDelete: (avatar: AvatarSummary) => void;
   /**
    * Draws a specific new style from the "…'s styles" sheet. Optional: absent it,
@@ -270,12 +281,10 @@ export function AvatarCard({
       {confirmOpen && (
         <DrawAgainConfirm
           name={avatar.displayName}
-          showRetryNote={redrawIsRetry}
-          onConfirm={() => {
-            setConfirmOpen(false);
-            onDrawAgain(avatar, activeStyle);
-          }}
-          onCancel={() => setConfirmOpen(false)}
+          avatarId={avatar.id}
+          targetIsFailed={redrawIsRetry}
+          onRedraw={() => onDrawAgain(avatar, activeStyle)}
+          onClose={() => setConfirmOpen(false)}
         />
       )}
     </motion.div>
@@ -283,29 +292,96 @@ export function AvatarCard({
 }
 
 /**
- * Confirm before a paid redraw fires. Portaled to document.body so it escapes
- * the shelf's `main` (z-10) stacking context and paints over the sticky header
- * (StyleWardrobeSheet precedent: same z-[80], backdrop, X close). The retry
- * note shows ONLY when the target rendition previously did not come out.
+ * Confirm before a paid redraw fires — with a photo-recovery affordance (F3).
+ * Portaled to document.body so it escapes the shelf's `main` (z-10) stacking
+ * context and paints over the sticky header (StyleWardrobeSheet precedent: same
+ * z-[80], backdrop, X close).
+ *
+ * Three states (redrawDialogState):
+ *  - confirm: exactly the Track E dialog (Close / Draw again).
+ *  - failedRecovery (target rendition FAILED): the retry note plus TWO actions,
+ *    a quiet "Try again" and a primary "Add a fresh photo".
+ *  - needsPhoto (the brick case — F2's rendition route answered needsPhoto):
+ *    a body explaining one photo is needed, and a single "Add a photo" action.
+ *
+ * The fresh-photo path uploads ONE photo through the studio machinery (imported
+ * dynamically to keep the shelf bundle lean), POSTs it to the attach route with
+ * relearn, then re-fires the redraw — which now has a source — and closes; the
+ * card twinkles via the existing shelf poll.
  */
 function DrawAgainConfirm({
   name,
-  showRetryNote,
-  onConfirm,
-  onCancel,
+  avatarId,
+  targetIsFailed,
+  onRedraw,
+  onClose,
 }: {
   name: string;
-  showRetryNote: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
+  avatarId: string;
+  targetIsFailed: boolean;
+  onRedraw: () => Promise<{ needsPhoto?: boolean }>;
+  onClose: () => void;
 }) {
   const t = useTranslations('characters');
+  const { getToken } = useAuth();
+  const [needsPhoto, setNeedsPhoto] = React.useState(false);
+  const [phase, setPhase] = React.useState<'idle' | 'redraw' | 'photo'>('idle');
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const busy = phase !== 'idle';
+  const state = redrawDialogState({ targetIsFailed, needsPhoto });
+
+  const runRedraw = async () => {
+    setPhase('redraw');
+    try {
+      const { needsPhoto: np } = await onRedraw();
+      // The route says a fresh photo is required — swap into that state instead
+      // of closing so the parent gets the recovery path in one dialog.
+      if (np) {
+        setNeedsPhoto(true);
+        setPhase('idle');
+        return;
+      }
+      onClose();
+    } catch {
+      setPhase('idle');
+    }
+  };
+
+  const openPicker = () => fileInputRef.current?.click();
+
+  const onFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file
+    if (!file) return;
+    setPhase('photo');
+    try {
+      // Reuse the studio upload path (single photo) without shipping its heavy
+      // downscale/canvas machinery in the shelf's initial bundle.
+      const { uploadSinglePhoto, validateFile } = await import('@/lib/uploadPhotos');
+      validateFile(file);
+      const asset = await uploadSinglePhoto(file, { getToken });
+      const res = await fetch(`/api/avatar/${avatarId}/photo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assetId: asset.id, relearn: true }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      // The fresh photo is now a source — the redraw starts and the card twinkles.
+      await onRedraw();
+      onClose();
+    } catch {
+      setPhase('idle');
+      const { toast } = await import('sonner');
+      toast(t('photoAddProblem'));
+    }
+  };
+
   if (typeof document === 'undefined') return null;
 
   return createPortal(
     <div
       className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 md:items-center"
-      onClick={onCancel}
+      onClick={busy ? undefined : onClose}
     >
       <div
         className="relative flex w-full max-w-sm flex-col gap-3 rounded-t-2xl bg-white p-5 md:rounded-2xl"
@@ -313,37 +389,99 @@ function DrawAgainConfirm({
         role="dialog"
         aria-modal="true"
       >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={PHOTO_ACCEPT}
+          onChange={onFileChosen}
+          className="sr-only"
+          aria-hidden="true"
+          tabIndex={-1}
+        />
         <button
           type="button"
           aria-label={t('close')}
-          onClick={onCancel}
-          className="absolute right-3 top-3 rounded-full p-2 text-gray-400 hover:bg-black/5"
+          onClick={onClose}
+          disabled={busy}
+          className="absolute right-3 top-3 rounded-full p-2 text-gray-400 hover:bg-black/5 disabled:opacity-40"
         >
           <X className="h-5 w-5" />
         </button>
+
         <h2 className="pr-8 font-playful text-xl text-[#1a1a1a]">
           {t('drawAgainConfirmTitle', { name })}
         </h2>
-        <p className="font-playful text-sm text-gray-500">{t('drawAgainConfirmBody')}</p>
-        {showRetryNote && (
-          <p className="font-playful text-sm text-coral">{t('drawAgainRetryNote')}</p>
+
+        {state === 'needsPhoto' ? (
+          <p className="font-playful text-sm text-gray-500">{t('needsPhotoBody', { name })}</p>
+        ) : (
+          <>
+            <p className="font-playful text-sm text-gray-500">{t('drawAgainConfirmBody')}</p>
+            {state === 'failedRecovery' && (
+              <p className="font-playful text-sm text-coral">{t('drawAgainRetryNote')}</p>
+            )}
+          </>
         )}
-        <div className="mt-1 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-full px-4 py-2 font-playful text-sm text-gray-500 hover:bg-black/5"
-          >
-            {t('close')}
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="rounded-full bg-coral px-4 py-2 font-playful text-sm text-white hover:bg-coral/90"
-          >
-            {t('drawAgain')}
-          </button>
-        </div>
+
+        {phase === 'photo' ? (
+          <div className="mt-1 flex items-center justify-center gap-2 py-2">
+            <Storydust variant="twinkle" size="inline" />
+            <span className="text-working-shimmer font-playful text-sm text-gray-500">
+              {t('addingPhoto')}
+            </span>
+          </div>
+        ) : (
+          <div className="mt-1 flex items-center justify-end gap-2">
+            {state === 'needsPhoto' ? (
+              <button
+                type="button"
+                onClick={openPicker}
+                disabled={busy}
+                className="rounded-full bg-coral px-4 py-2 font-playful text-sm text-white hover:bg-coral/90 disabled:opacity-60"
+              >
+                {t('addPhotoCta')}
+              </button>
+            ) : state === 'failedRecovery' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={runRedraw}
+                  disabled={busy}
+                  className="rounded-full px-4 py-2 font-playful text-sm text-gray-500 hover:bg-black/5 disabled:opacity-60"
+                >
+                  {t('drawAgainTryAgain')}
+                </button>
+                <button
+                  type="button"
+                  onClick={openPicker}
+                  disabled={busy}
+                  className="rounded-full bg-coral px-4 py-2 font-playful text-sm text-white hover:bg-coral/90 disabled:opacity-60"
+                >
+                  {t('drawAgainFreshPhoto')}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={busy}
+                  className="rounded-full px-4 py-2 font-playful text-sm text-gray-500 hover:bg-black/5 disabled:opacity-60"
+                >
+                  {t('close')}
+                </button>
+                <button
+                  type="button"
+                  onClick={runRedraw}
+                  disabled={busy}
+                  className="rounded-full bg-coral px-4 py-2 font-playful text-sm text-white hover:bg-coral/90 disabled:opacity-60"
+                >
+                  {t('drawAgain')}
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>,
     document.body,
