@@ -175,10 +175,23 @@ describe('createStoryGenerationPrompt — illustrationNotes stay wordless', () =
   });
 
   it('no longer offers quoted sound-words as effect examples', () => {
-    expect(text).not.toContain('"ZOOM!"');
-    expect(text).not.toContain('"SPLASH!"');
-    expect(text).not.toContain('"MUNCH!"');
-    expect(text).not.toContain('"BOING!"');
+    // The FULL set the effect-example lines used to quote — any one creeping
+    // back re-teaches the model to paint lettering.
+    for (const token of [
+      '"ZOOM!"',
+      '"WHOOSH!"',
+      '"SPLASH!"',
+      '"SPLISH!"',
+      '"YUM!"',
+      '"MUNCH!"',
+      '"CHOMP!"',
+      '"BOING!"',
+      '"WHEEE!"',
+      '"WOW!"',
+      '"OOOOH!"',
+    ]) {
+      expect(text).not.toContain(token);
+    }
     expect(text).toContain('motion lines, speed streaks');
   });
 });

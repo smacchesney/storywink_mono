@@ -143,9 +143,22 @@ describe('createAvatarStoryPrompt — shared machinery retained', () => {
     expect(text).toContain(
       'NEVER suggest words, letters, numbers, or sound-effect text in "illustrationNotes"',
     );
-    expect(text).not.toContain('"ZOOM!"');
-    expect(text).not.toContain('"SPLASH!"');
-    expect(text).not.toContain('"CHOMP!"');
+    // The FULL set the effect-example lines used to quote.
+    for (const token of [
+      '"ZOOM!"',
+      '"WHOOSH!"',
+      '"SPLASH!"',
+      '"SPLISH!"',
+      '"YUM!"',
+      '"MUNCH!"',
+      '"CHOMP!"',
+      '"BOING!"',
+      '"WHEEE!"',
+      '"WOW!"',
+      '"OOOOH!"',
+    ]) {
+      expect(text).not.toContain(token);
+    }
     expect(text).toContain('motion lines, speed streaks');
   });
 });

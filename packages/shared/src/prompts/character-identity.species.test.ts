@@ -79,6 +79,34 @@ describe('speciesLineFor — pet distillation', () => {
     });
     expect(speciesLineFor(dog, 'pet')).toBe('a golden dog');
   });
+
+  it('uses "an" before a vowel-initial distilled phrase', () => {
+    const owl = identity({
+      physicalTraits: { distinguishingFeatures: ['snowy owl markings'] },
+    });
+    expect(speciesLineFor(owl, 'pet')).toBe('an owl');
+    // Colored phrases keep "a" when the first word starts with a consonant.
+    const croc = identity({
+      physicalTraits: { distinguishingFeatures: ['green scaly fabric', 'long crocodile snout'] },
+    });
+    expect(speciesLineFor(croc, 'toy')).toBe('a green toy crocodile');
+  });
+
+  it("does not paint the pet with its collar's color — body color comes from features only", () => {
+    const collared = identity({
+      physicalTraits: { distinguishingFeatures: ['floppy dog ears'] },
+      typicalClothing: 'red collar',
+    });
+    expect(speciesLineFor(collared, 'pet')).toBe('a dog');
+  });
+
+  it('the creature noun may still come from the clothing text', () => {
+    const harnessed = identity({
+      physicalTraits: { distinguishingFeatures: ['golden fur'] },
+      typicalClothing: 'small dog harness',
+    });
+    expect(speciesLineFor(harnessed, 'pet')).toBe('a golden dog');
+  });
 });
 
 describe('speciesLineFor — explicit species field short-circuits distillation', () => {

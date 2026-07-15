@@ -346,3 +346,22 @@ describe('bridge prompt variant (source=BRIDGE pages)', () => {
     expect(stalePrompt).toContain('Aria (main_child)');
   });
 });
+
+describe('createIllustrationPrompt — photo-path interior no-text rule', () => {
+  it('contains the ABSOLUTELY NO TEXT rule and closes with it (photo shape, no contentAnchor)', () => {
+    const prompt = createIllustrationPrompt({
+      style: 'vignette',
+      pageText: 'Aria spun in the sunshine.',
+      bookTitle: "Aria's Big Day",
+      isTitlePage: false,
+      referenceImageCount: 1,
+      characterIdentity,
+      pageNumber: 3,
+    });
+    expect(prompt).toContain(
+      'ABSOLUTELY NO TEXT: Do not render any letters, words, numbers, captions, labels, speech bubbles, sound effects, or title text anywhere in the image. This is a wordless illustration.',
+    );
+    // Assembled LAST so it is the final instruction the model reads.
+    expect(prompt.endsWith('This is a wordless illustration.')).toBe(true);
+  });
+});

@@ -677,7 +677,11 @@ function firstWordFrom(haystack: string, candidates: string[]): string | undefin
 
 function withArticle(phrase: string): string {
   const trimmed = phrase.trim();
-  return /^an?\s/i.test(trimmed) ? trimmed : `a ${trimmed}`;
+  if (/^an?\s/i.test(trimmed)) return trimmed;
+  // Vowel-initial → "an" ("an owl", "an orange cat"), except the "you"-sound
+  // u-words ("a unicorn").
+  const an = /^[aeio]/i.test(trimmed) || (/^u/i.test(trimmed) && !/^uni/i.test(trimmed));
+  return `${an ? 'an' : 'a'} ${trimmed}`;
 }
 
 /**
@@ -697,23 +701,24 @@ export function speciesLineFor(
   const explicit = identity?.species?.trim();
   if (explicit) return withArticle(explicit.toLowerCase());
 
-  const haystack = [
-    ...(identity?.physicalTraits?.distinguishingFeatures ?? []),
-    identity?.typicalClothing ?? '',
-  ]
+  const featureText = (identity?.physicalTraits?.distinguishingFeatures ?? [])
     .join(' ')
     .toLowerCase();
+  const clothingText = (identity?.typicalClothing ?? '').toLowerCase();
 
-  const color = firstWordFrom(haystack, SPECIES_COLORS);
-  const creature = firstWordFrom(haystack, SPECIES_CREATURES);
+  // Body color from the FEATURES only — a red collar or raincoat must never
+  // become the creature's coat color. The creature noun may hide in either
+  // field ("crocodile snout", "small dog harness").
+  const color = firstWordFrom(featureText, SPECIES_COLORS);
+  const creature = firstWordFrom(`${featureText} ${clothingText}`, SPECIES_CREATURES);
 
   if (kind === 'toy') {
     // The "toy" qualifier always stays — it IS a toy crocodile, not a real one.
-    return ['a', color, 'toy', creature].filter(Boolean).join(' ');
+    return withArticle([color, 'toy', creature].filter(Boolean).join(' '));
   }
   if (kind === 'pet') {
-    if (creature) return ['a', color, creature].filter(Boolean).join(' ');
-    return color ? `a ${color} pet` : 'a pet';
+    if (creature) return withArticle([color, creature].filter(Boolean).join(' '));
+    return color ? withArticle(`${color} pet`) : 'a pet';
   }
   // People are carried by the CHARACTER IDENTITY block and their own sheet;
   // the map only needs to say "a person" unless extraction gave a species.
