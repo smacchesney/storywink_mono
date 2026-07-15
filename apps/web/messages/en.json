@@ -372,6 +372,7 @@
     "downloadingTitle": "Almost ready…",
     "readyTitle": "Your book is ready!",
     "readyBody": "The PDF is on its way to your downloads. Didn't see it? Tap Save below.",
+    "readyBodyManual": "Your book is ready. Tap Save PDF to keep it on your device.",
     "save": "Save PDF",
     "share": "Share",
     "done": "Done",
@@ -458,6 +459,7 @@
   },
   "characters": {
     "title": "My characters",
+    "loading": "Loading your characters…",
     "booksTab": "Books",
     "addSomeone": "Add someone",
     "emptyTitle": "No characters yet",

@@ -372,6 +372,7 @@
     "downloadingTitle": "もうすぐできあがります…",
     "readyTitle": "絵本ができあがりました！",
     "readyBody": "PDFの保存が始まりました。見つからないときは、下の「PDFを保存」を押してください。",
+    "readyBodyManual": "絵本ができあがりました。下の「PDFを保存」を押して、端末に保存してください。",
     "save": "PDFを保存",
     "share": "共有",
     "done": "閉じる",
@@ -458,6 +459,7 @@
   },
   "characters": {
     "title": "うちのキャラクター",
+    "loading": "キャラクターを よみこんでいます…",
     "booksTab": "えほん",
     "addSomeone": "だれかを ついか",
     "emptyTitle": "まだ キャラクターが いません",

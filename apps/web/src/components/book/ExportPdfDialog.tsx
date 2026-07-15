@@ -16,8 +16,25 @@ import { Storydust } from '@/components/ui/storydust';
 import { showError } from '@/lib/toast-utils';
 import { track } from '@/lib/track';
 import { pdfDownloadFileName } from '@/lib/pdf-download';
+import { shouldAutoSave } from '@/lib/pdf-autosave';
 
 type Phase = 'preparing' | 'downloading' | 'ready';
+
+/**
+ * iOS/iPadOS Safari, where a programmatic download needs a live user gesture.
+ * iPhone/iPod/older iPads report directly; iPadOS 13+ masquerades as a Mac but
+ * is the only "Macintosh" that carries a touch screen.
+ */
+function isIOSUserAgent(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  return (
+    /iPad|iPhone|iPod/.test(ua) ||
+    (/Macintosh/.test(ua) &&
+      typeof navigator.maxTouchPoints === 'number' &&
+      navigator.maxTouchPoints > 1)
+  );
+}
 
 interface ExportPdfDialogProps {
   bookId: string;
@@ -54,6 +71,9 @@ export function ExportPdfDialog({
   // the proxy AND the body streams; otherwise the spinner carries the wait.
   const [progress, setProgress] = useState<number | null>(null);
   const [canShare, setCanShare] = useState(false);
+  // Whether the silent auto-save fired. When it didn't (iOS with no live
+  // gesture), the ready phase leads with Save instead of claiming a download.
+  const [autoSaved, setAutoSaved] = useState(false);
 
   const fileName = pdfDownloadFileName(bookTitle);
 
@@ -78,8 +98,12 @@ export function ExportPdfDialog({
     setPhase('preparing');
     setProgress(null);
     setCanShare(false);
+    setAutoSaved(false);
 
     const run = async () => {
+      let blob: Blob;
+      // Phase 1 — fetch + stream the bytes. ONLY a failure here (before the
+      // blob exists) may close the dialog; a client cancel/abort is silent.
       try {
         const response = await fetch(`/api/book/${bookId}/export/pdf`, {
           signal: controller.signal,
@@ -89,7 +113,6 @@ export function ExportPdfDialog({
         }
 
         const totalBytes = Number(response.headers.get('Content-Length')) || 0;
-        let blob: Blob;
         if (response.body && totalBytes > 0) {
           setPhase('downloading');
           setProgress(0);
@@ -109,33 +132,73 @@ export function ExportPdfDialog({
         } else {
           blob = await response.blob();
         }
-        if (cancelled) return;
-
-        setProgress(100);
-        const url = URL.createObjectURL(blob);
-        objectUrlRef.current = url;
-
-        const file = new File([blob], fileNameRef.current, {
-          type: 'application/pdf',
-        });
-        fileRef.current = file;
-        setCanShare(
-          typeof navigator !== 'undefined' &&
-            typeof navigator.canShare === 'function' &&
-            navigator.canShare({ files: [file] })
-        );
-
-        // Auto-save: the tap that opened this dialog is the only tap needed.
-        triggerDownload(url, fileNameRef.current);
-        track('pdf_export', { bookId });
-        setPhase('ready');
       } catch (error) {
         if (cancelled || controller.signal.aborted) return;
         console.error('PDF export failed:', error);
         // Gentle copy only — the raw failure stays in the log.
         showError(error, tRef.current('errorTitle'), tRef.current('errorBody'));
         onOpenChangeRef.current(false);
+        return;
       }
+
+      // Phase 2 — the bytes have landed. From here NOTHING may close the
+      // dialog: every step is individually non-fatal and we always end on the
+      // ready phase, so a post-blob throw can never look like a self-close.
+      if (cancelled) return;
+      setProgress(100);
+
+      // The object URL powers the Save button. If it somehow throws, Save is a
+      // no-op but the dialog still lands on ready rather than vanishing.
+      try {
+        objectUrlRef.current = URL.createObjectURL(blob);
+      } catch (err) {
+        console.error('PDF export: createObjectURL failed after blob landed', err);
+      }
+
+      // File + share availability — best-effort, feature-detected. Older
+      // engines may lack File or throw from canShare; neither is fatal here.
+      try {
+        if (typeof File === 'function') {
+          const file = new File([blob], fileNameRef.current, {
+            type: 'application/pdf',
+          });
+          fileRef.current = file;
+          if (
+            typeof navigator !== 'undefined' &&
+            typeof navigator.canShare === 'function' &&
+            navigator.canShare({ files: [file] })
+          ) {
+            setCanShare(true);
+          }
+        }
+      } catch (err) {
+        console.error('PDF export: File/canShare probe failed after blob landed', err);
+      }
+
+      // Auto-save only when a synthetic click can actually land (desktop
+      // always; iOS only while a gesture is still live). Never fatal — on iOS
+      // the primary Save button carries the tap instead.
+      let saved = false;
+      const activation =
+        typeof navigator !== 'undefined' ? navigator.userActivation?.isActive : undefined;
+      if (objectUrlRef.current && shouldAutoSave(activation, isIOSUserAgent())) {
+        try {
+          triggerDownload(objectUrlRef.current, fileNameRef.current);
+          saved = true;
+        } catch (err) {
+          console.error('PDF export: auto-save download failed after blob landed', err);
+        }
+      }
+      setAutoSaved(saved);
+
+      // Fire-and-forget telemetry (never throws); guarded regardless.
+      try {
+        track('pdf_export', { bookId });
+      } catch (err) {
+        console.error('PDF export: track failed after blob landed', err);
+      }
+
+      setPhase('ready');
     };
     void run();
 
@@ -182,7 +245,11 @@ export function ExportPdfDialog({
                 : t('preparingTitle')}
           </DialogTitle>
           <DialogDescription>
-            {phase === 'ready' ? t('readyBody') : t('preparingBody')}
+            {phase === 'ready'
+              ? autoSaved
+                ? t('readyBody')
+                : t('readyBodyManual')
+              : t('preparingBody')}
           </DialogDescription>
         </DialogHeader>
 

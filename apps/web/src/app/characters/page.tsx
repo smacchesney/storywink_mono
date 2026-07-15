@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { BookOpen, Plus } from 'lucide-react';
 import AvatarCard, { type AvatarSummary } from '@/components/characters/AvatarCard';
 import AvatarStudioDialog from '@/components/characters/AvatarStudioDialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { drawAgainStyle } from '@/lib/avatarWardrobe';
 import { MASCOT_CATS_WAVING } from '@/lib/mascots';
 import type { StyleKey } from '@storywink/shared/prompts/styles';
@@ -147,6 +148,31 @@ function CharactersShelf() {
           </button>
         </div>
       </div>
+
+      {/* First load: a shelf of placeholder cards. Without this the page
+          collapses to the header alone while /api/avatars is in flight, so it
+          is shorter than the viewport and cannot scroll until the cards land —
+          the reported "scroll is dead while it loads". The placeholders give
+          the page its real height (scrollable throughout) and show the shelf
+          is filling in. Skeleton's pulse is already reduced-motion aware. */}
+      {avatars === null && (
+        <div
+          className="grid grid-cols-2 gap-x-4 gap-y-6 pt-2 md:grid-cols-3 md:gap-x-5"
+          role="status"
+          aria-label={t('loading')}
+        >
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-coral/20 bg-white p-2 shadow-sm"
+              aria-hidden
+            >
+              <Skeleton className="aspect-[3/4] w-full rounded-md bg-cream-deep" />
+              <Skeleton className="mt-2 h-5 w-2/3 bg-cream-deep" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {avatars && avatars.length === 0 && (
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-black/15 bg-white/60 px-6 py-12 text-center">
