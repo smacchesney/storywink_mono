@@ -151,7 +151,16 @@ export async function POST(request: NextRequest) {
         try {
           await getQueue(QueueName.AvatarRendition).add(
             `avatar-${avatar.id}-${artStyle}`,
-            { avatarId: avatar.id, userId: dbUser.id, artStyle },
+            {
+              avatarId: avatar.id,
+              userId: dbUser.id,
+              artStyle,
+              // Anchor a future identity re-extraction (X11 Track F): the group
+              // photo may hold more than one figure, so carry this subject's
+              // detect-stage line so the worker draws THIS one if it ever has to
+              // rebuild identity from the staged photos.
+              subjectDescription: subject.parentDescription,
+            },
             { attempts: 2, backoff: { type: 'exponential', delay: 10000 } },
           );
         } catch (queueError) {
@@ -217,7 +226,13 @@ export async function POST(request: NextRequest) {
     }
 
     logger.info(
-      { detectionId, created: created.length, failed: failed.length, enqueueFailures, stoppedAtCap },
+      {
+        detectionId,
+        created: created.length,
+        failed: failed.length,
+        enqueueFailures,
+        stoppedAtCap,
+      },
       'Batch avatar creation finished',
     );
     return NextResponse.json(

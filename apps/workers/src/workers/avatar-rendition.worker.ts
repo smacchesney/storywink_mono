@@ -49,6 +49,13 @@ export interface AvatarRenditionJobData {
    * flip, no status change, and the cutout silently swaps in when it lands.
    */
   cutoutOnly?: boolean;
+  /**
+   * Per-subject description from the detect stage (X11 Track F). Only used when
+   * this job has to extract identity from scratch (missing identity) — it binds
+   * extraction to the right figure in a group photo. Redis-transient; absent on
+   * the studio and relearn paths.
+   */
+  subjectDescription?: string;
 }
 
 export async function processAvatarRendition(job: Job<AvatarRenditionJobData>): Promise<void> {
@@ -227,6 +234,7 @@ export async function processAvatarRendition(job: Job<AvatarRenditionJobData>): 
         artStyle,
         sourceUrls: photoUrls.map((url) => optimizeCloudinaryUrlForVision(url)),
         logger,
+        subjectDescription: job.data.subjectDescription,
       });
       await prisma.avatar.update({
         where: { id: avatarId },

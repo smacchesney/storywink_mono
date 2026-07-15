@@ -77,18 +77,25 @@ export interface ExtractAvatarIdentityParams {
   artStyle: string;
   sourceUrls: string[];
   logger: Logger;
+  /**
+   * Per-subject description from the detect stage. Anchors extraction to the
+   * right figure in a group photo (X11 Track F). Optional everywhere — the
+   * studio and relearn paths pass nothing.
+   */
+  subjectDescription?: string;
 }
 
 /** One gpt-5-mini vision call: photos of one subject → CharacterDescription. */
 export async function extractAvatarIdentity(
   params: ExtractAvatarIdentityParams,
 ): Promise<AvatarIdentity> {
-  const { openai, kind, displayName, artStyle, sourceUrls, logger } = params;
+  const { openai, kind, displayName, artStyle, sourceUrls, logger, subjectDescription } = params;
   const prompt = createAvatarIdentityPrompt({
     kind,
     displayName,
     artStyle,
     photoCount: sourceUrls.length,
+    subjectDescription,
   });
 
   const response = await openai.responses.create({

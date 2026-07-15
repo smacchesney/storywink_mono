@@ -465,6 +465,15 @@ export interface AvatarIdentityPromptInput {
   displayName: string;
   artStyle: string;
   photoCount: number;
+  /**
+   * Optional per-subject description from the detect stage ("the red-furred
+   * beast toy on the left"). When the photos hold more than one figure — a
+   * group shot — this binds extraction to the RIGHT one instead of whichever
+   * figure the model finds most salient. Absent (or blank) leaves the prompt
+   * byte-identical to the single-subject baseline; the studio/relearn paths
+   * pass nothing.
+   */
+  subjectDescription?: string;
 }
 
 /**
@@ -502,8 +511,16 @@ export function createAvatarIdentityPrompt(input: AvatarIdentityPromptInput): { 
   };
   const subject = subjectByKind[input.kind] ?? subjectByKind.ADULT;
 
+  // Group-photo anchor (additive): when a per-subject description is supplied,
+  // lead with it so the model extracts THAT figure and no other. A blank or
+  // absent description renders nothing, keeping the baseline prompt untouched.
+  const described = input.subjectDescription?.trim();
+  const anchor = described
+    ? `The subject is: ${described}. Describe THAT figure only — ignore any other people, pets, or toys in the frame, even if another figure is larger or more central.\n\n`
+    : '';
+
   return {
-    text: `Analyze all ${input.photoCount} photos provided. Every photo shows the SAME ${subject.noun}, called "${input.displayName}", who will become a recurring illustrated character in a "${input.artStyle}" art style children's book.
+    text: `${anchor}Analyze all ${input.photoCount} photos provided. Every photo shows the SAME ${subject.noun}, called "${input.displayName}", who will become a recurring illustrated character in a "${input.artStyle}" art style children's book.
 
 Extract EXACTLY ONE character entry:
 
