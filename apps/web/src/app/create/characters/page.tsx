@@ -944,7 +944,7 @@ function AvatarStoryFlow() {
                       : capped
                         ? 'opacity-40'
                         : 'motion-safe:hover:-translate-y-0.5'
-                  } ${popped ? 'motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-300' : ''}`}
+                  } ${popped ? 'motion-safe:animate-in motion-safe:duration-300 motion-safe:zoom-in-95' : ''}`}
                 >
                   <StorybookFrame
                     className="h-full"
@@ -953,7 +953,7 @@ function AvatarStoryFlow() {
                   >
                     <div className="relative flex min-h-[44px] flex-col items-center">
                       {selected && (
-                        <span className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-coral text-white">
+                        <span className="absolute top-1 right-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-coral text-white">
                           <Check className="h-3.5 w-3.5" />
                         </span>
                       )}
@@ -1295,7 +1295,7 @@ function StepCta({
   label: React.ReactNode;
 }) {
   return (
-    <div className="sticky inset-x-0 bottom-0 z-10 mt-8 bg-gradient-to-t from-background via-background to-transparent pb-2 pt-6">
+    <div className="sticky inset-x-0 bottom-0 z-10 mt-8 bg-gradient-to-t from-background via-background to-transparent pt-6 pb-2">
       <button
         type="button"
         onClick={onClick}

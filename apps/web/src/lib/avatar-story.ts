@@ -32,7 +32,7 @@ export interface CastComposition {
 }
 
 export function castComposition(kinds: CastKind[]): CastComposition {
-  const people = kinds.filter(k => k === 'CHILD' || k === 'ADULT').length;
+  const people = kinds.filter((k) => k === 'CHILD' || k === 'ADULT').length;
   const companions = kinds.length - people;
   return {
     people,
@@ -54,8 +54,8 @@ export function autoSelectAfterCreate(
   cast: { id: string; kind: CastKind }[],
   avatar: { id: string; kind: CastKind },
 ): boolean {
-  if (cast.some(c => c.id === avatar.id)) return false;
-  return castComposition([...cast.map(c => c.kind), avatar.kind]).ok;
+  if (cast.some((c) => c.id === avatar.id)) return false;
+  return castComposition([...cast.map((c) => c.kind), avatar.kind]).ok;
 }
 
 /**
@@ -74,7 +74,7 @@ export function nextArrivalPollStart(
 ): number | null {
   if (drawingIds.size === 0) return null;
   if (startedAt === null) return now;
-  const hasNewDrawing = Array.from(drawingIds).some(id => !prevDrawingIds.has(id));
+  const hasNewDrawing = Array.from(drawingIds).some((id) => !prevDrawingIds.has(id));
   return hasNewDrawing ? now : startedAt;
 }
 
@@ -110,9 +110,7 @@ export interface StoredAvatarIdentity extends StoredAvatarCharacter {
 }
 
 /** Nested canonical → the character; legacy flat → the identity itself. */
-function unwrapStoredIdentity(
-  identity: StoredAvatarIdentity | null,
-): StoredAvatarCharacter | null {
+function unwrapStoredIdentity(identity: StoredAvatarIdentity | null): StoredAvatarCharacter | null {
   return identity?.character ?? identity;
 }
 
@@ -171,7 +169,7 @@ export function buildAvatarStoryRoster(cast: CastAvatarInput[]): {
   characters: RosterCharacter[];
   childName: string | null;
 } {
-  const firstChildIndex = cast.findIndex(a => a.kind === 'CHILD');
+  const firstChildIndex = cast.findIndex((a) => a.kind === 'CHILD');
   const characters = cast.map((avatar, i) => {
     const isStar = i === firstChildIndex;
     // Unwrap ONCE: the stored identity nests the character (legacy flat
@@ -211,16 +209,18 @@ export function buildAvatarStoryRoster(cast: CastAvatarInput[]): {
  * avatar-story can start in without drawing anyone again.
  */
 export function sharedReadyStyles(
-  cast: { renditions: { artStyle: string; status: string; turnaroundSheetUrl?: string | null }[] }[],
+  cast: {
+    renditions: { artStyle: string; status: string; turnaroundSheetUrl?: string | null }[];
+  }[],
 ): string[] {
   if (cast.length === 0) return [];
   const perAvatar = cast.map(
-    a =>
+    (a) =>
       new Set(
         a.renditions
-          .filter(r => r.status === 'READY' && r.turnaroundSheetUrl !== null)
-          .map(r => r.artStyle),
+          .filter((r) => r.status === 'READY' && r.turnaroundSheetUrl !== null)
+          .map((r) => r.artStyle),
       ),
   );
-  return Array.from(perAvatar[0]).filter(style => perAvatar.every(set => set.has(style)));
+  return Array.from(perAvatar[0]).filter((style) => perAvatar.every((set) => set.has(style)));
 }

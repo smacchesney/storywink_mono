@@ -6,12 +6,28 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { Book, Page, BookStatus } from '@prisma/client'; // Assuming prisma client types are available
-import { AlertTriangle, ChevronLeft, ChevronRight, Library, Download, Printer, ArrowLeft, Maximize2, Minimize2, Eye, EyeOff } from 'lucide-react'; // Added fullscreen icons
-import { Button } from "@/components/ui/button";
+import {
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  Library,
+  Download,
+  Printer,
+  ArrowLeft,
+  Maximize2,
+  Minimize2,
+  Eye,
+  EyeOff,
+} from 'lucide-react'; // Added fullscreen icons
+import { Button } from '@/components/ui/button';
 import { Storydust } from '@/components/ui/storydust';
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import BookPageGallery from '@/components/book/BookPageGallery'; // Import the new component
-import FlipbookViewer, { FlipbookActions, buildDisplayPages, type BookLayout } from '@/components/book/FlipbookViewer'; // Import FlipbookViewer, FlipbookActions type, and buildDisplayPages
+import FlipbookViewer, {
+  FlipbookActions,
+  buildDisplayPages,
+  type BookLayout,
+} from '@/components/book/FlipbookViewer'; // Import FlipbookViewer, FlipbookActions type, and buildDisplayPages
 import BookIssueBanner from '@/components/create/BookIssueBanner';
 import GenerationProgress from '@/components/create/GenerationProgress';
 import PageControlsMenu from '@/components/book/PageControlsMenu';
@@ -116,14 +132,16 @@ function BookPreviewContent() {
   // footer count stay in lockstep. The initial guess only covers the moment
   // before the first measurement lands.
   const [layout, setLayout] = useState<BookLayout>(() =>
-    typeof window !== 'undefined' && window.innerWidth < 640 ? 'portrait' : 'spread'
+    typeof window !== 'undefined' && window.innerWidth < 640 ? 'portrait' : 'spread',
   );
 
   // Add isMountedRef for cleanup safety
   const isMountedRef = useRef(true);
   useEffect(() => {
     isMountedRef.current = true;
-    return () => { isMountedRef.current = false; };
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   const hasLoadedRef = useRef(false);
@@ -242,11 +260,9 @@ function BookPreviewContent() {
   const collagePhotos = useMemo(
     () =>
       process.env.NEXT_PUBLIC_COLLAGE_PAGES_ENABLED === 'true' && book
-        ? book.pages
-            .filter((p) => p.asset?.url)
-            .map((p) => ({ id: p.id, url: p.asset!.url }))
+        ? book.pages.filter((p) => p.asset?.url).map((p) => ({ id: p.id, url: p.asset!.url }))
         : undefined,
-    [book]
+    [book],
   );
   const collageOptions = collagePhotos
     ? { collagePhotos, collageCreatedAt: book?.createdAt ?? null }
@@ -256,9 +272,17 @@ function BookPreviewContent() {
   const handleDisplayPageSelect = (displayIndex: number) => {
     setCurrentDisplayIndex(displayIndex);
     if (flipbookRef.current?.pageFlip) {
-       const totalDisplayPages = book ? buildDisplayPages(book.pages, { childName: book.childName, bookTitle: book.title, language: book.language, layout, ...collageOptions }).length : 1;
-       const pageIndex = Math.max(0, Math.min(displayIndex - 1, totalDisplayPages - 1));
-       flipbookRef.current.pageFlip().turnToPage(pageIndex);
+      const totalDisplayPages = book
+        ? buildDisplayPages(book.pages, {
+            childName: book.childName,
+            bookTitle: book.title,
+            language: book.language,
+            layout,
+            ...collageOptions,
+          }).length
+        : 1;
+      const pageIndex = Math.max(0, Math.min(displayIndex - 1, totalDisplayPages - 1));
+      flipbookRef.current.pageFlip().turnToPage(pageIndex);
     }
     // The phone-portrait gallery is an overlay; picking a page dismisses it.
     if (isPhonePortrait) {
@@ -268,10 +292,10 @@ function BookPreviewContent() {
 
   // Handler for when the page changes within the Flipbook component (receives 1-based display index)
   const handleFlipbookPageChange = (displayIndex: number) => {
-     setCurrentDisplayIndex(displayIndex);
+    setCurrentDisplayIndex(displayIndex);
   };
 
-  // --- Flipbook Control Handlers --- 
+  // --- Flipbook Control Handlers ---
 
   const handlePrevPage = () => {
     if (flipbookRef.current?.pageFlip) {
@@ -342,7 +366,7 @@ function BookPreviewContent() {
     setCanFullscreen(
       typeof document !== 'undefined' &&
         document.fullscreenEnabled === true &&
-        typeof document.documentElement.requestFullscreen === 'function'
+        typeof document.documentElement.requestFullscreen === 'function',
     );
   }, []);
 
@@ -433,40 +457,43 @@ function BookPreviewContent() {
     tapStartRef.current = { x: e.clientX, y: e.clientY };
   }, []);
 
-  const handleTapClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const start = tapStartRef.current;
-    tapStartRef.current = null;
-    if (!start) return;
-    if (Math.hypot(e.clientX - start.x, e.clientY - start.y) >= TAP_TRAVEL_PX) return;
-    if ((e.target as Element).closest('button, a')) return;
-    const container = flipAreaRef.current;
-    if (!container) return;
-    // Stay out of page-flip's corner squares — it flips those itself.
-    const block = container.querySelector('.stf__block');
-    if (block) {
-      const rect = block.getBoundingClientRect();
-      const pageWidth = layout === 'portrait' ? rect.width : rect.width / 2;
-      if (
-        isOnEngineCorner(
-          e.clientX - rect.left,
-          e.clientY - rect.top,
-          rect.width,
-          rect.height,
-          pageWidth,
-          layout === 'portrait' ? 'portrait' : 'landscape'
-        )
-      ) {
-        return;
+  const handleTapClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const start = tapStartRef.current;
+      tapStartRef.current = null;
+      if (!start) return;
+      if (Math.hypot(e.clientX - start.x, e.clientY - start.y) >= TAP_TRAVEL_PX) return;
+      if ((e.target as Element).closest('button, a')) return;
+      const container = flipAreaRef.current;
+      if (!container) return;
+      // Stay out of page-flip's corner squares — it flips those itself.
+      const block = container.querySelector('.stf__block');
+      if (block) {
+        const rect = block.getBoundingClientRect();
+        const pageWidth = layout === 'portrait' ? rect.width : rect.width / 2;
+        if (
+          isOnEngineCorner(
+            e.clientX - rect.left,
+            e.clientY - rect.top,
+            rect.width,
+            rect.height,
+            pageWidth,
+            layout === 'portrait' ? 'portrait' : 'landscape',
+          )
+        ) {
+          return;
+        }
       }
-    }
-    const areaRect = container.getBoundingClientRect();
-    const zone = edgeTapZone((e.clientX - areaRect.left) / areaRect.width);
-    if (zone === 'prev') {
-      flipbookRef.current?.pageFlip()?.flipPrev();
-    } else if (zone === 'next') {
-      flipbookRef.current?.pageFlip()?.flipNext();
-    }
-  }, [layout]);
+      const areaRect = container.getBoundingClientRect();
+      const zone = edgeTapZone((e.clientX - areaRect.left) / areaRect.width);
+      if (zone === 'prev') {
+        flipbookRef.current?.pageFlip()?.flipPrev();
+      } else if (zone === 'next') {
+        flipbookRef.current?.pageFlip()?.flipNext();
+      }
+    },
+    [layout],
+  );
 
   const handleGalleryToggle = useCallback(() => {
     galleryToggledRef.current = true;
@@ -481,13 +508,13 @@ function BookPreviewContent() {
     // "Making your book…" and the reveal.
     if (cameFromCompletion) {
       return (
-        <div className="flex justify-center items-center min-h-screen bg-waiting">
+        <div className="bg-waiting flex min-h-screen items-center justify-center">
           <Storydust variant="twinkle" size="card" label={t('opening')} />
         </div>
       );
     }
     return (
-      <div className="flex justify-center items-center min-h-screen bg-waiting">
+      <div className="bg-waiting flex min-h-screen items-center justify-center">
         <Storydust variant="twinkle" size="card" label={t('opening')} showLabel />
       </div>
     );
@@ -502,9 +529,9 @@ function BookPreviewContent() {
           ? t('notFound')
           : t('loadError');
     return (
-      <div className="flex flex-col justify-center items-center min-h-screen p-4 text-center">
-        <AlertTriangle className="h-10 w-10 mb-3 text-coral" />
-        <p className="font-playful text-lg text-gray-800 max-w-xs">{friendlyError}</p>
+      <div className="flex min-h-screen flex-col items-center justify-center p-4 text-center">
+        <AlertTriangle className="mb-3 h-10 w-10 text-coral" />
+        <p className="max-w-xs font-playful text-lg text-gray-800">{friendlyError}</p>
         <Button
           asChild
           className="mt-6 rounded-full bg-coral px-6 font-playful text-white hover:bg-coral/90"
@@ -516,7 +543,7 @@ function BookPreviewContent() {
   }
 
   if (!book) {
-    return <div className="flex justify-center items-center min-h-screen">{t('notFound')}</div>;
+    return <div className="flex min-h-screen items-center justify-center">{t('notFound')}</div>;
   }
 
   // --- Status-Based Rendering --- //
@@ -533,8 +560,8 @@ function BookPreviewContent() {
   }
 
   if (book.status === BookStatus.FAILED) {
-     return (
-      <div className="flex flex-col justify-center items-center min-h-screen p-4">
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center p-4">
         <div className="w-full max-w-md">
           <BookIssueBanner
             bookId={bookId}
@@ -551,7 +578,13 @@ function BookPreviewContent() {
   }
 
   if (isReadableStatus(book.status)) {
-    const displayPages = buildDisplayPages(book.pages, { childName: book.childName, bookTitle: book.title, language: book.language, layout, ...collageOptions });
+    const displayPages = buildDisplayPages(book.pages, {
+      childName: book.childName,
+      bookTitle: book.title,
+      language: book.language,
+      layout,
+      ...collageOptions,
+    });
     const totalDisplayPages = displayPages.length;
     // Disable prev/next based on current display index
     const canFlipPrev = currentDisplayIndex > 1;
@@ -562,7 +595,10 @@ function BookPreviewContent() {
     const isPartial = book.status === BookStatus.PARTIAL;
     const pagesNeedingLook = isPartial
       ? book.pages.filter(
-          (p) => !p.generatedImageUrl || p.moderationStatus === 'FLAGGED' || p.moderationStatus === 'FAILED'
+          (p) =>
+            !p.generatedImageUrl ||
+            p.moderationStatus === 'FLAGGED' ||
+            p.moderationStatus === 'FAILED',
         ).length || 1
       : 0;
 
@@ -578,7 +614,7 @@ function BookPreviewContent() {
       coverImageUrl: book.coverImageUrl ?? null,
       pageCount: printPageCounts(
         book.pages.length,
-        process.env.NEXT_PUBLIC_COLLAGE_PAGES_ENABLED === 'true'
+        process.env.NEXT_PUBLIC_COLLAGE_PAGES_ENABLED === 'true',
       ).interiorPages,
     };
 
@@ -587,7 +623,10 @@ function BookPreviewContent() {
     // page and get no menu. The cover (title page) is left alone by design.
     const currentDisplay = displayPages[currentDisplayIndex - 1];
     const currentSourcePage =
-      currentDisplay && (currentDisplay.type === 'illustration' || currentDisplay.type === 'text' || currentDisplay.type === 'story')
+      currentDisplay &&
+      (currentDisplay.type === 'illustration' ||
+        currentDisplay.type === 'text' ||
+        currentDisplay.type === 'story')
         ? currentDisplay.page
         : null;
     const menuPage = currentSourcePage && !currentSourcePage.isTitlePage ? currentSourcePage : null;
@@ -597,7 +636,7 @@ function BookPreviewContent() {
     // so the portal to <body> is what actually clears it). 100vh first as
     // the iOS <15.4 fallback; dvh takes over wherever it exists.
     const reader = (
-      <div className="fixed inset-x-0 top-0 z-[60] flex flex-col bg-background h-[100vh] supports-[height:100dvh]:h-[100dvh] pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+      <div className="fixed inset-x-0 top-0 z-[60] flex h-[100vh] flex-col bg-background pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] supports-[height:100dvh]:h-[100dvh]">
         {/* Slim reader header — static, calm, always there */}
         <div className="flex h-12 shrink-0 items-center justify-between border-b bg-white px-1">
           <Button variant="ghost" size="icon" asChild>
@@ -605,7 +644,9 @@ function BookPreviewContent() {
               <ArrowLeft className="h-5 w-5 text-coral" />
             </Link>
           </Button>
-          <h1 className="font-playful text-base font-semibold truncate max-w-[60%]">{book.title}</h1>
+          <h1 className="max-w-[60%] truncate font-playful text-base font-semibold">
+            {book.title}
+          </h1>
           <div className="flex items-center gap-1">
             {/* Gallery toggle — always rendered; on phones it opens the
                 overlay strip, elsewhere it collapses the in-flow one */}
@@ -626,58 +667,74 @@ function BookPreviewContent() {
                 onClick={toggleFullscreen}
                 aria-label={isFullscreen ? t('exitFullscreen') : t('enterFullscreen')}
               >
-                {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                {isFullscreen ? (
+                  <Minimize2 className="h-4 w-4" />
+                ) : (
+                  <Maximize2 className="h-4 w-4" />
+                )}
               </Button>
             )}
-              <Sheet open={isOptionsSheetOpen} onOpenChange={setIsOptionsSheetOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" aria-label={t('options')}>
-                    <svg width="18" height="4" viewBox="0 0 18 4" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2 0C0.9 0 0 0.9 0 2C0 3.1 0.9 4 2 4C3.1 4 4 3.1 4 2C4 0.9 3.1 0 2 0ZM16 0C14.9 0 14 0.9 14 2C14 3.1 14.9 4 16 4C17.1 4 18 3.1 18 2C18 0.9 17.1 0 16 0ZM9 0C7.9 0 7 0.9 7 2C7 3.1 7.9 4 9 4C10.1 4 11 3.1 11 2C11 0.9 10.1 0 9 0Z" fill="currentColor"/>
-                    </svg>
-                  </Button>
-                </SheetTrigger>
-                {/* z-[70]: portaled surfaces must clear the z-[60] reader */}
-                <SheetContent side="bottom" className="z-[70] rounded-t-xl h-auto">
-                  <SheetTitle className="sr-only">{t('options')}</SheetTitle>
-                  <div className="pt-4 space-y-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                    <Link href="/library" className="flex items-center gap-2 p-2 hover:bg-muted rounded-md w-full">
-                      <Library className="h-5 w-5 text-coral" />
-                      <span>{t('backToLibrary')}</span>
-                    </Link>
-                    {/* Persistent print entry point — only where we can ship. */}
-                    {printShippable && !isPartial && (
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          setIsOptionsSheetOpen(false);
-                          setIsPrintSheetOpen(true);
-                        }}
-                        className="flex items-center gap-2 p-2 w-full justify-start"
-                      >
-                        <Printer className="h-5 w-5 text-coral" />
-                        {tWhatNow('orderPrint')}
-                      </Button>
-                    )}
+            <Sheet open={isOptionsSheetOpen} onOpenChange={setIsOptionsSheetOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label={t('options')}>
+                  <svg
+                    width="18"
+                    height="4"
+                    viewBox="0 0 18 4"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M2 0C0.9 0 0 0.9 0 2C0 3.1 0.9 4 2 4C3.1 4 4 3.1 4 2C4 0.9 3.1 0 2 0ZM16 0C14.9 0 14 0.9 14 2C14 3.1 14.9 4 16 4C17.1 4 18 3.1 18 2C18 0.9 17.1 0 16 0ZM9 0C7.9 0 7 0.9 7 2C7 3.1 7.9 4 9 4C10.1 4 11 3.1 11 2C11 0.9 10.1 0 9 0Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </Button>
+              </SheetTrigger>
+              {/* z-[70]: portaled surfaces must clear the z-[60] reader */}
+              <SheetContent side="bottom" className="z-[70] h-auto rounded-t-xl">
+                <SheetTitle className="sr-only">{t('options')}</SheetTitle>
+                <div className="space-y-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                  <Link
+                    href="/library"
+                    className="flex w-full items-center gap-2 rounded-md p-2 hover:bg-muted"
+                  >
+                    <Library className="h-5 w-5 text-coral" />
+                    <span>{t('backToLibrary')}</span>
+                  </Link>
+                  {/* Persistent print entry point — only where we can ship. */}
+                  {printShippable && !isPartial && (
                     <Button
                       variant="ghost"
-                      onClick={handleExportPdf}
-                      disabled={isExportDialogOpen}
-                      className="flex items-center gap-2 p-2 w-full justify-start"
+                      onClick={() => {
+                        setIsOptionsSheetOpen(false);
+                        setIsPrintSheetOpen(true);
+                      }}
+                      className="flex w-full items-center justify-start gap-2 p-2"
                     >
-                      <Download className="h-5 w-5 text-coral" />
-                      {t('exportPdf')}
+                      <Printer className="h-5 w-5 text-coral" />
+                      {tWhatNow('orderPrint')}
                     </Button>
-                  </div>
-                </SheetContent>
-              </Sheet>
+                  )}
+                  <Button
+                    variant="ghost"
+                    onClick={handleExportPdf}
+                    disabled={isExportDialogOpen}
+                    className="flex w-full items-center justify-start gap-2 p-2"
+                  >
+                    <Download className="h-5 w-5 text-coral" />
+                    {t('exportPdf')}
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
 
         {/* PARTIAL: slim, warm strip — the rest of the book is readable now */}
         {isPartial && (
           <div className="flex items-center justify-between gap-3 border-b border-peach bg-[var(--cream-yellow)] px-3 py-2">
-            <p className="text-sm text-coral-ink font-playful">
+            <p className="font-playful text-sm text-coral-ink">
               {t('partialNote', { count: pagesNeedingLook })}
             </p>
             <Button
@@ -692,7 +749,7 @@ function BookPreviewContent() {
 
         {/* Gallery strip, in-flow — tablets and desktop, where there's room */}
         {!isPhonePortrait && isGalleryVisible && (
-          <div className="bg-muted/20 border-b shrink-0 px-2 pt-2 pb-1">
+          <div className="shrink-0 border-b bg-muted/20 px-2 pt-2 pb-1">
             <BookPageGallery
               pages={book.pages}
               bookStatus={book.status}
@@ -710,7 +767,7 @@ function BookPreviewContent() {
             semantics: edge thirds turn pages, the middle third does nothing. */}
         <div
           ref={flipAreaRef}
-          className="flex-1 relative overflow-hidden min-h-0"
+          className="relative min-h-0 flex-1 overflow-hidden"
           onPointerDown={handleTapPointerDown}
           onClick={handleTapClick}
         >
@@ -736,13 +793,13 @@ function BookPreviewContent() {
 
           {/* Floating Navigation Buttons */}
           <div className="absolute inset-y-0 left-0 flex items-center">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="icon"
               onClick={handlePrevPage}
               disabled={!canFlipPrev}
               aria-label={t('prevPage')}
-              className="h-10 w-10 bg-background/70 rounded-r-full shadow"
+              className="h-10 w-10 rounded-r-full bg-background/70 shadow"
             >
               <ChevronLeft className="h-6 w-6 text-coral" />
             </Button>
@@ -754,7 +811,7 @@ function BookPreviewContent() {
               onClick={handleNextPage}
               disabled={!canFlipNext}
               aria-label={t('nextPage')}
-              className="h-10 w-10 bg-background/70 rounded-l-full shadow"
+              className="h-10 w-10 rounded-l-full bg-background/70 shadow"
             >
               <ChevronRight className="h-6 w-6 text-coral" />
             </Button>
@@ -791,7 +848,7 @@ function BookPreviewContent() {
                 }}
               />
               <div
-                className="absolute bottom-0 inset-x-0 z-20 border-t bg-background/95 backdrop-blur animate-in fade-in-0 motion-safe:slide-in-from-bottom-4 duration-200"
+                className="absolute inset-x-0 bottom-0 z-20 animate-in border-t bg-background/95 backdrop-blur duration-200 fade-in-0 motion-safe:slide-in-from-bottom-4"
                 onClick={(e) => e.stopPropagation()}
               >
                 <BookPageGallery
@@ -811,19 +868,15 @@ function BookPreviewContent() {
 
         {/* Footer with Page Number + per-page menu — padded past the home
             indicator so the pill stays tappable in every bar state */}
-        <div className="flex justify-center items-center gap-2 bg-white border-t shrink-0 relative pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-          <div className="flex items-center bg-muted/20 rounded-full px-4 py-1">
+        <div className="relative flex shrink-0 items-center justify-center gap-2 border-t bg-white pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          <div className="flex items-center rounded-full bg-muted/20 px-4 py-1">
             <span className="text-sm font-medium">
               {t('pageOf', { current: currentDisplayIndex, total: totalDisplayPages })}
             </span>
           </div>
           {menuPage && (
             <div className="absolute right-3">
-              <PageControlsMenu
-                bookId={bookId}
-                page={menuPage}
-                onMutated={loadBook}
-              />
+              <PageControlsMenu bookId={bookId} page={menuPage} onMutated={loadBook} />
             </div>
           )}
         </div>
@@ -885,9 +938,9 @@ function BookPreviewContent() {
   // Fallback for any other status (DRAFT, mostly): a gentle nudge back into
   // the create flow instead of a raw status enum.
   return (
-    <div className="flex flex-col justify-center items-center min-h-screen p-4 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center p-4 text-center">
       <p className="font-playful text-lg text-gray-800">{t('notReadyTitle')}</p>
-      <p className="mt-2 text-sm text-gray-500 max-w-xs">{t('notReadyBody')}</p>
+      <p className="mt-2 max-w-xs text-sm text-gray-500">{t('notReadyBody')}</p>
       <Button
         asChild
         className="mt-6 rounded-full bg-coral px-6 font-playful text-white hover:bg-coral/90"
@@ -904,7 +957,7 @@ export default function BookPreviewPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex justify-center items-center min-h-screen bg-waiting">
+        <div className="bg-waiting flex min-h-screen items-center justify-center">
           <Storydust variant="twinkle" size="card" />
         </div>
       }

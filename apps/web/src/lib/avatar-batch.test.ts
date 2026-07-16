@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  MAX_BATCH_PHOTOS,
-  type DetectedSubject,
-} from '@storywink/shared/prompts/photo-analysis';
+import { MAX_BATCH_PHOTOS, type DetectedSubject } from '@storywink/shared/prompts/photo-analysis';
 import {
   detectRequestSchema,
   batchRequestSchema,

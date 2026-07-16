@@ -19,8 +19,7 @@ import type { QcClassFlagFeed } from './qc-batching.js';
 
 /** One content part of a QC vision call (OpenAI Responses input shape). */
 export type QcContentPart =
-  | { type: 'input_text'; text: string }
-  | { type: 'input_image'; image_url: string; detail: 'high' };
+  { type: 'input_text'; text: string } | { type: 'input_image'; image_url: string; detail: 'high' };
 
 /** The page fields batch assembly reads. */
 export interface QcAssemblyPage {
@@ -57,8 +56,7 @@ export function expectedCastForPage(
   const bridgeIds =
     page.source === 'BRIDGE' && page.bridgeScene && typeof page.bridgeScene === 'object'
       ? ((page.bridgeScene as { charactersPresent?: unknown }).charactersPresent as
-          | string[]
-          | undefined)
+          string[] | undefined)
       : undefined;
   const bridgeFiltered = bridgeIds?.length
     ? chars.filter((c) => bridgeIds.includes(c.characterId))

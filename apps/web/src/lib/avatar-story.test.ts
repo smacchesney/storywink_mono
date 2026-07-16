@@ -36,9 +36,7 @@ describe('castComposition', () => {
   });
 
   it('rejects a cast past the total ceiling (the illustration reference budget)', () => {
-    expect(
-      castComposition(['CHILD', 'ADULT', 'PET', 'TOY', 'PET', 'TOY', 'PET']).ok,
-    ).toBe(false); // 7 > MAX_CAST
+    expect(castComposition(['CHILD', 'ADULT', 'PET', 'TOY', 'PET', 'TOY', 'PET']).ok).toBe(false); // 7 > MAX_CAST
   });
 
   it('still reports people and companion counts', () => {

@@ -43,7 +43,7 @@ export function calculateBookBox(container: { width: number; height: number }): 
     // than 0.62.
     const pageAspectRatio = Math.min(
       PORTRAIT_ASPECT_MAX,
-      Math.max(PORTRAIT_ASPECT_MIN, availableWidth / availableHeight)
+      Math.max(PORTRAIT_ASPECT_MIN, availableWidth / availableHeight),
     );
 
     let finalWidth = pageWidth;

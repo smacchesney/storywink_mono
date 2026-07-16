@@ -124,16 +124,16 @@ function CharactersShelf() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6">
+    <div className="mx-auto w-full max-w-4xl px-4 pt-6 pb-16">
       {/* G2: mirror the library header treatment — title on its own line at
           375px, actions beneath; outlined-coral secondary (Books) + solid coral
           primary (Add someone), consistent 44px heights, no label wrap. */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="whitespace-nowrap font-playful text-2xl text-[#1a1a1a]">{t('title')}</h1>
+        <h1 className="font-playful text-2xl whitespace-nowrap text-[#1a1a1a]">{t('title')}</h1>
         <div className="flex gap-3">
           <Link
             href="/library"
-            className="flex min-h-[44px] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full border-2 border-coral/40 bg-white px-4 font-playful text-sm text-coral hover:border-coral hover:bg-coral/10 sm:flex-none"
+            className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-full border-2 border-coral/40 bg-white px-4 font-playful text-sm whitespace-nowrap text-coral hover:border-coral hover:bg-coral/10 sm:flex-none"
           >
             <BookOpen className="h-4 w-4" />
             {t('booksTab')}
@@ -141,7 +141,7 @@ function CharactersShelf() {
           <button
             type="button"
             onClick={() => setStudioOpen(true)}
-            className="flex min-h-[44px] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-coral px-4 font-playful text-sm text-white hover:bg-coral/90 sm:flex-none"
+            className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-full bg-coral px-4 font-playful text-sm whitespace-nowrap text-white hover:bg-coral/90 sm:flex-none"
           >
             <Plus className="h-4 w-4" />
             {t('addSomeone')}

@@ -53,7 +53,7 @@ export function isOnEngineCorner(
   blockWidth: number,
   blockHeight: number,
   pageWidth: number,
-  orientation: 'portrait' | 'landscape'
+  orientation: 'portrait' | 'landscape',
 ): boolean {
   const operatingDistance = Math.hypot(pageWidth, blockHeight) / 5;
   const inXBand =

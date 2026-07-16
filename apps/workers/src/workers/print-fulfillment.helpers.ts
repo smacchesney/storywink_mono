@@ -8,9 +8,7 @@
  */
 
 export type FulfillmentDecision =
-  | { kind: 'proceed' }
-  | { kind: 'skip'; reason: string }
-  | { kind: 'ambiguous-submission' };
+  { kind: 'proceed' } | { kind: 'skip'; reason: string } | { kind: 'ambiguous-submission' };
 
 export interface FulfillmentOrderState {
   status: string;

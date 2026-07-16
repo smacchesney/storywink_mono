@@ -29,9 +29,14 @@ function legacyBox(width: number, height: number) {
   const spreadAspectRatio = 2.0;
   let spreadWidth = availableWidth;
   let spreadHeight = availableHeight;
-  if (spreadWidth / spreadHeight > spreadAspectRatio) spreadWidth = spreadHeight * spreadAspectRatio;
+  if (spreadWidth / spreadHeight > spreadAspectRatio)
+    spreadWidth = spreadHeight * spreadAspectRatio;
   else spreadHeight = spreadWidth / spreadAspectRatio;
-  return { width: Math.floor(spreadWidth / 2), height: Math.floor(spreadHeight), isPortrait: false };
+  return {
+    width: Math.floor(spreadWidth / 2),
+    height: Math.floor(spreadHeight),
+    isPortrait: false,
+  };
 }
 
 describe('calculateBookBox — spread (unchanged, print-faithful)', () => {

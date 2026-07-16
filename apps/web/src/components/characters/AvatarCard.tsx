@@ -215,7 +215,7 @@ export function AvatarCard({
           </div>
         )}
 
-        <div className="flex items-center gap-1.5 px-1 pb-0.5 pt-1.5">
+        <div className="flex items-center gap-1.5 px-1 pt-1.5 pb-0.5">
           <span className="min-w-0 flex-1 truncate font-playful text-base text-[#1a1a1a]">
             {avatar.displayName}
           </span>
@@ -231,7 +231,7 @@ export function AvatarCard({
       </StorybookFrame>
 
       {menuOpen && (
-        <div className="absolute bottom-12 right-2 z-20 flex flex-col rounded-xl border border-black/10 bg-white py-1 shadow-lg">
+        <div className="absolute right-2 bottom-12 z-20 flex flex-col rounded-xl border border-black/10 bg-white py-1 shadow-lg">
           <MenuItem
             label={t('rename')}
             onClick={() => {
@@ -400,7 +400,7 @@ function DrawAgainConfirm({
           aria-label={t('close')}
           onClick={onClose}
           disabled={busy}
-          className="absolute right-3 top-3 rounded-full p-2 text-gray-400 hover:bg-black/5 disabled:opacity-40"
+          className="absolute top-3 right-3 rounded-full p-2 text-gray-400 hover:bg-black/5 disabled:opacity-40"
         >
           <X className="h-5 w-5" />
         </button>
@@ -554,7 +554,7 @@ function StyleWardrobeSheet({
           type="button"
           aria-label={t('close')}
           onClick={onClose}
-          className="absolute right-3 top-3 rounded-full p-2 text-gray-400 hover:bg-black/5"
+          className="absolute top-3 right-3 rounded-full p-2 text-gray-400 hover:bg-black/5"
         >
           <X className="h-5 w-5" />
         </button>

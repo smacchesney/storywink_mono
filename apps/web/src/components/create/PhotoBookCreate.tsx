@@ -83,10 +83,7 @@ export function PhotoBookCreate() {
       const token = await getToken();
       if (!token) throw new Error('not authenticated');
 
-      const response = await apiClient.createBook(
-        { assetIds, language },
-        token,
-      );
+      const response = await apiClient.createBook({ assetIds, language }, token);
       if (!response.success || !response.data) {
         throw new Error(response.error || 'Book creation failed');
       }
@@ -100,22 +97,11 @@ export function PhotoBookCreate() {
       toast.error(t('createFailed'), { description: t('createFailedHint') });
       setIsCreating(false);
     }
-  }, [
-    isCreating,
-    isLoaded,
-    assets,
-    language,
-    getToken,
-    router,
-    t,
-    waitForUploads,
-  ]);
+  }, [isCreating, isLoaded, assets, language, getToken, router, t, waitForUploads]);
 
   const hasReady = assets.length > 0;
   const continueLabel =
-    pendingCount > 0
-      ? t('stillUploading', { count: pendingCount })
-      : t('continue');
+    pendingCount > 0 ? t('stillUploading', { count: pendingCount }) : t('continue');
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-150px)] w-full max-w-2xl flex-col px-4 py-8">
@@ -162,20 +148,24 @@ export function PhotoBookCreate() {
       {/* Photo curation tips — copy only, no interactions. Which photos go
           in bounds everything downstream (story, arc, consistency). */}
       <div className="mx-auto mt-6 w-full max-w-md rounded-2xl border border-coral/15 bg-[#FFF9F5] px-5 py-4">
-        <p className="font-playful text-sm font-semibold text-[#1a1a1a]">
-          {t('tipsTitle')}
-        </p>
+        <p className="font-playful text-sm font-semibold text-[#1a1a1a]">{t('tipsTitle')}</p>
         <ul className="mt-2 space-y-1.5 text-sm text-gray-600">
           <li className="flex gap-2">
-            <span aria-hidden="true" className="text-coral">✦</span>
+            <span aria-hidden="true" className="text-coral">
+              ✦
+            </span>
             {t('tipVariety')}
           </li>
           <li className="flex gap-2">
-            <span aria-hidden="true" className="text-coral">✦</span>
+            <span aria-hidden="true" className="text-coral">
+              ✦
+            </span>
             {t('tipArc')}
           </li>
           <li className="flex gap-2">
-            <span aria-hidden="true" className="text-coral">✦</span>
+            <span aria-hidden="true" className="text-coral">
+              ✦
+            </span>
             {t('tipSkipDupes')}
           </li>
         </ul>

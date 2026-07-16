@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
@@ -59,12 +59,7 @@ function triggerDownload(url: string, fileName: string) {
  * also offers re-save and, where the browser supports file sharing, a Share
  * button for sending the book straight to grandparents.
  */
-export function ExportPdfDialog({
-  bookId,
-  bookTitle,
-  open,
-  onOpenChange,
-}: ExportPdfDialogProps) {
+export function ExportPdfDialog({ bookId, bookTitle, open, onOpenChange }: ExportPdfDialogProps) {
   const t = useTranslations('exportDialog');
   const [phase, setPhase] = useState<Phase>('preparing');
   // Byte progress is a bonus: it only renders when Content-Length survives
@@ -275,20 +270,16 @@ export function ExportPdfDialog({
               {t('done')}
             </Button>
             {canShare && (
-              <Button
-                variant="outline"
-                onClick={handleShare}
-                className="rounded-full font-playful"
-              >
-                <Share2 className="h-4 w-4 mr-1.5" />
+              <Button variant="outline" onClick={handleShare} className="rounded-full font-playful">
+                <Share2 className="mr-1.5 h-4 w-4" />
                 {t('share')}
               </Button>
             )}
             <Button
               onClick={handleSave}
-              className="bg-coral hover:bg-coral-hover rounded-full font-playful"
+              className="rounded-full bg-coral font-playful hover:bg-coral-hover"
             >
-              <Download className="h-4 w-4 mr-1.5" />
+              <Download className="mr-1.5 h-4 w-4" />
               {t('save')}
             </Button>
           </DialogFooter>

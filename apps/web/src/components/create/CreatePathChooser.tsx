@@ -13,13 +13,7 @@
  * /characters.
  */
 
-import React, {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import React, { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
@@ -60,9 +54,7 @@ const KIND_EMOJI: Record<AvatarSummary['kind'], string> = {
 
 /** The single source of truth for Card B — one fetch, one shape, no mixing. */
 type Snapshot =
-  | { phase: 'pending' }
-  | { phase: 'resolved'; avatars: AvatarSummary[] }
-  | { phase: 'unavailable' };
+  { phase: 'pending' } | { phase: 'resolved'; avatars: AvatarSummary[] } | { phase: 'unavailable' };
 
 /** hadCharacters for honest telemetry — null until the snapshot resolves. */
 function hadCharactersOf(snapshot: Snapshot): boolean | null {
@@ -83,9 +75,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 function PhotoGlyph() {
   return (
     <span aria-hidden className="relative block h-14 w-16">
-      <span className="absolute left-1 top-3 h-10 w-8 -rotate-12 rounded-lg border-2 border-white bg-[#FFE1D6] shadow-sm" />
-      <span className="absolute right-1 top-3 h-10 w-8 rotate-12 rounded-lg border-2 border-white bg-[#FFEDE7] shadow-sm" />
-      <span className="absolute left-1/2 top-1 h-11 w-8 -translate-x-1/2 rounded-lg border-2 border-white bg-[#FFF3EC] shadow" />
+      <span className="absolute top-3 left-1 h-10 w-8 -rotate-12 rounded-lg border-2 border-white bg-[#FFE1D6] shadow-sm" />
+      <span className="absolute top-3 right-1 h-10 w-8 rotate-12 rounded-lg border-2 border-white bg-[#FFEDE7] shadow-sm" />
+      <span className="absolute top-1 left-1/2 h-11 w-8 -translate-x-1/2 rounded-lg border-2 border-white bg-[#FFF3EC] shadow" />
     </span>
   );
 }
@@ -95,7 +87,7 @@ function SparklePencilGlyph() {
   return (
     <span aria-hidden className="relative flex h-14 w-14 items-center justify-center">
       <Pencil className="h-8 w-8 text-coral" strokeWidth={2} />
-      <Sparkles className="absolute right-0 top-1 h-4 w-4 text-[#FFB020]" strokeWidth={2} />
+      <Sparkles className="absolute top-1 right-0 h-4 w-4 text-[#FFB020]" strokeWidth={2} />
     </span>
   );
 }
@@ -114,9 +106,9 @@ function BookCoverGlyph() {
 function BookStackGlyph() {
   return (
     <span aria-hidden className="relative block h-14 w-16">
-      <span className="absolute left-1/2 top-2.5 h-10 w-8 -translate-x-1/2 -rotate-12 rounded-md border-2 border-black/10 bg-[#EAF2FF] shadow-sm" />
-      <span className="absolute left-1/2 top-2 h-10 w-8 -translate-x-1/2 rotate-12 rounded-md border-2 border-black/10 bg-[#FFF0E6] shadow-sm" />
-      <span className="absolute left-1/2 top-1 h-11 w-8 -translate-x-1/2 rounded-md rounded-l-sm border-2 border-coral/25 bg-white shadow">
+      <span className="absolute top-2.5 left-1/2 h-10 w-8 -translate-x-1/2 -rotate-12 rounded-md border-2 border-black/10 bg-[#EAF2FF] shadow-sm" />
+      <span className="absolute top-2 left-1/2 h-10 w-8 -translate-x-1/2 rotate-12 rounded-md border-2 border-black/10 bg-[#FFF0E6] shadow-sm" />
+      <span className="absolute top-1 left-1/2 h-11 w-8 -translate-x-1/2 rounded-md rounded-l-sm border-2 border-coral/25 bg-white shadow">
         <span className="absolute inset-y-0 left-0 w-1.5 rounded-l-sm bg-coral/70" />
       </span>
     </span>
@@ -230,7 +222,7 @@ const CHIP_CLASS =
  */
 function TopEdgePill({ children }: { children: ReactNode }) {
   return (
-    <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-coral px-3 py-1 text-xs font-medium text-white shadow-sm">
+    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-coral px-3 py-1 text-xs font-medium whitespace-nowrap text-white shadow-sm">
       {children}
     </span>
   );
@@ -344,7 +336,9 @@ export function CreatePathChooser() {
     }
     if (!mountedRef.current) return;
     const after = snapshotRef.current;
-    goAvatars(after.phase === 'resolved' ? characterPathDestination(after.avatars) : '/characters?add=1');
+    goAvatars(
+      after.phase === 'resolved' ? characterPathDestination(after.avatars) : '/characters?add=1',
+    );
   }, [goAvatars]);
 
   // Card B beat-2 art: one fixed box (h-16 w-20) shared by all three states,
@@ -443,7 +437,9 @@ export function CreatePathChooser() {
           {busyCardB ? (
             // Same box as the chip (border/padding preserved, just transparent)
             // so swapping in the twinkle can't change the card's height.
-            <span className={cn(CHIP_CLASS, 'mt-3 justify-center border-transparent bg-transparent')}>
+            <span
+              className={cn(CHIP_CLASS, 'mt-3 justify-center border-transparent bg-transparent')}
+            >
               <Storydust variant="twinkle" size="inline" />
             </span>
           ) : (
