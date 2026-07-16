@@ -66,8 +66,21 @@ import type {
 } from '../apps/workers/src/lib/illustrators/index.js';
 import { fetchImageInput, resizeForReference } from '../apps/workers/src/lib/images.js';
 import { mergeLinkedAvatarSheets } from '../apps/workers/src/lib/avatar-sheets.js';
-import { orderCharacterSheets, selectSceneSheets } from '../apps/workers/src/lib/avatar-story.js';
+import {
+  orderCharacterSheets,
+  selectSceneSheets,
+  reconcileSceneCastWithText,
+  type SceneCastRosterMember,
+  type SceneCastRepair,
+} from '../apps/workers/src/lib/avatar-story.js';
 import { upscaleForPrint } from '../apps/workers/src/utils/image-processing.js';
+
+/** Track B: the before/after cast + the reconcile repair, for reporting. */
+type SceneCastRepairLog = {
+  before: string[];
+  after: string[];
+  repair: SceneCastRepair | null;
+};
 
 const AVATAR_BOOK = 'cmrm0yfzd00ymo50dvcnetv1m'; // "Kai and the Wild Rumble", AVATAR_STORY, vignette
 const PHOTO_BOOK = 'cmr9u9he8000ypo0dy6zm3i4i'; // "Blocks, Balls & Bumblebee", PHOTO_STORY, vignette
@@ -98,6 +111,18 @@ const SET = process.env.X12_SET || '';
 // aborts the run with zero generate() calls for that page.
 const STAGE1 = process.argv.includes('--stage1');
 
+// X12 Track B — scene-cast repair proof (`--repair`). Before selecting sheets
+// and building the prompt for an avatar interior, run the branch's
+// `reconcileSceneCastWithText` over the page's STORED text + bridgeScene + the
+// book's roster: any character the text names but the persisted
+// charactersPresent dropped is union-added back. That repaired cast is what
+// `selectSceneSheets` and the exact-cast line then see — so the previously
+// missing character's SHEET now ships and it is named in the (neutralized under
+// --stage1) exact-cast constraint. Outputs are x12-b-<slug>.png / prompt dumps
+// x12-b-<slug>.txt (slug `p<N>-repaired`). Combine with --stage1 to match prod
+// (neutral names, 0 style-ref images). Output-only; the DB path stays read-only.
+const REPAIR = process.argv.includes('--repair');
+
 // X12-D — `--label <name>` (or `--label=<name>`) overrides the Stage 1 output
 // prefix (default `s1`). Used for the OPENAI_IMAGE_QUALITY A/B: rendering the
 // same Stage 1 pages with `--stage1 --label s1med` writes
@@ -116,9 +141,21 @@ function parseLabel(args: string[]): string {
 const STAGE1_LABEL = parseLabel(process.argv) || 's1';
 
 const dPng = (slug: string) =>
-  STAGE1 ? `x12-d-${STAGE1_LABEL}-${slug}` : SET ? `x12-d-${SET}-${slug}` : pngName(slug);
+  REPAIR
+    ? `x12-b-${slug}`
+    : STAGE1
+      ? `x12-d-${STAGE1_LABEL}-${slug}`
+      : SET
+        ? `x12-d-${SET}-${slug}`
+        : pngName(slug);
 const dPrompt = (slug: string) =>
-  STAGE1 ? `${STAGE1_LABEL}-${slug}` : SET ? `x12-d-${SET}-${slug}` : promptName(slug);
+  REPAIR
+    ? `x12-b-${slug}`
+    : STAGE1
+      ? `${STAGE1_LABEL}-${slug}`
+      : SET
+        ? `x12-d-${SET}-${slug}`
+        : promptName(slug);
 const RESULTS_JSON = path.join(SCREENSHOTS, 'x12-d-results.json');
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'warn' });
@@ -161,7 +198,7 @@ async function renderOne(opts: {
 }): Promise<Buffer | null> {
   const illustrator = getIllustrator();
   const rec: RenderRecord = {
-    set: STAGE1 ? STAGE1_LABEL : SET || '(none)',
+    set: REPAIR ? 'x12-b-repair' : STAGE1 ? STAGE1_LABEL : SET || '(none)',
     page: opts.pageLabel,
     provider: illustrator.name,
     model: illustrator.modelId,
@@ -335,6 +372,15 @@ async function loadAvatarBook() {
   const identity = book.characterIdentity as unknown as CharacterIdentity | null;
   const starId = identity?.characters?.find((c) => c.role?.startsWith('main'))?.characterId ?? null;
 
+  // Track B roster for reconcileSceneCastWithText: {characterId, name} pairs,
+  // mirroring the story worker's `rosterForScenes` (built there from
+  // avatarInput.cast). For a shipped book the same cast lives on
+  // Book.characterIdentity, so we read it AS-IS.
+  const rosterForScenes: SceneCastRosterMember[] = (identity?.characters ?? []).map((c) => ({
+    characterId: c.characterId,
+    name: c.name || c.characterId,
+  }));
+
   // Faithful mirror: the illustration flow's sheet stack = base sheets merged
   // with linked account-avatar sheets. characterReferences is null and
   // CHARACTER_SHEETS_ENABLED does not gate AVATAR_STORY, so base is [] and the
@@ -349,7 +395,7 @@ async function loadAvatarBook() {
     logger,
   });
 
-  return { book, identity, starId, sheetStack: sheetStack ?? [] };
+  return { book, identity, starId, rosterForScenes, sheetStack: sheetStack ?? [] };
 }
 
 /**
@@ -372,7 +418,40 @@ async function buildAvatarInterior(
   const styleKey = ctx.book.artStyle as StyleKey;
   const styleData = STYLE_LIBRARY[styleKey];
 
-  const bridgeScene = page.bridgeScene as unknown as AvatarPageScene | BridgeScene | null;
+  const storedScene = page.bridgeScene as unknown as AvatarPageScene | BridgeScene | null;
+
+  // Track B (--repair): union-repair the scene cast from the page text BEFORE it
+  // drives sheet selection and the exact-cast line — exactly as the story worker
+  // now does at persist time (reconcileSceneCastWithText). The stored bad book
+  // predates this fix, so its persisted charactersPresent dropped text-named
+  // characters; repairing here re-adds them, changing which sheets ship.
+  let bridgeScene = storedScene;
+  let sceneCastRepair: SceneCastRepairLog | null = null;
+  if (
+    REPAIR &&
+    storedScene &&
+    Array.isArray((storedScene as AvatarPageScene).charactersPresent) &&
+    !page.isTitlePage
+  ) {
+    const before = [...(storedScene as AvatarPageScene).charactersPresent];
+    const reconciled = reconcileSceneCastWithText(
+      storedScene as AvatarPageScene,
+      page.text ?? '',
+      ctx.rosterForScenes,
+    );
+    bridgeScene = reconciled.scene;
+    sceneCastRepair = {
+      before,
+      after: [...reconciled.scene.charactersPresent],
+      repair: reconciled.repair,
+    };
+    console.log(
+      `  [scene-cast repair p${page.pageNumber}] before=[${before.join(', ')}] ` +
+        `after=[${reconciled.scene.charactersPresent.join(', ')}] ` +
+        `addedIds=[${reconciled.repair?.addedIds.join(', ') ?? '(none)'}] ` +
+        `textNames=[${reconciled.repair?.textNames.join(', ') ?? '(none)'}]`,
+    );
+  }
 
   // Worker: title page keeps ALL sheets (feeds the cover); interiors ship only
   // the scene's present cast (+ star floor, cap 4).
@@ -439,7 +518,7 @@ async function buildAvatarInterior(
     styleRefs: styleReferenceBuffers,
     prompt,
   };
-  return { prompt, input, contentInput, sheetRefs, sheetRoster };
+  return { prompt, input, contentInput, sheetRefs, sheetRoster, sceneCastRepair };
 }
 
 /**
@@ -639,6 +718,51 @@ async function prep() {
 }
 
 // ---------------------------------------------------------------------------
+// RECONCILE mode (Track B): read-only, ZERO spend. For each listed pageNumber,
+// print the page text, the stored charactersPresent, the roster, and the
+// reconcileSceneCastWithText diff (before → after, addedIds, textNames). Proves
+// which pages the shipped scene cast dropped a text-named character on, and
+// exactly what the branch's union-repair restores — WITHOUT any generate() call.
+// ---------------------------------------------------------------------------
+async function reconcileInspect(pageNumbers: number[]) {
+  console.log('=== RECONCILE (read-only, no generate calls) ===');
+  const av = await loadAvatarBook();
+  console.log(`Avatar book: "${av.book.title}"  star=${av.starId}`);
+  console.log(
+    `Roster (id:name): ${av.rosterForScenes.map((r) => `${r.characterId}:${r.name}`).join(' | ')}`,
+  );
+  const pagesByNum = new Map(av.book.pages.map((p) => [p.pageNumber, p]));
+  for (const n of pageNumbers) {
+    const page = pagesByNum.get(n);
+    if (!page) {
+      console.log(`\n-- pageNumber ${n}: NOT FOUND --`);
+      continue;
+    }
+    const scene = page.bridgeScene as unknown as AvatarPageScene | null;
+    const present = scene?.charactersPresent ?? null;
+    console.log(`\n-- pageNumber ${n} (pdf p${2 * n + 2}) --`);
+    console.log(`  text: ${JSON.stringify(page.text)}`);
+    console.log(
+      `  stored charactersPresent: ${present ? `[${present.join(', ')}]` : '(no scene)'}`,
+    );
+    if (!scene || !Array.isArray(present)) {
+      console.log('  no reconcile — page has no structured avatar scene');
+      continue;
+    }
+    const out = reconcileSceneCastWithText(scene, page.text ?? '', av.rosterForScenes);
+    console.log(`  after reconcile: [${out.scene.charactersPresent.join(', ')}]`);
+    console.log(
+      `  repair: ${
+        out.repair
+          ? `addedIds=[${out.repair.addedIds.join(', ')}] textNames=[${out.repair.textNames.join(', ')}]`
+          : 'null (no change)'
+      }`,
+    );
+  }
+  console.log(`\nRECONCILE done. generate() calls: ${generateCalls} (must be 0).`);
+}
+
+// ---------------------------------------------------------------------------
 // RENDER mode: only the explicitly listed targets.
 // ---------------------------------------------------------------------------
 async function render(targets: string[], concurrency: number) {
@@ -693,7 +817,7 @@ async function render(targets: string[], concurrency: number) {
         return;
       }
       const built = await buildAvatarInterior(av, page);
-      const slug = SET || STAGE1 ? `p${n}` : (TAXO[n] ?? `p${n}`);
+      const slug = REPAIR ? `p${n}-repaired` : SET || STAGE1 ? `p${n}` : (TAXO[n] ?? `p${n}`);
       savePrompt(dPrompt(slug), built.prompt);
       assertNoNameLeak(built.prompt, av.identity, `p${n}`);
       await renderOne({
@@ -766,6 +890,14 @@ async function main() {
   const mode = process.argv[2];
   if (mode === 'prep') {
     await prep();
+  } else if (mode === 'reconcile') {
+    // `reconcile <n1,n2,...>` — zero-spend Track B cast-repair inspection.
+    const arg = process.argv.slice(3).find((a) => !a.startsWith('--')) || '5,7';
+    const pageNumbers = arg
+      .split(',')
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => Number.isFinite(n));
+    await reconcileInspect(pageNumbers);
   } else if (mode === 'render') {
     const rest = process.argv.slice(3);
     // First non-flag arg is the comma-separated target list.
@@ -782,7 +914,8 @@ async function main() {
     await render(targets, concurrency);
   } else {
     console.error(
-      'Usage: x12-rerender-proof.ts <prep | render <targets> [--concurrency N] [--stage1]>',
+      'Usage: x12-rerender-proof.ts <prep | reconcile <pageNums> | ' +
+        'render <targets> [--concurrency N] [--stage1] [--repair]>',
     );
     process.exit(1);
   }
