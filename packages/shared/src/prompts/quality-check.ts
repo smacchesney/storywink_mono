@@ -161,10 +161,21 @@ The cover PASSES only if titleMatches is true AND overall score >= 6 AND charact
   // conflict with name-neutralization — the illustration prompts sent to the
   // OpenAI renderer are name-neutralized, but that neutralization is a
   // render-time concern and never reaches this evaluation payload.
+  // Appearance anchor for the feed header: sheets when present, else the
+  // canonical identity section — and when NEITHER exists (no sheets, null
+  // identity) the character section explicitly says no reference is available,
+  // so pointing at "descriptions below" would dangle; fall back to the same
+  // internal-consistency basis that section declares.
+  const appearanceAnchor =
+    sheetCount > 0
+      ? ' against the REFERENCE SHEETS'
+      : characterIdentity
+        ? ' against the canonical descriptions below'
+        : ' for internal consistency across pages';
   const pageContext = options.pageContext ?? [];
   const pageContextSection =
     pageContext.length > 0
-      ? `\nPER-PAGE CONTEXT FEED — the expected cast and story text for each "PAGE n" image (match by ordinal). The names and species are the REAL character names/kinds, provided so you can judge each named character's APPEARANCE${sheetCount > 0 ? ' against the REFERENCE SHEETS' : ' against the canonical descriptions below'}:
+      ? `\nPER-PAGE CONTEXT FEED — the expected cast and story text for each "PAGE n" image (match by ordinal). The names and species are the REAL character names/kinds, provided so you can judge each named character's APPEARANCE${appearanceAnchor}:
 ${pageContext
   .map((p) => {
     const cast = p.cast.length

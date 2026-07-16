@@ -12,6 +12,7 @@ import {
   hasBlockingFlag,
   requeueFeedbackFor,
   buildQcClassFlagLog,
+  coverJudgeEligible,
   runQcBatches,
   buildQcRows,
   type QcBatchPageInfo,
@@ -20,6 +21,18 @@ import {
 
 function flags(overrides: Partial<QcClassFlags> = {}): QcClassFlags {
   return { ...emptyQcClassFlags(), ...overrides };
+}
+
+/**
+ * The pathological combo pinned in LOCKSTEP by selectRequeuePageIds and
+ * buildQcClassFlagLog: a qc_error sentinel that (impossibly, but defensively)
+ * ALSO carries a blocking class flag. Both derivations must treat it as an
+ * outage — never blocked, never requeued.
+ */
+function pathologicalSentinel(): PageQCResult {
+  const s = sentinelPageResult({ pageNumber: 1, pageId: 'errored' }, 'boom');
+  s.classFlags = flags({ renderedText: true });
+  return s;
 }
 
 function realResult(overrides: Partial<PageQCResult> = {}): PageQCResult {
@@ -208,9 +221,7 @@ describe('selectRequeuePageIds', () => {
   });
 
   it('never requeues a qc_error sentinel even if a blocking flag were somehow set', () => {
-    const sentinel = sentinelPageResult({ pageNumber: 1, pageId: 'errored' }, 'boom');
-    sentinel.classFlags = flags({ renderedText: true }); // pathological — should still not requeue
-    expect(selectRequeuePageIds([sentinel])).toEqual([]);
+    expect(selectRequeuePageIds([pathologicalSentinel()])).toEqual([]);
   });
 
   it('the promotion constant drives the split: pass species into the blocking set → it requeues', () => {
@@ -290,6 +301,9 @@ describe('buildQcClassFlagLog', () => {
       qcRound: 1,
       blocked: true, // rendered-text is a blocking class
       qcError: false,
+      expectedCast: [],
+      fedText: false,
+      fedProps: false,
       renderedText: true,
       intraImageDuplicate: false,
       missingExpectedCast: true,
@@ -298,6 +312,37 @@ describe('buildQcClassFlagLog', () => {
       propHolderMismatch: null,
       focalActionMismatch: null,
     });
+  });
+
+  it('carries the fed context so the precision-review dataset is self-contained', () => {
+    const log = buildQcClassFlagLog({
+      bookId: 'b',
+      qcRound: 0,
+      result: realResult({ pageId: 'p', classFlags: flags({ missingExpectedCast: true }) }),
+      feed: {
+        text: 'Kai splashed into the puddle.',
+        cast: [
+          { name: 'Kai', species: 'a young boy' },
+          { name: 'Grypho', species: 'a green toy crocodile' },
+        ],
+        props: ['lantern held by Kai'],
+      },
+    });
+    expect(log.expectedCast).toEqual(['Kai', 'Grypho']);
+    expect(log.fedText).toBe(true);
+    expect(log.fedProps).toBe(true);
+  });
+
+  it('reports fedText/fedProps false for empty text and holder-less props', () => {
+    const log = buildQcClassFlagLog({
+      bookId: 'b',
+      qcRound: 0,
+      result: realResult({ pageId: 'p' }),
+      feed: { text: '   ', cast: [], props: [] },
+    });
+    expect(log.expectedCast).toEqual([]);
+    expect(log.fedText).toBe(false);
+    expect(log.fedProps).toBe(false);
   });
 
   it('marks a telemetry-only defect as NOT blocked', () => {
@@ -319,6 +364,28 @@ describe('buildQcClassFlagLog', () => {
     expect(log.qcError).toBe(true);
     expect(log.blocked).toBe(false);
     expect(log.pageId).toBe('page-5');
+  });
+
+  it('LOCKSTEP with the requeue selector on the pathological sentinel-with-blocking-flag', () => {
+    const p = pathologicalSentinel();
+    // Log side: outage, never blocked — the flag itself is still recorded as data.
+    const log = buildQcClassFlagLog({ bookId: 'b', qcRound: 0, result: p });
+    expect(log.qcError).toBe(true);
+    expect(log.blocked).toBe(false);
+    expect(log.renderedText).toBe(true);
+    // Requeue side: the same fixture is excluded from the requeue set.
+    expect(selectRequeuePageIds([p])).toEqual([]);
+  });
+});
+
+describe('coverJudgeEligible', () => {
+  it('runs the isolated cover judge on the first QC round', () => {
+    expect(coverJudgeEligible(0)).toBe(true);
+  });
+
+  it('skips it on round 1+ (regen is round-0-gated, so the verdict is unactionable)', () => {
+    expect(coverJudgeEligible(1)).toBe(false);
+    expect(coverJudgeEligible(2)).toBe(false);
   });
 });
 

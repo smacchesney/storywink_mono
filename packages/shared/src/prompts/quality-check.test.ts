@@ -181,6 +181,44 @@ describe('createQCPrompt per-page context feed', () => {
     const bare = createQCPrompt(null, 2, 'en', { sheetCount: 1 });
     expect(bare).not.toContain('PER-PAGE CONTEXT FEED');
   });
+
+  it('anchors appearance to the sheets when sheets are present', () => {
+    expect(prompt).toContain('APPEARANCE against the REFERENCE SHEETS');
+  });
+
+  it('anchors appearance to the canonical descriptions when identity exists but no sheets', () => {
+    const identity = {
+      characters: [
+        {
+          characterId: 'child_1',
+          role: 'main_child',
+          name: 'Kai',
+          physicalTraits: {
+            apparentAge: '6',
+            hairColor: 'black',
+            hairStyle: 'short',
+            skinTone: 'golden-brown',
+            bodyBuild: 'small',
+            distinguishingFeatures: [],
+          },
+          typicalClothing: 'red raincoat',
+          styleTranslation: 'soft crayon',
+          appearsOnPages: [1, 2],
+        },
+      ],
+      sceneContext: 'rainy day',
+    };
+    const noSheets = createQCPrompt(identity, 2, 'en', { pageContext });
+    expect(noSheets).toContain('APPEARANCE against the canonical descriptions below');
+  });
+
+  it('does not dangle a canonical-descriptions reference when neither sheets nor identity exist', () => {
+    // sheetCount 0 AND null identity: the character section says no reference
+    // exists, so the feed header must not point at "descriptions below".
+    const bare = createQCPrompt(null, 2, 'en', { pageContext });
+    expect(bare).not.toContain('against the canonical descriptions below');
+    expect(bare).toContain('APPEARANCE for internal consistency across pages');
+  });
 });
 
 describe('QC_RESPONSE_SCHEMA coverResult extension', () => {

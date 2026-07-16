@@ -43,11 +43,8 @@ import {
   createQCPrompt,
   QC_SYSTEM_PROMPT,
   QC_RESPONSE_SCHEMA,
-  type QcPageContext,
   type QcClass,
 } from '@storywink/shared/prompts/quality-check';
-import { speciesLineFor, kindFromRole } from '@storywink/shared/prompts/character-identity';
-import { isMainCharacterRole } from '@storywink/shared/prompts/illustration';
 import { optimizeCloudinaryUrlForVision, resolveCoverPage } from '@storywink/shared/utils';
 import type {
   CharacterIdentity,
@@ -70,6 +67,11 @@ import {
   type QcRenderMeta,
   type QcResultRow,
 } from '../apps/workers/src/lib/qc-batching.js';
+import {
+  assembleQcBatchParts,
+  expectedCastForPage,
+  heldPropsForPage,
+} from '../apps/workers/src/lib/qc-assembly.js';
 import pino from 'pino';
 
 const BOOK_ID = 'cmrm0yfzd00ymo50dvcnetv1m'; // "Kai and the Wild Rumble", AVATAR_STORY
@@ -101,52 +103,9 @@ const EXPECTED: Record<number, { pdf: number; defect: string; class: QcClass | n
 // map above.
 const ONOMATOPOEIA_HINT = /\b(TIPTOE|DRIP|BOING|THUMP|SPLASH|WHEE|CRASH|BONK|ZOOM|POP)\b/i;
 
-// ---------------------------------------------------------------------------
-// Worker-faithful helpers (copied verbatim from book-finalize.worker.ts — they
-// are private there; this harness must feed the judge EXACTLY what the worker
-// feeds it).
-// ---------------------------------------------------------------------------
-const HOLDER_PHRASE = /\bheld by\b|\bcarried by\b|\bholds\b|\bholding\b/i;
-
-function expectedCastForPage(
-  characterIdentity: CharacterIdentity | null,
-  page: { pageNumber: number; source?: string | null; bridgeScene?: unknown },
-): Array<{ name: string; species: string }> {
-  const chars = characterIdentity?.characters ?? [];
-  if (chars.length === 0) return [];
-
-  const bridgeIds =
-    page.source === 'BRIDGE' && page.bridgeScene && typeof page.bridgeScene === 'object'
-      ? ((page.bridgeScene as { charactersPresent?: unknown }).charactersPresent as
-          | string[]
-          | undefined)
-      : undefined;
-  const bridgeFiltered = bridgeIds?.length
-    ? chars.filter((c) => bridgeIds.includes(c.characterId))
-    : [];
-
-  const relevant = bridgeFiltered.length
-    ? bridgeFiltered
-    : chars.filter(
-        (c) =>
-          isMainCharacterRole(c.role) ||
-          c.appearsOnPages.includes(page.pageNumber) ||
-          c.appearsOnPages.length === 0,
-      );
-
-  return relevant.map((c) => ({
-    name: c.name || c.characterId,
-    species: speciesLineFor(c, kindFromRole(c.role)),
-  }));
-}
-
-function heldPropsForPage(page: { bridgeScene?: unknown }): string[] {
-  const scene = page.bridgeScene;
-  if (!scene || typeof scene !== 'object') return [];
-  const props = (scene as { props?: unknown }).props;
-  if (!Array.isArray(props)) return [];
-  return props.filter((p): p is string => typeof p === 'string' && HOLDER_PHRASE.test(p));
-}
+// Worker-faithful helpers now come from the SHARED assembly module
+// (apps/workers/src/lib/qc-assembly.ts) — the same code the worker's
+// scoreBatch runs, so harness and production cannot drift.
 
 // ---------------------------------------------------------------------------
 // Judge plumbing — the single spend choke point + per-call measurement.
@@ -427,36 +386,21 @@ async function run() {
 
   // --- PAGE BATCHES via runQcBatches (mirrors runQualityCheck) -------------
   const scoreBatch = async (batch: IllPage[], batchIndex: number): Promise<QcBatchOutcome> => {
-    const parts: ContentPart[] = [...sheetParts];
-    const pageMapping: Array<{ pageNumber: number; pageId: string }> = [];
-    const bridgePageOrdinals: number[] = [];
-    const pageContext: QcPageContext[] = [];
-    for (const page of batch) {
-      const ordinal = pageMapping.length + 1;
-      parts.push({ type: 'input_text', text: `PAGE ${ordinal}` });
-      parts.push({
-        type: 'input_image',
-        image_url: optimizeCloudinaryUrlForVision(page.generatedImageUrl!),
-        detail: 'high',
-      });
-      if (page.source === 'BRIDGE') bridgePageOrdinals.push(ordinal);
-      pageContext.push({
-        ordinal,
-        text: page.text ?? null,
-        cast: expectedCastForPage(characterIdentity, page),
-        props: heldPropsForPage(page),
-      });
-      pageMapping.push({ pageNumber: page.pageNumber, pageId: page.pageId });
-    }
-    const promptText = createQCPrompt(characterIdentity, pageMapping.length, language, {
+    // The SAME tested assembly the worker's scoreBatch runs (qc-assembly.ts):
+    // batch-local PAGE-n ordinals, batch-local pageCount, per-page context feed.
+    const assembly = assembleQcBatchParts({
+      batch,
+      characterIdentity,
+      language,
       sheetCount: sheetsForJudge.length,
-      ...(bridgePageOrdinals.length ? { bridgePageOrdinals } : {}),
-      ...(pageContext.length ? { pageContext } : {}),
     });
-    parts.push({ type: 'input_text', text: promptText });
+    const parts: ContentPart[] = [...sheetParts, ...assembly.contentParts];
 
     const parsed = await countedJudge(openai, `batch${batchIndex}`, parts);
-    const { mapped, unmatchedEchoes } = mapQcResultsToPages(parsed.pageResults, pageMapping);
+    const { mapped, unmatchedEchoes } = mapQcResultsToPages(
+      parsed.pageResults,
+      assembly.pageMapping,
+    );
     if (unmatchedEchoes.length > 0) {
       console.log(`    batch ${batchIndex}: dropped unmatched echoes ${unmatchedEchoes.join(',')}`);
     }

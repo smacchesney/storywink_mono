@@ -169,6 +169,20 @@ export function requeueFeedbackFor(
   return combined || null;
 }
 
+/**
+ * What the judge was FED for one page — the context half of the telemetry
+ * record. Shape-compatible with `pageFeedFor` (qc-assembly), which builds it
+ * from the same helpers that build the judge's per-page context.
+ */
+export interface QcClassFlagFeed {
+  /** The page's story text as fed (null/blank = focal-action was a no-op). */
+  text: string | null;
+  /** Expected cast fed to the judge (real names + species phrases). */
+  cast: Array<{ name: string; species: string }>;
+  /** Holder-annotated props fed (empty = prop-holder was a no-op). */
+  props: string[];
+}
+
 /** One searchable per-page telemetry record carrying every class flag. */
 export interface QcClassFlagLog {
   event: 'qc_class_flags';
@@ -180,6 +194,12 @@ export interface QcClassFlagLog {
   blocked: boolean;
   /** True when the row is an unscored qc_error sentinel (exclude from precision stats). */
   qcError: boolean;
+  /** Cast names the judge was told to expect — makes the precision-review row self-contained. */
+  expectedCast: string[];
+  /** Whether story text was fed (focal-action judged) on this page. */
+  fedText: boolean;
+  /** Whether holder-annotated props were fed (prop-holder judged) on this page. */
+  fedProps: boolean;
   renderedText: boolean;
   intraImageDuplicate: boolean;
   missingExpectedCast: boolean;
@@ -192,15 +212,18 @@ export interface QcClassFlagLog {
 /**
  * Build the one-per-page `qc_class_flags` record — the dataset the promotion
  * criterion reads. Emitted for every page (sentinels included, marked
- * `qcError`) so each finalized page leaves exactly one telemetry row.
+ * `qcError`) so each finalized page leaves exactly one telemetry row. Pass
+ * `feed` (what the judge was fed) so a human reviewing precision never has to
+ * reconstruct the page's expected cast from another table.
  */
 export function buildQcClassFlagLog(params: {
   bookId: string;
   qcRound: number;
   result: PageQCResult;
+  feed?: QcClassFlagFeed;
   blockingClasses?: readonly QcClass[];
 }): QcClassFlagLog {
-  const { bookId, qcRound, result } = params;
+  const { bookId, qcRound, result, feed } = params;
   const blockingClasses = params.blockingClasses ?? QC_BLOCKING_CLASSES;
   const qcError = isQcErrorFeedback(result.suggestedPromptAdditions);
   const f = result.classFlags;
@@ -212,6 +235,9 @@ export function buildQcClassFlagLog(params: {
     qcRound,
     blocked: !qcError && hasBlockingFlag(result, blockingClasses),
     qcError,
+    expectedCast: feed?.cast.map((c) => c.name) ?? [],
+    fedText: Boolean(feed?.text && feed.text.trim()),
+    fedProps: (feed?.props.length ?? 0) > 0,
     renderedText: f.renderedText,
     intraImageDuplicate: f.intraImageDuplicate,
     missingExpectedCast: f.missingExpectedCast,
@@ -220,6 +246,17 @@ export function buildQcClassFlagLog(params: {
     propHolderMismatch: f.propHolderMismatch,
     focalActionMismatch: f.focalActionMismatch,
   };
+}
+
+/**
+ * The isolated cover judge call runs on the FIRST QC round only. The single
+ * cover regen it can buy is itself qcRound===0-gated, so a round-1+ cover
+ * verdict is unactionable: it costs a judge call, and a variance-flipped
+ * round-1 "failed cover" row would mislead naive latest-row queries. Round-0
+ * behavior is unchanged.
+ */
+export function coverJudgeEligible(qcRound: number): boolean {
+  return qcRound === 0;
 }
 
 /** What one batch's scoring call resolves to. */
