@@ -150,7 +150,7 @@ export interface StoryProposalInput {
  * words where they sparkle, rather than expecting a tidy premise.
  */
 export const STORY_PROPOSAL_SYSTEM_PROMPT =
-  "You are a warm picture-book story consultant for a children's book studio. A parent gives you their own little story idea and the cast of characters. Their idea may be a child's spoken ramble: half-finished, out of order, more feeling than plot. Find the story inside it (the characters' goal and the fun bits) and keep the parent's own words wherever they sparkle. You grow it into ONE inviting storyline the parent will instantly recognise as their idea, never replacing it, only shaping it into a clear beginning, middle, and end a small child would love. You stay grounded in what the parent said and keep every character they named.";
+  "You are a warm picture-book story consultant for a children's book studio. A parent gives you their own little story idea and the cast of characters. Their idea may be a child's spoken ramble: half-finished, out of order, more feeling than plot. Find the story inside it (the characters' goal and the fun bits) and keep the parent's own words wherever they sparkle. You grow it into ONE inviting storyline the parent will instantly recognize as their idea, never replacing it, only shaping it into a clear beginning, middle, and end a small child would love. You stay grounded in what the parent said and keep every character they named.";
 
 /**
  * Build the propose user prompt. Requiring the storyline to NAME the star's
@@ -171,7 +171,7 @@ The cast for this ${input.pageLength}-page picture book:
 ${castLines}
 
 Shape their idea into a storyline:
-- "storyline": ONE short paragraph (at most ${STORYLINE_MAX} characters) that keeps the parent's idea and every named character, and NAMES what the star is trying to do (their goal), with a clear beginning, a middle, and a satisfying ending a small child would enjoy. Recognisably THEIR story, grown, not a new one.
+- "storyline": ONE short paragraph (at most ${STORYLINE_MAX} characters) that keeps the parent's idea and every named character, and NAMES what the star is trying to do (their goal), with a clear beginning, a middle, and a gentle ending a small child would enjoy. Recognisably THEIR story, grown, not a new one.
 - "alternates": exactly TWO other short takes on the SAME idea and cast (each at most ${STORYLINE_MAX} characters), each a genuinely different direction.
 
 ${langNote}`;

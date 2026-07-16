@@ -210,6 +210,10 @@ describe('buildStoryProposalPrompt (goal + cast pins)', () => {
     expect(out).toContain('exactly TWO other short takes');
   });
 
+  it('keeps the original gentle-ending tone (any tone change belongs to Track S)', () => {
+    expect(buildStoryProposalPrompt(input)).toContain('a gentle ending');
+  });
+
   it('switches the language note for ja', () => {
     expect(buildStoryProposalPrompt(input)).toContain('warm, simple English');
     expect(buildStoryProposalPrompt({ ...input, language: 'ja' })).toContain(
