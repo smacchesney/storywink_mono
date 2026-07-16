@@ -370,7 +370,7 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
 
   const baseInstructions = [
     `# Instructions & Guiding Principles:`,
-    `- Imagine a parent curled up with their toddler at bedtime, reading aloud. Every sentence should feel warm, playful, and alive in a parent's voice.`,
+    `- Imagine a parent curled up with their child, reading aloud. Every sentence should feel warm, playful, and alive in a parent's voice.`,
     `- Write from the **toddler's perspective** — what they see, feel, touch, hear, and wonder about. Ground every moment in their sensory experience.`,
     ``,
     `## ANTI-CAPTION RULE (critical):`,
@@ -758,7 +758,7 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
 
   const baseInstructions = [
     `# Instructions & Guiding Principles:`,
-    `- Imagine a parent curled up with their toddler at bedtime, reading aloud. Every sentence should feel warm, playful, and alive in a parent's voice.`,
+    `- Imagine a parent curled up with their child, reading aloud. Every sentence should feel warm, playful, and alive in a parent's voice.`,
     `- Write from the **toddler's perspective** — what they see, feel, touch, hear, and wonder about. Ground every moment in their sensory experience.`,
     ``,
     sceneInstructions,

@@ -216,6 +216,12 @@ describe('AVATAR_STORY_SYSTEM_PROMPT', () => {
     expect(AVATAR_STORY_SYSTEM_PROMPT).toContain('a beginning, a problem, and a satisfying end');
     expect(AVATAR_STORY_SYSTEM_PROMPT).not.toContain('toddlers (ages 2-4)');
   });
+
+  it('drops the toddler-at-bedtime read-aloud frame from the instructions', () => {
+    const text = promptText(baseInput);
+    expect(text).toContain('curled up with their child, reading aloud');
+    expect(text).not.toContain('their toddler at bedtime');
+  });
 });
 
 describe('createAvatarStoryPrompt — S1 sound exemplars neutralized + cap', () => {

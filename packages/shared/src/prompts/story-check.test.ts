@@ -6,6 +6,7 @@ import {
   createStoryQCPrompt,
   countLearningWordEchoes,
   STORY_QC_RESPONSE_SCHEMA,
+  STORY_QC_SYSTEM_PROMPT,
   STORY_QC_THRESHOLDS,
 } from './story-check.js';
 import type { StoryArc } from './story.js';
@@ -251,5 +252,22 @@ describe('STORY_QC_RESPONSE_SCHEMA — new fields (S2/S3)', () => {
 describe('STORY_QC_THRESHOLDS — agency threshold (log-only)', () => {
   it('carries a log-only minAgency threshold', () => {
     expect(STORY_QC_THRESHOLDS.minAgency).toBe(6);
+  });
+});
+
+describe('story QC — judge shares the 3-5 adventure frame (S4 alignment)', () => {
+  it('system prompt drops the toddler frame for ages 3-5 + the adventure north-star', () => {
+    expect(STORY_QC_SYSTEM_PROMPT).toContain('ages 3-5');
+    expect(STORY_QC_SYSTEM_PROMPT).toContain('a beginning, a problem, and a satisfying end');
+    expect(STORY_QC_SYSTEM_PROMPT).not.toContain('toddlers (ages 2-4)');
+  });
+
+  it('QC body reviews an ages-3-5 manuscript, never a toddler one', () => {
+    const prompt = createStoryQCPrompt({
+      storyArc: arc,
+      pages: [{ pageNumber: 1, text: 'Splish!' }],
+    });
+    expect(prompt).toContain('picture-book manuscript for children ages 3-5');
+    expect(prompt).not.toContain('toddler picture-book manuscript');
   });
 });

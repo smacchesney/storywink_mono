@@ -13,7 +13,7 @@
 import type { StoryArc, StoryPageResponse } from './story.js';
 
 export const STORY_QC_SYSTEM_PROMPT =
-  "You are a ruthless children's-book editor reviewing a picture-book manuscript for toddlers (ages 2-4). You evaluate narrative arc, read-aloud rhythm, and whether pages tell a story or merely caption photos. You never rewrite the story yourself — you score it and give precise, actionable corrections.";
+  "You are a ruthless children's-book editor reviewing a picture-book manuscript for children ages 3-5 — every book should be a real little adventure with a beginning, a problem, and a satisfying end. You evaluate narrative arc, read-aloud rhythm, and whether pages tell a story or merely caption photos. You never rewrite the story yourself — you score it and give precise, actionable corrections.";
 
 export interface StoryQCInput {
   storyArc: StoryArc;
@@ -40,7 +40,7 @@ export function createStoryQCPrompt(input: StoryQCInput): string {
       ? `\n# Parent's context for this story\n"${input.theme}" — the story should feel true to this.\n`
       : '';
 
-  return `Review this ${input.pages.length}-page toddler picture-book manuscript.
+  return `Review this ${input.pages.length}-page picture-book manuscript for children ages 3-5.
 
 # Declared story arc
 - Desire: ${input.storyArc.desire}
@@ -175,7 +175,7 @@ export const STORY_QC_THRESHOLDS = {
 // deterministic refrain count in the worker) are unchanged.
 
 export const AVATAR_STORY_QC_SYSTEM_PROMPT =
-  "You are a ruthless children's-book editor reviewing a picture-book manuscript for toddlers (ages 2-4). This is an invented adventure starring the family's own characters — you evaluate narrative arc, read-aloud rhythm, and whether the story delivers the premise the parent picked. You never rewrite the story yourself — you score it and give precise, actionable corrections.";
+  "You are a ruthless children's-book editor reviewing a picture-book manuscript for children ages 3-5 — every book should be a real little adventure with a beginning, a problem, and a satisfying end. This is an invented adventure starring the family's own characters — you evaluate narrative arc, read-aloud rhythm, and whether the story delivers the premise the parent picked. You never rewrite the story yourself — you score it and give precise, actionable corrections.";
 
 export interface AvatarStoryQCInput {
   storyArc: StoryArc;
@@ -198,7 +198,7 @@ export function createAvatarStoryQCPrompt(input: AvatarStoryQCInput): string {
         )}\nEvery cast member should matter to the story; no character outside this list may appear.\n`
     : '';
 
-  return `Review this ${input.pages.length}-page toddler picture-book manuscript. It is an INVENTED adventure (no photos) starring the family's own characters, built on a premise the parent picked.
+  return `Review this ${input.pages.length}-page picture-book manuscript for children ages 3-5. It is an INVENTED adventure (no photos) starring the family's own characters, built on a premise the parent picked.
 
 # Declared story arc
 - Desire: ${input.storyArc.desire}

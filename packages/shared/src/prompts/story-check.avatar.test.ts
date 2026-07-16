@@ -112,4 +112,13 @@ describe('thresholds and system prompt', () => {
     expect(AVATAR_STORY_QC_SYSTEM_PROMPT).toContain('invented adventure');
     expect(AVATAR_STORY_QC_SYSTEM_PROMPT).not.toContain('caption');
   });
+
+  it('judge shares the 3-5 adventure frame, not the toddler one (S4 alignment)', () => {
+    expect(AVATAR_STORY_QC_SYSTEM_PROMPT).toContain('ages 3-5');
+    expect(AVATAR_STORY_QC_SYSTEM_PROMPT).toContain('a beginning, a problem, and a satisfying end');
+    expect(AVATAR_STORY_QC_SYSTEM_PROMPT).not.toContain('toddlers (ages 2-4)');
+    const prompt = createAvatarStoryQCPrompt(baseInput);
+    expect(prompt).toContain('picture-book manuscript for children ages 3-5');
+    expect(prompt).not.toContain('toddler picture-book manuscript');
+  });
 });

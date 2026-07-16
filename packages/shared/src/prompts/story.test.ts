@@ -298,6 +298,11 @@ describe('createStoryGenerationPrompt — S3 agency arc + S4 payoff/age frame', 
     );
     expect(STORY_GENERATION_SYSTEM_PROMPT).not.toContain('toddlers (ages 2-4)');
   });
+
+  it('drops the toddler-at-bedtime read-aloud frame from the instructions', () => {
+    expect(text).toContain('curled up with their child, reading aloud');
+    expect(text).not.toContain('their toddler at bedtime');
+  });
 });
 
 describe('STORY_RESPONSE_SCHEMA — storyArc agency + payoff fields (S3/S4)', () => {
