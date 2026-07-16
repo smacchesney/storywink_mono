@@ -44,6 +44,18 @@ export interface IllustrationPromptOptions {
    * scene anchors the cover repaint.
    */
   contentAnchor?: 'photo' | 'sheet' | 'interior';
+  /**
+   * X12-D Stage 1 (default absent/false = today's output byte-identical): on
+   * the avatar paths ('sheet' interiors, 'interior' covers) replace every
+   * roster display name with a neutral `Character N` token — the star is
+   * Character 1, the rest follow roster order. Evocative names ("Grypho")
+   * carry a name→appearance prior that can beat the reference sheet; tokens
+   * carry none, eliminating the prior by construction. Species phrases and
+   * every other section stay as today. The exact-title line is EXEMPT —
+   * bookTitle may legitimately contain the child's name and renders verbatim.
+   * The photo path never neutralizes, even when the option is set.
+   */
+  neutralizeCharacterNames?: boolean;
 }
 
 // ----------------------------------
@@ -113,6 +125,59 @@ export function sanitizeIllustrationNotes(notes: string | null): string | null {
  */
 export function isMainCharacterRole(role: string): boolean {
   return role.startsWith('main');
+}
+
+// ----------------------------------
+// NEUTRAL NAME TOKENS (X12-D Stage 1)
+// ----------------------------------
+
+export interface NeutralNameEntry {
+  /** Roster display name (name || characterId) — the string to replace. */
+  name: string;
+  /** Its stable neutral token, e.g. "Character 1". */
+  token: string;
+}
+
+/**
+ * Stable name→token map for neutralizeCharacterNames: the star (first role
+ * starting with 'main') is Character 1, the remaining roster follows in its
+ * existing array order — the same deterministic order the prompt's cast and
+ * identity sections already use, so a character keeps one token across every
+ * page of the book.
+ */
+export function buildNeutralNameMap(
+  characterIdentity: CharacterIdentity | null | undefined,
+): NeutralNameEntry[] {
+  const chars = characterIdentity?.characters ?? [];
+  if (chars.length === 0) return [];
+  const star = chars.find((c) => isMainCharacterRole(c.role));
+  const ordered = star ? [star, ...chars.filter((c) => c !== star)] : [...chars];
+  return ordered.map((c, i) => ({
+    name: c.name || c.characterId,
+    token: `Character ${i + 1}`,
+  }));
+}
+
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Whole-word name→token substitution: longest names first (so "Kai" never
+ * chews "Kaito"), exact-case pass first, then a case-insensitive pass for
+ * leftover variants. Boundaries are alphanumeric lookarounds, so possessives
+ * ("Kai's") and punctuation neighbors substitute cleanly while occurrences
+ * inside longer words never match.
+ */
+export function substituteCharacterNames(text: string, map: NeutralNameEntry[]): string {
+  if (!map.length) return text;
+  let out = text;
+  const byLength = [...map].sort((a, b) => b.name.length - a.name.length);
+  for (const { name, token } of byLength) {
+    if (!name) continue;
+    const body = `(?<![A-Za-z0-9])${escapeRegExp(name)}(?![A-Za-z0-9])`;
+    out = out.replace(new RegExp(body, 'g'), token);
+    out = out.replace(new RegExp(body, 'gi'), token);
+  }
+  return out;
 }
 
 function buildCharacterIdentitySection(
@@ -310,16 +375,37 @@ function buildQCFeedbackSection(qcFeedback: string | null | undefined): string |
 export function createIllustrationPrompt(opts: IllustrationPromptOptions): string {
   const style = getStyleDefinition(opts.style);
   const contentAnchor = opts.contentAnchor ?? 'photo';
+
+  // X12-D Stage 1: neutral name tokens, avatar paths only. An empty map (mode
+  // off, photo path, or no roster) makes neutralize() the identity function,
+  // keeping every existing prompt byte-identical.
+  const neutralMap =
+    opts.neutralizeCharacterNames === true && contentAnchor !== 'photo'
+      ? buildNeutralNameMap(opts.characterIdentity)
+      : [];
+  const neutralize = <T extends string | null>(text: T): T =>
+    (text && neutralMap.length ? substituteCharacterNames(text, neutralMap) : text) as T;
+
   const ctx: StylePromptContext = {
+    // bookTitle stays verbatim ALWAYS — the exact-title line may legitimately
+    // contain the child's name and must never be tokenized.
     bookTitle: opts.bookTitle,
     pageText: opts.pageText,
-    illustrationNotes: sanitizeIllustrationNotes(opts.illustrationNotes ?? null),
-    referenceImageCount: opts.referenceImageCount || 1,
+    illustrationNotes: neutralize(sanitizeIllustrationNotes(opts.illustrationNotes ?? null)),
+    // ?? (not ||): the X12-D style-ref diet legitimately sends 0 style images;
+    // absent still defaults to 1, so existing callers are byte-identical.
+    referenceImageCount: opts.referenceImageCount ?? 1,
     language: opts.language,
     characterSheetCount: opts.characterSheetCount ?? 0,
     interiorRenderCount: opts.interiorRenderCount ?? 0,
     contentAnchor,
-    sheetRoster: opts.sheetRoster,
+    sheetRoster:
+      neutralMap.length && opts.sheetRoster
+        ? opts.sheetRoster.map((s) => ({
+            ...s,
+            name: substituteCharacterNames(s.name, neutralMap),
+          }))
+        : opts.sheetRoster,
   };
 
   // 1. Style-specific prompt (the bulk of the prompt)
@@ -333,12 +419,13 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
   //      comes from the story model (or the page text)
   //    - avatar-story covers ('interior'): the approved interior render
   //      anchors the cover repaint
-  const bridgeSection =
+  const bridgeSection = neutralize(
     contentAnchor === 'sheet'
       ? buildAvatarSceneSection(opts.bridgeScene, opts.pageText)
       : contentAnchor === 'interior'
         ? buildInteriorAnchorSection()
-        : buildBridgeSceneSection(opts.bridgeScene as BridgeScene | null | undefined);
+        : buildBridgeSceneSection(opts.bridgeScene as BridgeScene | null | undefined),
+  );
 
   // 3. Cross-cutting: character identity.
   // Sheet-anchored pages with a scene that names NOBODY (a wide establishing
@@ -350,24 +437,28 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
     contentAnchor === 'sheet' &&
     opts.bridgeScene != null &&
     opts.bridgeScene.charactersPresent.length === 0;
-  const charSection = emptySceneCast
-    ? null
-    : buildCharacterIdentitySection(
-        opts.characterIdentity,
-        opts.pageNumber,
-        opts.bridgeScene?.charactersPresent ?? null,
-        contentAnchor === 'sheet' || contentAnchor === 'interior',
-      );
+  const charSection = neutralize(
+    emptySceneCast
+      ? null
+      : buildCharacterIdentitySection(
+          opts.characterIdentity,
+          opts.pageNumber,
+          opts.bridgeScene?.charactersPresent ?? null,
+          contentAnchor === 'sheet' || contentAnchor === 'interior',
+        ),
+  );
 
   // 4. A5 exact-cast constraint (avatar-story pages only — the only path with a
   //    structured scene cast; forbids duplicates and stray creatures).
-  const exactCastSection =
+  const exactCastSection = neutralize(
     contentAnchor === 'sheet'
       ? buildExactCastSection(opts.characterIdentity, opts.bridgeScene)
-      : null;
+      : null,
+  );
 
-  // 5. Cross-cutting: QC feedback
-  const qcSection = buildQCFeedbackSection(opts.qcFeedback);
+  // 5. Cross-cutting: QC feedback (neutralized too — feedback text quoting a
+  //    display name would smuggle the name prior right back in).
+  const qcSection = neutralize(buildQCFeedbackSection(opts.qcFeedback));
 
   // 6. The no-text rule lands LAST for INTERIOR pages (both avatar and photo
   //    paths). Covers are excluded — they render a bounded title.

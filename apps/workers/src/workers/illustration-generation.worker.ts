@@ -25,6 +25,7 @@ import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/sh
 // Upscaling for print (the cover's logo overlay lives in lib/cover-generation)
 import { upscaleForPrint } from '../utils/image-processing.js';
 import { characterSheetsEnabled } from '../lib/character-sheets.js';
+import { capStyleRefs, styleRefsMax } from '../lib/style-refs.js';
 import { generateAndStoreCover } from '../lib/cover-generation.js';
 import { fetchImageInput, resizeForReference } from '../lib/images.js';
 import type { IllustrationImageInput } from '../lib/illustrators/index.js';
@@ -437,17 +438,26 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     // Cover pages get a separate cover-style illustration generated afterwards.
     // With character sheets in the stack, trim the style exemplars to 2
     // (kawaii ships 4) to keep the reference budget for identity.
-    const styleReferenceUrls: string[] =
+    const baseStyleReferenceUrls: string[] =
       sheetRefs.length > 0
         ? [...styleData.referenceImageUrls].slice(0, 2)
         : [...styleData.referenceImageUrls];
+    // X12-D style-ref diet (ILLUSTRATION_STYLE_REFS_MAX, default unset =
+    // current behavior). 0 deliberately sends no style-ref images — the style
+    // bible text carries the style. Applied AFTER the base trim; the
+    // missing-URL diagnostic below checks the UNCAPPED list so genuinely
+    // broken style data is still caught in diet mode.
+    const styleRefsCap = styleRefsMax(process.env);
+    const styleReferenceUrls: string[] = capStyleRefs(baseStyleReferenceUrls, styleRefsCap);
 
     // ============================================================================
     // DIAGNOSTIC: Database-persisted logging to survive process crashes
     // ============================================================================
     // CRITICAL: Console logs are being lost due to process crashes/termination.
     // Write diagnostic data to database FIRST, then log to console.
-    if (!styleReferenceUrls || styleReferenceUrls.length === 0) {
+    // Checks the UNCAPPED list: an empty CAPPED list under the diet is
+    // deliberate, an empty BASE list is broken style data.
+    if (!baseStyleReferenceUrls || baseStyleReferenceUrls.length === 0) {
       // Write to database IMMEDIATELY - survives even SIGKILL
       try {
         await prisma.workerDiagnostic.create({
@@ -544,7 +554,9 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       }
     }
 
-    if (styleReferenceBuffers.length === 0) {
+    // Zero fetched buffers is only an error when the diet didn't deliberately
+    // zero the list (ILLUSTRATION_STYLE_REFS_MAX=0 sends none by design).
+    if (styleReferenceBuffers.length === 0 && styleRefsCap !== 0) {
       logger.error(
         { jobId: job.id, pageId, pageNumber },
         'No style reference images fetched successfully.',

@@ -34,6 +34,10 @@
  *         avatar-title-interior | avatar-cover | avatar-p<N> |
  *         photo-interior | photo-cover
  *       avatar-cover implies avatar-title-interior first (it is the anchor).
+ *       --stage1 (X12-D): avatar interiors render name-neutral
+ *       (neutralizeCharacterNames) with ZERO style-ref images; outputs are
+ *       x12-d-s1-<slug>.png / prompt dumps s1-<slug>.txt, and a preflight
+ *       aborts before spend if any roster name leaks into a built prompt.
  *
  * Every generate() call is counted and the total printed at exit.
  */
@@ -85,8 +89,19 @@ const promptName = (slug: string) => (LABEL ? `${LABEL}-${slug}` : `x12-a-${slug
 // render is timed into the machine-readable results JSON. Output-only; the DB
 // path stays read-only. Unset preserves the Track A x12-a naming.
 const SET = process.env.X12_SET || '';
-const dPng = (slug: string) => (SET ? `x12-d-${SET}-${slug}` : pngName(slug));
-const dPrompt = (slug: string) => (SET ? `x12-d-${SET}-${slug}` : promptName(slug));
+
+// X12 Track D — Stage 1 (`--stage1`): the name-neutral + style-ref-diet
+// experiment. Avatar interior builds set neutralizeCharacterNames: true and
+// send ZERO style-ref images (the style bible text remains); outputs become
+// x12-d-s1-<slug>.png and prompt dumps s1-<slug>.txt. Before ANY spend, a
+// preflight asserts the built prompt leaks no roster display name — a leak
+// aborts the run with zero generate() calls for that page.
+const STAGE1 = process.argv.includes('--stage1');
+
+const dPng = (slug: string) =>
+  STAGE1 ? `x12-d-s1-${slug}` : SET ? `x12-d-${SET}-${slug}` : pngName(slug);
+const dPrompt = (slug: string) =>
+  STAGE1 ? `s1-${slug}` : SET ? `x12-d-${SET}-${slug}` : promptName(slug);
 const RESULTS_JSON = path.join(SCREENSHOTS, 'x12-d-results.json');
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'warn' });
@@ -129,7 +144,7 @@ async function renderOne(opts: {
 }): Promise<Buffer | null> {
   const illustrator = getIllustrator();
   const rec: RenderRecord = {
-    set: SET || '(none)',
+    set: STAGE1 ? 's1' : SET || '(none)',
     page: opts.pageLabel,
     provider: illustrator.name,
     model: illustrator.modelId,
@@ -233,6 +248,26 @@ async function countedGenerate(name: string, input: IllustrationInput) {
   );
   const out = await illustrator.generate(input);
   return out;
+}
+
+/**
+ * Stage-1 preflight (zero-spend safety): the whole point of the experiment is
+ * that the model never sees a roster display name. If one leaks into a built
+ * prompt (roster/name-shape surprise on the real book), ABORT before the
+ * generate() call rather than burning a counted render on a broken premise.
+ */
+function assertNoNameLeak(prompt: string, identity: CharacterIdentity | null, label: string): void {
+  if (!STAGE1) return;
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const names = (identity?.characters ?? []).map((c) => c.name || c.characterId).filter(Boolean);
+  const leaked = names.filter((n) =>
+    new RegExp(`(?<![A-Za-z0-9])${esc(n)}(?![A-Za-z0-9])`, 'i').test(prompt),
+  );
+  if (leaked.length > 0) {
+    throw new Error(
+      `STAGE1 PREFLIGHT FAIL on ${label}: roster name(s) leaked into the prompt: ${leaked.join(', ')} — aborting before any spend`,
+    );
+  }
 }
 
 function savePng(name: string, base64: string) {
@@ -341,8 +376,11 @@ async function buildAvatarInterior(
     fetchedSheetMeta.push({ characterId: s.characterId, name: s.name });
   }
 
-  const styleReferenceUrls =
-    sheetRefs.length > 0
+  // Stage 1 diet: NO style-ref images (mirrors ILLUSTRATION_STYLE_REFS_MAX=0);
+  // the style bible text stays in the prompt as the style truth.
+  const styleReferenceUrls = STAGE1
+    ? []
+    : sheetRefs.length > 0
       ? [...styleData.referenceImageUrls].slice(0, 2)
       : [...styleData.referenceImageUrls];
   const styleReferenceBuffers = await fetchStyleBuffers(styleReferenceUrls);
@@ -374,6 +412,7 @@ async function buildAvatarInterior(
     bridgeScene: bridgeScene as any,
     contentAnchor: sheetAnchored ? ('sheet' as const) : undefined,
     sheetRoster,
+    ...(STAGE1 ? { neutralizeCharacterNames: true } : {}),
   };
   const prompt = createIllustrationPrompt(promptInput);
 
@@ -601,6 +640,7 @@ async function render(targets: string[], concurrency: number) {
     console.log(`\n[avatar-title-interior] p${titlePage.pageNumber}`);
     const built = await buildAvatarInterior(av, titlePage);
     savePrompt(dPrompt('title'), built.prompt);
+    assertNoNameLeak(built.prompt, av.identity, 'title');
     titleInteriorBuffer = await renderOne({
       pageLabel: 'title',
       slug: 'title',
@@ -636,8 +676,9 @@ async function render(targets: string[], concurrency: number) {
         return;
       }
       const built = await buildAvatarInterior(av, page);
-      const slug = SET ? `p${n}` : (TAXO[n] ?? `p${n}`);
+      const slug = SET || STAGE1 ? `p${n}` : (TAXO[n] ?? `p${n}`);
       savePrompt(dPrompt(slug), built.prompt);
+      assertNoNameLeak(built.prompt, av.identity, `p${n}`);
       await renderOne({
         pageLabel: `p${n}`,
         slug,
@@ -723,7 +764,9 @@ async function main() {
     const concurrency = parseConcurrency(rest);
     await render(targets, concurrency);
   } else {
-    console.error('Usage: x12-rerender-proof.ts <prep | render <targets> [--concurrency N]>');
+    console.error(
+      'Usage: x12-rerender-proof.ts <prep | render <targets> [--concurrency N] [--stage1]>',
+    );
     process.exit(1);
   }
 }

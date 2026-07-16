@@ -82,9 +82,13 @@ function imageCountText(
         `each sheet is one specific named character — ${bindings} — so draw each character to match their OWN named sheet and never swap identities between sheets`,
       );
     }
-    roles.push(
-      `the final ${refCount === 1 ? 'image shows' : `${refCount} images show`} the artistic style to apply`,
-    );
+    // X12-D style-ref diet: with 0 style images the style-role line must not
+    // dangle — the style bible TEXT carries the style truth instead.
+    if (refCount > 0) {
+      roles.push(
+        `the final ${refCount === 1 ? 'image shows' : `${refCount} images show`} the artistic style to apply`,
+      );
+    }
     // Anti-name-semantics: a griffin was drawn for "Grypho" even WITH the map.
     // The rule rides the sheet branch unconditionally — it matters most when a
     // stale roster drops the map and names only appear in the identity block.
@@ -164,7 +168,7 @@ Render ALL faces using a simplified children's book style as shown in the refere
 This simplified face style must be applied uniformly to every person (adults and children alike) while still preserving each person's distinguishing features (hair, skin tone, face shape, glasses, facial hair, etc.) so they remain recognizable. A parent must look at your illustration and instantly recognize their child and family.`;
 
 function vignetteInteriorPrompt(ctx: StylePromptContext): string {
-  const refCount = ctx.referenceImageCount || 1;
+  const refCount = ctx.referenceImageCount ?? 1; // ?? not ||: the X12-D diet passes an explicit 0
 
   const sections = [
     `Create a children's picture book illustration ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo', ctx.sheetRoster)}`,
@@ -190,7 +194,7 @@ function vignetteInteriorPrompt(ctx: StylePromptContext): string {
 }
 
 function vignetteCoverPrompt(ctx: StylePromptContext): string {
-  const refCount = ctx.referenceImageCount || 1;
+  const refCount = ctx.referenceImageCount ?? 1; // ?? not ||: the X12-D diet passes an explicit 0
 
   const sections = [
     `Create a children's picture book illustration ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo', ctx.sheetRoster)}`,
@@ -256,7 +260,7 @@ const ORIGAMI_STYLE_BIBLE = [
  * Returns the sections as an array for the caller to extend.
  */
 function origamiBaseSections(ctx: StylePromptContext): string[] {
-  const refCount = ctx.referenceImageCount || 1;
+  const refCount = ctx.referenceImageCount ?? 1; // ?? not ||: the X12-D diet passes an explicit 0
 
   return [
     `Create a flat, layered paper-craft illustration ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo', ctx.sheetRoster)}`,
@@ -375,7 +379,7 @@ function kawaiiBaseSections(): string[] {
 }
 
 function kawaiiInteriorPrompt(ctx: StylePromptContext): string {
-  const refCount = ctx.referenceImageCount || 1;
+  const refCount = ctx.referenceImageCount ?? 1; // ?? not ||: the X12-D diet passes an explicit 0
 
   const sections = [
     `Create a warm, gentle children's book illustration in a soft storybook style ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo', ctx.sheetRoster)} The aesthetic combines clean digital illustration with a subtle watercolor/crayon texture, creating a cozy, nurturing feel. The image should be in landscape format (wider than tall) with softly rounded corners.`,
@@ -412,7 +416,7 @@ function kawaiiInteriorPrompt(ctx: StylePromptContext): string {
 }
 
 function kawaiiCoverPrompt(ctx: StylePromptContext): string {
-  const refCount = ctx.referenceImageCount || 1;
+  const refCount = ctx.referenceImageCount ?? 1; // ?? not ||: the X12-D diet passes an explicit 0
 
   const sections = [
     `Create a warm, gentle children's book COVER illustration in a soft storybook style ${imageCountText(refCount, ctx.characterSheetCount ?? 0, ctx.interiorRenderCount ?? 0, ctx.contentAnchor ?? 'photo', ctx.sheetRoster)} The scene is a focused vignette on a pure white background — NOT a full-bleed scene. Square format.`,
