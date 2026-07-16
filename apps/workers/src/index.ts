@@ -256,6 +256,11 @@ const printFulfillmentWorker = new Worker(QUEUE_NAMES.PRINT_FULFILLMENT, process
   connection: redis,
   concurrency: PRINT_FULFILLMENT_CONCURRENCY,
   lockDuration: 600000, // 10 minutes for PDF generation + upload + Lulu submission
+  // A stalled fulfillment must never be silently re-run — this is the one job
+  // where duplicate processing submits a second PAID Lulu order. Stalls fail
+  // loudly (Sentry via the failed handler) instead; the processor's
+  // luluSubmissionAttemptedAt claim is the second line of defense.
+  maxStalledCount: 0,
 });
 
 const characterExtractionWorker = new Worker(

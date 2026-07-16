@@ -75,6 +75,22 @@ export interface LuluPrintJob {
 }
 
 /**
+ * Error from a Lulu API response, carrying the HTTP status so callers can
+ * distinguish "Lulu rejected the request" (4xx — nothing was created) from
+ * "outcome unknown" (5xx). Network-level failures throw plain fetch errors
+ * and therefore carry no status.
+ */
+export class LuluApiError extends Error {
+  constructor(
+    public readonly httpStatus: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'LuluApiError';
+  }
+}
+
+/**
  * Lulu API Client
  */
 export class LuluApiClient {
@@ -165,7 +181,7 @@ export class LuluApiClient {
       } catch {
         // HTML error response, already logged above
       }
-      throw new Error(`Lulu API error: ${response.status} ${errorText}`);
+      throw new LuluApiError(response.status, `Lulu API error: ${response.status} ${errorText}`);
     }
 
     return response.json() as Promise<T>;

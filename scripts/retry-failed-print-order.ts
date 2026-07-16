@@ -2,8 +2,13 @@
 /**
  * Retry a failed print order by resetting its status and re-queuing the fulfillment job.
  *
- * Usage: npx tsx scripts/retry-failed-print-order.ts <orderId>
+ * Usage: npx tsx scripts/retry-failed-print-order.ts <orderId> [--confirm-not-submitted]
  * Example: npx tsx scripts/retry-failed-print-order.ts cmj7akirs0053le0d8ody1m0s
+ *
+ * --confirm-not-submitted: required when the order died inside the Lulu
+ * submission window (luluSubmissionAttemptedAt set, no luluPrintJobId). It
+ * asserts you checked Lulu's dashboard for external_id=<orderId> and found no
+ * print job; the script then clears the claim so the worker may submit again.
  *
  * Prerequisites:
  * - Ensure the Chromium fix has been deployed to workers
@@ -14,10 +19,14 @@ import prisma from '../packages/database/src/index.js';
 import { Queue } from 'bullmq';
 import { createBullMQConnection, QUEUE_NAMES } from '@storywink/shared';
 
-const orderId = process.argv[2];
+const args = process.argv.slice(2);
+const confirmNotSubmitted = args.includes('--confirm-not-submitted');
+const orderId = args.find((arg) => !arg.startsWith('--'));
 
 if (!orderId) {
-  console.error('Usage: npx tsx scripts/retry-failed-print-order.ts <orderId>');
+  console.error(
+    'Usage: npx tsx scripts/retry-failed-print-order.ts <orderId> [--confirm-not-submitted]',
+  );
   console.error('');
   console.error('Example:');
   console.error('  npx tsx scripts/retry-failed-print-order.ts cmj7akirs0053le0d8ody1m0s');
@@ -46,19 +55,56 @@ async function retryFailedOrder() {
     console.log(`  Status: ${order.status}`);
     console.log(`  Created: ${order.createdAt}`);
 
-    if (order.status !== 'FAILED') {
-      console.error(`\n❌ Order is not in FAILED status. Current status: ${order.status}`);
-      console.error('Only FAILED orders can be retried with this script.');
+    if (order.luluPrintJobId) {
+      console.error(`\n❌ Order already has Lulu print job ${order.luluPrintJobId}.`);
+      console.error('Retrying would submit a second paid order. Nothing to do here —');
+      console.error('if the order status is wrong, fix it directly against the Lulu job.');
       process.exit(1);
     }
 
-    // Reset order status to PAYMENT_COMPLETED
+    // A claim without a Lulu id means a previous run died inside the
+    // submission window — Lulu may or may not have the job. A wedged claim can
+    // leave the order in PAYMENT_COMPLETED (stalled worker) or FAILED.
+    const wedgedSubmission = Boolean(order.luluSubmissionAttemptedAt);
+
+    // PAYMENT_COMPLETED without a claim covers a worker that died before ever
+    // reaching Lulu (e.g. a stall during PDF generation). Re-enqueueing is
+    // safe even if a job is still queued: the worker's atomic claim lets only
+    // one run submit.
+    const retryable = order.status === 'FAILED' || order.status === 'PAYMENT_COMPLETED';
+    if (!retryable) {
+      console.error(`\n❌ Order is not retryable. Current status: ${order.status}`);
+      console.error('Only FAILED or stuck PAYMENT_COMPLETED orders can be retried.');
+      process.exit(1);
+    }
+
+    if (wedgedSubmission && !confirmNotSubmitted) {
+      console.error(`\n❌ This order died inside the Lulu submission window`);
+      console.error(
+        `   (luluSubmissionAttemptedAt=${order.luluSubmissionAttemptedAt?.toISOString()}, no luluPrintJobId).`,
+      );
+      console.error('   Lulu may already have this print job. Before retrying:');
+      console.error(`   1. Search Lulu's dashboard/API for external_id=${orderId}`);
+      console.error(
+        '   2. If a print job EXISTS: set luluPrintJobId + status=SUBMITTED_TO_LULU manually.',
+      );
+      console.error(
+        '   3. If NO print job exists: re-run this script with --confirm-not-submitted.',
+      );
+      process.exit(1);
+    }
+
+    // Reset order status to PAYMENT_COMPLETED (and release the submission
+    // claim when the operator confirmed Lulu has no job for this order)
     console.log('\nResetting order status to PAYMENT_COMPLETED...');
     await prisma.printOrder.update({
       where: { id: orderId },
-      data: { status: 'PAYMENT_COMPLETED' },
+      data: {
+        status: 'PAYMENT_COMPLETED',
+        ...(wedgedSubmission ? { luluSubmissionAttemptedAt: null } : {}),
+      },
     });
-    console.log('✓ Order status reset');
+    console.log(`✓ Order status reset${wedgedSubmission ? ' (submission claim cleared)' : ''}`);
 
     // Queue the print fulfillment job
     console.log('\nConnecting to Redis and queuing fulfillment job...');

@@ -411,6 +411,10 @@ model PrintOrder {
 
   // Lulu-specific fields
   luluPrintJobId String? // Lulu's print job ID
+  // Set atomically right before createPrintJob is dispatched. Non-null with a
+  // null luluPrintJobId means a run died inside the submission window — the
+  // worker fails closed (never resubmits) until a human reconciles with Lulu.
+  luluSubmissionAttemptedAt DateTime?
   podPackageId   String? // e.g., "0850X0850FCSTDSS060UW444GXX"
   pageCount      Int? // Interior page count
 
