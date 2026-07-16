@@ -187,15 +187,28 @@ export interface SceneCastRepair {
 const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
- * Whole-word, case-insensitive test for a roster name inside page text. Mirrors
- * the proven neutral-name substitution boundary (`illustration.ts`): alphanumeric
- * lookarounds, so "Kai" never matches inside "Kaito", and a possessive ("Kai's")
- * still matches — the apostrophe is a non-alphanumeric boundary.
+ * Whole-word test for a roster name inside page text. Mirrors the proven
+ * neutral-name substitution (`substituteCharacterNames`, illustration.ts) in
+ * BOTH of its guards: alphanumeric lookarounds, so "Kai" never matches inside
+ * "Kaito" while a possessive ("Kai's") still matches; and capitalization-
+ * preserving acceptance, so a bare-lowercase occurrence is treated as a
+ * common-noun homograph, not the character — a child named "Star" must not be
+ * union-added onto a page whose text only says "the falling star" (post-Track-A,
+ * charactersPresent is an authoritative draw instruction AND the sheet
+ * selector, and a false add is invisible to QC because expectedCastForPage
+ * derives from this same repaired scene). Occurrences whose first letter is
+ * uppercase ("Star", "STAR", sentence-case) count, plus the roster's exact
+ * spelling (covers characterId fallbacks like "avatar_2" that are legitimately
+ * lowercase). Sentence-start homographs ("Biscuit crumbs everywhere!") are an
+ * accepted edge — the same one substituteCharacterNames lives with.
  */
 function textNamesCharacter(text: string, name: string): boolean {
   if (!name.trim()) return false;
   const body = `(?<![A-Za-z0-9])${escapeRegExp(name)}(?![A-Za-z0-9])`;
-  return new RegExp(body, 'i').test(text);
+  for (const match of text.matchAll(new RegExp(body, 'gi'))) {
+    if (match[0] === name || /^\p{Lu}/u.test(match[0])) return true;
+  }
+  return false;
 }
 
 /**

@@ -326,6 +326,47 @@ describe('reconcileSceneCastWithText — union-repair scene cast from page text'
     expect(out.repair).toBeNull();
     expect(out.scene).toBe(input);
   });
+
+  describe('capitalization guard — common-noun homographs never repair (X12-B review)', () => {
+    const homographRoster = [
+      { characterId: 'star_1', name: 'Star' },
+      { characterId: 'biscuit_1', name: 'Biscuit' },
+      { characterId: 'avatar_2', name: 'avatar_2' }, // characterId-fallback display name
+    ];
+
+    it('a bare-lowercase homograph does NOT repair: "the falling star" is not the child Star', () => {
+      const input = scene([]);
+      const out = reconcileSceneCastWithText(input, 'She wished on the falling star.', [
+        homographRoster[0],
+      ]);
+      expect(out.repair).toBeNull();
+      expect(out.scene).toBe(input);
+    });
+
+    it('an uppercase-first occurrence still repairs: "Star waved" names the character', () => {
+      const out = reconcileSceneCastWithText(scene([]), 'Star waved from the hilltop.', [
+        homographRoster[0],
+      ]);
+      expect(out.scene.charactersPresent).toEqual(['star_1']);
+      expect(out.repair).toEqual({ addedIds: ['star_1'], textNames: ['Star'] });
+    });
+
+    it("the roster's exact spelling always matches — legitimately lowercase characterId fallbacks", () => {
+      const out = reconcileSceneCastWithText(scene([]), 'Then avatar_2 hums along.', [
+        homographRoster[2],
+      ]);
+      expect(out.scene.charactersPresent).toEqual(['avatar_2']);
+      expect(out.repair).toEqual({ addedIds: ['avatar_2'], textNames: ['avatar_2'] });
+    });
+
+    it('accepted edge: a sentence-start homograph repairs — "Biscuit crumbs everywhere!" (same edge substituteCharacterNames lives with)', () => {
+      const out = reconcileSceneCastWithText(scene([]), 'Biscuit crumbs everywhere!', [
+        homographRoster[1],
+      ]);
+      expect(out.scene.charactersPresent).toEqual(['biscuit_1']);
+      expect(out.repair).toEqual({ addedIds: ['biscuit_1'], textNames: ['Biscuit'] });
+    });
+  });
 });
 
 describe('avatarStoryQcProblems', () => {
