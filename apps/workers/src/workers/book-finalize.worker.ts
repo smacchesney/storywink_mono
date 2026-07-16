@@ -22,6 +22,13 @@ import { isValidStyle } from '@storywink/shared/prompts/styles';
 import { trackEvent } from '@storywink/shared';
 import { computeBookStatus } from '../lib/computeBookStatus.js';
 import { mapQcResultsToPages, RawQcPageResult } from '../lib/qc-mapping.js';
+import {
+  partitionQcPages,
+  runQcBatches,
+  selectRequeuePageIds,
+  isQcErrorFeedback,
+  type QcBatchOutcome,
+} from '../lib/qc-batching.js';
 import { characterSheetsEnabled, sheetRefsForStyle } from '../lib/character-sheets.js';
 import { mergeLinkedAvatarSheets } from '../lib/avatar-sheets.js';
 import {
@@ -95,123 +102,157 @@ async function runQualityCheck(
     `[BookFinalize/QC] Running QC on ${illustratedPages.length} illustrations for book ${bookId}`,
   );
 
-  // Build image content parts from URLs directly (no base64 fetching)
-  const contentParts: Array<
+  // Character sheet content parts — the ground truth PREPENDED TO EVERY BATCH
+  // (each batch is judged against the same sheets, so cross-batch drift shares
+  // one anchor). Non-numeric labels ("REFERENCE SHEET", not "PAGE n") so they
+  // can never collide with a page ordinal in the echoed results.
+  const sheetParts: Array<
     | { type: 'input_text'; text: string }
     | { type: 'input_image'; image_url: string; detail: 'high' }
   > = [];
-  const pageMapping: Array<{ pageNumber: number; pageId: string }> = [];
-
-  // Character sheets first — ground truth for character consistency. The
-  // label is deliberately NON-NUMERIC ("REFERENCE SHEET", not "PAGE n") so
-  // it can never collide with a page ordinal in the echoed results.
   for (const sheet of sheets) {
-    contentParts.push({
+    sheetParts.push({
       type: 'input_text',
       text: `REFERENCE SHEET — ${sheet.name || sheet.characterId}`,
     });
-    contentParts.push({
+    sheetParts.push({
       type: 'input_image',
       image_url: optimizeCloudinaryUrlForVision(sheet.url),
       detail: 'high',
     });
   }
 
-  // The cover (non-numeric label too); scored via the coverResult schema
-  // field with its own rubric variant, never via pageResults.
-  if (cover) {
-    contentParts.push({ type: 'input_text', text: 'COVER' });
-    contentParts.push({
-      type: 'input_image',
-      image_url: optimizeCloudinaryUrlForVision(cover.url),
-      detail: 'high',
-    });
-  }
-
-  // BRIDGE rows (DB is the single source of truth, same pattern as the
-  // illustration worker) get the bridge rubric: strict identity judging plus
-  // the near-duplicate-composition FAIL rule. Collected as the same 1-based
-  // presentation ordinals the "PAGE n" labels use — NOT DB pageNumbers.
-  const bridgePageOrdinals: number[] = [];
-  for (const page of illustratedPages) {
-    const url = optimizeCloudinaryUrlForVision(page.generatedImageUrl!);
-    // Label each image with its 1-based presentation ordinal. The judge echoes
-    // this label's number, which indexes pageMapping — it is NOT the DB
-    // pageNumber (they diverge when un-illustrated pages are skipped).
-    contentParts.push({ type: 'input_text', text: `PAGE ${pageMapping.length + 1}` });
-    contentParts.push({ type: 'input_image', image_url: url, detail: 'high' });
-    if (page.source === 'BRIDGE') bridgePageOrdinals.push(pageMapping.length + 1);
-    pageMapping.push({ pageNumber: page.pageNumber, pageId: page.pageId });
-  }
-
-  if (pageMapping.length < 2) {
-    logger.warn({ bookId }, 'Skipping QC: not enough images');
-    return null;
-  }
-
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const promptText = createQCPrompt(characterIdentity, pageMapping.length, language, {
-    sheetCount: sheets.length,
-    cover: cover ? { expectedTitle: cover.expectedTitle } : null,
-    // Books without BRIDGE rows yield an empty list and a byte-identical
-    // prompt, so the flag-off default is untouched.
-    ...(bridgePageOrdinals.length ? { bridgePageOrdinals } : {}),
-  });
 
-  // Add the text prompt after all images
-  contentParts.push({ type: 'input_text', text: promptText });
+  // Split the book into small batches so no single vision call carries the
+  // whole book (the oversized-call failure mode that shipped a book with ZERO
+  // QC rows). Each batch re-sends the sheets ground truth; the cover rides
+  // batch 0 only (it must be scored once, not once per batch).
+  const batches = partitionQcPages(illustratedPages);
 
-  const result = await openai.responses.create({
-    model: ANALYSIS_MODEL,
-    instructions: QC_SYSTEM_PROMPT,
-    input: [{ role: 'user', content: contentParts }],
-    text: {
-      format: {
-        type: 'json_schema',
-        name: 'qc_response',
-        strict: true,
-        schema: QC_RESPONSE_SCHEMA as Record<string, unknown>,
+  const scoreBatch = async (
+    batch: typeof illustratedPages,
+    batchIndex: number,
+    includeCover: boolean,
+  ): Promise<QcBatchOutcome> => {
+    const contentParts: Array<
+      | { type: 'input_text'; text: string }
+      | { type: 'input_image'; image_url: string; detail: 'high' }
+    > = [...sheetParts];
+
+    // The cover (non-numeric label too); scored via the coverResult schema
+    // field with its own rubric variant, never via pageResults. Only batch 0.
+    if (includeCover && cover) {
+      contentParts.push({ type: 'input_text', text: 'COVER' });
+      contentParts.push({
+        type: 'input_image',
+        image_url: optimizeCloudinaryUrlForVision(cover.url),
+        detail: 'high',
+      });
+    }
+
+    // Per-batch "PAGE n" ordinals restart at 1 — the judge's echo indexes THIS
+    // batch's local pageMapping, not a book-wide position. BRIDGE ordinals are
+    // likewise local to the batch.
+    const pageMapping: Array<{ pageNumber: number; pageId: string }> = [];
+    const bridgePageOrdinals: number[] = [];
+    for (const page of batch) {
+      contentParts.push({ type: 'input_text', text: `PAGE ${pageMapping.length + 1}` });
+      contentParts.push({
+        type: 'input_image',
+        image_url: optimizeCloudinaryUrlForVision(page.generatedImageUrl!),
+        detail: 'high',
+      });
+      if (page.source === 'BRIDGE') bridgePageOrdinals.push(pageMapping.length + 1);
+      pageMapping.push({ pageNumber: page.pageNumber, pageId: page.pageId });
+    }
+
+    const promptText = createQCPrompt(characterIdentity, pageMapping.length, language, {
+      sheetCount: sheets.length,
+      cover: includeCover && cover ? { expectedTitle: cover.expectedTitle } : null,
+      // Books without BRIDGE rows yield an empty list and a byte-identical
+      // prompt, so the flag-off default is untouched.
+      ...(bridgePageOrdinals.length ? { bridgePageOrdinals } : {}),
+    });
+    contentParts.push({ type: 'input_text', text: promptText });
+
+    const result = await openai.responses.create({
+      model: ANALYSIS_MODEL,
+      instructions: QC_SYSTEM_PROMPT,
+      input: [{ role: 'user', content: contentParts }],
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'qc_response',
+          strict: true,
+          schema: QC_RESPONSE_SCHEMA as Record<string, unknown>,
+        },
       },
-    },
-  });
+    });
 
-  const rawResult = result.output_text;
-  if (!rawResult) {
-    logger.error({ bookId }, 'OpenAI QC returned empty response');
-    return null;
-  }
+    const rawResult = result.output_text;
+    // Throw (caught by runQcBatches → sentinel rows) rather than silently
+    // dropping the batch: an empty response is an infra failure, not a pass.
+    if (!rawResult) throw new Error('OpenAI QC returned empty response');
 
-  const qcResult = JSON.parse(rawResult) as {
-    passed: boolean;
-    summary: string;
-    coverResult?: CoverQCResult | null;
-    pageResults: RawQcPageResult[];
+    const parsed = JSON.parse(rawResult) as {
+      passed: boolean;
+      summary: string;
+      coverResult?: CoverQCResult | null;
+      pageResults: RawQcPageResult[];
+    };
+
+    const { mapped, unmatchedEchoes } = mapQcResultsToPages(parsed.pageResults, pageMapping);
+    if (unmatchedEchoes.length > 0) {
+      logger.warn(
+        { bookId, batchIndex, unmatchedEchoes, imageCount: pageMapping.length },
+        'QC echoed page numbers matching no image label — dropped those results',
+      );
+    }
+
+    return {
+      pageResults: mapped,
+      coverResult: includeCover && cover ? (parsed.coverResult ?? null) : null,
+    };
   };
 
-  // Map the echoed "PAGE n" ordinals back to actual pageIds
-  const { mapped: mappedResults, unmatchedEchoes } = mapQcResultsToPages(
-    qcResult.pageResults,
-    pageMapping,
-  );
-
-  if (unmatchedEchoes.length > 0) {
-    logger.warn(
-      { bookId, unmatchedEchoes, imageCount: pageMapping.length },
-      'QC echoed page numbers matching no image label — dropped those results',
+  // Batch failures are isolated: one throwing batch yields sentinel rows for
+  // its pages (persisted, never requeued) while the other batches' real
+  // results stand. Guarantees exactly one page result per illustrated page.
+  const { pageResults, coverResult, logs } = await runQcBatches(batches, scoreBatch, (log) => {
+    if (log.ok) {
+      logger.info({ bookId, ...log }, 'QC batch scored');
+    } else {
+      logger.error({ bookId, ...log }, 'QC batch failed — sentinel rows recorded');
+    }
+    console.log(
+      `[BookFinalize/QC] batch ${log.batchIndex} (${log.pageCount} pages): ${
+        log.ok ? 'ok' : `error — ${log.error}`
+      }`,
     );
-  }
+  });
 
-  const failedPageIds = mappedResults.filter((r) => !r.passed).map((r) => r.pageId);
+  // Genuine quality failures only — qc_error sentinels are excluded so an
+  // outage never re-illustrates a page.
+  const failedPageIds = selectRequeuePageIds(pageResults);
+  const sentinelCount = pageResults.filter((r) =>
+    isQcErrorFeedback(r.suggestedPromptAdditions),
+  ).length;
+  const batchesFailed = logs.filter((l) => !l.ok).length;
 
   const bookQCResult: BookQCResult = {
-    passed: qcResult.passed && failedPageIds.length === 0,
+    // A book "passes" only with no genuine failures AND no unverified
+    // (sentinel) pages. Sentinels never requeue (excluded from failedPageIds),
+    // so an all-sentinel book still ships — visibly unverified, not silently
+    // unchecked.
+    passed: failedPageIds.length === 0 && sentinelCount === 0,
     qcRound: 0, // Will be set by caller
-    pageResults: mappedResults,
+    pageResults,
     failedPageIds,
-    summary: qcResult.summary,
-    // Only meaningful when a cover was in the call; the schema makes the
-    // field required-nullable, so ignore any hallucinated value otherwise.
-    coverResult: cover ? (qcResult.coverResult ?? null) : null,
+    summary: `${failedPageIds.length} genuine failure(s), ${sentinelCount} unverified page(s) across ${batches.length} batch(es) (${batchesFailed} batch error(s)).`,
+    // Only meaningful when a cover was in the call; ignore any hallucinated
+    // value otherwise. The cover rides batch 0.
+    coverResult: cover ? coverResult : null,
   };
 
   logger.info(
@@ -219,7 +260,10 @@ async function runQualityCheck(
       bookId,
       passed: bookQCResult.passed,
       failedCount: failedPageIds.length,
-      totalChecked: mappedResults.length,
+      sentinelCount,
+      totalChecked: pageResults.length,
+      batches: batches.length,
+      batchesFailed,
       summary: bookQCResult.summary,
     },
     'QC check completed',
@@ -227,13 +271,16 @@ async function runQualityCheck(
 
   console.log(`[BookFinalize/QC] QC result for book ${bookId}:`);
   console.log(`  - Passed: ${bookQCResult.passed}`);
-  console.log(`  - Failed pages: ${failedPageIds.length}/${mappedResults.length}`);
+  console.log(
+    `  - Failed pages: ${failedPageIds.length}/${pageResults.length} (unverified: ${sentinelCount})`,
+  );
   console.log(`  - Summary: ${bookQCResult.summary}`);
 
-  for (const pr of mappedResults) {
+  for (const pr of pageResults) {
     if (!pr.passed) {
+      const errored = isQcErrorFeedback(pr.suggestedPromptAdditions);
       console.log(
-        `  - Page ${pr.pageNumber} FAILED (char: ${pr.characterConsistencyScore}, style: ${pr.styleConsistencyScore}, overall: ${pr.overallScore})`,
+        `  - Page ${pr.pageNumber} ${errored ? 'UNVERIFIED (qc_error)' : 'FAILED'} (char: ${pr.characterConsistencyScore}, style: ${pr.styleConsistencyScore}, overall: ${pr.overallScore})`,
       );
       console.log(`    Issues: ${pr.issues.join('; ')}`);
       if (pr.suggestedPromptAdditions) {
@@ -581,20 +628,27 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
             );
             await prisma.illustrationQcResult.createMany({
               data: [
-                ...qcResult.pageResults.map((r) => ({
-                  bookId,
-                  pageId: r.pageId,
-                  target: 'page',
-                  qcRound,
-                  charScore: r.characterConsistencyScore,
-                  styleScore: r.styleConsistencyScore,
-                  overallScore: r.overallScore,
-                  passed: r.passed,
-                  provider: renderMetaByPageId.get(r.pageId)?.provider ?? null,
-                  model: renderMetaByPageId.get(r.pageId)?.model ?? null,
-                  hadSheet: renderMetaByPageId.get(r.pageId)?.hadSheet ?? false,
-                  feedback: r.suggestedPromptAdditions,
-                })),
+                ...qcResult.pageResults.map((r) => {
+                  // qc_error sentinel: the batch call threw/returned nothing.
+                  // Persist the row (invariant: every page has a QC row) but
+                  // with NULL scores — the placeholder 0s are not a verdict.
+                  const qcErrored = isQcErrorFeedback(r.suggestedPromptAdditions);
+                  const meta = renderMetaByPageId.get(r.pageId);
+                  return {
+                    bookId,
+                    pageId: r.pageId,
+                    target: 'page',
+                    qcRound,
+                    charScore: qcErrored ? null : r.characterConsistencyScore,
+                    styleScore: qcErrored ? null : r.styleConsistencyScore,
+                    overallScore: qcErrored ? null : r.overallScore,
+                    passed: r.passed,
+                    provider: meta?.provider ?? null,
+                    model: meta?.model ?? null,
+                    hadSheet: meta?.hadSheet ?? false,
+                    feedback: r.suggestedPromptAdditions,
+                  };
+                }),
                 // target='cover' keeps cover rows out of page-drift stats.
                 ...(coverForQc && qcResult.coverResult
                   ? [
