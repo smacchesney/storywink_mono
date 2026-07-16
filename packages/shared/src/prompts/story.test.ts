@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { createStoryGenerationPrompt, StoryGenerationInput } from './story.js';
+import {
+  createStoryGenerationPrompt,
+  StoryGenerationInput,
+  STORY_RESPONSE_SCHEMA,
+  STORY_GENERATION_SYSTEM_PROMPT,
+} from './story.js';
 
 function promptText(input: StoryGenerationInput): string {
   return createStoryGenerationPrompt(input)
@@ -215,5 +220,101 @@ describe('createStoryGenerationPrompt — learning words', () => {
     const text = promptText({ ...baseInput, learningWords: ['a', 'b', 'c', 'd', 'e'] });
     expect(text).toContain('"a", "b", "c", "d"');
     expect(text).not.toContain('"e"');
+  });
+});
+
+describe('createStoryGenerationPrompt — S1 sound exemplars neutralized + cap', () => {
+  const text = promptText(baseInput);
+  const jaText = promptText({ ...baseInput, language: 'ja' });
+
+  it('drops every sound-pushing exemplar the model used to copy', () => {
+    expect(text).not.toContain('Splish, splash, one more splash!');
+    expect(text).not.toContain('("Splish!")');
+    expect(text).not.toContain('rumble, swoosh, crunch, pitter-pat');
+    expect(text).not.toContain('How many splashes was that?');
+    expect(text).not.toContain('funny sounds');
+    // ja block
+    expect(jaText).not.toContain('Katakana is OK for onomatopoeia and foreign words');
+    expect(jaText).not.toContain('どきどき');
+    expect(jaText).not.toContain('ぴょんぴょん');
+    expect(jaText).not.toContain('きらきら');
+  });
+
+  it('caps sound words at one per page, never the main event', () => {
+    expect(text).toContain('AT MOST one sound word per page');
+    expect(text).toContain("never as the page's main event");
+    expect(text).toContain('one spice among many');
+  });
+
+  it('leads the refrain example with an action refrain, not a sound', () => {
+    expect(text).toContain('One more step, brave Kai!');
+  });
+
+  it('uses an action fragment as the punchy-fragment example', () => {
+    expect(text).toContain('"Up, up, up!"');
+  });
+
+  it('leads the hand-off examples with a non-sound cue', () => {
+    expect(text).toContain('a shadow slipping across the floor');
+  });
+
+  it('uses a non-sound participation question example', () => {
+    expect(text).toContain('What do YOU think is behind the door?');
+  });
+
+  it('reframes the ja sound-word rule under the one-per-page cap', () => {
+    expect(jaText).toContain('at most one per page');
+  });
+});
+
+describe('createStoryGenerationPrompt — S3 agency arc + S4 payoff/age frame', () => {
+  const text = promptText(baseInput);
+
+  it('names the child as the DOER in the narrative architecture', () => {
+    expect(text).toContain('The child is the DOER');
+    expect(text).toContain('try again before it works');
+  });
+
+  it('reframes humor as situation-driven, not sound effects', () => {
+    expect(text).toContain('comes from the SITUATION, not sound effects');
+    expect(text).toContain('repeats and grows');
+  });
+
+  it('lands on the win with an inferred tone (never asks the parent)', () => {
+    expect(text).toContain('Land on the WIN');
+    expect(text).toContain('Only sweet or sleepy stories');
+    expect(text).toContain('never ask the parent');
+  });
+
+  it('adds obstacle + tryAndOvercome to the storyArc planning instruction', () => {
+    expect(text).toContain('obstacle');
+    expect(text).toContain('tryAndOvercome');
+  });
+
+  it('widens the system prompt to ages 3-5 with the adventure north-star', () => {
+    expect(STORY_GENERATION_SYSTEM_PROMPT).toContain('ages 3-5');
+    expect(STORY_GENERATION_SYSTEM_PROMPT).toContain(
+      'a beginning, a problem, and a satisfying end',
+    );
+    expect(STORY_GENERATION_SYSTEM_PROMPT).not.toContain('toddlers (ages 2-4)');
+  });
+});
+
+describe('STORY_RESPONSE_SCHEMA — storyArc agency + payoff fields (S3/S4)', () => {
+  const arc = STORY_RESPONSE_SCHEMA.properties.storyArc;
+
+  it('requires obstacle and tryAndOvercome on the shared storyArc', () => {
+    expect(arc.required).toContain('obstacle');
+    expect(arc.required).toContain('tryAndOvercome');
+  });
+
+  it('models obstacle as required-string, tryAndOvercome as required-nullable', () => {
+    expect(arc.properties.obstacle.type).toBe('string');
+    expect(arc.properties.tryAndOvercome.type).toEqual(['string', 'null']);
+  });
+
+  it('retargets the resolution field to a tone-neutral payoff', () => {
+    expect(arc.properties.resolution.description).toContain('payoff');
+    expect(arc.properties.resolution.description).not.toContain('carry into sleep');
   });
 });

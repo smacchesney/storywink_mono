@@ -396,6 +396,16 @@ describe('avatarStoryQcProblems', () => {
     expect(avatarStoryQcProblems(qcWithTerriblePremise, 'drip drop off we go', 5)).toEqual([]);
   });
 
+  it('soundOverload + agency are LOG-ONLY on avatar by construction (S2/S3)', () => {
+    // Neither is in the verdict Pick, so a sound-drenched, agency-less draft
+    // still passes the avatar gate (photo enforces soundOverload; avatar logs).
+    const qcWorstCase = { ...passing, soundOverload: true, agency: 0 } as typeof passing & {
+      soundOverload: boolean;
+      agency: number;
+    };
+    expect(avatarStoryQcProblems(qcWorstCase, 'drip drop off we go', 5)).toEqual([]);
+  });
+
   it('model feedback only rides along when something enforced failed', () => {
     expect(
       avatarStoryQcProblems({ ...passing, feedback: 'nitpicks' }, 'drip drop off we go', 5),

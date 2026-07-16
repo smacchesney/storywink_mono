@@ -259,6 +259,10 @@ async function evaluateStoryQuality(
       castNamesMissing: castCoverage?.missing ?? [],
       castNamesSkippedScript: castCoverage?.skippedScript ?? 0,
       truthToEvent: qc.truthToEvent,
+      // ENFORCED on photo (S2): a sound-overloaded draft is regenerated.
+      soundOverload: qc.soundOverload,
+      // LOG-ONLY at launch (S3): flip to enforcing after Railway data.
+      agency: qc.agency,
       hadEventSummary: !!input.eventSummary,
       confirmedFactCount: input.confirmedFacts?.length ?? 0,
     },
@@ -284,6 +288,13 @@ async function evaluateStoryQuality(
         `Page ${page.pageNumber} reads like a photo caption (risk ${page.captionRisk}/10). ${page.issue || "Rewrite from the child's inner experience."}`,
       );
     }
+  }
+  // ENFORCED on photo books (S2): the avatar path logs the same flag but never
+  // regenerates on it (see evaluateAvatarStoryQuality).
+  if (qc.soundOverload) {
+    problems.push(
+      "The story leans on sound words. Cut them back to at most one per page, and never as a page's main event — reach for a vivid verb or an image instead.",
+    );
   }
   if (problems.length > 0 && qc.feedback) {
     problems.push(qc.feedback);
@@ -387,6 +398,10 @@ async function evaluateAvatarStoryQuality(
       // launch (flip to enforcing only after Railway data validates the
       // distribution — every new trigger is a silent extra generation).
       premiseTruth: qc.premiseTruth,
+      // LOG-ONLY on avatar (S2/S3): soundOverload enforces on PHOTO books only;
+      // agency is log-only on both. Neither reaches avatarStoryQcProblems.
+      soundOverload: qc.soundOverload,
+      agency: qc.agency,
       pageIssues: qc.pages.filter((p) => p.issue).length,
       childNameCheck,
       childNameEchoes,

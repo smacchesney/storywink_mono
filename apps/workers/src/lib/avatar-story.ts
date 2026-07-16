@@ -67,7 +67,9 @@ export function buildAvatarCastForPrompt(
  * draft and force the single regeneration. premiseTruth is deliberately
  * ABSENT — it ships LOG-ONLY, same telemetry-first philosophy as every other
  * new check (an enforcing check is a silent extra generation during the
- * parent's wait).
+ * parent's wait). X13 Track S adds two more log-only-on-avatar scores kept
+ * out of this Pick by the same principle: soundOverload (the PHOTO judge
+ * enforces it; avatar only logs) and agency (log-only on both at launch).
  */
 export function avatarStoryQcProblems(
   qc: Pick<

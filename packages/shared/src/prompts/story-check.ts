@@ -44,6 +44,8 @@ export function createStoryQCPrompt(input: StoryQCInput): string {
 
 # Declared story arc
 - Desire: ${input.storyArc.desire}
+- Obstacle: ${input.storyArc.obstacle}
+- Try: ${input.storyArc.tryAndOvercome ?? '(none declared)'}
 - Refrain: ${input.storyArc.refrain}
 - Emotional peak: ${input.storyArc.emotionalPeak}
 - Resolution: ${input.storyArc.resolution}
@@ -55,7 +57,7 @@ ${pagesBlock}
 Score the manuscript:
 
 1. arcCoherence (0-10): Do the pages actually deliver the declared arc — a desire established early, escalation through the middle, an emotional peak, a soft landing? A flat sequence of disconnected moments scores below 5.
-2. readAloudRhythm (0-10): Read it aloud in your head. Varied sentence lengths, musicality, organic sound words score high. Monotonous subject-verb-object chains score below 5.
+2. readAloudRhythm (0-10): Read it aloud in your head. Varied sentence lengths and musicality score high; leaning on sound words does NOT — a story that reaches for a sound word where a vivid verb or image would do scores below 6. Monotonous subject-verb-object chains score below 5.
 3. lastPageLanding (boolean): true only if the final page lands as a soft, warm exhale WITHOUT a summary statement ("What a wonderful day", "それはすてきないちにちでした" and the like are automatic false).
 4. Per page, captionRisk (0-10): 0 = pure story (feeling, wonder, discovery); 10 = pure photo caption ("Kai is at the beach. He sees waves."). Anything that mostly narrates what a camera would see scores 7+.
 5. truthToEvent (0-10, or null): ${
@@ -63,8 +65,10 @@ Score the manuscript:
       ? 'Does the manuscript deliver the specific day described under "What actually happened" — its people, its place, its arc — rather than a generic day-shaped story? A story that could be about any day scores below 5.'
       : 'No event summary was provided — return null.'
   }
-${input.language === 'ja' ? '\n6. The text must be Japanese in hiragana/katakana with NO kanji. Flag any kanji as a page issue.\n' : ''}
-If ANY of these fail (arcCoherence < 6, readAloudRhythm < 6, lastPageLanding false, or any page captionRisk >= 7), write "feedback": a numbered list of specific corrections. Reference page numbers. Say exactly what is wrong and what a fix looks like — do not write replacement text yourself.
+6. soundOverload (boolean): true if the manuscript leans on sound words — any page that stacks 2+ sound words, or makes a sound word the page's main event. A story that reaches for a sound word where a vivid verb or image would do is overloaded. When true, name the offending pages in "feedback".
+7. agency (0-10): Is the child the DOER — one clear goal, a real obstacle, and a try-wobble-try before the payoff? A child who only moves THROUGH a tour of moments (witnessing, not acting) scores below 5.
+${input.language === 'ja' ? '\n8. The text must be Japanese in hiragana/katakana with NO kanji. Flag any kanji as a page issue.\n' : ''}
+If ANY of these fail (arcCoherence < 6, readAloudRhythm < 6, lastPageLanding false, soundOverload true, or any page captionRisk >= 7), write "feedback": a numbered list of specific corrections. Reference page numbers. Say exactly what is wrong and what a fix looks like — do not write replacement text yourself.
 
 BAD feedback:  "Page 3 is too caption-like"
 GOOD feedback: "Page 3 only describes the visible scene (girl on swing). Rewrite from her inner experience — what does the swoop feel like in her tummy? Add one sensory or imaginative element beyond the photo."
@@ -98,6 +102,15 @@ export const STORY_QC_RESPONSE_SCHEMA = {
       type: ['number', 'null'],
       description: '0-10 when an event summary was provided, else null',
     },
+    soundOverload: {
+      type: ['boolean', 'null'],
+      description:
+        "true if the story leans on sound words (2+ on a page, or sound as a page's main event); null if not assessed",
+    },
+    agency: {
+      type: 'number',
+      description: '0-10 — is the child the doer with a goal, an obstacle, and a try',
+    },
     feedback: {
       type: ['string', 'null'],
       description: 'Numbered corrections if failing, else null',
@@ -109,6 +122,8 @@ export const STORY_QC_RESPONSE_SCHEMA = {
     'lastPageLanding',
     'pages',
     'truthToEvent',
+    'soundOverload',
+    'agency',
     'feedback',
   ],
   additionalProperties: false,
@@ -120,6 +135,10 @@ export interface StoryQCResponse {
   lastPageLanding: boolean;
   pages: { pageNumber: number; captionRisk: number; issue: string | null }[];
   truthToEvent: number | null;
+  /** Photo judge enforces this; true = the story over-uses sound words. */
+  soundOverload: boolean | null;
+  /** Log-only at launch — is the child the doer (goal, obstacle, try)? */
+  agency: number;
   feedback: string | null;
 }
 
@@ -137,6 +156,12 @@ export const STORY_QC_THRESHOLDS = {
   // Log-only (X6d): premiseTruth is scored on AVATAR_STORY books and logged,
   // never enforced — same telemetry-first philosophy as truthToEvent.
   minPremiseTruth: 6,
+  // Log-only (X13 S3): agency is scored on BOTH photo and avatar books and
+  // logged, never enforced at launch. soundOverload (the sibling S-track
+  // check) DOES enforce on photo — it is a boolean flag, no threshold needed.
+  // Flip agency to enforcing only after Railway data validates the
+  // distribution (every new trigger is a silent extra generation).
+  minAgency: 6,
 } as const;
 
 // ----------------------------------
@@ -177,6 +202,8 @@ export function createAvatarStoryQCPrompt(input: AvatarStoryQCInput): string {
 
 # Declared story arc
 - Desire: ${input.storyArc.desire}
+- Obstacle: ${input.storyArc.obstacle}
+- Try: ${input.storyArc.tryAndOvercome ?? '(none declared)'}
 - Refrain: ${input.storyArc.refrain}
 - Emotional peak: ${input.storyArc.emotionalPeak}
 - Resolution: ${input.storyArc.resolution}
@@ -191,15 +218,17 @@ ${pagesBlock}
 Score the manuscript:
 
 1. arcCoherence (0-10): Do the pages actually deliver the declared arc — a desire established early, escalation through the middle, an emotional peak, a soft landing? A flat sequence of disconnected moments scores below 5.
-2. readAloudRhythm (0-10): Read it aloud in your head. Varied sentence lengths, musicality, organic sound words score high. Monotonous subject-verb-object chains score below 5.
+2. readAloudRhythm (0-10): Read it aloud in your head. Varied sentence lengths and musicality score high; leaning on sound words does NOT — a story that reaches for a sound word where a vivid verb or image would do scores below 6. Monotonous subject-verb-object chains score below 5.
 3. lastPageLanding (boolean): true only if the final page lands as a soft, warm exhale WITHOUT a summary statement ("What a wonderful day", "それはすてきないちにちでした" and the like are automatic false).
 4. premiseTruth (0-10): Does the manuscript deliver the premise above — its promise shapes the desire, the peak, and the landing? A story that could hang off any premise scores below 5.
-5. Per page, note a specific "issue" (or null): an invented character, a broken hand-off, a page that stalls the story.
-${input.language === 'ja' ? '\n6. The text must be Japanese in hiragana/katakana with NO kanji. Flag any kanji as a page issue.\n' : ''}
+5. soundOverload (boolean): true if the manuscript leans on sound words — any page that stacks 2+ sound words, or makes a sound word the page's main event. A story that reaches for a sound word where a vivid verb or image would do is overloaded.
+6. agency (0-10): Is the child the DOER — one clear goal, a real obstacle, and a try-wobble-try before the payoff? A child who only moves THROUGH a tour of moments (witnessing, not acting) scores below 5.
+7. Per page, note a specific "issue" (or null): an invented character, a broken hand-off, a page that stalls the story.
+${input.language === 'ja' ? '\n8. The text must be Japanese in hiragana/katakana with NO kanji. Flag any kanji as a page issue.\n' : ''}
 If ANY of these fail (arcCoherence < 6, readAloudRhythm < 6, or lastPageLanding false), write "feedback": a numbered list of specific corrections. Reference page numbers. Say exactly what is wrong and what a fix looks like — do not write replacement text yourself.
 
 BAD feedback:  "Page 3 is weak"
-GOOD feedback: "Page 3 stalls — nothing leans into page 4. End it with a sound getting closer or a question, so the listener needs the page turn."
+GOOD feedback: "Page 3 stalls — nothing leans into page 4. End it with a glance toward the next thing or a question, so the listener needs the page turn."
 
 If everything passes, set "feedback" to null.`;
 }
@@ -229,6 +258,15 @@ export const AVATAR_STORY_QC_RESPONSE_SCHEMA = {
       type: 'number',
       description: '0-10 — does the manuscript deliver the parent-picked premise',
     },
+    soundOverload: {
+      type: ['boolean', 'null'],
+      description:
+        "true if the story leans on sound words (2+ on a page, or sound as a page's main event); null if not assessed",
+    },
+    agency: {
+      type: 'number',
+      description: '0-10 — is the child the doer with a goal, an obstacle, and a try',
+    },
     feedback: {
       type: ['string', 'null'],
       description: 'Numbered corrections if failing, else null',
@@ -240,6 +278,8 @@ export const AVATAR_STORY_QC_RESPONSE_SCHEMA = {
     'lastPageLanding',
     'pages',
     'premiseTruth',
+    'soundOverload',
+    'agency',
     'feedback',
   ],
   additionalProperties: false,
@@ -251,6 +291,10 @@ export interface AvatarStoryQCResponse {
   lastPageLanding: boolean;
   pages: { pageNumber: number; issue: string | null }[];
   premiseTruth: number;
+  /** Log-only on avatar (photo enforces); true = the story over-uses sound words. */
+  soundOverload: boolean | null;
+  /** Log-only — is the child the doer (goal, obstacle, try)? */
+  agency: number;
   feedback: string | null;
 }
 

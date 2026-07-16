@@ -5,8 +5,19 @@ import {
   countChildNameEchoes,
   createStoryQCPrompt,
   countLearningWordEchoes,
+  STORY_QC_RESPONSE_SCHEMA,
+  STORY_QC_THRESHOLDS,
 } from './story-check.js';
 import type { StoryArc } from './story.js';
+
+const arc: StoryArc = {
+  desire: 'To rescue the soggy teddy',
+  obstacle: 'The teddy is stuck under the shed in the rain',
+  tryAndOvercome: 'Emma tries a stick, then a broom, then asks Grandma for a boost',
+  refrain: 'Splish, splash!',
+  emotionalPeak: 'The biggest puddle of all',
+  resolution: 'Warm and dry at home',
+};
 
 describe('countRefrainEchoes (en)', () => {
   const refrain = 'Splish, splash, one more splash!';
@@ -149,6 +160,8 @@ describe('countChildNameEchoes', () => {
 describe('createStoryQCPrompt context block', () => {
   const storyArc: StoryArc = {
     desire: 'To splash in every puddle',
+    obstacle: 'The biggest puddle is guarded by a grumpy goose',
+    tryAndOvercome: 'She tiptoes, she waits, then she offers the goose a crumb',
     refrain: 'Splish, splash!',
     emotionalPeak: 'The biggest puddle of all',
     resolution: 'Warm and dry at home',
@@ -194,5 +207,49 @@ describe('countLearningWordEchoes', () => {
   it('counts CJK words as substrings (ja)', () => {
     const pages = ['かさを さして', 'あめが ざあざあ', 'かさは まほう'];
     expect(countLearningWordEchoes('かさ', pages, 'ja')).toBe(2);
+  });
+});
+
+describe('createStoryQCPrompt — S2/S3 retargeted rubric (photo)', () => {
+  const prompt = createStoryQCPrompt({
+    storyArc: arc,
+    pages: [{ pageNumber: 1, text: 'Splish!' }],
+  });
+
+  it('stops praising sound words in the rhythm rubric', () => {
+    expect(prompt).not.toContain('organic sound words score high');
+    expect(prompt).toContain('leaning on sound words does NOT');
+  });
+
+  it('scores soundOverload and enforces it on the photo judge', () => {
+    expect(prompt).toContain('soundOverload (boolean)');
+    const failLine = prompt.split('\n').find((l) => l.startsWith('If ANY of these fail'));
+    expect(failLine).toContain('soundOverload true');
+  });
+
+  it('scores agency but keeps it out of the fail conditions (log-only)', () => {
+    expect(prompt).toContain('agency (0-10)');
+    const failLine = prompt.split('\n').find((l) => l.startsWith('If ANY of these fail'));
+    expect(failLine).not.toContain('agency');
+  });
+
+  it('renders the obstacle + try in the declared-arc block', () => {
+    expect(prompt).toContain('Obstacle:');
+    expect(prompt).toContain('Try:');
+  });
+});
+
+describe('STORY_QC_RESPONSE_SCHEMA — new fields (S2/S3)', () => {
+  it('adds soundOverload (required-nullable) and agency (required number)', () => {
+    expect(STORY_QC_RESPONSE_SCHEMA.required).toContain('soundOverload');
+    expect(STORY_QC_RESPONSE_SCHEMA.required).toContain('agency');
+    expect(STORY_QC_RESPONSE_SCHEMA.properties.soundOverload.type).toEqual(['boolean', 'null']);
+    expect(STORY_QC_RESPONSE_SCHEMA.properties.agency.type).toBe('number');
+  });
+});
+
+describe('STORY_QC_THRESHOLDS — agency threshold (log-only)', () => {
+  it('carries a log-only minAgency threshold', () => {
+    expect(STORY_QC_THRESHOLDS.minAgency).toBe(6);
   });
 });
