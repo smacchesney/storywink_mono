@@ -1,4 +1,5 @@
-import type { PageQCResult } from '@storywink/shared/types';
+import type { PageQCResult, QcClassFlags } from '@storywink/shared/types';
+import { emptyQcClassFlags } from '@storywink/shared/prompts/quality-check';
 
 /** One entry per illustrated image sent to the QC judge, in presentation order. */
 export interface QcPageRef {
@@ -16,6 +17,28 @@ export interface RawQcPageResult {
   overallScore: number;
   issues: string[];
   suggestedPromptAdditions: string | null;
+  /**
+   * Rubric-v2 defect classes. Strict mode guarantees the judge returns these,
+   * but a pre-schema echo (or a partial payload) is normalized against the
+   * all-clean default so a missing class never reads as a defect.
+   */
+  classFlags?: Partial<QcClassFlags> | null;
+}
+
+/** Coerce a raw judge classFlags blob onto the strict QcClassFlags shape. */
+function normalizeClassFlags(raw: Partial<QcClassFlags> | null | undefined): QcClassFlags {
+  const base = emptyQcClassFlags();
+  if (!raw) return base;
+  return {
+    renderedText: raw.renderedText ?? base.renderedText,
+    intraImageDuplicate: raw.intraImageDuplicate ?? base.intraImageDuplicate,
+    missingExpectedCast: raw.missingExpectedCast ?? base.missingExpectedCast,
+    speciesMismatch: raw.speciesMismatch ?? base.speciesMismatch,
+    characterHybrid: raw.characterHybrid ?? base.characterHybrid,
+    // Nullable no-op classes: honor an explicit null/boolean, else default null.
+    propHolderMismatch: raw.propHolderMismatch ?? base.propHolderMismatch,
+    focalActionMismatch: raw.focalActionMismatch ?? base.focalActionMismatch,
+  };
 }
 
 export interface QcMappingResult {
@@ -58,6 +81,7 @@ export function mapQcResultsToPages(
       styleConsistencyScore: pr.styleConsistencyScore,
       overallScore: pr.overallScore,
       suggestedPromptAdditions: pr.suggestedPromptAdditions ?? null,
+      classFlags: normalizeClassFlags(pr.classFlags),
     });
   }
 

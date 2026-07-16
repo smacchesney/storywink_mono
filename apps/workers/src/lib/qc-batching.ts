@@ -1,4 +1,9 @@
 import type { PageQCResult, CoverQCResult } from '@storywink/shared/types';
+import {
+  QC_BLOCKING_CLASSES,
+  emptyQcClassFlags,
+  type QcClass,
+} from '@storywink/shared/prompts/quality-check';
 
 /**
  * Maximum pages per QC vision call. The book-finalize QC is split into batches
@@ -70,6 +75,9 @@ export function sentinelPageResult(page: QcBatchPageInfo, message: string): Page
     styleConsistencyScore: 0,
     overallScore: 0,
     suggestedPromptAdditions: `${QC_ERROR_PREFIX} ${message}`,
+    // Unscored page: the all-clean/null default, NOT a clean verdict. A
+    // sentinel's flags never trigger a blocking-class requeue.
+    classFlags: emptyQcClassFlags(),
   };
 }
 
@@ -94,14 +102,124 @@ export function sentinelCoverResult(message: string): CoverQCResult {
 }
 
 /**
- * Page ids that must be re-illustrated: genuine quality failures only. A
- * qc_error sentinel (infra failure) is deliberately excluded — the finalize
- * requeue keys off `!passed`, and an outage is not a quality verdict.
+ * True if any of the given blocking classes fired on this page's flags. Only
+ * `true` counts as a defect — a `null` no-op class never blocks.
  */
-export function selectRequeuePageIds(pageResults: PageQCResult[]): string[] {
+export function hasBlockingFlag(
+  result: PageQCResult,
+  blockingClasses: readonly QcClass[] = QC_BLOCKING_CLASSES,
+): boolean {
+  return blockingClasses.some((cls) => result.classFlags[cls] === true);
+}
+
+/**
+ * Page ids that must be re-illustrated. Two independent triggers, both gated
+ * behind "not a qc_error sentinel" (an outage is never a quality verdict):
+ *   1. a genuine score failure (`!passed`), or
+ *   2. a BLOCKING defect class fired (rendered-text / intra-image-duplicate).
+ *
+ * `blockingClasses` defaults to `QC_BLOCKING_CLASSES` so promoting a telemetry
+ * class into the gate is a one-line change to that constant — pass a custom set
+ * only in tests. TELEMETRY-only class flags (missing-cast, species, hybrid,
+ * prop-holder, focal-action) never appear here; they ride `qc_class_flags`.
+ */
+export function selectRequeuePageIds(
+  pageResults: PageQCResult[],
+  blockingClasses: readonly QcClass[] = QC_BLOCKING_CLASSES,
+): string[] {
   return pageResults
-    .filter((r) => !r.passed && !isQcErrorFeedback(r.suggestedPromptAdditions))
+    .filter(
+      (r) =>
+        !isQcErrorFeedback(r.suggestedPromptAdditions) &&
+        (!r.passed || hasBlockingFlag(r, blockingClasses)),
+    )
     .map((r) => r.pageId);
+}
+
+/**
+ * Canonical re-render feedback for each BLOCKING class — the class-specific
+ * instruction the re-illustration prompt needs when the judge's own
+ * suggestedPromptAdditions is thin. Telemetry-only classes have no entry: they
+ * never requeue, so they never need re-render feedback.
+ */
+export const QC_BLOCKING_CLASS_FEEDBACK: Partial<Record<QcClass, string>> = {
+  renderedText:
+    'REMOVE ALL TEXT: the illustration contains rendered letters or words (sound-effect words included). Interior art must contain NO text of any kind — the story words are added as a separate overlay.',
+  intraImageDuplicate:
+    'DUPLICATE CHARACTER: the same character appears more than once in this image. Draw each character exactly once.',
+};
+
+/**
+ * The feedback string to attach to a requeued page. Prepends the canonical
+ * text for whichever blocking classes fired (so a blocking failure always
+ * carries class-specific guidance) and appends the judge's own feedback when
+ * present. Returns null only when there is nothing to say.
+ */
+export function requeueFeedbackFor(
+  result: PageQCResult,
+  blockingClasses: readonly QcClass[] = QC_BLOCKING_CLASSES,
+): string | null {
+  const classText = blockingClasses
+    .filter((cls) => result.classFlags[cls] === true)
+    .map((cls) => QC_BLOCKING_CLASS_FEEDBACK[cls])
+    .filter((text): text is string => Boolean(text))
+    .join(' ');
+  const judge = result.suggestedPromptAdditions?.trim() || '';
+  const combined = [classText, judge].filter(Boolean).join(' ');
+  return combined || null;
+}
+
+/** One searchable per-page telemetry record carrying every class flag. */
+export interface QcClassFlagLog {
+  event: 'qc_class_flags';
+  bookId: string;
+  pageId: string;
+  pageNumber: number;
+  qcRound: number;
+  /** True when a BLOCKING class fired (this page is being re-queued). */
+  blocked: boolean;
+  /** True when the row is an unscored qc_error sentinel (exclude from precision stats). */
+  qcError: boolean;
+  renderedText: boolean;
+  intraImageDuplicate: boolean;
+  missingExpectedCast: boolean;
+  speciesMismatch: boolean;
+  characterHybrid: boolean;
+  propHolderMismatch: boolean | null;
+  focalActionMismatch: boolean | null;
+}
+
+/**
+ * Build the one-per-page `qc_class_flags` record — the dataset the promotion
+ * criterion reads. Emitted for every page (sentinels included, marked
+ * `qcError`) so each finalized page leaves exactly one telemetry row.
+ */
+export function buildQcClassFlagLog(params: {
+  bookId: string;
+  qcRound: number;
+  result: PageQCResult;
+  blockingClasses?: readonly QcClass[];
+}): QcClassFlagLog {
+  const { bookId, qcRound, result } = params;
+  const blockingClasses = params.blockingClasses ?? QC_BLOCKING_CLASSES;
+  const qcError = isQcErrorFeedback(result.suggestedPromptAdditions);
+  const f = result.classFlags;
+  return {
+    event: 'qc_class_flags',
+    bookId,
+    pageId: result.pageId,
+    pageNumber: result.pageNumber,
+    qcRound,
+    blocked: !qcError && hasBlockingFlag(result, blockingClasses),
+    qcError,
+    renderedText: f.renderedText,
+    intraImageDuplicate: f.intraImageDuplicate,
+    missingExpectedCast: f.missingExpectedCast,
+    speciesMismatch: f.speciesMismatch,
+    characterHybrid: f.characterHybrid,
+    propHolderMismatch: f.propHolderMismatch,
+    focalActionMismatch: f.focalActionMismatch,
+  };
 }
 
 /** What one batch's scoring call resolves to. */

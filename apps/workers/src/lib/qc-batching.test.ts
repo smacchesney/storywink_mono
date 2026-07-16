@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { PageQCResult, CoverQCResult } from '@storywink/shared/types';
+import type { PageQCResult, CoverQCResult, QcClassFlags } from '@storywink/shared/types';
+import { emptyQcClassFlags } from '@storywink/shared/prompts/quality-check';
 import {
   QC_BATCH_MAX_PAGES,
   QC_ERROR_PREFIX,
@@ -8,11 +9,18 @@ import {
   sentinelPageResult,
   sentinelCoverResult,
   selectRequeuePageIds,
+  hasBlockingFlag,
+  requeueFeedbackFor,
+  buildQcClassFlagLog,
   runQcBatches,
   buildQcRows,
   type QcBatchPageInfo,
   type QcRenderMeta,
 } from './qc-batching.js';
+
+function flags(overrides: Partial<QcClassFlags> = {}): QcClassFlags {
+  return { ...emptyQcClassFlags(), ...overrides };
+}
 
 function realResult(overrides: Partial<PageQCResult> = {}): PageQCResult {
   return {
@@ -24,6 +32,7 @@ function realResult(overrides: Partial<PageQCResult> = {}): PageQCResult {
     styleConsistencyScore: 8,
     overallScore: 8,
     suggestedPromptAdditions: null,
+    classFlags: emptyQcClassFlags(),
     ...overrides,
   };
 }
@@ -121,6 +130,12 @@ describe('isQcErrorFeedback / sentinelPageResult / sentinelCoverResult', () => {
     expect(isQcErrorFeedback(s.suggestedPromptAdditions)).toBe(true);
   });
 
+  it('gives a page sentinel the all-clean/null classFlags default (unjudged, never blocking)', () => {
+    const s = sentinelPageResult({ pageNumber: 4, pageId: 'page-4' }, 'boom');
+    expect(s.classFlags).toEqual(emptyQcClassFlags());
+    expect(hasBlockingFlag(s)).toBe(false);
+  });
+
   it('builds a cover sentinel: unverified (not passed, title unconfirmed), prefixed feedback', () => {
     const s = sentinelCoverResult('cover call exploded');
     expect(s.passed).toBe(false);
@@ -158,6 +173,152 @@ describe('selectRequeuePageIds', () => {
       realResult({ pageId: 'fine', passed: true }),
     ];
     expect(selectRequeuePageIds(results)).toEqual(['genuine']);
+  });
+
+  it('requeues a blocking-class flag (rendered-text) even when the judge marked the page passed', () => {
+    const results = [
+      realResult({ pageId: 'texty', passed: true, classFlags: flags({ renderedText: true }) }),
+      realResult({
+        pageId: 'dupe',
+        passed: true,
+        classFlags: flags({ intraImageDuplicate: true }),
+      }),
+      realResult({ pageId: 'clean', passed: true }),
+    ];
+    expect(selectRequeuePageIds(results)).toEqual(['texty', 'dupe']);
+  });
+
+  it('does NOT requeue telemetry-only class flags (missing-cast, species, hybrid, prop, focal)', () => {
+    const results = [
+      realResult({
+        pageId: 'miss',
+        passed: true,
+        classFlags: flags({ missingExpectedCast: true }),
+      }),
+      realResult({ pageId: 'species', passed: true, classFlags: flags({ speciesMismatch: true }) }),
+      realResult({ pageId: 'hybrid', passed: true, classFlags: flags({ characterHybrid: true }) }),
+      realResult({ pageId: 'prop', passed: true, classFlags: flags({ propHolderMismatch: true }) }),
+      realResult({
+        pageId: 'focal',
+        passed: true,
+        classFlags: flags({ focalActionMismatch: true }),
+      }),
+    ];
+    expect(selectRequeuePageIds(results)).toEqual([]);
+  });
+
+  it('never requeues a qc_error sentinel even if a blocking flag were somehow set', () => {
+    const sentinel = sentinelPageResult({ pageNumber: 1, pageId: 'errored' }, 'boom');
+    sentinel.classFlags = flags({ renderedText: true }); // pathological — should still not requeue
+    expect(selectRequeuePageIds([sentinel])).toEqual([]);
+  });
+
+  it('the promotion constant drives the split: pass species into the blocking set → it requeues', () => {
+    const results = [
+      realResult({ pageId: 'species', passed: true, classFlags: flags({ speciesMismatch: true }) }),
+      realResult({ pageId: 'clean', passed: true }),
+    ];
+    // Default posture: species is telemetry-only.
+    expect(selectRequeuePageIds(results)).toEqual([]);
+    // Promote species by passing it as a blocking class — one-line change in prod.
+    expect(
+      selectRequeuePageIds(results, ['renderedText', 'intraImageDuplicate', 'speciesMismatch']),
+    ).toEqual(['species']);
+  });
+});
+
+describe('requeueFeedbackFor', () => {
+  it('prepends class-specific text for a blocking class and appends the judge feedback', () => {
+    const r = realResult({
+      pageId: 'p',
+      passed: false,
+      classFlags: flags({ renderedText: true }),
+      suggestedPromptAdditions: 'HAIR COLOR WRONG: must be black.',
+    });
+    const fb = requeueFeedbackFor(r)!;
+    expect(fb).toContain('REMOVE ALL TEXT');
+    expect(fb).toContain('HAIR COLOR WRONG: must be black.');
+    expect(fb.indexOf('REMOVE ALL TEXT')).toBeLessThan(fb.indexOf('HAIR COLOR'));
+  });
+
+  it('names each blocking class that fired', () => {
+    const r = realResult({
+      pageId: 'p',
+      passed: false,
+      classFlags: flags({ renderedText: true, intraImageDuplicate: true }),
+      suggestedPromptAdditions: null,
+    });
+    const fb = requeueFeedbackFor(r)!;
+    expect(fb).toContain('REMOVE ALL TEXT');
+    expect(fb).toContain('DUPLICATE CHARACTER');
+  });
+
+  it('adds NO class text for a plain score failure with only telemetry flags', () => {
+    const r = realResult({
+      pageId: 'p',
+      passed: false,
+      classFlags: flags({ speciesMismatch: true }),
+      suggestedPromptAdditions: 'SKIN TONE DRIFT: too pale.',
+    });
+    expect(requeueFeedbackFor(r)).toBe('SKIN TONE DRIFT: too pale.');
+  });
+
+  it('returns null when there is nothing to say', () => {
+    expect(requeueFeedbackFor(realResult({ passed: false, suggestedPromptAdditions: null }))).toBe(
+      null,
+    );
+  });
+});
+
+describe('buildQcClassFlagLog', () => {
+  it('emits one structured record with every class flag and a blocked marker', () => {
+    const log = buildQcClassFlagLog({
+      bookId: 'book-1',
+      qcRound: 1,
+      result: realResult({
+        pageId: 'page-2',
+        pageNumber: 2,
+        passed: true,
+        classFlags: flags({ renderedText: true, missingExpectedCast: true }),
+      }),
+    });
+    expect(log).toEqual({
+      event: 'qc_class_flags',
+      bookId: 'book-1',
+      pageId: 'page-2',
+      pageNumber: 2,
+      qcRound: 1,
+      blocked: true, // rendered-text is a blocking class
+      qcError: false,
+      renderedText: true,
+      intraImageDuplicate: false,
+      missingExpectedCast: true,
+      speciesMismatch: false,
+      characterHybrid: false,
+      propHolderMismatch: null,
+      focalActionMismatch: null,
+    });
+  });
+
+  it('marks a telemetry-only defect as NOT blocked', () => {
+    const log = buildQcClassFlagLog({
+      bookId: 'b',
+      qcRound: 0,
+      result: realResult({ pageId: 'p', classFlags: flags({ speciesMismatch: true }) }),
+    });
+    expect(log.blocked).toBe(false);
+    expect(log.speciesMismatch).toBe(true);
+  });
+
+  it('marks a qc_error sentinel row (excluded from precision stats, never blocked)', () => {
+    const log = buildQcClassFlagLog({
+      bookId: 'b',
+      qcRound: 0,
+      result: sentinelPageResult({ pageNumber: 5, pageId: 'page-5' }, 'boom'),
+    });
+    expect(log.qcError).toBe(true);
+    expect(log.blocked).toBe(false);
+    expect(log.pageId).toBe('page-5');
   });
 });
 

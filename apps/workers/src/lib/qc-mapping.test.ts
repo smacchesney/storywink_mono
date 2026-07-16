@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { emptyQcClassFlags } from '@storywink/shared/prompts/quality-check';
 import { mapQcResultsToPages, RawQcPageResult, QcPageRef } from './qc-mapping.js';
 
 function rawResult(overrides: Partial<RawQcPageResult> = {}): RawQcPageResult {
@@ -107,6 +108,46 @@ describe('mapQcResultsToPages', () => {
       styleConsistencyScore: 6,
       overallScore: 5,
       suggestedPromptAdditions: 'HAIR COLOR WRONG: must be black.',
+      // No classFlags on the raw echo → normalized to the all-clean default.
+      classFlags: emptyQcClassFlags(),
     });
+  });
+
+  it('carries the judge classFlags through and defaults missing ones', () => {
+    const pageMapping: QcPageRef[] = [{ pageNumber: 3, pageId: 'page-3' }];
+
+    const { mapped } = mapQcResultsToPages(
+      [
+        rawResult({
+          pageNumber: 1,
+          passed: false,
+          // Judge supplies a partial blob — the rest normalizes to the default.
+          classFlags: {
+            renderedText: true,
+            intraImageDuplicate: false,
+            speciesMismatch: true,
+            propHolderMismatch: false,
+            focalActionMismatch: null,
+          },
+        }),
+      ],
+      pageMapping,
+    );
+
+    expect(mapped[0].classFlags).toEqual({
+      renderedText: true,
+      intraImageDuplicate: false,
+      missingExpectedCast: false,
+      speciesMismatch: true,
+      characterHybrid: false,
+      propHolderMismatch: false,
+      focalActionMismatch: null,
+    });
+  });
+
+  it('defaults classFlags to the all-clean default when the judge omits them', () => {
+    const pageMapping: QcPageRef[] = [{ pageNumber: 1, pageId: 'page-a' }];
+    const { mapped } = mapQcResultsToPages([rawResult({ pageNumber: 1 })], pageMapping);
+    expect(mapped[0].classFlags).toEqual(emptyQcClassFlags());
   });
 });
