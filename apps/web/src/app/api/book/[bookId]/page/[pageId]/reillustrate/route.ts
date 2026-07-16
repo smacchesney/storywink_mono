@@ -17,7 +17,7 @@ import { checkRateLimit } from '@/lib/rateLimit';
  */
 export async function POST(
   _request: Request,
-  { params }: { params: Promise<{ bookId: string; pageId: string }> }
+  { params }: { params: Promise<{ bookId: string; pageId: string }> },
 ) {
   const { bookId, pageId } = await params;
 
@@ -26,9 +26,18 @@ export async function POST(
 
     const rl = await checkRateLimit(`reillustrate:${dbUser.id}`, 30, 3600);
     if (!rl.allowed) {
-      logger.warn({ dbUserId: dbUser.id, key: `reillustrate:${dbUser.id}`, remaining: rl.remaining }, 'Rate limit exceeded: reillustrate page');
+      logger.warn(
+        { dbUserId: dbUser.id, key: `reillustrate:${dbUser.id}`, remaining: rl.remaining },
+        'Rate limit exceeded: reillustrate page',
+      );
       if (process.env.RATE_LIMIT_ENFORCE === 'true') {
-        return NextResponse.json({ error: "You're re-illustrating pages very quickly. Please wait a little while and try again." }, { status: 429 });
+        return NextResponse.json(
+          {
+            error:
+              "You're re-illustrating pages very quickly. Please wait a little while and try again.",
+          },
+          { status: 429 },
+        );
       }
     }
 
@@ -50,7 +59,10 @@ export async function POST(
     });
 
     if (!book) {
-      return NextResponse.json({ error: 'Book not found or you do not have permission.' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Book not found or you do not have permission.' },
+        { status: 403 },
+      );
     }
 
     const page = book.pages[0];
@@ -69,8 +81,10 @@ export async function POST(
     });
     if (transition.count === 0) {
       return NextResponse.json(
-        { error: `A single page can only be re-illustrated on a finished book (current status: ${book.status}).` },
-        { status: 409 }
+        {
+          error: `A single page can only be re-illustrated on a finished book (current status: ${book.status}).`,
+        },
+        { status: 409 },
       );
     }
 
@@ -94,17 +108,17 @@ export async function POST(
         backoff: { type: 'exponential', delay: 10000 },
         removeOnComplete: { count: 100 },
         removeOnFail: { count: 500 },
-      }
+      },
     );
 
     logger.info(
       { clerkId, dbUserId: dbUser.id, bookId, pageId, extractionJobId: extractionJob.id },
-      'API: Single-page re-illustration queued'
+      'API: Single-page re-illustration queued',
     );
 
     return NextResponse.json(
       { message: 'Re-illustration started for this page.', bookId, pageId },
-      { status: 202 }
+      { status: 202 },
     );
   } catch (error) {
     if (

@@ -37,13 +37,7 @@ const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 /** How many uploads run at once. Keeps mobile connections from stalling. */
 const CONCURRENCY = 3;
 
-const ALLOWED_MIME = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/heic',
-  'image/heif',
-]);
+const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']);
 
 /** A stable per-file key the UI uses to route progress/error events back to a tile. */
 export type FileKey = string;
@@ -86,11 +80,7 @@ export interface UploadPhotosOptions {
  * Translation keys under the `upload` namespace. The engine never renders copy
  * itself — it hands the UI a key so error text stays in messages/{en,ja}.json.
  */
-export type UploadErrorKey =
-  | 'errorTooBig'
-  | 'errorWrongType'
-  | 'errorNetwork'
-  | 'errorGeneric';
+export type UploadErrorKey = 'errorTooBig' | 'errorWrongType' | 'errorNetwork' | 'errorGeneric';
 
 /** A file paired with its stable UI key. */
 export interface KeyedFile {
@@ -147,15 +137,10 @@ export function validateFile(file: File): void {
  * JPEG q0.85. Returns { blob, format } to upload. On ANY failure — or for HEIC,
  * or for already-small files — returns null so the caller uploads the original.
  */
-async function downscale(
-  file: File,
-): Promise<{ blob: Blob; format: string } | null> {
+async function downscale(file: File): Promise<{ blob: Blob; format: string } | null> {
   if (isHeic(file)) return null;
   if (file.size < SKIP_UNDER_BYTES) return null;
-  if (
-    typeof createImageBitmap !== 'function' ||
-    typeof document === 'undefined'
-  ) {
+  if (typeof createImageBitmap !== 'function' || typeof document === 'undefined') {
     return null;
   }
 
@@ -191,10 +176,7 @@ async function downscale(
 
     return { blob, format: 'jpg' };
   } catch (err) {
-    logger.warn(
-      { err, name: file.name },
-      'Client downscale failed — uploading original',
-    );
+    logger.warn({ err, name: file.name }, 'Client downscale failed — uploading original');
     return null;
   } finally {
     bitmap?.close?.();
@@ -257,10 +239,7 @@ function xhrUpload(
     form.append('signature', sig.signature);
 
     const xhr = new XMLHttpRequest();
-    xhr.open(
-      'POST',
-      `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`,
-    );
+    xhr.open('POST', `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`);
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
@@ -312,8 +291,7 @@ async function uploadOne(
     throw new UploadError('errorTooBig');
   }
 
-  const runUpload = () =>
-    xhrUpload(blob, filename, sig, (pct) => opts.onProgress?.(key, pct));
+  const runUpload = () => xhrUpload(blob, filename, sig, (pct) => opts.onProgress?.(key, pct));
 
   let result: CloudinaryUploadResult;
   try {
@@ -409,8 +387,7 @@ export async function uploadPhotos(
   const sig = await fetchSignature(token);
 
   // Concurrency pool of CONCURRENCY, preserving per-file error isolation.
-  const succeeded: Array<{ key: FileKey; payload: CloudinaryAssetPayload }> =
-    [];
+  const succeeded: Array<{ key: FileKey; payload: CloudinaryAssetPayload }> = [];
   let cursor = 0;
 
   async function worker() {
@@ -421,18 +398,13 @@ export async function uploadPhotos(
         const payload = await uploadOne(keyed, sig, opts);
         succeeded.push({ key: keyed.key, payload });
       } catch (err) {
-        const errorKey =
-          err instanceof UploadError
-            ? err.key
-            : ('errorGeneric' as UploadErrorKey);
+        const errorKey = err instanceof UploadError ? err.key : ('errorGeneric' as UploadErrorKey);
         opts.onFileError?.(keyed.key, errorKey);
       }
     }
   }
 
-  await Promise.all(
-    Array.from({ length: Math.min(CONCURRENCY, files.length) }, () => worker()),
-  );
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, files.length) }, () => worker()));
 
   if (succeeded.length === 0) return [];
 

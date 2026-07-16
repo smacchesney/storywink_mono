@@ -46,24 +46,24 @@ export async function GET(request: NextRequest) {
       childName: book.childName,
       bookType: book.bookType,
       totalPages: book.pages.length,
-      pagesWithText: book.pages.filter(p => p.text && p.text.trim().length > 0).length,
-      pagesWithIllustrations: book.pages.filter(p => p.generatedImageUrl).length,
-      failedPages: book.pages.filter(p => p.moderationStatus === 'FAILED').length,
+      pagesWithText: book.pages.filter((p) => p.text && p.text.trim().length > 0).length,
+      pagesWithIllustrations: book.pages.filter((p) => p.generatedImageUrl).length,
+      failedPages: book.pages.filter((p) => p.moderationStatus === 'FAILED').length,
     };
 
     return NextResponse.json(progress, { status: 200 });
-
   } catch (error) {
     // Handle authentication errors
-    if (error instanceof Error && (
-      error.message.includes('not authenticated') ||
-      error.message.includes('ID mismatch') ||
-      error.message.includes('primary email not found')
-    )) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('not authenticated') ||
+        error.message.includes('ID mismatch') ||
+        error.message.includes('primary email not found'))
+    ) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     console.error(`Error fetching status for book:`, error);
     return NextResponse.json({ error: 'Failed to fetch book status' }, { status: 500 });
   }
-} 
+}

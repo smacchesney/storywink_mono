@@ -75,7 +75,7 @@ describe('buildAvatarStoryRoster', () => {
 
   it('mints avatar_N ids in pick order and stars the first CHILD', () => {
     const { characters, childName } = buildAvatarStoryRoster([grandma, emma, biscuit]);
-    expect(characters.map(c => c.characterId)).toEqual(['avatar_1', 'avatar_2', 'avatar_3']);
+    expect(characters.map((c) => c.characterId)).toEqual(['avatar_1', 'avatar_2', 'avatar_3']);
     expect(characters[1].role).toBe('main_child');
     expect(characters[1].namedVia).toBe('childName');
     expect(characters[0].role).toBe('grown-up');
@@ -103,7 +103,7 @@ describe('buildAvatarStoryRoster', () => {
   it('no CHILD in cast → childName null, nobody starred', () => {
     const { characters, childName } = buildAvatarStoryRoster([grandma, biscuit]);
     expect(childName).toBeNull();
-    expect(characters.every(c => c.role !== 'main_child')).toBe(true);
+    expect(characters.every((c) => c.role !== 'main_child')).toBe(true);
   });
 
   it('roster enters page-less', () => {
@@ -254,7 +254,11 @@ describe('nextArrivalPollStart', () => {
 });
 
 describe('sharedReadyStyles', () => {
-  const rendition = (artStyle: string, status = 'READY', turnaroundSheetUrl: string | null = 'https://x/sheet.png') => ({
+  const rendition = (
+    artStyle: string,
+    status = 'READY',
+    turnaroundSheetUrl: string | null = 'https://x/sheet.png',
+  ) => ({
     artStyle,
     status,
     turnaroundSheetUrl,
@@ -280,7 +284,10 @@ describe('sharedReadyStyles', () => {
 
   it('empty intersection and empty cast are honest', () => {
     expect(
-      sharedReadyStyles([{ renditions: [rendition('vignette')] }, { renditions: [rendition('kawaii')] }]),
+      sharedReadyStyles([
+        { renditions: [rendition('vignette')] },
+        { renditions: [rendition('kawaii')] },
+      ]),
     ).toEqual([]);
     expect(sharedReadyStyles([])).toEqual([]);
   });

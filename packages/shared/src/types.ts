@@ -14,13 +14,7 @@ export interface User {
  * Book project types
  */
 export type BookStatus =
-  | 'DRAFT'
-  | 'GENERATING'
-  | 'STORY_READY'
-  | 'ILLUSTRATING'
-  | 'COMPLETED'
-  | 'FAILED'
-  | 'PARTIAL';
+  'DRAFT' | 'GENERATING' | 'STORY_READY' | 'ILLUSTRATING' | 'COMPLETED' | 'FAILED' | 'PARTIAL';
 
 /** PHOTO_STORY = made from uploaded photos; AVATAR_STORY = invented adventure starring account avatars (X6d). */
 export type BookType = 'PHOTO_STORY' | 'AVATAR_STORY';

@@ -10,12 +10,7 @@
 
 /** Worker-written pipeline phases (finer-grained than BookStatus). */
 export type GenerationPhase =
-  | 'story'
-  | 'story_check'
-  | 'characters'
-  | 'illustrating'
-  | 'finishing'
-  | 'polishing';
+  'story' | 'story_check' | 'characters' | 'illustrating' | 'finishing' | 'polishing';
 
 export interface ProgressSnapshot {
   /** BookStatus as a string ('GENERATING', 'ILLUSTRATING', ...). */
@@ -54,7 +49,8 @@ export function resolveProgressHeadline(snapshot: ProgressSnapshot): ProgressHea
     snapshot;
 
   const trustedPhase =
-    status && generationPhase &&
+    status &&
+    generationPhase &&
     PHASES_FOR_STATUS[status]?.includes(generationPhase as GenerationPhase)
       ? (generationPhase as GenerationPhase)
       : null;

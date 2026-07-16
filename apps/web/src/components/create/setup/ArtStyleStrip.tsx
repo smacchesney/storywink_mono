@@ -52,7 +52,7 @@ export function ArtStyleStrip({ value, onChange }: ArtStyleStripProps) {
                 <Check className="h-3 w-3" />
               </span>
             )}
-            <span className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent px-1 pb-1 pt-3 text-[11px] font-playful text-white text-center">
+            <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-1 pt-3 pb-1 text-center font-playful text-[11px] text-white">
               {label}
             </span>
           </button>

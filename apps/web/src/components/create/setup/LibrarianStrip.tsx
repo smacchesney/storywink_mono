@@ -36,10 +36,7 @@ export function LibrarianStrip({ phase, questionCount }: LibrarianStripProps) {
     if (phase !== 'reading') return;
     setElapsed(0);
     const t1 = setTimeout(() => setElapsed(STRIP_FACES_AT_MS), STRIP_FACES_AT_MS);
-    const t2 = setTimeout(
-      () => setElapsed(STRIP_READING_AT_MS),
-      STRIP_READING_AT_MS,
-    );
+    const t2 = setTimeout(() => setElapsed(STRIP_READING_AT_MS), STRIP_READING_AT_MS);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
@@ -62,9 +59,7 @@ export function LibrarianStrip({ phase, questionCount }: LibrarianStripProps) {
       <motion.div
         className="shrink-0"
         // One gentle bounce the moment perception arrives; nothing on settle.
-        animate={
-          arrived && !reducedMotion ? { scale: [1, 1.06, 1] } : { scale: 1 }
-        }
+        animate={arrived && !reducedMotion ? { scale: [1, 1.06, 1] } : { scale: 1 }}
         transition={{ duration: 0.4 }}
       >
         <Image

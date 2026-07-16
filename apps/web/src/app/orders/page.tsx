@@ -61,28 +61,25 @@ export default async function OrdersPage() {
     trackingUrl: order.trackingUrl,
     createdAt: order.createdAt,
     bookTitle: order.book?.title ?? null,
-    coverImageUrl:
-      order.book?.coverImageUrl || order.book?.pages[0]?.generatedImageUrl || null,
+    coverImageUrl: order.book?.coverImageUrl || order.book?.pages[0]?.generatedImageUrl || null,
   }));
 
   return (
-    <div className="min-h-screen bg-cream py-10 px-4">
-      <div className="max-w-lg mx-auto">
+    <div className="min-h-screen bg-cream px-4 py-10">
+      <div className="mx-auto max-w-lg">
         <header className="mb-8 text-center">
           <h1 className="font-playful text-3xl text-ink">{t('title')}</h1>
-          {orders.length > 0 && (
-            <p className="text-muted-foreground mt-2">{t('subtitle')}</p>
-          )}
+          {orders.length > 0 && <p className="mt-2 text-muted-foreground">{t('subtitle')}</p>}
         </header>
 
         {orders.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-cream-deep p-8 text-center">
-            <p className="font-playful text-xl text-ink mb-2">{t('emptyTitle')}</p>
-            <p className="text-muted-foreground mb-6">{t('emptyBody')}</p>
+          <div className="rounded-xl border border-cream-deep bg-white p-8 text-center shadow-sm">
+            <p className="mb-2 font-playful text-xl text-ink">{t('emptyTitle')}</p>
+            <p className="mb-6 text-muted-foreground">{t('emptyBody')}</p>
             <Link href="/library">
-              <Button className="bg-coral hover:bg-coral-hover text-white font-playful">
+              <Button className="bg-coral font-playful text-white hover:bg-coral-hover">
                 {t('emptyCta')}
-                <ArrowRight className="w-4 h-4 ml-1.5" />
+                <ArrowRight className="ml-1.5 h-4 w-4" />
               </Button>
             </Link>
           </div>
@@ -94,7 +91,7 @@ export default async function OrdersPage() {
           </div>
         )}
 
-        <p className="text-center text-sm text-muted-foreground mt-8">
+        <p className="mt-8 text-center text-sm text-muted-foreground">
           {t('helpPrompt')}{' '}
           <a
             href="mailto:support@storywink.ai"

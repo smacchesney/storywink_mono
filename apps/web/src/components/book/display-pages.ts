@@ -111,7 +111,7 @@ function buildCollageEntries<P extends DisplaySourcePage>(
  */
 export function buildDisplayPages<P extends DisplaySourcePage>(
   pages: P[],
-  options?: BuildDisplayPagesOptions
+  options?: BuildDisplayPagesOptions,
 ): DisplayPage<P>[] {
   const displayPages: DisplayPage<P>[] = [];
   const language = options?.language || 'en';
@@ -223,7 +223,7 @@ function displayKey<P extends DisplaySourcePage>(dp: DisplayPage<P>, index: numb
 export function remapDisplayIndex<P extends DisplaySourcePage>(
   from: DisplayPage<P>[],
   fromIndex: number,
-  to: DisplayPage<P>[]
+  to: DisplayPage<P>[],
 ): number {
   if (to.length === 0) return 0;
   if (from.length === 0) return Math.max(0, Math.min(fromIndex, to.length - 1));
@@ -238,11 +238,7 @@ export function remapDisplayIndex<P extends DisplaySourcePage>(
   if (!fromHasStories && start % 2 === 1 && start + 1 < from.length) {
     const left = from[start];
     const right = from[start + 1];
-    if (
-      left.type === 'illustration' &&
-      right.type === 'text' &&
-      left.page.id !== right.page.id
-    ) {
+    if (left.type === 'illustration' && right.type === 'text' && left.page.id !== right.page.id) {
       start = start + 1;
     }
   }

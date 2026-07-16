@@ -1,0 +1,983 @@
+{
+  "bookId": "cmrm0yfzd00ymo50dvcnetv1m",
+  "title": "Kai and the Wild Rumble",
+  "bookType": "AVATAR_STORY",
+  "model": "gpt-5-mini",
+  "generatedAt": "2026-07-16T14:12:20.884Z",
+  "spend": {
+    "judgeCalls": 4,
+    "calls": [
+      {
+        "label": "cover",
+        "model": "gpt-5-mini",
+        "ms": 58724,
+        "ok": true,
+        "inputTokens": 27598,
+        "outputTokens": 3447,
+        "totalTokens": 31045
+      },
+      {
+        "label": "batch0",
+        "model": "gpt-5-mini",
+        "ms": 93098,
+        "ok": true,
+        "inputTokens": 52703,
+        "outputTokens": 4693,
+        "totalTokens": 57396
+      },
+      {
+        "label": "batch1",
+        "model": "gpt-5-mini",
+        "ms": 74796,
+        "ok": true,
+        "inputTokens": 52713,
+        "outputTokens": 3807,
+        "totalTokens": 56520
+      },
+      {
+        "label": "forced-error-batch0",
+        "model": "gpt-5-mini-x12c-does-not-exist",
+        "ms": 325,
+        "ok": false,
+        "inputTokens": null,
+        "outputTokens": null,
+        "totalTokens": null,
+        "error": "400 The requested model 'gpt-5-mini-x12c-does-not-exist' does not exist."
+      }
+    ],
+    "okTokens": {
+      "input": 133014,
+      "output": 11947,
+      "total": 144961
+    },
+    "rate": {
+      "inputPerM": 0.25,
+      "outputPerM": 2,
+      "note": "assumed gpt-5-mini public list price"
+    },
+    "estCostAllCallsUsd": 0.05715,
+    "realPerBookQc": {
+      "calls": 3,
+      "input": 133014,
+      "output": 11947,
+      "estCostUsd": 0.05715,
+      "note": "cover + page batches only (excludes forced-error probe)"
+    }
+  },
+  "cover": {
+    "present": true,
+    "expectedTitle": "Kai and the Wild Rumble",
+    "result": {
+      "passed": false,
+      "titleMatches": true,
+      "characterConsistencyScore": 9,
+      "styleConsistencyScore": 8,
+      "overallScore": 4,
+      "issues": [
+        "UNINTENDED_RENDERED_TEXT: The cover contains additional rendered words (e.g. “TIPTOE!”) besides the painted title. Any non-title lettering on the cover (other than the very small logo mark) caps overall quality at 4.",
+        "EXTRA_LOGO: A small logo/text mark (“Storywink.ai”) is present. (Small logo marks are allowed, but list here for clarity.)",
+        "MINOR_SCALE/PLACEMENT: Pets are well-rendered and recognizable, but one pet (the long-snouted crocodilian) sits lower in the composition and appears a touch larger relative to the child than in the provided turnaround reference — this is minor and does not break recognizability."
+      ],
+      "suggestedPromptAdditions": "1) REMOVE ALL NON-TITLE LETTERING: Remove the word/word-bubble “TIPTOE!” (and any other extraneous words) from the illustration. No sound-words, captions, or scene-type text should be painted onto the cover image itself. 2) TITLE ACCURACY: Keep the painted title exactly as: “Kai and the Wild Rumble” (no extra words, subtitles, or stray text lines). 3) LOGO: If a small logo mark is required, make it tiny and unobtrusive at the corner; do NOT add additional words or taglines. 4) PET SCALE ADJUSTMENT (minor): Adjust the long-snouted crocodilian so its eye/headline and overall height match the exact proportions from its reference turnaround (slightly raise the body or reduce width so the height ratio to the child matches the sheet). 5) STYLE/CONSTRUCTION NOTE (optional): Maintain the handcrafted collage + paper + gouache tactile look used in the references: keep sampled colors exactly, soft paper halo vignettes behind each character, and subtle deckled-paper shadow layers beneath feet. This will ensure final imagery is fully consistent with the reference sheets."
+    }
+  },
+  "requeuePageIds": [
+    "cmrm0yfzv00yno50dtg2p0s5b",
+    "cmrm0yfzv00yoo50d6w1z1bk3",
+    "cmrm0yfzv00ypo50dyow8hzsb",
+    "cmrm0yfzv00yqo50drtjp5hrq",
+    "cmrm0yfzv00yro50dr1svpw0x",
+    "cmrm0yfzv00yso50d934fhaot",
+    "cmrm0yfzv00yto50dnjazdbow",
+    "cmrm0yfzv00yuo50dbcggi4t3",
+    "cmrm0yfzv00yvo50dh1papuol",
+    "cmrm0yfzv00ywo50dewd3jy4q",
+    "cmrm0yfzv00yxo50d24oh4p99",
+    "cmrm0yfzv00yyo50dqlbqkmvi"
+  ],
+  "pages": [
+    {
+      "pageNumber": 1,
+      "isTitlePage": true,
+      "source": "BRIDGE",
+      "textSnippet": "Kai stands at the garden gate with a paper map in his hand. Trapjaw holds the lantern. Godzilla snif",
+      "expectedCast": [
+        {
+          "name": "Trapjaw",
+          "species": "a person"
+        },
+        {
+          "name": "Godzilla",
+          "species": "a pet"
+        },
+        {
+          "name": "Grypho",
+          "species": "a pet"
+        },
+        {
+          "name": "Kai",
+          "species": "a person"
+        }
+      ],
+      "expected": null,
+      "onomatopoeia": true,
+      "result": {
+        "pageNumber": 1,
+        "pageId": "cmrm0yfzv00yno50dtg2p0s5b",
+        "passed": false,
+        "issues": [
+          "RENDERED_TEXT: the sound word \"TIPTOE!\" appears in the illustration (lettering/onomatopoeia present).",
+          "OVERALL_QUALITY_CAPPED_BY_RENDERED_TEXT: any interior lettering is disallowed and forces a quality cap.",
+          "Minor: none of the canonical characters appear to have major deviations vs the reference sheets."
+        ],
+        "characterConsistencyScore": 9,
+        "styleConsistencyScore": 9,
+        "overallScore": 4,
+        "suggestedPromptAdditions": "REMOVE ALL LETTERING: remove the rendered sound word 'TIPTOE!' from the artwork. KEEP CHARACTER DETAILS EXACT: Trapjaw must keep the red helmet, green face tone, blue body, metal prosthetic arm and leather belt exactly matched to the reference sheet (sample colors from the sheet). Kai must keep the black hair, warm golden skin tone, orange/white striped outfit and child head-to-body proportions exactly as in the reference. Godzilla must keep the large black body, purple dorsal plates and red chest markings exactly as on the reference. Grypho must keep its small pet scale/feather shapes and colors exactly. PROP: Trapjaw should be shown holding the lantern in his hand (as in the script) — ensure the lantern is visually in Trapjaw’s right hand and not floating or held by another character. BACKGROUND: keep the same warm vignette and paper texture as the rest of the book. Remove any stray marks that look like letters or glyphs.",
+        "classFlags": {
+          "renderedText": true,
+          "intraImageDuplicate": false,
+          "missingExpectedCast": false,
+          "speciesMismatch": false,
+          "characterHybrid": false,
+          "propHolderMismatch": false,
+          "focalActionMismatch": false
+        }
+      },
+      "requeued": true
+    },
+    {
+      "pageNumber": 2,
+      "isTitlePage": false,
+      "source": "BRIDGE",
+      "textSnippet": "The gate creaks open—eee-eee! The garden grows tall and green, like a jungle made of big wet leaves.",
+      "expectedCast": [
+        {
+          "name": "Trapjaw",
+          "species": "a person"
+        },
+        {
+          "name": "Godzilla",
+          "species": "a pet"
+        },
+        {
+          "name": "Grypho",
+          "species": "a pet"
+        },
+        {
+          "name": "Kai",
+          "species": "a person"
+        }
+      ],
+      "expected": null,
+      "onomatopoeia": true,
+      "result": {
+        "pageNumber": 2,
+        "pageId": "cmrm0yfzv00yoo50d6w1z1bk3",
+        "passed": false,
+        "issues": [
+          "RENDERED_TEXT: the sound words 'DRIP! DRIP!' are present in the illustration (lettering/onomatopoeia).",
+          "OVERALL_QUALITY_CAPPED_BY_RENDERED_TEXT."
+        ],
+        "characterConsistencyScore": 9,
+        "styleConsistencyScore": 9,
+        "overallScore": 4,
+        "suggestedPromptAdditions": "REMOVE ALL LETTERING: remove the rendered onomatopoeia 'DRIP! DRIP!' (or any other sound words) from the artwork. ACTION NOTE: show Kai touching a large leaf and a single water drop falling — no text. CHARACTER DETAILS: sample Kai’s skin and hair color exactly from the Kai reference (black hair, warm golden skin). Trapjaw: keep exact helmet red, green face color and metal arm. Godzilla and Grypho: keep scale/fur colors and proportions exactly as on their sheets. STYLE: maintain the handcrafted collage + gouache look (paper-edge layers, subtle deckled edges, soft gouache washes).",
+        "classFlags": {
+          "renderedText": true,
+          "intraImageDuplicate": false,
+          "missingExpectedCast": false,
+          "speciesMismatch": false,
+          "characterHybrid": false,
+          "propHolderMismatch": null,
+          "focalActionMismatch": false
+        }
+      },
+      "requeued": true
+    },
+    {
+      "pageNumber": 3,
+      "isTitlePage": false,
+      "source": "BRIDGE",
+      "textSnippet": "Crunch, crunch, crunch go Kai’s shoes. Godzilla’s nose finds a long, silver scale under a fern. Trap",
+      "expectedCast": [
+        {
+          "name": "Trapjaw",
+          "species": "a person"
+        },
+        {
+          "name": "Godzilla",
+          "species": "a pet"
+        },
+        {
+          "name": "Kai",
+          "species": "a person"
+        }
+      ],
+      "expected": {
+        "pdf": 8,
+        "defect": "scaffold-caption (rendered text)",
+        "class": "renderedText"
+      },
+      "onomatopoeia": false,
+      "result": {
+        "pageNumber": 3,
+        "pageId": "cmrm0yfzv00ypo50dyow8hzsb",
+        "passed": false,
+        "issues": [
+          "RENDERED_TEXT: the sound-word/label 'SNIFF SNIFF' (or similar sniffing onomatopoeia) is visible in the scene.",
+          "OVERALL_QUALITY_CAPPED_BY_RENDERED_TEXT."
+        ],
+        "characterConsistencyScore": 9,
+        "styleConsistencyScore": 9,
+        "overallScore": 4,
+        "suggestedPromptAdditions": "REMOVE ALL LETTERING: remove the rendered 'SNIFF SNIFF' (or any sniff/noise text) from this page. ACTION / PROP: depict Godzilla discovering a long silver scale under a fern (scale may lie on the ground near Godzilla’s snout) — do NOT add any text labels pointing at the scale. If Godzilla holds the scale, show it in Godzilla’s mouth or paw; otherwise leave it on the ground near the fern. CHARACTER DETAILS: ensure Trapjaw is kneeling and smiling, with his metal shoulder/arm and red-helmeted head matching the Trapjaw reference exactly (sample colors). Kai should look on with the correct child proportions, hair, and outfit per the Kai reference. STYLE: keep collage/paper layers and gouache washes consistent with the rest of the book.",
+        "classFlags": {
+          "renderedText": true,
+          "intraImageDuplicate": false,
+          "missingExpectedCast": false,
+          "speciesMismatch": false,
+          "characterHybrid": false,
+          "propHolderMismatch": null,
+          "focalActionMismatch": false
+        }
+      },
+      "requeued": true
+    },
+    {
+      "pageNumber": 4,
+      "isTitlePage": false,
+      "source": "BRIDGE",
+      "textSnippet": "A giant coil slides around a mossy log. Not too close—just close enough to see! The Titan boa flicks",
+      "expectedCast": [
+        {
+          "name": "Trapjaw",
+          "species": "a person"
+        },
+        {
+          "name": "Godzilla",
+          "species": "a pet"
+        },
+        {
+          "name": "Grypho",
+          "species": "a pet"
+        },
+        {
+          "name": "Kai",
+          "species": "a person"
+        }
+      ],
+      "expected": {
+        "pdf": 10,
+        "defect": "double-Kai (same child twice)",
+        "class": "intraImageDuplicate"
+      },
+      "onomatopoeia": true,
+      "result": {
+        "pageNumber": 4,
+        "pageId": "cmrm0yfzv00yqo50drtjp5hrq",
+        "passed": false,
+        "issues": [
+          "RENDERED_TEXT: onomatopoeia such as 'TICKA-TICKA' (or other ticka/ticka sound) appears in the image.",
+          "OVERALL_QUALITY_CAPPED_BY_RENDERED_TEXT."
+        ],
+        "characterConsistencyScore": 9,
+        "styleConsistencyScore": 9,
+        "overallScore": 4,
+        "suggestedPromptAdditions": "REMOVE ALL LETTERING: delete 'TICKA-TICKA' (and any other sound words) from the art. COMPOSITION: show a giant coil (the Titan boa) partially wrapped around a mossy log with the coil’s texture visible — no text labels. Keep the coil scale/skin pattern, and the thumbnail silhouette of the Titan boa, but do not change the canonical sizes of Godzilla and Grypho (they should remain pet-scale as in the reference sheet). CHARACTERS: include Trapjaw (red helmet/metal arm), Kai child (orange outfit, black hair), Godzilla (big black/purple dorsal markings) and Grypho (small pet) with the exact colors and proportions sampled from the reference sheets. STYLE: keep the hand-cut paper / gouache / colored-pencil finishing as the established approach.",
+        "classFlags": {
+          "renderedText": true,
+          "intraImageDuplicate": false,
+          "missingExpectedCast": false,
+          "speciesMismatch": false,
+          "characterHybrid": false,
+          "propHolderMismatch": null,
+          "focalActionMismatch": false
+        }
+      },
+      "requeued": true
+    },
+    {
+      "pageNumber": 5,
+      "isTitlePage": false,
+      "source": "BRIDGE",
+      "textSnippet": "Grypho hops onto the log—boing! The log rolls one teeny roll, and Kai flops into soft moss. Trapjaw ",
+      "expectedCast": [
+        {
+          "name": "Trapjaw",
+          "species": "a person"
+        },
+        {
+          "name": "Godzilla",
+          "species": "a pet"
+        },
+        {
+          "name": "Grypho",
+          "species": "a pet"
+        },
+        {
+          "name": "Kai",
+          "species": "a person"
+        }
+      ],
+      "expected": {
+        "pdf": 12,
+        "defect": "missing named cast",
+        "class": "missingExpectedCast"
+      },
+      "onomatopoeia": true,
+      "result": {
+        "pageNumber": 5,
+        "pageId": "cmrm0yfzv00yro50dr1svpw0x",
+        "passed": false,
+        "issues": [
+          "RENDERED_TEXT: visible onomatopoeia such as 'BOING!' and 'ACHOO!' are included in the art.",
+          "OVERALL_QUALITY_CAPPED_BY_RENDERED_TEXT."
+        ],
+        "characterConsistencyScore": 9,
+        "styleConsistencyScore": 9,
+        "overallScore": 4,
+        "suggestedPromptAdditions": "REMOVE ALL LETTERING: remove 'BOING!', 'ACHOO!', or any other sound words from the illustration. COMPOSITION: show Grypho hopping on the log (motion indicated by simple motion lines, not text), the log rolling and Kai tipping into moss — express the motion visually (tilted log, shifted weight) not with lettering. CHARACTER ACCURACY: Kai must keep the exact child proportions, black hair, warm skin tone, and orange/white clothing. Trapjaw must keep the red helmet, green face color and metal arm exactly. Godzilla and Grypho must retain scale patterns and colors exactly as in their reference sheets. Keep collage/paper edges and gouache washes consistent.",
+        "classFlags": {
+          "renderedText": true,
+          "intraImageDuplicate": false,
+          "missingExpectedCast": false,
+          "speciesMismatch": false,
+          "characterHybrid": false,
+          "propHolderMismatch": null,
+          "focalActionMismatch": false
+        }
+      },
+      "requeued": true
+    },
+    {
+      "pageNumber": 6,
+      "isTitlePage": false,
+      "source": "BRIDGE",
+      "textSnippet": "Rummm-bum-bum. The map shakes in Kai’s hands. Ahead, a dark hill puffs a little gray cloud. “Volcano",
+      "expectedCast": [
+        {
+          "name": "Trapjaw",
+          "species": "a person"
+        },
+        {
+          "name": "Godzilla",
+          "species": "a pet"
+        },
+        {
+          "name": "Grypho",
+          "species": "a pet"
+        },
+        {
+          "name": "Kai",
+          "species": "a person"
+        }
+      ],
+      "expected": null,
+      "onomatopoeia": false,
+      "result": {
+        "pageNumber": 6,
+        "pageId": "cmrm0yfzv00yso50d934fhaot",
+        "passed": false,
+        "issues": [
+          "RENDERED_TEXT: visible sound or rumbling words (smoke/volcano text like 'RUMMM'/'RUMMM-BUM-BUM') inside the art.",
+          "OVERALL_QUALITY_CAPPED_BY_RENDERED_TEXT."
+        ],
+        "characterConsistencyScore": 9,
+        "styleConsistencyScore": 9,
+        "overallScore": 4,
+        "suggestedPromptAdditions": "REMOVE ALL LETTERING: remove any rendered rumble/volcano onomatopoeia from the image. COMPOSITION: depict a small gray puff of volcanic smoke over a dark hill (visual smoke shapes only, no text). Ensure the map in Kai’s trembling hands is shown with fold lines and a clear paper texture but NO printed words inside the artwork. CHARACTER ACCURACY: Trapjaw must match the reference exactly (red helmet, green face, blue body, metal arm) and should be near Kai pointing or whispering 'Volcano' (dialogue belongs in the book text, not in the art). Godzilla and Grypho must keep their canonical color patterns and relative sizes. Maintain the handcrafted paper + gouache style and sampled colors.",
+        "classFlags": {
+          "renderedText": true,
+          "intraImageDuplicate": false,
+          "missingExpectedCast": false,
+          "speciesMismatch": false,
+          "characterHybrid": false,
+          "propHolderMismatch": null,
+          "focalActionMismatch": false
+        }
+      },
+      "requeued": true
+    },
+    {
+      "pageNumber": 7,
+      "isTitlePage": false,
+      "source": "BRIDGE",
+      "textSnippet": "Up, up, up the warm black stones. Kai holds Trapjaw’s hand, and Trapjaw’s hand feels steady. Godzill",
+      "expectedCast": [
+        {
+          "name": "Trapjaw",
+          "species": "a person"
+        },
+        {
+          "name": "Godzilla",
+          "species": "a pet"
+        },
+        {
+          "name": "Grypho",
+          "species": "a pet"
+        },
+        {
+          "name": "Kai",
+          "species": "a person"
+        }
+      ],
+      "expected": {
+        "pdf": 16,
+        "defect": "missing named cast",
+        "class": "missingExpectedCast"
+      },
+      "onomatopoeia": true,
+      "result": {
+        "pageNumber": 7,
+        "pageId": "cmrm0yfzv00yto50dnjazdbow",
+        "passed": false,
+        "issues": [
+          "RENDERED TEXT: large on-image lettering present ('UP! UP! UP!' on the rocks) — on-image text is not allowed (this triggers the quality cap).",
+          "NO MISSING CAST: all expected characters (Trapjaw, Kai, Godzilla, Grypho) are present and properly scaled.",
+          "NO ANATOMY ERRORS detected."
+        ],
+        "characterConsistencyScore": 9,
+        "styleConsistencyScore": 9,
+        "overallScore": 4,
+        "suggestedPromptAdditions": "REMOVE RENDERED LETTERING: Delete the on-image words 'UP! UP! UP!' and any other sound or caption text. Replace with non-letter graphic cues only — e.g. subtle motion lines, stepped rock markings or hand-drawn footsteps — but do NOT place any letters or words inside the artwork. Keep Trapjaw (blue, green face, red helmet, mechanical arm), Kai (black hair, orange outfit), Godzilla (black scales with purple dorsal), and Grypho (brown feathers) exactly as in the reference turnarounds; do not alter hair/hue/proportions. Maintain current composition and handcrafted paper+gouache rendering, only remove lettering.",
+        "classFlags": {
+          "renderedText": true,
+          "intraImageDuplicate": false,
+          "missingExpectedCast": false,
+          "speciesMismatch": false,
+          "characterHybrid": false,
+          "propHolderMismatch": null,
+          "focalActionMismatch": false
+        }
+      },
+      "requeued": true
+    },
+    {
+      "pageNumber": 8,
+      "isTitlePage": false,
+      "source": "BRIDGE",
+      "textSnippet": "At the top, the volcano burps—poof! Red-orange light wiggles below like soup, but everyone stays on ",
+      "expectedCast": [
+        {
+          "name": "Trapjaw",
+          "species": "a person"
+        },
+        {
+          "name": "Godzilla",
+          "species": "a pet"
+        },
+        {
+          "name": "Grypho",
+          "species": "a pet"
+        },
+        {
+          "name": "Kai",
+          "species": "a person"
+        }
+      ],
+      "expected": {
+        "pdf": 18,
+        "defect": "Grypho drawn as griffin (wrong species)",
+        "class": "speciesMismatch"
+      },
+      "onomatopoeia": false,
+      "result": {
+        "pageNumber": 8,
+        "pageId": "cmrm0yfzv00yuo50dbcggi4t3",
+        "passed": false,
+        "issues": [
+          "RENDERED TEXT: visible on-image word 'POOF!' (volcano) — on-image text is not allowed (quality cap applies).",
+          "NO MISSING CAST: Trapjaw, Kai, Godzilla and Grypho are present and correctly scaled.",
+          "NO ANATOMY ERRORS detected."
+        ],
+        "characterConsistencyScore": 9,
+        "styleConsistencyScore": 9,
+        "overallScore": 4,
+        "suggestedPromptAdditions": "REMOVE RENDERED LETTERING: Remove 'POOF!' (and any other sound words / captions) from the volcano scene. If you need to show the volcano's burp, use visual cues only (steam puffs, radial motion strokes, warm rim lighting on crater) — no letters. Keep all character attributes exact to the reference sheets (Trapjaw: blue body, green face, red helmet, mechanical arm; Kai: black hair, orange outfit; pets' colors and proportions unchanged). Preserve the tactile mixed-media look.",
+        "classFlags": {
+          "renderedText": true,
+          "intraImageDuplicate": false,
+          "missingExpectedCast": false,
+          "speciesMismatch": false,
+          "characterHybrid": false,
+          "propHolderMismatch": null,
+          "focalActionMismatch": false
+        }
+      },
+      "requeued": true
+    },
+    {
+      "pageNumber": 9,
+      "isTitlePage": false,
+      "source": "BRIDGE",
+      "textSnippet": "The footprint trail goes down into ferny shadows. Thump. Thump. THUMP. Kai’s eyes go wide, and he sq",
+      "expectedCast": [
+        {
+          "name": "Trapjaw",
+          "species": "a person"
+        },
+        {
+          "name": "Godzilla",
+          "species": "a pet"
+        },
+        {
+          "name": "Grypho",
+          "species": "a pet"
+        },
+        {
+          "name": "Kai",
+          "species": "a person"
+        }
+      ],
+      "expected": null,
+      "onomatopoeia": true,
+      "result": {
+        "pageNumber": 9,
+        "pageId": "cmrm0yfzv00yvo50dh1papuol",
+        "passed": false,
+        "issues": [
+          "RENDERED TEXT: large on-image sound-word(s) 'THUMP, THUMP, THUMP' are present — on-image text is not allowed (quality cap applies).",
+          "NO MISSING CAST: expected characters present (Kai with map, Trapjaw and the pets in background).",
+          "NO ANATOMY ERRORS detected."
+        ],
+        "characterConsistencyScore": 9,
+        "styleConsistencyScore": 9,
+        "overallScore": 4,
+        "suggestedPromptAdditions": "REMOVE RENDERED LETTERING: Delete the 'THUMP, THUMP...' on the page. Show the heavy footsteps with non-letter devices (deep footprint impressions, repeated motion lines, subtle ground vibration marks) instead. Keep Kai's map and expression, Trapjaw and the pets exactly as in the reference turnarounds (do not alter hair, skin, proportions, or pet markings). Maintain the same handcrafted texture and layered-paper rendering.",
+        "classFlags": {
+          "renderedText": true,
+          "intraImageDuplicate": false,
+          "missingExpectedCast": false,
+          "speciesMismatch": false,
+          "characterHybrid": false,
+          "propHolderMismatch": null,
+          "focalActionMismatch": false
+        }
+      },
+      "requeued": true
+    },
+    {
+      "pageNumber": 10,
+      "isTitlePage": false,
+      "source": "BRIDGE",
+      "textSnippet": "Out steps the T-Rex—big teeth, tiny arms, muddy feet. It sniffs the lantern, snorts a warm puff, and",
+      "expectedCast": [
+        {
+          "name": "Trapjaw",
+          "species": "a person"
+        },
+        {
+          "name": "Godzilla",
+          "species": "a pet"
+        },
+        {
+          "name": "Grypho",
+          "species": "a pet"
+        },
+        {
+          "name": "Kai",
+          "species": "a person"
+        }
+      ],
+      "expected": {
+        "pdf": 22,
+        "defect": "Trapjaw x T-Rex fusion (hybrid)",
+        "class": "characterHybrid"
+      },
+      "onomatopoeia": false,
+      "result": {
+        "pageNumber": 10,
+        "pageId": "cmrm0yfzv00ywo50dewd3jy4q",
+        "passed": false,
+        "issues": [
+          "RENDERED TEXT: visible sound words/labels ('ACHOO-ROAR!' and 'CRINKLE') appear inside the illustration — on-image text is not allowed (quality cap applies).",
+          "NO MISSING CAST: Trapjaw, Kai, Godzilla and Grypho are present; the new T-Rex is depicted as the story requires.",
+          "NO ANATOMY ERRORS detected."
+        ],
+        "characterConsistencyScore": 9,
+        "styleConsistencyScore": 9,
+        "overallScore": 4,
+        "suggestedPromptAdditions": "REMOVE RENDERED LETTERING: Remove 'ACHOO-ROAR!', 'CRINKLE' and any other in-image text. Represent the sneeze and the crinkling map through pure visual animation — e.g., puff of ash, radial sneeze lines, small floating ash particles, and the map creasing motion lines — but no letters. Keep character design fidelity exactly as the reference sheets (Trapjaw: helmet/green face/mech arm; Kai: black hair/orange outfit; Godzilla/Grypho unchanged).",
+        "classFlags": {
+          "renderedText": true,
+          "intraImageDuplicate": false,
+          "missingExpectedCast": false,
+          "speciesMismatch": false,
+          "characterHybrid": false,
+          "propHolderMismatch": null,
+          "focalActionMismatch": false
+        }
+      },
+      "requeued": true
+    },
+    {
+      "pageNumber": 11,
+      "isTitlePage": false,
+      "source": "BRIDGE",
+      "textSnippet": "The T-Rex stomps away, smaller and smaller between the trees. Fireflies blink on. Trapjaw turns the ",
+      "expectedCast": [
+        {
+          "name": "Trapjaw",
+          "species": "a person"
+        },
+        {
+          "name": "Godzilla",
+          "species": "a pet"
+        },
+        {
+          "name": "Grypho",
+          "species": "a pet"
+        },
+        {
+          "name": "Kai",
+          "species": "a person"
+        }
+      ],
+      "expected": null,
+      "onomatopoeia": true,
+      "result": {
+        "pageNumber": 11,
+        "pageId": "cmrm0yfzv00yxo50d24oh4p99",
+        "passed": false,
+        "issues": [
+          "RENDERED TEXT: visible on-image sound-word(s) such as 'STOMP... STOMP...' are present — on-image text is not permitted (quality cap applies).",
+          "NO MISSING CAST: Trapjaw, Kai, Godzilla and Grypho are present and near the lantern as expected.",
+          "NO ANATOMY ERRORS detected."
+        ],
+        "characterConsistencyScore": 9,
+        "styleConsistencyScore": 9,
+        "overallScore": 4,
+        "suggestedPromptAdditions": "REMOVE RENDERED LETTERING: Delete 'STOMP... STOMP...' and any other lettering. Use non-letter visual devices to show the T-Rex receding: progressively smaller footprints, a shrinking silhouette in the distance, fading color saturation — but do not include words. Keep the lantern, fireflies, and pets positioned as in the reference; preserve exact colors and proportions for Trapjaw, Kai, Godzilla, and Grypho.",
+        "classFlags": {
+          "renderedText": true,
+          "intraImageDuplicate": false,
+          "missingExpectedCast": false,
+          "speciesMismatch": false,
+          "characterHybrid": false,
+          "propHolderMismatch": null,
+          "focalActionMismatch": false
+        }
+      },
+      "requeued": true
+    },
+    {
+      "pageNumber": 12,
+      "isTitlePage": false,
+      "source": "BRIDGE",
+      "textSnippet": "Back in bed, Kai tucks the paper map under his pillow. Godzilla curls near one foot, and Grypho nest",
+      "expectedCast": [
+        {
+          "name": "Trapjaw",
+          "species": "a person"
+        },
+        {
+          "name": "Godzilla",
+          "species": "a pet"
+        },
+        {
+          "name": "Grypho",
+          "species": "a pet"
+        },
+        {
+          "name": "Kai",
+          "species": "a person"
+        }
+      ],
+      "expected": null,
+      "onomatopoeia": true,
+      "result": {
+        "pageNumber": 12,
+        "pageId": "cmrm0yfzv00yyo50dqlbqkmvi",
+        "passed": false,
+        "issues": [
+          "RENDERED TEXT: visible on-image text such as 'DIM... SHHH...' (and possibly 'Tiptoe, Kai' lettering) appears above Trapjaw — any lettering inside the illustration is not allowed (quality cap applies).",
+          "NO MISSING CAST: Kai (sleeping with map under pillow), Trapjaw (dimming lantern), Godzilla and Grypho (curled near the bed) are present.",
+          "NO ANATOMY ERRORS detected."
+        ],
+        "characterConsistencyScore": 9,
+        "styleConsistencyScore": 9,
+        "overallScore": 4,
+        "suggestedPromptAdditions": "REMOVE RENDERED LETTERING: Remove 'DIM... SHHH...' and any other text from this bedroom vignette. Use subtle visual cues for the dimming action (a small light falloff gradient from the lantern, softer halo) and quiet motion lines for Trapjaw’s hand — but do not include words. Keep all character features exactly as in the reference turnarounds: Kai's hair and orange outfit, Trapjaw's red helmet/green face/mechanical arm/blue body, Godzilla and Grypho colors and proportions. Preserve the mixed-media/collage rendering and the tactile paper+gouache finish.",
+        "classFlags": {
+          "renderedText": true,
+          "intraImageDuplicate": false,
+          "missingExpectedCast": false,
+          "speciesMismatch": false,
+          "characterHybrid": false,
+          "propHolderMismatch": null,
+          "focalActionMismatch": false
+        }
+      },
+      "requeued": true
+    }
+  ],
+  "dryRunRows": [
+    {
+      "bookId": "cmrm0yfzd00ymo50dvcnetv1m",
+      "pageId": "cmrm0yfzv00yno50dtg2p0s5b",
+      "target": "page",
+      "qcRound": 0,
+      "charScore": 9,
+      "styleScore": 9,
+      "overallScore": 4,
+      "passed": false,
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-image-preview",
+      "hadSheet": true,
+      "feedback": "REMOVE ALL LETTERING: remove the rendered sound word 'TIPTOE!' from the artwork. KEEP CHARACTER DETAILS EXACT: Trapjaw must keep the red helmet, green face tone, blue body, metal prosthetic arm and leather belt exactly matched to the reference sheet (sample colors from the sheet). Kai must keep the black hair, warm golden skin tone, orange/white striped outfit and child head-to-body proportions exactly as in the reference. Godzilla must keep the large black body, purple dorsal plates and red chest markings exactly as on the reference. Grypho must keep its small pet scale/feather shapes and colors exactly. PROP: Trapjaw should be shown holding the lantern in his hand (as in the script) — ensure the lantern is visually in Trapjaw’s right hand and not floating or held by another character. BACKGROUND: keep the same warm vignette and paper texture as the rest of the book. Remove any stray marks that look like letters or glyphs."
+    },
+    {
+      "bookId": "cmrm0yfzd00ymo50dvcnetv1m",
+      "pageId": "cmrm0yfzv00yoo50d6w1z1bk3",
+      "target": "page",
+      "qcRound": 0,
+      "charScore": 9,
+      "styleScore": 9,
+      "overallScore": 4,
+      "passed": false,
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-image-preview",
+      "hadSheet": true,
+      "feedback": "REMOVE ALL LETTERING: remove the rendered onomatopoeia 'DRIP! DRIP!' (or any other sound words) from the artwork. ACTION NOTE: show Kai touching a large leaf and a single water drop falling — no text. CHARACTER DETAILS: sample Kai’s skin and hair color exactly from the Kai reference (black hair, warm golden skin). Trapjaw: keep exact helmet red, green face color and metal arm. Godzilla and Grypho: keep scale/fur colors and proportions exactly as on their sheets. STYLE: maintain the handcrafted collage + gouache look (paper-edge layers, subtle deckled edges, soft gouache washes)."
+    },
+    {
+      "bookId": "cmrm0yfzd00ymo50dvcnetv1m",
+      "pageId": "cmrm0yfzv00ypo50dyow8hzsb",
+      "target": "page",
+      "qcRound": 0,
+      "charScore": 9,
+      "styleScore": 9,
+      "overallScore": 4,
+      "passed": false,
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-image-preview",
+      "hadSheet": true,
+      "feedback": "REMOVE ALL LETTERING: remove the rendered 'SNIFF SNIFF' (or any sniff/noise text) from this page. ACTION / PROP: depict Godzilla discovering a long silver scale under a fern (scale may lie on the ground near Godzilla’s snout) — do NOT add any text labels pointing at the scale. If Godzilla holds the scale, show it in Godzilla’s mouth or paw; otherwise leave it on the ground near the fern. CHARACTER DETAILS: ensure Trapjaw is kneeling and smiling, with his metal shoulder/arm and red-helmeted head matching the Trapjaw reference exactly (sample colors). Kai should look on with the correct child proportions, hair, and outfit per the Kai reference. STYLE: keep collage/paper layers and gouache washes consistent with the rest of the book."
+    },
+    {
+      "bookId": "cmrm0yfzd00ymo50dvcnetv1m",
+      "pageId": "cmrm0yfzv00yqo50drtjp5hrq",
+      "target": "page",
+      "qcRound": 0,
+      "charScore": 9,
+      "styleScore": 9,
+      "overallScore": 4,
+      "passed": false,
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-image-preview",
+      "hadSheet": true,
+      "feedback": "REMOVE ALL LETTERING: delete 'TICKA-TICKA' (and any other sound words) from the art. COMPOSITION: show a giant coil (the Titan boa) partially wrapped around a mossy log with the coil’s texture visible — no text labels. Keep the coil scale/skin pattern, and the thumbnail silhouette of the Titan boa, but do not change the canonical sizes of Godzilla and Grypho (they should remain pet-scale as in the reference sheet). CHARACTERS: include Trapjaw (red helmet/metal arm), Kai child (orange outfit, black hair), Godzilla (big black/purple dorsal markings) and Grypho (small pet) with the exact colors and proportions sampled from the reference sheets. STYLE: keep the hand-cut paper / gouache / colored-pencil finishing as the established approach."
+    },
+    {
+      "bookId": "cmrm0yfzd00ymo50dvcnetv1m",
+      "pageId": "cmrm0yfzv00yro50dr1svpw0x",
+      "target": "page",
+      "qcRound": 0,
+      "charScore": 9,
+      "styleScore": 9,
+      "overallScore": 4,
+      "passed": false,
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-image-preview",
+      "hadSheet": true,
+      "feedback": "REMOVE ALL LETTERING: remove 'BOING!', 'ACHOO!', or any other sound words from the illustration. COMPOSITION: show Grypho hopping on the log (motion indicated by simple motion lines, not text), the log rolling and Kai tipping into moss — express the motion visually (tilted log, shifted weight) not with lettering. CHARACTER ACCURACY: Kai must keep the exact child proportions, black hair, warm skin tone, and orange/white clothing. Trapjaw must keep the red helmet, green face color and metal arm exactly. Godzilla and Grypho must retain scale patterns and colors exactly as in their reference sheets. Keep collage/paper edges and gouache washes consistent."
+    },
+    {
+      "bookId": "cmrm0yfzd00ymo50dvcnetv1m",
+      "pageId": "cmrm0yfzv00yso50d934fhaot",
+      "target": "page",
+      "qcRound": 0,
+      "charScore": 9,
+      "styleScore": 9,
+      "overallScore": 4,
+      "passed": false,
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-image-preview",
+      "hadSheet": true,
+      "feedback": "REMOVE ALL LETTERING: remove any rendered rumble/volcano onomatopoeia from the image. COMPOSITION: depict a small gray puff of volcanic smoke over a dark hill (visual smoke shapes only, no text). Ensure the map in Kai’s trembling hands is shown with fold lines and a clear paper texture but NO printed words inside the artwork. CHARACTER ACCURACY: Trapjaw must match the reference exactly (red helmet, green face, blue body, metal arm) and should be near Kai pointing or whispering 'Volcano' (dialogue belongs in the book text, not in the art). Godzilla and Grypho must keep their canonical color patterns and relative sizes. Maintain the handcrafted paper + gouache style and sampled colors."
+    },
+    {
+      "bookId": "cmrm0yfzd00ymo50dvcnetv1m",
+      "pageId": "cmrm0yfzv00yto50dnjazdbow",
+      "target": "page",
+      "qcRound": 0,
+      "charScore": 9,
+      "styleScore": 9,
+      "overallScore": 4,
+      "passed": false,
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-image-preview",
+      "hadSheet": true,
+      "feedback": "REMOVE RENDERED LETTERING: Delete the on-image words 'UP! UP! UP!' and any other sound or caption text. Replace with non-letter graphic cues only — e.g. subtle motion lines, stepped rock markings or hand-drawn footsteps — but do NOT place any letters or words inside the artwork. Keep Trapjaw (blue, green face, red helmet, mechanical arm), Kai (black hair, orange outfit), Godzilla (black scales with purple dorsal), and Grypho (brown feathers) exactly as in the reference turnarounds; do not alter hair/hue/proportions. Maintain current composition and handcrafted paper+gouache rendering, only remove lettering."
+    },
+    {
+      "bookId": "cmrm0yfzd00ymo50dvcnetv1m",
+      "pageId": "cmrm0yfzv00yuo50dbcggi4t3",
+      "target": "page",
+      "qcRound": 0,
+      "charScore": 9,
+      "styleScore": 9,
+      "overallScore": 4,
+      "passed": false,
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-image-preview",
+      "hadSheet": true,
+      "feedback": "REMOVE RENDERED LETTERING: Remove 'POOF!' (and any other sound words / captions) from the volcano scene. If you need to show the volcano's burp, use visual cues only (steam puffs, radial motion strokes, warm rim lighting on crater) — no letters. Keep all character attributes exact to the reference sheets (Trapjaw: blue body, green face, red helmet, mechanical arm; Kai: black hair, orange outfit; pets' colors and proportions unchanged). Preserve the tactile mixed-media look."
+    },
+    {
+      "bookId": "cmrm0yfzd00ymo50dvcnetv1m",
+      "pageId": "cmrm0yfzv00yvo50dh1papuol",
+      "target": "page",
+      "qcRound": 0,
+      "charScore": 9,
+      "styleScore": 9,
+      "overallScore": 4,
+      "passed": false,
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-image-preview",
+      "hadSheet": true,
+      "feedback": "REMOVE RENDERED LETTERING: Delete the 'THUMP, THUMP...' on the page. Show the heavy footsteps with non-letter devices (deep footprint impressions, repeated motion lines, subtle ground vibration marks) instead. Keep Kai's map and expression, Trapjaw and the pets exactly as in the reference turnarounds (do not alter hair, skin, proportions, or pet markings). Maintain the same handcrafted texture and layered-paper rendering."
+    },
+    {
+      "bookId": "cmrm0yfzd00ymo50dvcnetv1m",
+      "pageId": "cmrm0yfzv00ywo50dewd3jy4q",
+      "target": "page",
+      "qcRound": 0,
+      "charScore": 9,
+      "styleScore": 9,
+      "overallScore": 4,
+      "passed": false,
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-image-preview",
+      "hadSheet": true,
+      "feedback": "REMOVE RENDERED LETTERING: Remove 'ACHOO-ROAR!', 'CRINKLE' and any other in-image text. Represent the sneeze and the crinkling map through pure visual animation — e.g., puff of ash, radial sneeze lines, small floating ash particles, and the map creasing motion lines — but no letters. Keep character design fidelity exactly as the reference sheets (Trapjaw: helmet/green face/mech arm; Kai: black hair/orange outfit; Godzilla/Grypho unchanged)."
+    },
+    {
+      "bookId": "cmrm0yfzd00ymo50dvcnetv1m",
+      "pageId": "cmrm0yfzv00yxo50d24oh4p99",
+      "target": "page",
+      "qcRound": 0,
+      "charScore": 9,
+      "styleScore": 9,
+      "overallScore": 4,
+      "passed": false,
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-image-preview",
+      "hadSheet": true,
+      "feedback": "REMOVE RENDERED LETTERING: Delete 'STOMP... STOMP...' and any other lettering. Use non-letter visual devices to show the T-Rex receding: progressively smaller footprints, a shrinking silhouette in the distance, fading color saturation — but do not include words. Keep the lantern, fireflies, and pets positioned as in the reference; preserve exact colors and proportions for Trapjaw, Kai, Godzilla, and Grypho."
+    },
+    {
+      "bookId": "cmrm0yfzd00ymo50dvcnetv1m",
+      "pageId": "cmrm0yfzv00yyo50dqlbqkmvi",
+      "target": "page",
+      "qcRound": 0,
+      "charScore": 9,
+      "styleScore": 9,
+      "overallScore": 4,
+      "passed": false,
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-image-preview",
+      "hadSheet": true,
+      "feedback": "REMOVE RENDERED LETTERING: Remove 'DIM... SHHH...' and any other text from this bedroom vignette. Use subtle visual cues for the dimming action (a small light falloff gradient from the lantern, softer halo) and quiet motion lines for Trapjaw’s hand — but do not include words. Keep all character features exactly as in the reference turnarounds: Kai's hair and orange outfit, Trapjaw's red helmet/green face/mechanical arm/blue body, Godzilla and Grypho colors and proportions. Preserve the mixed-media/collage rendering and the tactile paper+gouache finish."
+    },
+    {
+      "bookId": "cmrm0yfzd00ymo50dvcnetv1m",
+      "pageId": null,
+      "target": "cover",
+      "qcRound": 0,
+      "charScore": 9,
+      "styleScore": 8,
+      "overallScore": 4,
+      "passed": false,
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-image-preview",
+      "hadSheet": true,
+      "feedback": "1) REMOVE ALL NON-TITLE LETTERING: Remove the word/word-bubble “TIPTOE!” (and any other extraneous words) from the illustration. No sound-words, captions, or scene-type text should be painted onto the cover image itself. 2) TITLE ACCURACY: Keep the painted title exactly as: “Kai and the Wild Rumble” (no extra words, subtitles, or stray text lines). 3) LOGO: If a small logo mark is required, make it tiny and unobtrusive at the corner; do NOT add additional words or taglines. 4) PET SCALE ADJUSTMENT (minor): Adjust the long-snouted crocodilian so its eye/headline and overall height match the exact proportions from its reference turnaround (slightly raise the body or reduce width so the height ratio to the child matches the sheet). 5) STYLE/CONSTRUCTION NOTE (optional): Maintain the handcrafted collage + paper + gouache tactile look used in the references: keep sampled colors exactly, soft paper halo vignettes behind each character, and subtle deckled-paper shadow layers beneath feet. This will ensure final imagery is fully consistent with the reference sheets."
+    }
+  ],
+  "forcedError": {
+    "badModel": "gpt-5-mini-x12c-does-not-exist",
+    "batch": [
+      {
+        "pageNumber": 1,
+        "pageId": "cmrm0yfzv00yno50dtg2p0s5b"
+      },
+      {
+        "pageNumber": 2,
+        "pageId": "cmrm0yfzv00yoo50d6w1z1bk3"
+      }
+    ],
+    "sentinelResults": [
+      {
+        "pageNumber": 1,
+        "pageId": "cmrm0yfzv00yno50dtg2p0s5b",
+        "passed": false,
+        "issues": [],
+        "characterConsistencyScore": 0,
+        "styleConsistencyScore": 0,
+        "overallScore": 0,
+        "suggestedPromptAdditions": "qc_error: 400 The requested model 'gpt-5-mini-x12c-does-not-exist' does not exist.",
+        "classFlags": {
+          "renderedText": false,
+          "intraImageDuplicate": false,
+          "missingExpectedCast": false,
+          "speciesMismatch": false,
+          "characterHybrid": false,
+          "propHolderMismatch": null,
+          "focalActionMismatch": null
+        }
+      },
+      {
+        "pageNumber": 2,
+        "pageId": "cmrm0yfzv00yoo50d6w1z1bk3",
+        "passed": false,
+        "issues": [],
+        "characterConsistencyScore": 0,
+        "styleConsistencyScore": 0,
+        "overallScore": 0,
+        "suggestedPromptAdditions": "qc_error: 400 The requested model 'gpt-5-mini-x12c-does-not-exist' does not exist.",
+        "classFlags": {
+          "renderedText": false,
+          "intraImageDuplicate": false,
+          "missingExpectedCast": false,
+          "speciesMismatch": false,
+          "characterHybrid": false,
+          "propHolderMismatch": null,
+          "focalActionMismatch": null
+        }
+      }
+    ],
+    "sentinelRows": [
+      {
+        "bookId": "cmrm0yfzd00ymo50dvcnetv1m",
+        "pageId": "cmrm0yfzv00yno50dtg2p0s5b",
+        "target": "page",
+        "qcRound": 0,
+        "charScore": null,
+        "styleScore": null,
+        "overallScore": null,
+        "passed": false,
+        "provider": "gemini",
+        "model": "gemini-3.1-flash-image-preview",
+        "hadSheet": true,
+        "feedback": "qc_error: 400 The requested model 'gpt-5-mini-x12c-does-not-exist' does not exist."
+      },
+      {
+        "bookId": "cmrm0yfzd00ymo50dvcnetv1m",
+        "pageId": "cmrm0yfzv00yoo50d6w1z1bk3",
+        "target": "page",
+        "qcRound": 0,
+        "charScore": null,
+        "styleScore": null,
+        "overallScore": null,
+        "passed": false,
+        "provider": "gemini",
+        "model": "gemini-3.1-flash-image-preview",
+        "hadSheet": true,
+        "feedback": "qc_error: 400 The requested model 'gpt-5-mini-x12c-does-not-exist' does not exist."
+      }
+    ],
+    "requeueAfterSentinel": []
+  }
+}

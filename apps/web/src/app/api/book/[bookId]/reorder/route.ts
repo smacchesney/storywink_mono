@@ -6,21 +6,20 @@ import logger from '@/lib/logger';
 
 // Zod schema for request body validation
 const reorderPagesSchema = z.object({
-  pages: z.array(
-    z.object({
-      pageId: z.string().cuid(),
-      index: z.number().min(0), // New index position (0-based)
-    })
-  ).min(1, { message: 'At least one page required for reordering.' }),
+  pages: z
+    .array(
+      z.object({
+        pageId: z.string().cuid(),
+        index: z.number().min(0), // New index position (0-based)
+      }),
+    )
+    .min(1, { message: 'At least one page required for reordering.' }),
 });
 
 // Define the context type for the route
 type Context = { params: Promise<{ bookId: string }> };
 
-export async function POST(
-  req: NextRequest,
-  { params }: Context
-) {
+export async function POST(req: NextRequest, { params }: Context) {
   const { bookId } = await params;
 
   try {
@@ -35,11 +34,20 @@ export async function POST(
     try {
       const body = await req.json();
       validatedData = reorderPagesSchema.parse(body);
-      logger.info({ clerkId, dbUserId: dbUser.id, bookId, pageCount: validatedData.pages.length }, 'API: Validated page reorder request.');
+      logger.info(
+        { clerkId, dbUserId: dbUser.id, bookId, pageCount: validatedData.pages.length },
+        'API: Validated page reorder request.',
+      );
     } catch (error) {
-      logger.warn({ clerkId, dbUserId: dbUser.id, bookId, error }, 'API: Invalid page reorder request body.');
+      logger.warn(
+        { clerkId, dbUserId: dbUser.id, bookId, error },
+        'API: Invalid page reorder request body.',
+      );
       if (error instanceof z.ZodError) {
-        return NextResponse.json({ error: 'Invalid request body', details: error.errors }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Invalid request body', details: error.errors },
+          { status: 400 },
+        );
       }
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
@@ -53,8 +61,14 @@ export async function POST(
     });
 
     if (!bookOwnerCheck) {
-      logger.warn({ clerkId, dbUserId: dbUser.id, bookId }, 'API: Reorder attempt failed - Book not found or user does not own it.');
-      return NextResponse.json({ error: 'Book not found or you do not have permission.' }, { status: 403 }); // Forbidden or 404
+      logger.warn(
+        { clerkId, dbUserId: dbUser.id, bookId },
+        'API: Reorder attempt failed - Book not found or user does not own it.',
+      );
+      return NextResponse.json(
+        { error: 'Book not found or you do not have permission.' },
+        { status: 403 },
+      ); // Forbidden or 404
     }
 
     // Fetch current page state before reordering
@@ -67,30 +81,36 @@ export async function POST(
         isTitlePage: true,
         assetId: true,
       },
-      orderBy: { index: 'asc' }
+      orderBy: { index: 'asc' },
     });
 
-    logger.info({
-      clerkId,
-      dbUserId: dbUser.id,
-      bookId,
-      beforeState: currentPages.map(p => ({
-        id: p.id,
-        index: p.index,
-        pageNumber: p.pageNumber,
-        isTitlePage: p.isTitlePage
-      }))
-    }, 'API: Page state before reorder');
+    logger.info(
+      {
+        clerkId,
+        dbUserId: dbUser.id,
+        bookId,
+        beforeState: currentPages.map((p) => ({
+          id: p.id,
+          index: p.index,
+          pageNumber: p.pageNumber,
+          isTitlePage: p.isTitlePage,
+        })),
+      },
+      'API: Page state before reorder',
+    );
 
     // Build a map of pageId → page for isTitlePage derivation
-    const pageById = new Map(currentPages.map(p => [p.id, p]));
+    const pageById = new Map(currentPages.map((p) => [p.id, p]));
     const coverAssetId = bookOwnerCheck.coverAssetId;
 
     // Use a transaction to update all page indices atomically
     await prisma.$transaction(async (tx) => {
-      logger.info({ clerkId, dbUserId: dbUser.id, bookId }, 'API: Starting page reorder transaction.');
+      logger.info(
+        { clerkId, dbUserId: dbUser.id, bookId },
+        'API: Starting page reorder transaction.',
+      );
 
-      const updatePromises = pages.map(page =>
+      const updatePromises = pages.map((page) =>
         tx.page.updateMany({
           where: {
             id: page.pageId,
@@ -108,16 +128,21 @@ export async function POST(
                 ? pageById.get(page.pageId)?.assetId === coverAssetId && coverAssetId !== null
                 : (pageById.get(page.pageId)?.isTitlePage ?? false),
           },
-        })
+        }),
       );
       const results = await Promise.all(updatePromises);
-      
+
       // Optional: Check results to ensure all updates affected 1 row
-      const failedUpdates = results.filter(result => result.count !== 1);
+      const failedUpdates = results.filter((result) => result.count !== 1);
       if (failedUpdates.length > 0) {
-         logger.error({ clerkId, dbUserId: dbUser.id, bookId, failedUpdates }, 'API: Some pages failed to update during reorder transaction.');
-         // Rollback happens automatically due to the error
-         throw new Error('Failed to update one or more pages during reorder. Mismatched page IDs or book association?');
+        logger.error(
+          { clerkId, dbUserId: dbUser.id, bookId, failedUpdates },
+          'API: Some pages failed to update during reorder transaction.',
+        );
+        // Rollback happens automatically due to the error
+        throw new Error(
+          'Failed to update one or more pages during reorder. Mismatched page IDs or book association?',
+        );
       }
 
       // Fetch and log new state
@@ -129,49 +154,55 @@ export async function POST(
           pageNumber: true,
           isTitlePage: true,
         },
-        orderBy: { index: 'asc' }
+        orderBy: { index: 'asc' },
       });
 
       // Detect which pages changed isTitlePage status
       const titlePageChanges = currentPages
-        .map(before => {
-          const after = afterPages.find(a => a.id === before.id);
+        .map((before) => {
+          const after = afterPages.find((a) => a.id === before.id);
           if (after && before.isTitlePage !== after.isTitlePage) {
             return {
               pageId: before.id,
               wasTitlePage: before.isTitlePage,
-              nowTitlePage: after.isTitlePage
+              nowTitlePage: after.isTitlePage,
             };
           }
           return null;
         })
         .filter(Boolean);
 
-      logger.info({
-        clerkId,
-        dbUserId: dbUser.id,
-        bookId,
-        afterState: afterPages.map(p => ({
-          id: p.id,
-          index: p.index,
-          pageNumber: p.pageNumber,
-          isTitlePage: p.isTitlePage
-        })),
-        titlePageChanges: titlePageChanges.length > 0 ? titlePageChanges : 'none'
-      }, 'API: Page state after reorder');
+      logger.info(
+        {
+          clerkId,
+          dbUserId: dbUser.id,
+          bookId,
+          afterState: afterPages.map((p) => ({
+            id: p.id,
+            index: p.index,
+            pageNumber: p.pageNumber,
+            isTitlePage: p.isTitlePage,
+          })),
+          titlePageChanges: titlePageChanges.length > 0 ? titlePageChanges : 'none',
+        },
+        'API: Page state after reorder',
+      );
 
-      logger.info({ clerkId, dbUserId: dbUser.id, bookId, updatedCount: results.length }, 'API: Page reorder transaction committed.');
+      logger.info(
+        { clerkId, dbUserId: dbUser.id, bookId, updatedCount: results.length },
+        'API: Page reorder transaction committed.',
+      );
     });
 
     return NextResponse.json({ message: 'Page order updated successfully' }, { status: 200 });
-
   } catch (error) {
     // Handle authentication errors
-    if (error instanceof Error && (
-      error.message.includes('not authenticated') ||
-      error.message.includes('ID mismatch') ||
-      error.message.includes('primary email not found')
-    )) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('not authenticated') ||
+        error.message.includes('ID mismatch') ||
+        error.message.includes('primary email not found'))
+    ) {
       logger.warn('API: Page reorder attempt without authentication.');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -179,4 +210,4 @@ export async function POST(
     logger.error({ bookId, error }, 'API: Error during page reorder.');
     return NextResponse.json({ error: 'Failed to reorder pages' }, { status: 500 });
   }
-} 
+}

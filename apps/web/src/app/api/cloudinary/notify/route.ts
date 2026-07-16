@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   try {
     // Get authenticated user
     const { dbUser, clerkId } = await getAuthenticatedUser();
-    logger.info({ clerkUserId: clerkId, dbUserId: dbUser.id }, "Cloudinary notify endpoint called");
+    logger.info({ clerkUserId: clerkId, dbUserId: dbUser.id }, 'Cloudinary notify endpoint called');
 
     let body: unknown;
     try {
@@ -62,7 +62,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid asset ownership' }, { status: 400 });
     }
 
-    console.log(`>>> DEBUG: Cloudinary notify - dbUserId: ${dbUser.id}, assetCount: ${assets.length}, bookId: ${bookId || 'none'}`);
+    console.log(
+      `>>> DEBUG: Cloudinary notify - dbUserId: ${dbUser.id}, assetCount: ${assets.length}, bookId: ${bookId || 'none'}`,
+    );
 
     const createdAssets = [];
     let bookPageCount = 0;
@@ -72,7 +74,7 @@ export async function POST(request: NextRequest) {
     if (bookId) {
       const book = await prisma.book.findUnique({
         where: { id: bookId, userId: dbUser.id },
-        select: { status: true, bookType: true, _count: { select: { pages: true } } }
+        select: { status: true, bookType: true, _count: { select: { pages: true } } },
       });
       if (!book) {
         return NextResponse.json({ error: 'Book not found or permission denied' }, { status: 404 });
@@ -81,7 +83,10 @@ export async function POST(request: NextRequest) {
       // roster, and premise are authored from the cast. Attaching photos here
       // would desync pageLength and invite the photo pipeline in.
       if (book.bookType === 'AVATAR_STORY') {
-        return NextResponse.json({ error: 'This book is made from characters, not photos' }, { status: 409 });
+        return NextResponse.json(
+          { error: 'This book is made from characters, not photos' },
+          { status: 409 },
+        );
       }
       bookPageCount = book._count.pages;
       bookStatus = book.status;
@@ -100,7 +105,9 @@ export async function POST(request: NextRequest) {
           asset.url?.toLowerCase().includes('.heic') ||
           asset.url?.toLowerCase().includes('.heif');
         const storedUrl = isHeic ? convertHeicToJpeg(asset.url) : asset.url;
-        const storedThumbnailUrl = isHeic ? convertHeicToJpeg(asset.thumbnailUrl) : asset.thumbnailUrl;
+        const storedThumbnailUrl = isHeic
+          ? convertHeicToJpeg(asset.thumbnailUrl)
+          : asset.thumbnailUrl;
         const storedFileType = isHeic ? 'image/jpeg' : `image/${asset.format}`;
 
         const createdData = await prisma.$transaction(async (tx) => {
@@ -118,8 +125,13 @@ export async function POST(request: NextRequest) {
             },
           });
 
-          console.log(`>>> DEBUG: Asset created - id: ${newAsset.id}, userId: ${dbUser.id}, publicId: ${asset.publicId}`);
-          logger.info({ assetId: newAsset.id, publicId: asset.publicId }, "Asset created in database");
+          console.log(
+            `>>> DEBUG: Asset created - id: ${newAsset.id}, userId: ${dbUser.id}, publicId: ${asset.publicId}`,
+          );
+          logger.info(
+            { assetId: newAsset.id, publicId: asset.publicId },
+            'Asset created in database',
+          );
 
           // If bookId was provided, create Page record
           if (bookId) {
@@ -132,10 +144,10 @@ export async function POST(request: NextRequest) {
                 originalImageUrl: newAsset.thumbnailUrl || newAsset.url,
                 pageType: PageType.SINGLE,
                 isTitlePage: false,
-              }
+              },
             });
             bookPageCount++;
-            logger.info({ bookId, assetId: newAsset.id }, "Page created for book");
+            logger.info({ bookId, assetId: newAsset.id }, 'Page created for book');
           }
 
           return {
@@ -147,16 +159,19 @@ export async function POST(request: NextRequest) {
 
         createdAssets.push(createdData);
       } catch (error) {
-        logger.error({
-          asset: asset.publicId,
-          err: error,
-          errorMessage: error instanceof Error ? error.message : String(error)
-        }, "Failed to create database record for asset");
+        logger.error(
+          {
+            asset: asset.publicId,
+            err: error,
+            errorMessage: error instanceof Error ? error.message : String(error),
+          },
+          'Failed to create database record for asset',
+        );
         // Continue with other assets even if one fails
       }
     }
 
-    logger.info({ count: createdAssets.length }, "Assets created successfully");
+    logger.info({ count: createdAssets.length }, 'Assets created successfully');
 
     // Photos added to a DRAFT book change what the perception pass saw —
     // refresh the story brief/questions/identity for the new set. Non-fatal.
@@ -170,39 +185,51 @@ export async function POST(request: NextRequest) {
             backoff: { type: 'exponential', delay: 5000 },
             removeOnComplete: { count: 100 },
             removeOnFail: { count: 500 },
-          }
+          },
         );
       } catch (queueError) {
-        logger.error({ bookId, error: queueError }, 'Failed to enqueue perception refresh (non-fatal)');
+        logger.error(
+          { bookId, error: queueError },
+          'Failed to enqueue perception refresh (non-fatal)',
+        );
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        assets: createdAssets,
-        count: createdAssets.length
-      }
-    }, { status: 201 });
-
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          assets: createdAssets,
+          count: createdAssets.length,
+        },
+      },
+      { status: 201 },
+    );
   } catch (error) {
     // Handle authentication errors
-    if (error instanceof Error && (
-      error.message.includes('not authenticated') ||
-      error.message.includes('ID mismatch') ||
-      error.message.includes('primary email not found')
-    )) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('not authenticated') ||
+        error.message.includes('ID mismatch') ||
+        error.message.includes('primary email not found'))
+    ) {
       logger.warn('Cloudinary notify attempt without authentication');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    logger.error({
-      err: error,
-      errorMessage: error instanceof Error ? error.message : String(error)
-    }, 'Cloudinary notify endpoint error');
-    return NextResponse.json({ 
-      error: 'Failed to process uploaded assets',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    logger.error(
+      {
+        err: error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      },
+      'Cloudinary notify endpoint error',
+    );
+    return NextResponse.json(
+      {
+        error: 'Failed to process uploaded assets',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 },
+    );
   }
 }

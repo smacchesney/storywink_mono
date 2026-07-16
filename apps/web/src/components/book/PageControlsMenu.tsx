@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -45,7 +45,12 @@ interface PageControlsMenuProps {
  * app-authored) additionally get "Remove this page" — the one-tap decline for
  * content the parent never chose.
  */
-export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: PageControlsMenuProps) {
+export function PageControlsMenu({
+  bookId,
+  page,
+  canChangePhoto,
+  onMutated,
+}: PageControlsMenuProps) {
   const t = useTranslations('pageMenu');
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
@@ -182,7 +187,9 @@ export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: Pa
               disabled={isRemoving}
               className="bg-red-600 font-playful text-white hover:bg-red-700"
             >
-              {isRemoving ? <Storydust variant="twinkle" size="inline" className="mr-2 text-white" /> : null}
+              {isRemoving ? (
+                <Storydust variant="twinkle" size="inline" className="mr-2 text-white" />
+              ) : null}
               {t('removeConfirm')}
             </Button>
           </DialogFooter>
@@ -198,7 +205,7 @@ export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: Pa
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={4}
-            className="w-full resize-none rounded-xl border border-black/10 bg-white px-3 py-2 font-playful text-base text-gray-800 focus:border-coral focus:outline-none focus:ring-1 focus:ring-coral"
+            className="w-full resize-none rounded-xl border border-black/10 bg-white px-3 py-2 font-playful text-base text-gray-800 focus:border-coral focus:ring-1 focus:ring-coral focus:outline-none"
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)} disabled={isSavingText}>
@@ -209,7 +216,9 @@ export function PageControlsMenu({ bookId, page, canChangePhoto, onMutated }: Pa
               disabled={isSavingText}
               className="bg-coral font-playful text-white hover:bg-coral/90"
             >
-              {isSavingText ? <Storydust variant="twinkle" size="inline" className="mr-2 text-white" /> : null}
+              {isSavingText ? (
+                <Storydust variant="twinkle" size="inline" className="mr-2 text-white" />
+              ) : null}
               {t('save')}
             </Button>
           </DialogFooter>

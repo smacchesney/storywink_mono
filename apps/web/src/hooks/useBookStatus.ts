@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { BookStatus } from '@prisma/client';
@@ -70,7 +70,7 @@ const TERMINAL_STATUSES: BookStatus[] = [
  */
 export function useBookStatus(
   bookId: string | null | undefined,
-  { intervalMs = 5000, timeoutMs, enabled = true }: UseBookStatusOptions = {}
+  { intervalMs = 5000, timeoutMs, enabled = true }: UseBookStatusOptions = {},
 ): BookStatusResult {
   const [data, setData] = useState<BookStatusData>({
     status: null,

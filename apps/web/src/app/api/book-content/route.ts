@@ -5,7 +5,7 @@ import { db as prisma } from '@/lib/db';
 export async function GET(request: Request) {
   try {
     const { dbUser } = await getAuthenticatedUser();
-    
+
     const { searchParams } = new URL(request.url);
     const bookId = searchParams.get('bookId');
 
@@ -19,7 +19,8 @@ export async function GET(request: Request) {
         userId: dbUser.id, // Use database user ID, not Clerk ID
       },
       include: {
-        pages: { // Include the related pages
+        pages: {
+          // Include the related pages
           orderBy: {
             index: 'asc', // Order pages by user-defined sequence
           },
@@ -39,18 +40,18 @@ export async function GET(request: Request) {
 
     // We only need to return the pages array for the frontend
     return NextResponse.json({ pages: book.pages }, { status: 200 });
-
   } catch (error) {
     // Handle authentication errors
-    if (error instanceof Error && (
-      error.message.includes('not authenticated') ||
-      error.message.includes('ID mismatch') ||
-      error.message.includes('primary email not found')
-    )) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('not authenticated') ||
+        error.message.includes('ID mismatch') ||
+        error.message.includes('primary email not found'))
+    ) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     console.error(`Error fetching content for book:`, error);
     return NextResponse.json({ error: 'Failed to fetch book content' }, { status: 500 });
   }
-} 
+}

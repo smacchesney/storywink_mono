@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useRef, useState } from "react";
-import { useReducedMotion } from "framer-motion";
-import RoughUnderline from "@/components/ui/rough-underline";
+import { useEffect, useRef, useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
+import RoughUnderline from '@/components/ui/rough-underline';
 
 interface AnimatedHeroTextProps {
   /** Sentence fragment before the rotating word (carries its own spacing). */
@@ -33,13 +33,13 @@ interface AnimatedHeroTextProps {
  * animated copy is `aria-hidden`.
  */
 function AnimatedHeroText({
-  lead = "",
-  trail = "",
-  rotatingWords = ["Hero", "Princess", "Adventurer", "Explorer", "Firefighter"],
+  lead = '',
+  trail = '',
+  rotatingWords = ['Hero', 'Princess', 'Adventurer', 'Explorer', 'Firefighter'],
   interval = 2600,
-  className = "",
+  className = '',
 }: AnimatedHeroTextProps) {
-  const words = rotatingWords.length ? rotatingWords : ["Hero"];
+  const words = rotatingWords.length ? rotatingWords : ['Hero'];
   const [index, setIndex] = useState(0);
   const prefersReduced = useReducedMotion();
   const slotRef = useRef<HTMLSpanElement>(null);
@@ -49,7 +49,7 @@ function AnimatedHeroText({
 
   useEffect(() => {
     const el = slotRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
+    if (!el || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(() => setSlotWidth(el.offsetWidth));
     observer.observe(el);
     setSlotWidth(el.offsetWidth);
@@ -58,10 +58,7 @@ function AnimatedHeroText({
 
   useEffect(() => {
     if (prefersReduced || words.length < 2) return;
-    const id = setInterval(
-      () => setIndex((i) => (i + 1) % words.length),
-      interval,
-    );
+    const id = setInterval(() => setIndex((i) => (i + 1) % words.length), interval);
     return () => clearInterval(id);
   }, [words.length, interval, prefersReduced]);
 
@@ -71,7 +68,7 @@ function AnimatedHeroText({
 
   return (
     <h1
-      className={`text-balance text-3xl font-bold leading-[1.12] tracking-tight text-ink sm:text-4xl md:text-5xl lg:text-[3.4rem] ${className}`}
+      className={`text-3xl leading-[1.12] font-bold tracking-tight text-balance text-ink sm:text-4xl md:text-5xl lg:text-[3.4rem] ${className}`}
     >
       <span className="sr-only">
         {lead}
@@ -82,7 +79,7 @@ function AnimatedHeroText({
         {lead}
         <span
           ref={slotRef}
-          className="relative inline-grid justify-items-center whitespace-nowrap align-baseline font-playful text-coral"
+          className="relative inline-grid justify-items-center align-baseline font-playful whitespace-nowrap text-coral"
         >
           {words.map((word, i) => {
             const isCurrent = i === index;
@@ -92,9 +89,9 @@ function AnimatedHeroText({
                 key={`${word}-${i}`}
                 className={`col-start-1 row-start-1 whitespace-nowrap transition-[opacity,transform] duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
                   isCurrent
-                    ? "opacity-100 translate-y-0"
+                    ? 'translate-y-0 opacity-100'
                     : `pointer-events-none opacity-0 ${
-                        isLeaving ? "-translate-y-[0.32em]" : "translate-y-[0.32em]"
+                        isLeaving ? '-translate-y-[0.32em]' : 'translate-y-[0.32em]'
                       }`
                 }`}
               >
@@ -106,7 +103,7 @@ function AnimatedHeroText({
               the measured width, never transform-stretched, so the
               hand-drawn stroke keeps its character. */}
           {slotWidth > 0 && (
-            <span className="pointer-events-none absolute left-1/2 top-full -mt-[0.08em] -translate-x-1/2">
+            <span className="pointer-events-none absolute top-full left-1/2 -mt-[0.08em] -translate-x-1/2">
               <RoughUnderline
                 width={slotWidth}
                 color="var(--coral-primary)"

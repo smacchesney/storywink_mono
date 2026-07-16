@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { useState } from 'react';
 import Image from 'next/image';
@@ -40,13 +40,7 @@ interface PrintOrderSheetProps {
 }
 
 // Panel content (shared between Sheet and Drawer)
-function PanelContent({
-  book,
-  onClose,
-}: {
-  book: PrintOrderBook;
-  onClose: () => void;
-}) {
+function PanelContent({ book, onClose }: { book: PrintOrderBook; onClose: () => void }) {
   const t = useTranslations('print');
   const tc = useTranslations('common');
   const [quantity, setQuantity] = useState(1);
@@ -99,12 +93,12 @@ function PanelContent({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       {/* Book preview */}
       <div className="px-4 py-4">
         <div className="flex gap-4">
           {/* Cover image */}
-          <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+          <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
             {book.coverImageUrl ? (
               <Image
                 src={coolifyImageUrl(book.coverImageUrl)}
@@ -114,20 +108,18 @@ function PanelContent({
                 className="object-cover"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">
+              <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
                 {t('noCover')}
               </div>
             )}
           </div>
           {/* Book details */}
-          <div className="flex-grow min-w-0">
-            <h3 className="font-semibold text-base truncate">
-              {book.title || t('untitledBook')}
-            </h3>
+          <div className="min-w-0 flex-grow">
+            <h3 className="truncate text-base font-semibold">{book.title || t('untitledBook')}</h3>
             <p className="text-sm text-muted-foreground">
               {t('pageCount', { count: book.pageCount })}
             </p>
-            <p className="text-sm font-medium text-coral mt-1">
+            <p className="mt-1 text-sm font-medium text-coral">
               {t('perBook', { price: formatMoney(bookPrice, currency) })}
             </p>
           </div>
@@ -135,17 +127,12 @@ function PanelContent({
       </div>
 
       {/* Divider */}
-      <div className="border-t mx-4" />
+      <div className="mx-4 border-t" />
 
       {/* Quantity selector */}
       <div className="px-4 py-4">
-        <label className="block text-sm font-medium mb-2">{t('quantity')}</label>
-        <QuantitySelector
-          quantity={quantity}
-          onChange={setQuantity}
-          min={1}
-          max={10}
-        />
+        <label className="mb-2 block text-sm font-medium">{t('quantity')}</label>
+        <QuantitySelector quantity={quantity} onChange={setQuantity} min={1} max={10} />
       </div>
 
       {/* Spacer */}
@@ -154,35 +141,33 @@ function PanelContent({
       {/* Footer with total and checkout button */}
       <DrawerFooter className="border-t pt-4">
         {/* Price summary */}
-        <div className="space-y-1 mb-1">
-          <div className="flex justify-between items-center text-sm text-muted-foreground">
+        <div className="mb-1 space-y-1">
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
             <span>{t('subtotal', { count: quantity })}</span>
             <span>{formatMoney(subtotal, currency)}</span>
           </div>
-          <div className="flex justify-between items-center text-sm text-muted-foreground">
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
             <span>{t('shipping')}</span>
             <span>{formatMoney(shippingTier.priceCents, currency)}</span>
           </div>
-          <div className="flex justify-between items-center">
+          <div className="flex items-center justify-between">
             <span className="text-sm font-medium">{t('total')}</span>
             <span className="text-lg font-bold">{formatMoney(total, currency)}</span>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground mb-3">
+        <p className="mb-3 text-xs text-muted-foreground">
           {t('arrives', {
             min: shippingTier.deliveryDaysMin,
             max: shippingTier.deliveryDaysMax,
           })}
         </p>
 
-        {error && (
-          <p className="text-sm text-red-600 mb-2 text-center">{error}</p>
-        )}
+        {error && <p className="mb-2 text-center text-sm text-red-600">{error}</p>}
 
         <Button
           onClick={handleCheckout}
           disabled={isLoading}
-          className="w-full bg-coral hover:bg-[#E55A4C] text-white py-6 text-base font-semibold"
+          className="w-full bg-coral py-6 text-base font-semibold text-white hover:bg-[#E55A4C]"
         >
           {isLoading ? (
             <>
@@ -198,9 +183,7 @@ function PanelContent({
           {tc('cancel')}
         </Button>
 
-        <p className="text-xs text-muted-foreground text-center mt-2">
-          {t('shipsTo')}
-        </p>
+        <p className="mt-2 text-center text-xs text-muted-foreground">{t('shipsTo')}</p>
       </DrawerFooter>
     </div>
   );
@@ -212,8 +195,13 @@ export function PrintOrderSheet({ book, isOpen, onClose }: PrintOrderSheetProps)
 
   if (isDesktop) {
     return (
-      <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()} modal={false} shouldScaleBackground={false}>
-        <DrawerContent className="h-full w-[380px] mt-0 fixed right-0 left-auto rounded-none border-l">
+      <Drawer
+        open={isOpen}
+        onOpenChange={(open) => !open && onClose()}
+        modal={false}
+        shouldScaleBackground={false}
+      >
+        <DrawerContent className="fixed right-0 left-auto mt-0 h-full w-[380px] rounded-none border-l">
           <DrawerHeader>
             <DrawerTitle>{t('title')}</DrawerTitle>
             <DrawerDescription>{t('subtitle')}</DrawerDescription>
@@ -226,7 +214,7 @@ export function PrintOrderSheet({ book, isOpen, onClose }: PrintOrderSheetProps)
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="bottom" className="z-[70] h-[85vh] flex flex-col p-0">
+      <SheetContent side="bottom" className="z-[70] flex h-[85vh] flex-col p-0">
         <SheetHeader className="px-4 pt-4 pb-2">
           <SheetTitle>{t('title')}</SheetTitle>
           <SheetDescription>{t('subtitle')}</SheetDescription>

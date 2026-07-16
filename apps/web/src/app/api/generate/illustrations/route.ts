@@ -9,7 +9,7 @@ import { checkRateLimit } from '@/lib/rateLimit';
 
 // Define the expected input schema using Zod
 const illustrationRequestSchema = z.object({
-  bookId: z.string().cuid({ message: "Valid Book ID (CUID) is required" }),
+  bookId: z.string().cuid({ message: 'Valid Book ID (CUID) is required' }),
   pageIds: z.array(z.string().cuid()).optional(),
 });
 
@@ -21,9 +21,22 @@ export async function POST(request: Request) {
 
     const rl = await checkRateLimit(`generate-illustrations:${dbUser.id}`, 20, 3600);
     if (!rl.allowed) {
-      logger.warn({ dbUserId: dbUser.id, key: `generate-illustrations:${dbUser.id}`, remaining: rl.remaining }, 'Rate limit exceeded: generate illustrations');
+      logger.warn(
+        {
+          dbUserId: dbUser.id,
+          key: `generate-illustrations:${dbUser.id}`,
+          remaining: rl.remaining,
+        },
+        'Rate limit exceeded: generate illustrations',
+      );
       if (process.env.RATE_LIMIT_ENFORCE === 'true') {
-        return NextResponse.json({ error: "You're generating illustrations very quickly. Please wait a little while and try again." }, { status: 429 });
+        return NextResponse.json(
+          {
+            error:
+              "You're generating illustrations very quickly. Please wait a little while and try again.",
+          },
+          { status: 429 },
+        );
       }
     }
 
@@ -31,11 +44,20 @@ export async function POST(request: Request) {
     try {
       const rawData = await request.json();
       requestData = illustrationRequestSchema.parse(rawData);
-      logger.info({ clerkId, dbUserId: dbUser.id, bookId: requestData.bookId }, 'Received illustration generation request');
+      logger.info(
+        { clerkId, dbUserId: dbUser.id, bookId: requestData.bookId },
+        'Received illustration generation request',
+      );
     } catch (error) {
-      logger.error({ clerkId, dbUserId: dbUser.id, error }, 'Invalid illustration generation request data');
+      logger.error(
+        { clerkId, dbUserId: dbUser.id, error },
+        'Invalid illustration generation request data',
+      );
       if (error instanceof z.ZodError) {
-        return NextResponse.json({ error: 'Invalid input data', details: error.errors }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Invalid input data', details: error.errors },
+          { status: 400 },
+        );
       }
       return NextResponse.json({ error: 'Failed to parse request data' }, { status: 400 });
     }
@@ -65,41 +87,71 @@ export async function POST(request: Request) {
             pageNumber: true,
             moderationStatus: true,
             generatedImageUrl: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
 
     if (!book) {
-      logger.warn({ clerkId, dbUserId: dbUser.id, bookId: requestData.bookId }, 'Book not found or user mismatch for illustration generation.');
+      logger.warn(
+        { clerkId, dbUserId: dbUser.id, bookId: requestData.bookId },
+        'Book not found or user mismatch for illustration generation.',
+      );
       return NextResponse.json({ error: 'Book not found or access denied.' }, { status: 404 });
     }
 
     // Prevent re-illustration of already completed books (but allow retry for PARTIAL/FAILED)
     if (book.status === BookStatus.COMPLETED) {
-      logger.warn({ clerkId, dbUserId: dbUser.id, bookId: requestData.bookId, status: book.status }, 'Rejected illustration request for already-completed book.');
-      return NextResponse.json({
-        error: 'Book already illustrated',
-        message: 'This book has already been illustrated and cannot be re-illustrated.',
-        status: book.status
-      }, { status: 409 });
+      logger.warn(
+        { clerkId, dbUserId: dbUser.id, bookId: requestData.bookId, status: book.status },
+        'Rejected illustration request for already-completed book.',
+      );
+      return NextResponse.json(
+        {
+          error: 'Book already illustrated',
+          message: 'This book has already been illustrated and cannot be re-illustrated.',
+          status: book.status,
+        },
+        { status: 409 },
+      );
     }
 
     // Book must be in STORY_READY, PARTIAL, or FAILED state to start/retry illustration
-    const allowedStatuses: BookStatus[] = [BookStatus.STORY_READY, BookStatus.PARTIAL, BookStatus.FAILED];
+    const allowedStatuses: BookStatus[] = [
+      BookStatus.STORY_READY,
+      BookStatus.PARTIAL,
+      BookStatus.FAILED,
+    ];
     if (!allowedStatuses.includes(book.status)) {
-      logger.warn({ clerkId, dbUserId: dbUser.id, bookId: requestData.bookId, status: book.status }, 'Book not in correct state for illustration generation.');
-      return NextResponse.json({ error: `Book must be in STORY_READY, PARTIAL, or FAILED state to start illustration (current: ${book.status})` }, { status: 409 });
+      logger.warn(
+        { clerkId, dbUserId: dbUser.id, bookId: requestData.bookId, status: book.status },
+        'Book not in correct state for illustration generation.',
+      );
+      return NextResponse.json(
+        {
+          error: `Book must be in STORY_READY, PARTIAL, or FAILED state to start illustration (current: ${book.status})`,
+        },
+        { status: 409 },
+      );
     }
 
     // Log if this is a retry
     if (book.status === BookStatus.PARTIAL || book.status === BookStatus.FAILED) {
-      logger.info({ clerkId, dbUserId: dbUser.id, bookId: requestData.bookId, status: book.status }, 'Retrying illustration for failed/partial book.');
+      logger.info(
+        { clerkId, dbUserId: dbUser.id, bookId: requestData.bookId, status: book.status },
+        'Retrying illustration for failed/partial book.',
+      );
     }
 
     if (!book.pages || book.pages.length === 0) {
-       logger.error({ clerkId, dbUserId: dbUser.id, bookId: book.id }, 'No pages found for this book to illustrate.');
-       return NextResponse.json({ error: 'Cannot illustrate a book with no pages.' }, { status: 400 });
+      logger.error(
+        { clerkId, dbUserId: dbUser.id, bookId: book.id },
+        'No pages found for this book to illustrate.',
+      );
+      return NextResponse.json(
+        { error: 'Cannot illustrate a book with no pages.' },
+        { status: 400 },
+      );
     }
 
     // Smart Retry: Only process pages that need illustration
@@ -120,13 +172,16 @@ export async function POST(request: Request) {
         });
       }
 
-      logger.info({
-        clerkId,
-        dbUserId: dbUser.id,
-        bookId: book.id,
-        requestedPageIds: requestData.pageIds,
-        matchedPages: pagesToProcess.length,
-      }, 'Specific pageIds requested for illustration');
+      logger.info(
+        {
+          clerkId,
+          dbUserId: dbUser.id,
+          bookId: book.id,
+          requestedPageIds: requestData.pageIds,
+          matchedPages: pagesToProcess.length,
+        },
+        'Specific pageIds requested for illustration',
+      );
     } else if (isRetry) {
       pagesToProcess = book.pages.filter((page) => {
         // Skip pages with successful illustrations (OK status)
@@ -141,18 +196,23 @@ export async function POST(request: Request) {
         return true;
       });
 
-      const skippedOk = book.pages.filter(p => p.moderationStatus === 'OK' && p.generatedImageUrl).length;
-      const skippedFlagged = book.pages.filter(p => p.moderationStatus === 'FLAGGED').length;
+      const skippedOk = book.pages.filter(
+        (p) => p.moderationStatus === 'OK' && p.generatedImageUrl,
+      ).length;
+      const skippedFlagged = book.pages.filter((p) => p.moderationStatus === 'FLAGGED').length;
 
-      logger.info({
-        clerkId,
-        dbUserId: dbUser.id,
-        bookId: book.id,
-        totalPages: book.pages.length,
-        pagesToRetry: pagesToProcess.length,
-        skippedOk,
-        skippedFlagged
-      }, 'Smart retry - filtering to failed/missing pages only');
+      logger.info(
+        {
+          clerkId,
+          dbUserId: dbUser.id,
+          bookId: book.id,
+          totalPages: book.pages.length,
+          pagesToRetry: pagesToProcess.length,
+          skippedOk,
+          skippedFlagged,
+        },
+        'Smart retry - filtering to failed/missing pages only',
+      );
 
       console.log(`[IllustrationAPI] Smart Retry Mode:`);
       console.log(`  - Total Pages: ${book.pages.length}`);
@@ -163,55 +223,72 @@ export async function POST(request: Request) {
 
     // Handle edge case: no pages to retry
     if (isRetry && pagesToProcess.length === 0) {
-      const flaggedCount = book.pages.filter(p => p.moderationStatus === 'FLAGGED').length;
-      const okCount = book.pages.filter(p => p.moderationStatus === 'OK' && p.generatedImageUrl).length;
+      const flaggedCount = book.pages.filter((p) => p.moderationStatus === 'FLAGGED').length;
+      const okCount = book.pages.filter(
+        (p) => p.moderationStatus === 'OK' && p.generatedImageUrl,
+      ).length;
 
       if (flaggedCount > 0 && okCount === book.pages.length - flaggedCount) {
         // All non-flagged pages succeeded, but some are flagged
         // Keep as PARTIAL - user needs to address flagged content (Phase 2)
-        logger.info({
-          clerkId,
-          dbUserId: dbUser.id,
-          bookId: book.id,
-          flaggedCount,
-          okCount
-        }, 'No pages to retry - all remaining are FLAGGED by content policy');
+        logger.info(
+          {
+            clerkId,
+            dbUserId: dbUser.id,
+            bookId: book.id,
+            flaggedCount,
+            okCount,
+          },
+          'No pages to retry - all remaining are FLAGGED by content policy',
+        );
 
-        return NextResponse.json({
-          message: `${flaggedCount} page(s) were flagged by content policy and cannot be retried. Please edit your book to remove flagged photos.`,
-          bookId: book.id,
-          flaggedCount,
-          status: 'PARTIAL'
-        }, { status: 200 });
+        return NextResponse.json(
+          {
+            message: `${flaggedCount} page(s) were flagged by content policy and cannot be retried. Please edit your book to remove flagged photos.`,
+            bookId: book.id,
+            flaggedCount,
+            status: 'PARTIAL',
+          },
+          { status: 200 },
+        );
       }
 
       // All pages succeeded - update to COMPLETED
       await prisma.book.update({
         where: { id: book.id },
-        data: { status: BookStatus.COMPLETED }
+        data: { status: BookStatus.COMPLETED },
       });
 
-      logger.info({
-        clerkId,
-        dbUserId: dbUser.id,
-        bookId: book.id
-      }, 'All pages already have successful illustrations - marking as COMPLETED');
+      logger.info(
+        {
+          clerkId,
+          dbUserId: dbUser.id,
+          bookId: book.id,
+        },
+        'All pages already have successful illustrations - marking as COMPLETED',
+      );
 
-      return NextResponse.json({
-        message: 'All pages already have successful illustrations.',
-        bookId: book.id,
-        status: 'COMPLETED'
-      }, { status: 200 });
+      return NextResponse.json(
+        {
+          message: 'All pages already have successful illustrations.',
+          bookId: book.id,
+          status: 'COMPLETED',
+        },
+        { status: 200 },
+      );
     }
 
-    logger.info({
-      clerkId,
-      dbUserId: dbUser.id,
-      bookId: book.id,
-      pageCount: book.pages.length,
-      currentStatus: book.status,
-      artStyle: book.artStyle
-    }, 'Book validation successful.');
+    logger.info(
+      {
+        clerkId,
+        dbUserId: dbUser.id,
+        bookId: book.id,
+        pageCount: book.pages.length,
+        currentStatus: book.status,
+        artStyle: book.artStyle,
+      },
+      'Book validation successful.',
+    );
 
     console.log(`[IllustrationAPI] Starting illustration for book ${book.id}:`);
     console.log(`  - Title: ${book.title}`);
@@ -220,10 +297,13 @@ export async function POST(request: Request) {
 
     // Step 2: Update Book Status to ILLUSTRATING
     await prisma.book.update({
-        where: { id: book.id },
-        data: { status: BookStatus.ILLUSTRATING }
+      where: { id: book.id },
+      data: { status: BookStatus.ILLUSTRATING },
     });
-    logger.info({ clerkId, dbUserId: dbUser.id, bookId: book.id }, 'Book status updated to ILLUSTRATING.');
+    logger.info(
+      { clerkId, dbUserId: dbUser.id, bookId: book.id },
+      'Book status updated to ILLUSTRATING.',
+    );
 
     // Step 3: Queue character extraction job
     // The extraction worker will analyze all photos for character identity,
@@ -244,45 +324,57 @@ export async function POST(request: Request) {
         backoff: { type: 'exponential', delay: 10000 },
         removeOnComplete: { count: 100 },
         removeOnFail: { count: 500 },
-      }
+      },
     );
 
-    logger.info({
-      clerkId,
-      dbUserId: dbUser.id,
-      bookId: book.id,
-      pageCount: pagesToProcess.length,
-      artStyle: book.artStyle,
-      extractionJobId: extractionJob.id,
-    }, 'Queued character extraction job (will create illustration flow on completion)');
+    logger.info(
+      {
+        clerkId,
+        dbUserId: dbUser.id,
+        bookId: book.id,
+        pageCount: pagesToProcess.length,
+        artStyle: book.artStyle,
+        extractionJobId: extractionJob.id,
+      },
+      'Queued character extraction job (will create illustration flow on completion)',
+    );
 
     console.log(`[IllustrationAPI] Character extraction job queued for book ${book.id}`);
     console.log(`  - Extraction Job ID: ${extractionJob.id}`);
     console.log(`  - Pages to illustrate: ${pagesToProcess.length}`);
 
     // Step 4: Return confirmation
-    return NextResponse.json({
-      message: `Character extraction started. ${pagesToProcess.length} pages will be illustrated after extraction.`,
-      bookId: book.id,
-      extractionJobId: extractionJob.id,
-    }, { status: 202 });
-
+    return NextResponse.json(
+      {
+        message: `Character extraction started. ${pagesToProcess.length} pages will be illustrated after extraction.`,
+        bookId: book.id,
+        extractionJobId: extractionJob.id,
+      },
+      { status: 202 },
+    );
   } catch (error: any) {
     // Handle authentication errors first
-    if (error instanceof Error && (
-      error.message.includes('not authenticated') ||
-      error.message.includes('ID mismatch') ||
-      error.message.includes('primary email not found')
-    )) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('not authenticated') ||
+        error.message.includes('ID mismatch') ||
+        error.message.includes('primary email not found'))
+    ) {
       logger.warn('Unauthorized illustration generation attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // For other errors, extract bookId if available
     const bookId = error?.requestData?.bookId || 'unknown';
-    logger.error({ bookId, error: error.message }, 'Error during illustration job queuing or validation');
+    logger.error(
+      { bookId, error: error.message },
+      'Error during illustration job queuing or validation',
+    );
     // Attempt to revert status - maybe move status update to finalize job?
     // For now, just log the error and return 500
-    return NextResponse.json({ error: error.message || 'An unexpected error occurred' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'An unexpected error occurred' },
+      { status: 500 },
+    );
   }
-} 
+}

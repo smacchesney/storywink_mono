@@ -31,7 +31,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     const [book, avatar] = await Promise.all([
       prisma.book.findUnique({ where: { id: bookId, userId: dbUser.id }, select: { id: true } }),
-      prisma.avatar.findUnique({ where: { id: avatarId, userId: dbUser.id }, select: { id: true } }),
+      prisma.avatar.findUnique({
+        where: { id: avatarId, userId: dbUser.id },
+        select: { id: true },
+      }),
     ]);
     if (!book || !avatar) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React from 'react';
 import { useTranslations } from 'next-intl';
@@ -49,9 +49,7 @@ export function CaptureChips({ questions, onChange }: CaptureChipsProps) {
 
   // A typed name: answered, not skipped, and not one of the tappable options.
   const customAnswer = (q: CaptureQuestion): string | null =>
-    q.answer && q.answer !== SKIP && !q.options.includes(q.answer)
-      ? q.answer
-      : null;
+    q.answer && q.answer !== SKIP && !q.options.includes(q.answer) ? q.answer : null;
 
   const commitCustom = (q: CaptureQuestion, raw: string) => {
     setEditingId(null);
@@ -85,10 +83,10 @@ export function CaptureChips({ questions, onChange }: CaptureChipsProps) {
                     type="button"
                     onClick={() => setAnswer(q.id, active ? null : opt)}
                     className={cn(
-                      'rounded-full border px-3 py-1 text-sm font-playful transition-colors',
+                      'rounded-full border px-3 py-1 font-playful text-sm transition-colors',
                       active
                         ? 'border-coral bg-coral text-white'
-                        : 'border-black/10 bg-white text-gray-700 hover:border-coral/50'
+                        : 'border-black/10 bg-white text-gray-700 hover:border-coral/50',
                     )}
                   >
                     {opt}
@@ -112,17 +110,17 @@ export function CaptureChips({ questions, onChange }: CaptureChipsProps) {
                         e.currentTarget.blur();
                       }
                     }}
-                    className="h-[30px] w-36 rounded-full border border-coral bg-white px-3 text-sm font-playful text-gray-800 focus:outline-none focus:ring-1 focus:ring-coral"
+                    className="h-[30px] w-36 rounded-full border border-coral bg-white px-3 font-playful text-sm text-gray-800 focus:ring-1 focus:ring-coral focus:outline-none"
                   />
                 ) : (
                   <button
                     type="button"
                     onClick={() => setEditingId(q.id)}
                     className={cn(
-                      'rounded-full border px-3 py-1 text-sm font-playful transition-colors',
+                      'rounded-full border px-3 py-1 font-playful text-sm transition-colors',
                       typed
                         ? 'border-coral bg-coral text-white'
-                        : 'border-dashed border-black/20 bg-white text-gray-500 hover:border-coral/50 hover:text-gray-700'
+                        : 'border-dashed border-black/20 bg-white text-gray-500 hover:border-coral/50 hover:text-gray-700',
                     )}
                   >
                     {typed ?? t(isObject ? 'itsCalled' : 'someoneElse')}
@@ -132,10 +130,10 @@ export function CaptureChips({ questions, onChange }: CaptureChipsProps) {
                 type="button"
                 onClick={() => setAnswer(q.id, skipped ? null : SKIP)}
                 className={cn(
-                  'rounded-full border px-3 py-1 text-sm font-playful transition-colors',
+                  'rounded-full border px-3 py-1 font-playful text-sm transition-colors',
                   skipped
                     ? 'border-gray-300 bg-gray-200 text-gray-500'
-                    : 'border-transparent text-gray-400 hover:text-gray-600'
+                    : 'border-transparent text-gray-400 hover:text-gray-600',
                 )}
               >
                 {t('skip')}

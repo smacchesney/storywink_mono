@@ -10,12 +10,7 @@
  * - settled:       the poll capped out — slow and failed are indistinguishable
  *                  and treated identically. The sheet stays fully usable.
  */
-export type StripPhase =
-  | 'hidden'
-  | 'reading'
-  | 'arrived'
-  | 'arrivedQuiet'
-  | 'settled';
+export type StripPhase = 'hidden' | 'reading' | 'arrived' | 'arrivedQuiet' | 'settled';
 
 /** A book older than this has no perception pass plausibly in flight. */
 export const FRESH_WINDOW_MS = 10 * 60_000;
@@ -75,12 +70,7 @@ export function arrivalStripPhase(
 }
 
 export type StripLineKey =
-  | 'stripPeeking'
-  | 'stripFaces'
-  | 'stripReading'
-  | 'stripQuestions'
-  | 'stripAllRead'
-  | 'stripRest';
+  'stripPeeking' | 'stripFaces' | 'stripReading' | 'stripQuestions' | 'stripAllRead' | 'stripRest';
 
 /** Staged-line schedule while reading (ms from strip mount). */
 export const STRIP_FACES_AT_MS = 7_000;

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import Image from 'next/image';
@@ -38,7 +38,7 @@ const POLLING_INTERVAL = 5000; // Check every 5 seconds
  */
 function WriteWait({ line }: { line: string }) {
   return (
-    <div className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-6 bg-waiting px-6">
+    <div className="bg-waiting fixed inset-0 z-40 flex flex-col items-center justify-center gap-6 px-6">
       <Image
         src={MASCOT_CAT_FLOATING}
         alt=""
@@ -66,7 +66,7 @@ function ReviewPageContent() {
   const t = useTranslations('review');
 
   // Get bookId from URL query parameter
-  const bookIdFromUrl = searchParams.get('bookId'); 
+  const bookIdFromUrl = searchParams.get('bookId');
 
   // State hooks
   const [pages, setPages] = useState<PageData[]>([]); // Holds ALL pages (cover at index 0)
@@ -92,7 +92,7 @@ function ReviewPageContent() {
     return () => {
       isMountedRef.current = false;
       if (textPollingIntervalRef.current) {
-         clearInterval(textPollingIntervalRef.current);
+        clearInterval(textPollingIntervalRef.current);
       }
       if (finalStatusPollingIntervalRef.current) {
         clearInterval(finalStatusPollingIntervalRef.current);
@@ -103,12 +103,13 @@ function ReviewPageContent() {
     };
   }, []);
 
-  // --- Initial Setup Logic --- 
+  // --- Initial Setup Logic ---
   useEffect(() => {
     const fetchBookData = async () => {
       const bookIdToFetch = bookIdFromUrl;
 
-      if (!bookIdToFetch) { // <-- Check bookId from URL
+      if (!bookIdToFetch) {
+        // <-- Check bookId from URL
         toast.error(t('bookIdNotFound'));
         setIsFetchingInitialData(false);
         return;
@@ -129,14 +130,19 @@ function ReviewPageContent() {
         if (!isMountedRef.current) return;
 
         if (!fetchedBook || !fetchedBook.pages) {
-          throw new Error("Fetched data is invalid or missing pages.");
+          throw new Error('Fetched data is invalid or missing pages.');
         }
 
-        console.log("Review Page: Fetched Full Book Data:", fetchedBook);
+        console.log('Review Page: Fetched Full Book Data:', fetchedBook);
 
         // Route guard: Redirect completed books to preview page
-        if (fetchedBook.status === BookStatus.COMPLETED || fetchedBook.status === BookStatus.PARTIAL) {
-          console.log(`[Review Page] Book ${bookIdToFetch} is already ${fetchedBook.status}, redirecting to preview`);
+        if (
+          fetchedBook.status === BookStatus.COMPLETED ||
+          fetchedBook.status === BookStatus.PARTIAL
+        ) {
+          console.log(
+            `[Review Page] Book ${bookIdToFetch} is already ${fetchedBook.status}, redirecting to preview`,
+          );
           router.replace(`/book/${bookIdToFetch}/preview`);
           return;
         }
@@ -146,54 +152,58 @@ function ReviewPageContent() {
         const sortedPages = [...fetchedBook.pages].sort((a, b) => a.index - b.index);
 
         if (sortedPages.length > 0) {
-            const mappedPages: PageData[] = sortedPages.map((p: Page) => ({
-              id: p.id,
-              text: p.text,
-              originalImageUrl: p.originalImageUrl,
-              assetId: p.assetId,
-              generatedImageUrl: p.generatedImageUrl,
-              isTitlePage: p.isTitlePage || false,
-              pageNumber: p.pageNumber,
-              source: p.source,
-              moderationStatus: p.moderationStatus,
-              moderationReason: p.moderationReason
-            }));
-            console.log("Review Page: Successfully mapped pages:", mappedPages); // Log after successful map
-            setPages(mappedPages);
-            // Store fetched book data (removed unused state variable)
+          const mappedPages: PageData[] = sortedPages.map((p: Page) => ({
+            id: p.id,
+            text: p.text,
+            originalImageUrl: p.originalImageUrl,
+            assetId: p.assetId,
+            generatedImageUrl: p.generatedImageUrl,
+            isTitlePage: p.isTitlePage || false,
+            pageNumber: p.pageNumber,
+            source: p.source,
+            moderationStatus: p.moderationStatus,
+            moderationReason: p.moderationReason,
+          }));
+          console.log('Review Page: Successfully mapped pages:', mappedPages); // Log after successful map
+          setPages(mappedPages);
+          // Store fetched book data (removed unused state variable)
 
-            // Initialize confirmed: ALL false initially
-            setConfirmed(sortedPages.map(() => false)); 
-            
-            setCurrentIndex(0);
+          // Initialize confirmed: ALL false initially
+          setConfirmed(sortedPages.map(() => false));
 
-            const hasMissingText = mappedPages.some(p => p.text === null);
+          setCurrentIndex(0);
 
-            if (hasMissingText && fetchedBook.status === BookStatus.GENERATING) {
-              // This case should be less common now, but handle if pages exist but text is null
-              console.log(`Review Page: Text missing and status is ${fetchedBook.status}. Starting text polling.`);
-              setIsLoadingText(true);
-              setNeedsTextPolling(true);
-            } else if (fetchedBook.status === BookStatus.ILLUSTRATING) {
-              console.log("Review Page: Status is ILLUSTRATING, setting up final status polling.");
-              setIsLoadingText(false); 
-              setNeedsTextPolling(false);
-              setIsAwaitingFinalStatus(true); 
-            } else {
-              // Includes COMPLETED, FAILED, DRAFT (if pages somehow exist)
-              console.log(`Review Page: Initial status ${fetchedBook.status}. No text polling needed.`);
-              setIsLoadingText(false);
-              setNeedsTextPolling(false);
-              setIsAwaitingFinalStatus(false);
-            }
+          const hasMissingText = mappedPages.some((p) => p.text === null);
+
+          if (hasMissingText && fetchedBook.status === BookStatus.GENERATING) {
+            // This case should be less common now, but handle if pages exist but text is null
+            console.log(
+              `Review Page: Text missing and status is ${fetchedBook.status}. Starting text polling.`,
+            );
+            setIsLoadingText(true);
+            setNeedsTextPolling(true);
+          } else if (fetchedBook.status === BookStatus.ILLUSTRATING) {
+            console.log('Review Page: Status is ILLUSTRATING, setting up final status polling.');
+            setIsLoadingText(false);
+            setNeedsTextPolling(false);
+            setIsAwaitingFinalStatus(true);
+          } else {
+            // Includes COMPLETED, FAILED, DRAFT (if pages somehow exist)
+            console.log(
+              `Review Page: Initial status ${fetchedBook.status}. No text polling needed.`,
+            );
+            setIsLoadingText(false);
+            setNeedsTextPolling(false);
+            setIsAwaitingFinalStatus(false);
+          }
         } else {
-           // Status is not GENERATING, but no pages found - this is an error state.
-           console.error(`Review Page: Status is ${fetchedBook.status}, but no pages found.`);
-           throw new Error(`Book status is ${fetchedBook.status}, but no pages were loaded.`);
+          // Status is not GENERATING, but no pages found - this is an error state.
+          console.error(`Review Page: Status is ${fetchedBook.status}, but no pages found.`);
+          throw new Error(`Book status is ${fetchedBook.status}, but no pages were loaded.`);
         }
       } catch (error) {
         // Raw error text goes to the log, never to the parent.
-        console.error("Error fetching initial review data:", error);
+        console.error('Error fetching initial review data:', error);
         if (isMountedRef.current) {
           toast.error(t('errorLoadingReviewData'));
           // Optionally redirect or show a persistent error state
@@ -203,19 +213,18 @@ function ReviewPageContent() {
           setIsFetchingInitialData(false);
         }
       }
-    }
+    };
 
     fetchBookData();
-
   }, [bookIdFromUrl]); // <-- Depend on bookId from URL
 
-  // --- Text Polling Function --- 
+  // --- Text Polling Function ---
   const checkTextStatus = useCallback(async () => {
     const bookIdToPoll = bookIdFromUrl;
     if (!isMountedRef.current || !bookIdToPoll || !needsTextPolling) return;
-    console.log("Polling for text generation status...");
+    console.log('Polling for text generation status...');
     try {
-      const statusRes = await fetch(`/api/book-status?bookId=${bookIdToPoll}`); 
+      const statusRes = await fetch(`/api/book-status?bookId=${bookIdToPoll}`);
       if (!isMountedRef.current) return;
       if (!statusRes.ok) {
         const errorText = await statusRes.text().catch(() => `HTTP error ${statusRes.status}`);
@@ -225,74 +234,83 @@ function ReviewPageContent() {
       if (!isMountedRef.current) return;
       const newStatus = statusData.status as BookStatus;
       // Track status change (removed unused state variable)
-      console.log("Poll Status (Text Check):", newStatus);
-      if (newStatus === BookStatus.STORY_READY || newStatus === BookStatus.COMPLETED || newStatus === BookStatus.ILLUSTRATING) {
-          if (isLoadingText) { 
-              console.log("Text generation complete (status changed). Stopping poll and fetching full content...");
-              if (textPollingIntervalRef.current) clearInterval(textPollingIntervalRef.current);
-              setNeedsTextPolling(false);
-              try {
-                  const contentRes = await fetch(`/api/book/${bookIdToPoll}`); 
-                  if (!isMountedRef.current) return;
-                  if (!contentRes.ok) throw new Error(`Failed to fetch book content (${contentRes.status})`);
-                  const fetchedBook = await contentRes.json();
-                  if (!isMountedRef.current) return;
-                  if (fetchedBook.pages) {
-                      const updatedPageData: PageData[] = fetchedBook.pages.map((p: Page) => ({
-                          id: p.id || undefined,
-                          text: p.text || '',
-                          originalImageUrl: p.originalImageUrl,
-                          assetId: p.assetId,
-                          pageNumber: p.pageNumber,
-                          generatedImageUrl: p.generatedImageUrl || null,
-                          isTitlePage: p.isTitlePage || false,
-                          source: p.source,
-                          moderationStatus: p.moderationStatus,
-                          moderationReason: p.moderationReason
-                      }));
-                      console.log("Review Page: Updating pages state with fetched text:", updatedPageData);
-                      setPages(updatedPageData);
-                      setConfirmed(fetchedBook.pages.map((p: Page) => p.textConfirmed || false));
-                      setIsLoadingText(false);
-                      console.log("Review Page: Story text generated successfully");
-                  } else {
-                      throw new Error("Fetched book content missing pages data.");
-                  }
-              } catch (contentError) {
-                  // Raw error text goes to the log, never to the parent.
-                  console.error("Error fetching or processing book content:", contentError);
-                  if (isMountedRef.current) {
-                      setIsLoadingText(false);
-                      toast.error(t('errorCheckingStatus'));
-                  }
-              }
-          } else {
-              if (textPollingIntervalRef.current) clearInterval(textPollingIntervalRef.current);
-              setNeedsTextPolling(false); 
-              console.log("Book status changed to STORY_READY/COMPLETED/ILLUSTRATING, but wasn't loading text. Stopping poll.");
-          }
-      } else if (newStatus === BookStatus.FAILED) {
+      console.log('Poll Status (Text Check):', newStatus);
+      if (
+        newStatus === BookStatus.STORY_READY ||
+        newStatus === BookStatus.COMPLETED ||
+        newStatus === BookStatus.ILLUSTRATING
+      ) {
+        if (isLoadingText) {
+          console.log(
+            'Text generation complete (status changed). Stopping poll and fetching full content...',
+          );
           if (textPollingIntervalRef.current) clearInterval(textPollingIntervalRef.current);
           setNeedsTextPolling(false);
-          setIsLoadingText(false);
-          console.error("Story generation failed.");
-          toast.error(t('storyGenerationFailed'));
+          try {
+            const contentRes = await fetch(`/api/book/${bookIdToPoll}`);
+            if (!isMountedRef.current) return;
+            if (!contentRes.ok)
+              throw new Error(`Failed to fetch book content (${contentRes.status})`);
+            const fetchedBook = await contentRes.json();
+            if (!isMountedRef.current) return;
+            if (fetchedBook.pages) {
+              const updatedPageData: PageData[] = fetchedBook.pages.map((p: Page) => ({
+                id: p.id || undefined,
+                text: p.text || '',
+                originalImageUrl: p.originalImageUrl,
+                assetId: p.assetId,
+                pageNumber: p.pageNumber,
+                generatedImageUrl: p.generatedImageUrl || null,
+                isTitlePage: p.isTitlePage || false,
+                source: p.source,
+                moderationStatus: p.moderationStatus,
+                moderationReason: p.moderationReason,
+              }));
+              console.log('Review Page: Updating pages state with fetched text:', updatedPageData);
+              setPages(updatedPageData);
+              setConfirmed(fetchedBook.pages.map((p: Page) => p.textConfirmed || false));
+              setIsLoadingText(false);
+              console.log('Review Page: Story text generated successfully');
+            } else {
+              throw new Error('Fetched book content missing pages data.');
+            }
+          } catch (contentError) {
+            // Raw error text goes to the log, never to the parent.
+            console.error('Error fetching or processing book content:', contentError);
+            if (isMountedRef.current) {
+              setIsLoadingText(false);
+              toast.error(t('errorCheckingStatus'));
+            }
+          }
+        } else {
+          if (textPollingIntervalRef.current) clearInterval(textPollingIntervalRef.current);
+          setNeedsTextPolling(false);
+          console.log(
+            "Book status changed to STORY_READY/COMPLETED/ILLUSTRATING, but wasn't loading text. Stopping poll.",
+          );
+        }
+      } else if (newStatus === BookStatus.FAILED) {
+        if (textPollingIntervalRef.current) clearInterval(textPollingIntervalRef.current);
+        setNeedsTextPolling(false);
+        setIsLoadingText(false);
+        console.error('Story generation failed.');
+        toast.error(t('storyGenerationFailed'));
       } else {
-          console.log("Still generating text, continuing poll...");
+        console.log('Still generating text, continuing poll...');
       }
     } catch (error) {
       // Raw error text goes to the log, never to the parent.
-      console.error("Text polling error:", error);
+      console.error('Text polling error:', error);
       if (textPollingIntervalRef.current) clearInterval(textPollingIntervalRef.current);
       if (isMountedRef.current) {
-          setNeedsTextPolling(false);
-          setIsLoadingText(false);
-          toast.error(t('errorCheckingStatus'));
+        setNeedsTextPolling(false);
+        setIsLoadingText(false);
+        toast.error(t('errorCheckingStatus'));
       }
     }
   }, [bookIdFromUrl, needsTextPolling, isLoadingText]); // <-- Update dependencies
 
-  // --- Effect to Manage Text Polling Interval --- 
+  // --- Effect to Manage Text Polling Interval ---
   useEffect(() => {
     const bookIdToPoll = bookIdFromUrl;
     if (isFetchingInitialData || !needsTextPolling || !bookIdToPoll) {
@@ -318,10 +336,10 @@ function ReviewPageContent() {
     };
   }, [isFetchingInitialData, needsTextPolling, bookIdFromUrl, checkTextStatus]); // <-- Update dependencies
 
-  // --- Final Status Polling Function --- 
+  // --- Final Status Polling Function ---
   // This function has been removed as it was unused and causing TypeScript errors
 
-  // --- Effect to Manage Final Status Polling Interval --- 
+  // --- Effect to Manage Final Status Polling Interval ---
   useEffect(() => {
     const bookIdToPoll = bookIdFromUrl;
     if (isFetchingInitialData || !isAwaitingFinalStatus || !bookIdToPoll) {
@@ -342,12 +360,12 @@ function ReviewPageContent() {
   }, [isFetchingInitialData, isAwaitingFinalStatus, bookIdFromUrl]); // Removed checkFinalBookStatus from dependencies
 
   // Navigation handlers (operate on full pages array index)
-  const goPrev = () => setCurrentIndex(i => Math.max(i - 1, 0));
-  const goNext = () => setCurrentIndex(i => Math.min(i + 1, pages.length - 1));
+  const goPrev = () => setCurrentIndex((i) => Math.max(i - 1, 0));
+  const goNext = () => setCurrentIndex((i) => Math.min(i + 1, pages.length - 1));
 
   // Handle text updates
   const handleTextChange = (newText: string) => {
-    setPages(prev => {
+    setPages((prev) => {
       const copy = [...prev];
       if (copy[currentIndex]) {
         copy[currentIndex] = { ...copy[currentIndex], text: newText };
@@ -356,7 +374,7 @@ function ReviewPageContent() {
     });
 
     // Mark as unconfirmed when text changes
-    setConfirmed(prev => {
+    setConfirmed((prev) => {
       const copy = [...prev];
       copy[currentIndex] = false;
       return copy;
@@ -379,7 +397,7 @@ function ReviewPageContent() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
-      if (!currentPage.id) throw new Error("Page ID is missing, cannot save.");
+      if (!currentPage.id) throw new Error('Page ID is missing, cannot save.');
       const response = await fetch(`/api/book/${bookIdToUse}/page/${currentPage.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -393,24 +411,23 @@ function ReviewPageContent() {
       }
 
       // Mark as saved locally
-      setConfirmed(arr => {
+      setConfirmed((arr) => {
         const copy = [...arr];
         copy[currentIndex] = true;
         return copy;
       });
-
     } catch (error) {
       // Raw error text goes to the log, never to the parent.
-      console.error("Error saving page:", error);
+      console.error('Error saving page:', error);
       toast.error(t('saveTimeout'));
     } finally {
-       clearTimeout(timeoutId);
-       if (isMountedRef.current) {
-           setIsSavingPage(false);
-       }
+      clearTimeout(timeoutId);
+      if (isMountedRef.current) {
+        setIsSavingPage(false);
+      }
     }
   };
-  
+
   // Regenerate Story handler
   // This function has been removed as it was unused and causing TypeScript errors
 
@@ -418,82 +435,91 @@ function ReviewPageContent() {
   const handleIllustrate = async () => {
     const bookIdToUse = bookIdFromUrl;
     if (!bookIdToUse || !allConfirmed || isLoadingText) {
-       return;
-     }
-     if (isStartingIllustration || isAwaitingFinalStatus) return;
+      return;
+    }
+    if (isStartingIllustration || isAwaitingFinalStatus) return;
 
-     console.log("Attempting to start illustration process...");
-     setIsStartingIllustration(true);
+    console.log('Attempting to start illustration process...');
+    setIsStartingIllustration(true);
 
-     try {
-        const response = await fetch('/api/generate/illustrations', {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ bookId: bookIdToUse }),
-        });
-        if (!response.ok && response.status !== 202) {
-            const errorData = await response.json().catch(() => ({ message: "Unknown error occurred" }));
-            throw new Error(errorData.error || errorData.message || `Failed to start illustration generation (Status: ${response.status})`);
-        }
-        const result = await response.json().catch(() => ({}));
-        console.log("Illustration Job Request Result:", result);
+    try {
+      const response = await fetch('/api/generate/illustrations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookId: bookIdToUse }),
+      });
+      if (!response.ok && response.status !== 202) {
+        const errorData = await response
+          .json()
+          .catch(() => ({ message: 'Unknown error occurred' }));
+        throw new Error(
+          errorData.error ||
+            errorData.message ||
+            `Failed to start illustration generation (Status: ${response.status})`,
+        );
+      }
+      const result = await response.json().catch(() => ({}));
+      console.log('Illustration Job Request Result:', result);
 
-        // Back to setup, which renders the branded progress screen for
-        // in-flight books — the parent keeps the "you can leave" reassurance
-        // instead of being dumped on the library grid.
-        router.push(`/create/${bookIdToUse}/setup`);
-
-     } catch (error) {
-        // Raw error text goes to the log, never to the parent.
-        console.error("Error initiating illustration generation:", error);
-        if (isMountedRef.current) {
-           toast.error(t('errorStartingIllustration'));
-           setIsStartingIllustration(false);
-        }
-     }
+      // Back to setup, which renders the branded progress screen for
+      // in-flight books — the parent keeps the "you can leave" reassurance
+      // instead of being dumped on the library grid.
+      router.push(`/create/${bookIdToUse}/setup`);
+    } catch (error) {
+      // Raw error text goes to the log, never to the parent.
+      console.error('Error initiating illustration generation:', error);
+      if (isMountedRef.current) {
+        toast.error(t('errorStartingIllustration'));
+        setIsStartingIllustration(false);
+      }
+    }
   };
 
   // Keyboard arrow navigation
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-      if (e.key === 'ArrowLeft') goPrev();
-      if (e.key === 'ArrowRight') goNext();
-    };
-    window.addEventListener('keydown', handleKey);
-    // Need dependencies here for goPrev/goNext if they aren't stable
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [/* Add goPrev, goNext if needed */]); 
+  useEffect(
+    () => {
+      const handleKey = (e: KeyboardEvent) => {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        if (e.key === 'ArrowLeft') goPrev();
+        if (e.key === 'ArrowRight') goNext();
+      };
+      window.addEventListener('keydown', handleKey);
+      // Need dependencies here for goPrev/goNext if they aren't stable
+      return () => window.removeEventListener('keydown', handleKey);
+    },
+    [/* Add goPrev, goNext if needed */],
+  );
 
   // "Illustrate Book" is enabled whenever every page has non-empty text. The
   // old per-page Confirm gate is gone; editing a page still saves its text,
   // but a parent never has to tap Confirm on every page to proceed.
-  const allPagesHaveText = pages.length > 0 && pages.every(p => (p.text || '').trim().length > 0);
+  const allPagesHaveText = pages.length > 0 && pages.every((p) => (p.text || '').trim().length > 0);
   const allConfirmed = allPagesHaveText;
-  const isWorking = isLoadingText || isSavingPage || isStartingIllustration || isAwaitingFinalStatus || isFetchingInitialData;
+  const isWorking =
+    isLoadingText ||
+    isSavingPage ||
+    isStartingIllustration ||
+    isAwaitingFinalStatus ||
+    isFetchingInitialData;
 
   // Handle loading/redirect state before rendering main UI
   if (isFetchingInitialData) {
-      return <WriteWait line={t('writingWaitNoName')} />;
+    return <WriteWait line={t('writingWaitNoName')} />;
   }
 
   if (pages.length === 0 && !isFetchingInitialData) {
-      return <div className="p-6 text-red-600">{t('errorLoadingPages')}</div>;
+    return <div className="p-6 text-red-600">{t('errorLoadingPages')}</div>;
   }
 
   // The story is still being written — hold the branded wait instead of a
   // grid of empty cards. Polling flips isLoadingText once the words land.
   if (isLoadingText) {
-      return (
-        <WriteWait
-          line={
-            childName
-              ? t('writingWait', { name: childName })
-              : t('writingWaitNoName')
-          }
-        />
-      );
+    return (
+      <WriteWait
+        line={childName ? t('writingWait', { name: childName }) : t('writingWaitNoName')}
+      />
+    );
   }
 
   const currentPageData = pages[currentIndex];
@@ -501,18 +527,18 @@ function ReviewPageContent() {
 
   // Main Render - New Mobile-Optimized Layout
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex h-screen flex-col">
       {/* Progress Tracker at Top */}
-      <PageTracker 
-        totalPages={pages.length} 
-        currentPage={currentIndex} 
+      <PageTracker
+        totalPages={pages.length}
+        currentPage={currentIndex}
         confirmed={confirmed}
-        onPageSelect={setCurrentIndex} 
+        onPageSelect={setCurrentIndex}
         allPagesConfirmed={allConfirmed}
         isProcessing={isWorking && !isAwaitingFinalStatus} // Modify isProcessing if needed
         onIllustrate={handleIllustrate}
       />
-      
+
       {/* Main Content Area - Shows One Page at a Time */}
       <div className="flex-1 overflow-y-auto p-4">
         <PageCard
@@ -531,9 +557,9 @@ function ReviewPageContent() {
           onSave={savePage}
         />
       </div>
-      
+
       {/* Bottom Navigation */}
-      <NavigationControls 
+      <NavigationControls
         currentPage={currentIndex}
         totalPages={pages.length}
         canGoNext={currentIndex < pages.length - 1 && !isWorking}

@@ -20,7 +20,7 @@ function makePage(overrides: Partial<DisplaySourcePage> & { id: string }): Displ
 function makeBook(storyCount: number): DisplaySourcePage[] {
   const title = makePage({ id: 'title', pageNumber: 1, isTitlePage: true, text: null });
   const stories = Array.from({ length: storyCount }, (_, i) =>
-    makePage({ id: `story-${i + 1}`, pageNumber: i + 2, text: `Beat ${i + 1}.` })
+    makePage({ id: `story-${i + 1}`, pageNumber: i + 2, text: `Beat ${i + 1}.` }),
   );
   return [title, ...stories];
 }
@@ -82,7 +82,10 @@ describe('buildDisplayPages — portrait (combined pages)', () => {
   it('keeps story order and carries language through', () => {
     const dps = buildDisplayPages(makeBook(2), { layout: 'portrait', language: 'ja' });
     const stories = dps.filter((dp) => dp.type === 'story');
-    expect(stories.map((dp) => (dp.type === 'story' ? dp.page.id : ''))).toEqual(['story-1', 'story-2']);
+    expect(stories.map((dp) => (dp.type === 'story' ? dp.page.id : ''))).toEqual([
+      'story-1',
+      'story-2',
+    ]);
     expect(stories.every((dp) => dp.type === 'story' && dp.language === 'ja')).toBe(true);
   });
 
@@ -128,7 +131,9 @@ describe('remapDisplayIndex — rotation keeps the reader on the same beat', () 
   });
 
   it('a spread illustration maps to the beat its visible pair is reading', () => {
-    const illusIdx = spread.findIndex((dp) => dp.type === 'illustration' && !dp.page.isTitlePage && dp.page.id === 'story-7');
+    const illusIdx = spread.findIndex(
+      (dp) => dp.type === 'illustration' && !dp.page.isTitlePage && dp.page.id === 'story-7',
+    );
     // With the title beat in the loop this illustration is a LEFT page whose
     // right-hand neighbour is the NEXT beat's text — that text is the beat
     // on screen, so the remap anchors there.
@@ -154,7 +159,9 @@ describe('remapDisplayIndex — rotation keeps the reader on the same beat', () 
     // spread: [0 cover] [1 blank] [2 dedication] [3 illustration(title beat)] [4 text story-1] ...
     const titleBeatIdx = 3;
     expect(spread[titleBeatIdx].type).toBe('illustration');
-    const firstStoryIdx = portrait.findIndex((dp) => dp.type === 'story' && dp.page.id === 'story-1');
+    const firstStoryIdx = portrait.findIndex(
+      (dp) => dp.type === 'story' && dp.page.id === 'story-1',
+    );
     expect(remapDisplayIndex(spread, titleBeatIdx, portrait)).toBe(firstStoryIdx);
   });
 
@@ -199,9 +206,11 @@ describe('remapDisplayIndex — rotation keeps the reader on the same beat', () 
     // Remove story-2 from the target book entirely
     const target = buildDisplayPages(
       shortBook.filter((p) => p.id !== 'story-2'),
-      { layout: 'spread' }
+      { layout: 'spread' },
     );
-    const story2Idx = fromPortrait.findIndex((dp) => dp.type === 'story' && dp.page.id === 'story-2');
+    const story2Idx = fromPortrait.findIndex(
+      (dp) => dp.type === 'story' && dp.page.id === 'story-2',
+    );
     const endingIdx = target.findIndex((dp) => dp.type === 'ending');
     // Forward bias: the next beat after story-2 is the ending
     expect(remapDisplayIndex(fromPortrait, story2Idx, target)).toBe(endingIdx);
@@ -235,7 +244,7 @@ describe('collage display entries', () => {
 
   it('no collagePhotos = legacy layout byte-for-byte', () => {
     expect(buildDisplayPages(makeBook(3), { layout: 'spread' })).toEqual(
-      buildDisplayPages(makeBook(3), { layout: 'spread', collagePhotos: [] })
+      buildDisplayPages(makeBook(3), { layout: 'spread', collagePhotos: [] }),
     );
   });
 
@@ -256,7 +265,12 @@ describe('collage display entries', () => {
     });
     const collages = pages.filter((p) => p.type === 'collage');
     expect(collages).toHaveLength(2);
-    expect(collages[0]).toMatchObject({ withHeading: true, withMascot: false, subline: 'July 2026', seq: 0 });
+    expect(collages[0]).toMatchObject({
+      withHeading: true,
+      withMascot: false,
+      subline: 'July 2026',
+      seq: 0,
+    });
     expect(collages[1]).toMatchObject({ withHeading: false, withMascot: true, seq: 1 });
   });
 

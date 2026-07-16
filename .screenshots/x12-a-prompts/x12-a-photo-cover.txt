@@ -1,0 +1,38 @@
+Create a children's picture book illustration using the 4 images provided. The first image shows the scene/subjects, the following 3 image(s) show the artistic style to apply. Use all style reference images for comprehensive style matching. ARTISTIC STYLE (Primary directive): Fully transform this into a hand-drawn/painted children's book illustration matching the style from the reference image(s). Apply its complete aesthetic: color palette, brush techniques, line work, textures, shading, and lighting approach. The final image must look like a hand-illustrated children's book page, not a filtered photograph—while keeping people precisely recognizable. Replace all photographic elements (realistic textures, camera lighting, photo grain) with illustrated equivalents. Backgrounds should be simplified into clean illustrated shapes and forms. Style emphasis: Create a vignette-style illustration with soft, organic edges that fade into PURE WHITE (#FFFFFF). The vignette edges and any background showing through must be pure white, not off-white, cream, or gray. Match the watercolor/pencil aesthetic, warm color palette, and hand-drawn quality shown in the reference images. Fill the entire canvas with the illustration. SCENE INTERPRETATION (Secondary directive): Use the first image as reference for: character/subject identity and their pose, the spatial layout and composition, key recognizable objects that establish the setting. Translate these elements into illustration form - a wooden fence becomes illustrated wood with simple line work, not photographic grain; metal becomes clean illustrated surfaces with simple highlights, not realistic reflections. Simplify complex backgrounds into essential illustrated elements while keeping the scene recognizable. FACIAL RENDERING STYLE (critical for consistency across pages):
+Render ALL faces using a simplified children's book style as shown in the reference images:
+- Eyes: small, simple dots or short curved lines — NOT detailed realistic eyes
+- Nose: tiny dot, small L-shape, or simple curved line — minimal and understated
+- Mouth: simple curved line for smiles, small open shape for expressions
+- Cheeks: soft rosy circles on cheeks for warmth
+- Keep facial details minimal and consistent — simpler faces are more consistent across pages
+This simplified face style must be applied uniformly to every person (adults and children alike) while still preserving each person's distinguishing features (hair, skin tone, face shape, glasses, facial hair, etc.) so they remain recognizable. A parent must look at your illustration and instantly recognize their child and family. PEOPLE - SOURCE HIERARCHY (non-negotiable):
+Every person in the illustration must be immediately recognizable to their own family.
+Two sources describe the people in this scene. Apply them in this exact order:
+1. IDENTITY — face shape, hair color/style/length, skin tone, and distinguishing features (glasses, freckles, dimples): follow the CHARACTER IDENTITY reference when one is provided below. It is the canonical source; when the photo is ambiguous or disagrees on these features (lighting, angle, shadow, hat), the CHARACTER IDENTITY reference wins.
+2. THIS PAGE'S PHOTO — pose, body position, expression, clothing, other people present, and scene composition: follow the photo exactly. Never copy clothing, poses, or people from any style reference image.
+If no CHARACTER IDENTITY reference is provided, match every feature to the photo. If a feature is hidden in the photo (hat, angle, shadow) and no reference describes it, keep it hidden — never invent. Each character appears exactly once — never draw the same character twice. Title: Render this exact title text and nothing more: "Blocks, Balls & Bumblebee". Use a bold, readable hand-drawn font matching the reference images' text style. Position it naturally without covering important subjects, sized appropriately (5-7% of image height). Fill the lettering with #F76C5E and a black outline stroke. The ONLY text in the image is the title above — no subtitles, taglines, color names, or other words. CHARACTER IDENTITY (canonical reference — wins on face, hair, and skin):
+The following characters appear in this scene. Their face shape, hair, skin tone, and distinguishing features MUST match these descriptions on every page; when the photo is ambiguous or disagrees on those features (lighting, angle, shadow), these descriptions win. Pose, clothing, and scene composition follow this page's photo:
+- Kai (main_child):
+  Age: about 2–4 years old
+  Hair: jet black, classic straight bowl cut — heavy blunt fringe across forehead, sides even length, glossy
+  Skin tone: warm light-medium (Asian complexion)
+  Build: typical toddler build — slightly rounded/soft
+  Distinguishing features: very expressive eyebrows and wide eyes, round cheeks, frequently barefoot in playground photo
+  Typical clothing (this page's photo takes precedence): often short-sleeve striped polo or a blue long-sleeve rashguard with playful prints; in other photos he wears light shorts and colorful toddler sneakers with velcro straps
+  Style rendering: draw as a compact, round-faced toddler with a pronounced bowl haircut, oversized head-to-body ratio, cotton-texture clothing (striped polo or print rashguard), bright Velcro sneakers; use saturated friendly colors and soft outlines to emphasize his expressions and hands
+- child_2 (friend / playmate / sibling):
+  Age: about 2–4 years old (similar age to main child)
+  Hair: black, short straight bob, blunt cut at chin
+  Skin tone: warm light-medium
+  Build: small toddler build
+  Distinguishing features: short bob with straight fringe, wears a pink sleeveless dress in playground photo
+  Typical clothing (this page's photo takes precedence): pink sleeveless summer dress
+  Style rendering: draw as a small, neat bob-haired toddler in a simple pink dress; keep proportions and expression slightly quieter than main child
+- adult_crop (relative / guardian (woman in white crop top and skirt at playground)):
+  Age: mid-20s to 30s
+  Hair: dark brown (visible only partially), long hair (partially visible), straight
+  Skin tone: warm tan
+  Build: athletic
+  Distinguishing features: wears white tennis-style skirt and crop top, athletic bracelet/watch
+  Typical clothing (this page's photo takes precedence): white cropped top and white skater skirt, white trainers
+  Style rendering: use a sporty silhouette (crop top + skirt) and long hair to identify her; keep face minimal since not fully visible in photo

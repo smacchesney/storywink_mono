@@ -41,7 +41,7 @@ export function TextShimmerWave({
           'relative inline-block',
           '[--base-color:#a1a1aa] [--base-gradient-color:#000]',
           'dark:[--base-color:#71717a] dark:[--base-gradient-color:#ffffff]',
-          className
+          className,
         )}
         style={{ color: 'var(--base-color)' }}
       >
@@ -50,9 +50,7 @@ export function TextShimmerWave({
     );
   }
 
-  const MotionComponent = motion.create(
-    Component as keyof JSX.IntrinsicElements
-  );
+  const MotionComponent = motion.create(Component as keyof JSX.IntrinsicElements);
 
   return (
     <MotionComponent
@@ -60,7 +58,7 @@ export function TextShimmerWave({
         'relative inline-block [perspective:500px]',
         '[--base-color:#a1a1aa] [--base-gradient-color:#000]',
         'dark:[--base-color:#71717a] dark:[--base-gradient-color:#ffffff]',
-        className
+        className,
       )}
       style={{ color: 'var(--base-color)' }}
     >
@@ -70,9 +68,7 @@ export function TextShimmerWave({
         return (
           <motion.span
             key={i}
-            className={cn(
-              'inline-block whitespace-pre [transform-style:preserve-3d]'
-            )}
+            className={cn('inline-block whitespace-pre [transform-style:preserve-3d]')}
             initial={{
               translateZ: 0,
               scale: 1,
@@ -85,11 +81,7 @@ export function TextShimmerWave({
               translateY: [0, yDistance, 0],
               scale: [1, scaleDistance, 1],
               rotateY: [0, rotateYDistance, 0],
-              color: [
-                'var(--base-color)',
-                'var(--base-gradient-color)',
-                'var(--base-color)',
-              ],
+              color: ['var(--base-color)', 'var(--base-gradient-color)', 'var(--base-color)'],
             }}
             transition={{
               duration: duration,
@@ -106,4 +98,4 @@ export function TextShimmerWave({
       })}
     </MotionComponent>
   );
-} 
+}

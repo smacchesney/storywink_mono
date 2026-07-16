@@ -25,14 +25,14 @@ const PageTracker = ({
   onPageSelect,
   allPagesConfirmed,
   isProcessing,
-  onIllustrate
+  onIllustrate,
 }: PageTrackerProps) => {
   const t = useTranslations('review');
   return (
-    <div className="page-tracker py-2 px-3 border-b bg-white sticky top-0 z-10">
-      <div className="flex items-center justify-between mb-1">
+    <div className="page-tracker sticky top-0 z-10 border-b bg-white px-3 py-2">
+      <div className="mb-1 flex items-center justify-between">
         {/* Dots container moved to the left side of the header */}
-        <div className="dots-container flex gap-1 overflow-x-auto py-1 no-scrollbar">
+        <div className="dots-container no-scrollbar flex gap-1 overflow-x-auto py-1">
           {Array.from({ length: totalPages }).map((_, idx) => {
             const isConfirmed = confirmed[idx] ?? false;
             const isCurrent = idx === currentPage;
@@ -41,18 +41,12 @@ const PageTracker = ({
               <div key={idx} className="group relative">
                 <button
                   onClick={() => onPageSelect(idx)}
-                  className={`
-                    h-2 transition-all duration-200
-                    ${isCurrent ? 'w-6' : 'w-2'}
-                    rounded-full
-                    ${isCurrent ? 'scale-y-150' : ''}
-                    ${isConfirmed ? 'bg-green-500' : 'bg-gray-300'}
-                  `}
+                  className={`h-2 transition-all duration-200 ${isCurrent ? 'w-6' : 'w-2'} rounded-full ${isCurrent ? 'scale-y-150' : ''} ${isConfirmed ? 'bg-green-500' : 'bg-gray-300'} `}
                   aria-label={t('goToPage', { n: idx + 1 })}
                 />
 
                 {/* Hoverable tooltip */}
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap">
+                <div className="pointer-events-none absolute bottom-full left-1/2 mb-1 -translate-x-1/2 transform rounded bg-gray-800 px-2 py-1 text-xs whitespace-nowrap text-white opacity-0 transition-opacity group-hover:opacity-100">
                   {t('page', { n: idx + 1 })}
                   {isConfirmed && ' ✓'}
                 </div>
@@ -60,24 +54,24 @@ const PageTracker = ({
             );
           })}
         </div>
-        
+
         {/* Illustrate button - always visible but conditionally styled/disabled */}
-        <Button 
+        <Button
           onClick={onIllustrate}
           disabled={!allPagesConfirmed || isProcessing}
           size="sm"
           className={cn(
-            "ml-2 transition-colors duration-200 whitespace-nowrap",
+            'ml-2 whitespace-nowrap transition-colors duration-200',
             allPagesConfirmed && !isProcessing
-              ? "bg-coral text-white hover:bg-coral/90"
-              : "bg-gray-400 text-white cursor-not-allowed hover:bg-gray-400"
+              ? 'bg-coral text-white hover:bg-coral/90'
+              : 'cursor-not-allowed bg-gray-400 text-white hover:bg-gray-400',
           )}
         >
           {isProcessing ? (
             <>{t('working')}</>
           ) : (
             <>
-              <CheckCircle className="h-4 w-4 mr-1" />
+              <CheckCircle className="mr-1 h-4 w-4" />
               {t('illustrateBook')}
             </>
           )}
@@ -87,4 +81,4 @@ const PageTracker = ({
   );
 };
 
-export default PageTracker; 
+export default PageTracker;

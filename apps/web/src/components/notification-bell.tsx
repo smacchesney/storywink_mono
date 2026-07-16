@@ -175,7 +175,7 @@ export function NotificationBell() {
         ? '/orders'
         : notification.bookId && notification.type.startsWith('BOOK_')
           ? `/book/${notification.bookId}/preview`
-          : '/library'
+          : '/library',
     );
   };
 
@@ -188,13 +188,13 @@ export function NotificationBell() {
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="relative flex items-center justify-center w-11 h-11 rounded-full hover:bg-mint/30 transition-colors"
+        className="relative flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-mint/30"
         aria-label={unreadCount > 0 ? t('bellUnread', { count: unreadCount }) : t('title')}
       >
         <Bell className="h-5 w-5 text-ink-soft" />
         {/* Badge */}
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[11px] font-bold text-white bg-coral rounded-sm">
+          <span className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-sm bg-coral px-1 text-[11px] font-bold text-white">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -204,10 +204,10 @@ export function NotificationBell() {
       {isOpen && (
         <div
           ref={dropdownRef}
-          className="absolute right-0 top-full mt-2 w-[280px] sm:w-[320px] max-w-[90vw] bg-white rounded-lg shadow-lg border border-coral/15 overflow-hidden z-50"
+          className="absolute top-full right-0 z-50 mt-2 w-[280px] max-w-[90vw] overflow-hidden rounded-lg border border-coral/15 bg-white shadow-lg sm:w-[320px]"
         >
           {/* Header */}
-          <div className="px-4 py-3 border-b border-coral/15">
+          <div className="border-b border-coral/15 px-4 py-3">
             <h3 className="font-playful font-semibold text-ink">{t('title')}</h3>
           </div>
 
@@ -220,7 +220,7 @@ export function NotificationBell() {
               </div>
             ) : notifications.length === 0 ? (
               <div className="px-4 py-8 text-center text-ink-soft">
-                <Bell className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                <Bell className="mx-auto mb-2 h-8 w-8 opacity-40" />
                 <p>{t('empty')}</p>
               </div>
             ) : (
@@ -229,31 +229,31 @@ export function NotificationBell() {
                   <li key={notification.id}>
                     <button
                       onClick={() => handleNotificationClick(notification)}
-                      className="w-full px-4 py-3 flex items-start gap-3 hover:bg-coral-soft/40 transition-colors text-left"
+                      className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-coral-soft/40"
                     >
                       {/* Book thumbnail */}
-                      <div className="flex-shrink-0 w-10 h-10 rounded bg-cream-deep overflow-hidden">
+                      <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded bg-cream-deep">
                         {notification.coverImageUrl ? (
                           <Image
                             src={notification.coverImageUrl}
                             alt=""
                             width={40}
                             height={40}
-                            className="w-full h-full object-cover"
+                            className="h-full w-full object-cover"
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-ink-soft/50">
+                          <div className="flex h-full w-full items-center justify-center text-ink-soft/50">
                             <span className="text-lg">📖</span>
                           </div>
                         )}
                       </div>
 
                       {/* Text content */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-ink truncate">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-ink">
                           {notificationTitle(notification)}
                         </p>
-                        <p className="text-xs text-ink-soft mt-0.5">
+                        <p className="mt-0.5 text-xs text-ink-soft">
                           {formatRelativeTime(notification.createdAt)}
                         </p>
                       </div>

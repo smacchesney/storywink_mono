@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -90,7 +90,7 @@ export function BookIssueBanner({
     <div className="flex flex-col items-center gap-3 rounded-2xl border border-coral/25 bg-[#FFF5F0] p-5 text-center">
       <AlertTriangle className="h-7 w-7 text-coral" />
       <p className="font-playful text-base text-gray-800">{t('somethingWentWrong')}</p>
-      <p className="text-sm text-gray-500 max-w-xs">{t('failedMessage')}</p>
+      <p className="max-w-xs text-sm text-gray-500">{t('failedMessage')}</p>
       <Button
         onClick={handleRetry}
         disabled={isRetrying}

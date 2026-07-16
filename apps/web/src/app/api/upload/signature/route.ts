@@ -26,7 +26,11 @@ export async function POST() {
   try {
     const { dbUser } = await getAuthenticatedUser();
 
-    if (!process.env.CLOUDINARY_API_SECRET || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_CLOUD_NAME) {
+    if (
+      !process.env.CLOUDINARY_API_SECRET ||
+      !process.env.CLOUDINARY_API_KEY ||
+      !process.env.CLOUDINARY_CLOUD_NAME
+    ) {
       logger.error('Cloudinary credentials not configured for signed uploads');
       return NextResponse.json({ error: 'Upload service not configured' }, { status: 500 });
     }
@@ -36,7 +40,7 @@ export async function POST() {
 
     const signature = cloudinary.utils.api_sign_request(
       { timestamp, folder },
-      process.env.CLOUDINARY_API_SECRET
+      process.env.CLOUDINARY_API_SECRET,
     );
 
     return NextResponse.json({

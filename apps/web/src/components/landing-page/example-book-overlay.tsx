@@ -19,10 +19,8 @@ import { SparkleIcon } from './landing-cta';
 const FlipbookViewer = dynamic(() => import('@/components/book/FlipbookViewer'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full flex items-center justify-center">
-      <div
-        className="w-full max-w-sm aspect-square bg-[var(--cream-yellow)] rounded-lg animate-pulse"
-      />
+    <div className="flex h-full w-full items-center justify-center">
+      <div className="aspect-square w-full max-w-sm animate-pulse rounded-lg bg-[var(--cream-yellow)]" />
     </div>
   ),
 });
@@ -43,11 +41,7 @@ const FOCUSABLE_SELECTOR =
  * to edge); on md+ a centered card. Progress tracks flipbook VIEWS via
  * overlay-view-math so portrait and spread layouts agree.
  */
-const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
-  book,
-  onClose,
-  onCtaClick,
-}) => {
+const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({ book, onClose, onCtaClick }) => {
   const t = useTranslations('landing');
   const prefersReduced = useReducedMotion();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -68,12 +62,12 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
             layout,
           }).length
         : 0,
-    [book, layout]
+    [book, layout],
   );
   const { totalViews, currentView, isAtEnd } = computeViewState(
     layout,
     displayCount,
-    currentPage - 1
+    currentPage - 1,
   );
   const { dotCount, activeDot } = computeDots(totalViews, currentView);
 
@@ -144,7 +138,7 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
     (e: React.MouseEvent) => {
       if (e.target === e.currentTarget) onClose();
     },
-    [onClose]
+    [onClose],
   );
 
   const handlePrev = useCallback(() => {
@@ -192,7 +186,7 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
           >
             <motion.div
               ref={cardRef}
-              className="relative flex h-full w-full max-w-none flex-col overflow-y-auto overflow-x-hidden rounded-none bg-[var(--bg-playful)] p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl md:h-auto md:max-h-[90vh] md:w-full md:max-w-4xl md:rounded-2xl md:p-6"
+              className="relative flex h-full w-full max-w-none flex-col overflow-x-hidden overflow-y-auto rounded-none bg-[var(--bg-playful)] p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl md:h-auto md:max-h-[90vh] md:w-full md:max-w-4xl md:rounded-2xl md:p-6"
               initial={prefersReduced ? false : { scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={prefersReduced ? { opacity: 0 } : { scale: 0.9, y: 20 }}
@@ -203,25 +197,25 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
               <button
                 ref={closeButtonRef}
                 onClick={onClose}
-                className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-10 w-11 h-11 rounded-full bg-white shadow-md flex items-center justify-center text-ink-soft hover:text-ink hover:bg-coral-soft/60 transition-all cursor-pointer"
+                className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-10 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-white text-ink-soft shadow-md transition-all hover:bg-coral-soft/60 hover:text-ink"
                 aria-label={t('closePreview')}
               >
-                <X className="w-5 h-5" />
+                <X className="h-5 w-5" />
               </button>
 
               {/* Title + Style */}
-              <div className="text-center mb-3 pr-12 short:mb-1">
-                <h2 className="text-xl md:text-2xl font-playful font-bold text-ink">
+              <div className="mb-3 pr-12 text-center short:mb-1">
+                <h2 className="font-playful text-xl font-bold text-ink md:text-2xl">
                   {book.title}
                 </h2>
-                <p className="font-playful text-sm md:text-base mt-0.5 text-ink-soft short:hidden">
+                <p className="mt-0.5 font-playful text-sm text-ink-soft md:text-base short:hidden">
                   {t('overlayStyle')}{' '}
                   <span className="text-coral">{t(`styleNames.${book.styleKey}`)}</span>
                 </p>
               </div>
 
               {/* FlipbookViewer with navigation arrows — absorbs remaining height on mobile */}
-              <div className="relative w-full overflow-hidden flex-1 min-h-[280px] short:min-h-[200px] md:flex-none md:h-[60vh] md:max-h-[520px]">
+              <div className="relative min-h-[280px] w-full flex-1 overflow-hidden md:h-[60vh] md:max-h-[520px] md:flex-none short:min-h-[200px]">
                 <FlipbookViewer
                   ref={flipbookRef}
                   pages={book.bookPages as unknown as Page[]}
@@ -236,62 +230,58 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
                 <button
                   onClick={handlePrev}
                   disabled={currentView <= 0}
-                  className="absolute left-1 md:left-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/80 hover:bg-white shadow-md flex items-center justify-center text-coral hover:text-coral-hover transition-all disabled:opacity-0 disabled:pointer-events-none cursor-pointer"
+                  className="absolute top-1/2 left-1 z-10 flex h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-white/80 text-coral shadow-md transition-all hover:bg-white hover:text-coral-hover disabled:pointer-events-none disabled:opacity-0 md:left-3 md:h-10 md:w-10"
                   aria-label={t('prevPage')}
                 >
-                  <ChevronLeft className="w-5 h-5 md:w-6 md:h-6" />
+                  <ChevronLeft className="h-5 w-5 md:h-6 md:w-6" />
                 </button>
 
                 {/* Next page arrow */}
                 <button
                   onClick={handleNext}
                   disabled={isAtEnd}
-                  className="absolute right-1 md:right-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/80 hover:bg-white shadow-md flex items-center justify-center text-coral hover:text-coral-hover transition-all disabled:opacity-0 disabled:pointer-events-none cursor-pointer"
+                  className="absolute top-1/2 right-1 z-10 flex h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-white/80 text-coral shadow-md transition-all hover:bg-white hover:text-coral-hover disabled:pointer-events-none disabled:opacity-0 md:right-3 md:h-10 md:w-10"
                   aria-label={t('nextPage')}
                 >
-                  <ChevronRight className="w-5 h-5 md:w-6 md:h-6" />
+                  <ChevronRight className="h-5 w-5 md:h-6 md:w-6" />
                 </button>
               </div>
 
               {/* Read Again button — always rendered, opacity-controlled to prevent layout shift */}
-              <div className="flex justify-center mt-3 short:mt-1">
+              <div className="mt-3 flex justify-center short:mt-1">
                 <button
                   onClick={handleRestart}
-                  className={`flex items-center gap-2 px-4 py-1.5 text-sm font-playful text-coral hover:text-coral-hover hover:bg-coral/5 border border-coral/40 rounded-full transition-all duration-300 cursor-pointer ${isAtEnd ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                  className={`flex cursor-pointer items-center gap-2 rounded-full border border-coral/40 px-4 py-1.5 font-playful text-sm text-coral transition-all duration-300 hover:bg-coral/5 hover:text-coral-hover ${isAtEnd ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
                   tabIndex={isAtEnd ? 0 : -1}
                 >
-                  <RotateCcw className="w-4 h-4" />
+                  <RotateCcw className="h-4 w-4" />
                   {t('readAgain')}
                 </button>
               </div>
 
               {/* Progress dots — view-based, capped so long books stay calm */}
-              <div className="flex gap-0.5 items-center justify-center mt-2 py-1">
+              <div className="mt-2 flex items-center justify-center gap-0.5 py-1">
                 {Array.from({ length: dotCount }).map((_, idx) => {
                   const isFilled = idx <= activeDot;
                   const isCurrent = idx === activeDot;
                   return (
                     <div
                       key={idx}
-                      className={`
-                        h-1.5 rounded-full transition-all duration-300
-                        ${isCurrent ? 'w-4' : 'w-1.5'}
-                        ${isFilled ? 'bg-coral' : 'bg-gray-300'}
-                      `}
+                      className={`h-1.5 rounded-full transition-all duration-300 ${isCurrent ? 'w-4' : 'w-1.5'} ${isFilled ? 'bg-coral' : 'bg-gray-300'} `}
                     />
                   );
                 })}
               </div>
 
               {/* CTA button — THE string, same as every landing instance */}
-              <div className="flex justify-center mt-4 short:mt-2">
+              <div className="mt-4 flex justify-center short:mt-2">
                 <Button
                   size="lg"
                   variant="default"
-                  className="w-full sm:w-auto px-6 py-2.5 md:px-8 md:py-3 text-base md:text-lg bg-coral text-white hover:bg-coral-hover transition-all rounded-full font-playful group"
+                  className="group w-full rounded-full bg-coral px-6 py-2.5 font-playful text-base text-white transition-all hover:bg-coral-hover sm:w-auto md:px-8 md:py-3 md:text-lg"
                   onClick={onCtaClick}
                 >
-                  <SparkleIcon className="mr-2 h-4 w-4 md:h-5 md:w-5 transition-transform group-hover:scale-125 group-hover:rotate-12" />
+                  <SparkleIcon className="mr-2 h-4 w-4 transition-transform group-hover:scale-125 group-hover:rotate-12 md:h-5 md:w-5" />
                   {t('createYourStorybook')}
                 </Button>
               </div>
@@ -300,7 +290,7 @@ const ExampleBookOverlay: React.FC<ExampleBookOverlayProps> = ({
         </>
       )}
     </AnimatePresence>,
-    document.body
+    document.body,
   );
 };
 

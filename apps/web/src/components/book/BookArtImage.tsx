@@ -51,7 +51,7 @@ export default function BookArtImage({
         'object-cover',
         fadeIn && 'transition-opacity duration-200',
         fadeIn && !loaded && 'opacity-0',
-        className
+        className,
       )}
     />
   );

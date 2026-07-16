@@ -6,13 +6,13 @@ const SRC = 'https://res.cloudinary.com/storywink/image/upload/v1234/books/page1
 describe('cloudinaryLoader', () => {
   it('inserts one width-limited transform with auto format and quality', () => {
     expect(cloudinaryLoader({ src: SRC, width: 640 })).toBe(
-      'https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto,w_640,c_limit/v1234/books/page1.png'
+      'https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto,w_640,c_limit/v1234/books/page1.png',
     );
   });
 
   it('honours an explicit quality', () => {
     expect(cloudinaryLoader({ src: SRC, width: 1080, quality: 75 })).toContain(
-      '/upload/f_auto,q_75,w_1080,c_limit/'
+      '/upload/f_auto,q_75,w_1080,c_limit/',
     );
   });
 
@@ -30,7 +30,7 @@ describe('cloudinaryLoader', () => {
 describe('tinyThumbUrl', () => {
   it('derives a single tiny variant for the CSS-blurred backdrop', () => {
     expect(tinyThumbUrl(SRC)).toBe(
-      'https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto,w_24/v1234/books/page1.png'
+      'https://res.cloudinary.com/storywink/image/upload/f_auto,q_auto,w_24/v1234/books/page1.png',
     );
   });
 

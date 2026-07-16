@@ -50,31 +50,36 @@ const captureQuestionSchema = z.object({
 });
 
 // Zod schema for validating PATCH request body
-const updateBookSchema = z.object({
-  artStyle: z.string().nullable().optional(), // Allow null or undefined
-  title: z.string().min(1, { message: 'Title cannot be empty.' }).optional(),
-  language: z.enum(['en', 'ja']).optional(),
-  coverAssetId: z.string().cuid().nullable().optional(), // For cover changes
-  childName: z.string().max(50, 'Name too long').nullable().optional(),
-  additionalCharacters: z.array(additionalCharacterSchema).max(5, 'Maximum 5 characters').optional(),
-  tone: z.enum(STORY_MOODS).nullable().optional(),
-  theme: z.string().max(100).nullable().optional(),
-  // The experience-capture fields the setup surface fills before generation.
-  eventSummary: z.string().max(500).nullable().optional(),
-  learningWords: z
-    .array(z.object({ word: z.string().min(1).max(30) }))
-    .max(4)
-    .nullable()
-    .optional(),
-  captureQuestions: z.array(captureQuestionSchema).max(10).nullable().optional(),
-  autoIllustrate: z.boolean().optional(),
-}).strict(); // Ensure no extra fields are passed
+const updateBookSchema = z
+  .object({
+    artStyle: z.string().nullable().optional(), // Allow null or undefined
+    title: z.string().min(1, { message: 'Title cannot be empty.' }).optional(),
+    language: z.enum(['en', 'ja']).optional(),
+    coverAssetId: z.string().cuid().nullable().optional(), // For cover changes
+    childName: z.string().max(50, 'Name too long').nullable().optional(),
+    additionalCharacters: z
+      .array(additionalCharacterSchema)
+      .max(5, 'Maximum 5 characters')
+      .optional(),
+    tone: z.enum(STORY_MOODS).nullable().optional(),
+    theme: z.string().max(100).nullable().optional(),
+    // The experience-capture fields the setup surface fills before generation.
+    eventSummary: z.string().max(500).nullable().optional(),
+    learningWords: z
+      .array(z.object({ word: z.string().min(1).max(30) }))
+      .max(4)
+      .nullable()
+      .optional(),
+    captureQuestions: z.array(captureQuestionSchema).max(10).nullable().optional(),
+    autoIllustrate: z.boolean().optional(),
+  })
+  .strict(); // Ensure no extra fields are passed
 
 type RouteContext = { params: Promise<{ bookId: string }> };
 
 export async function GET(
   _req: NextRequest, // Changed from request: Request
-  { params }: RouteContext // Applied RouteContext
+  { params }: RouteContext, // Applied RouteContext
 ) {
   const { bookId } = await params;
 
@@ -102,19 +107,24 @@ export async function GET(
                 id: true,
                 url: true,
                 thumbnailUrl: true,
-              }
-            }
-          }
+              },
+            },
+          },
         },
       },
     });
 
     if (!book) {
       console.log(`Book ${bookId} not found or user ${clerkId} does not have permission.`);
-      return NextResponse.json({ error: 'Book not found or you do not have permission to view it' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Book not found or you do not have permission to view it' },
+        { status: 404 },
+      );
     }
 
-    console.log(`Successfully fetched book ${bookId} with ${book.pages.length} pages including assets.`);
+    console.log(
+      `Successfully fetched book ${bookId} with ${book.pages.length} pages including assets.`,
+    );
 
     // Setup prefill: a returning parent's unnamed draft carries the child's
     // name from their most recent book. Derived server-side so the setup
@@ -138,14 +148,14 @@ export async function GET(
     // You might want to conditionally return data based on status if needed
     // For preview, we generally want the data regardless of status to show progress/errors
     return NextResponse.json({ ...book, childNameSuggestion }, { status: 200 });
-
   } catch (error) {
     // Handle authentication errors
-    if (error instanceof Error && (
-      error.message.includes('not authenticated') ||
-      error.message.includes('ID mismatch') ||
-      error.message.includes('primary email not found')
-    )) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('not authenticated') ||
+        error.message.includes('ID mismatch') ||
+        error.message.includes('primary email not found'))
+    ) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -156,7 +166,7 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest, // Use NextRequest to easily get JSON body
-  { params }: RouteContext // Applied RouteContext
+  { params }: RouteContext, // Applied RouteContext
 ) {
   const { bookId } = await params;
 
@@ -176,11 +186,20 @@ export async function PATCH(
       if (Object.keys(validatedData).length === 0) {
         return NextResponse.json({ error: 'No update data provided' }, { status: 400 });
       }
-      logger.info({ clerkId, dbUserId: dbUser.id, bookId, data: validatedData }, 'API: Validated book update request.');
+      logger.info(
+        { clerkId, dbUserId: dbUser.id, bookId, data: validatedData },
+        'API: Validated book update request.',
+      );
     } catch (error) {
-      logger.warn({ clerkId, dbUserId: dbUser.id, bookId, error }, 'API: Invalid book update request body.');
+      logger.warn(
+        { clerkId, dbUserId: dbUser.id, bookId, error },
+        'API: Invalid book update request body.',
+      );
       if (error instanceof z.ZodError) {
-        return NextResponse.json({ error: 'Invalid request body', details: error.errors }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Invalid request body', details: error.errors },
+          { status: 400 },
+        );
       }
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
@@ -193,23 +212,26 @@ export async function PATCH(
           coverAssetId: true,
           pages: {
             where: { isTitlePage: true },
-            select: { id: true, assetId: true }
-          }
-        }
+            select: { id: true, assetId: true },
+          },
+        },
       });
 
-      logger.info({
-        clerkId,
-        dbUserId: dbUser.id,
-        bookId,
-        oldCoverAssetId: currentBook?.coverAssetId,
-        newCoverAssetId: validatedData.coverAssetId,
-        currentTitlePages: currentBook?.pages.map(p => p.id),
-        willAffectPages: currentBook?.pages.filter(
-          p => p.assetId === validatedData.coverAssetId ||
-               p.assetId === currentBook.coverAssetId
-        ).length
-      }, 'API: Cover asset is being changed');
+      logger.info(
+        {
+          clerkId,
+          dbUserId: dbUser.id,
+          bookId,
+          oldCoverAssetId: currentBook?.coverAssetId,
+          newCoverAssetId: validatedData.coverAssetId,
+          currentTitlePages: currentBook?.pages.map((p) => p.id),
+          willAffectPages: currentBook?.pages.filter(
+            (p) =>
+              p.assetId === validatedData.coverAssetId || p.assetId === currentBook.coverAssetId,
+          ).length,
+        },
+        'API: Cover asset is being changed',
+      );
     }
 
     // Prepare data for Prisma (serialize additionalCharacters to JSON string)
@@ -232,9 +254,15 @@ export async function PATCH(
 
     // Check if any record was actually updated
     if (updateResult.count === 0) {
-      logger.warn({ clerkId, dbUserId: dbUser.id, bookId }, 'API: Book update failed - Book not found or user does not own it.');
+      logger.warn(
+        { clerkId, dbUserId: dbUser.id, bookId },
+        'API: Book update failed - Book not found or user does not own it.',
+      );
       // Check if the book exists at all to differentiate 404 vs 403
-      const bookExists = await prisma.book.findUnique({ where: { id: bookId }, select: { id: true } });
+      const bookExists = await prisma.book.findUnique({
+        where: { id: bookId },
+        select: { id: true },
+      });
       const status = bookExists ? 403 : 404;
       const message = bookExists ? 'Permission denied' : 'Book not found';
       return NextResponse.json({ error: message }, { status });
@@ -245,14 +273,14 @@ export async function PATCH(
     // const updatedBook = await prisma.book.findUnique({ where: { id: bookId } });
     // return NextResponse.json(updatedBook, { status: 200 });
     return NextResponse.json({ message: 'Book updated successfully' }, { status: 200 });
-
   } catch (error) {
     // Handle authentication errors
-    if (error instanceof Error && (
-      error.message.includes('not authenticated') ||
-      error.message.includes('ID mismatch') ||
-      error.message.includes('primary email not found')
-    )) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('not authenticated') ||
+        error.message.includes('ID mismatch') ||
+        error.message.includes('primary email not found'))
+    ) {
       logger.warn('API: Book update attempt without authentication.');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -263,10 +291,7 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  _req: NextRequest,
-  { params }: RouteContext
-) {
+export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const { bookId } = await params;
 
   try {
@@ -296,8 +321,14 @@ export async function DELETE(
     });
 
     if (!book) {
-      logger.warn({ clerkId, dbUserId: dbUser.id, bookId }, 'API: Book delete failed - Book not found or user does not own it.');
-      const bookExists = await prisma.book.findUnique({ where: { id: bookId }, select: { id: true } });
+      logger.warn(
+        { clerkId, dbUserId: dbUser.id, bookId },
+        'API: Book delete failed - Book not found or user does not own it.',
+      );
+      const bookExists = await prisma.book.findUnique({
+        where: { id: bookId },
+        select: { id: true },
+      });
       const status = bookExists ? 403 : 404;
       const message = bookExists ? 'Permission denied' : 'Book not found';
       return NextResponse.json({ error: message }, { status });
@@ -317,7 +348,13 @@ export async function DELETE(
     });
     if (activeOrder) {
       logger.info(
-        { clerkId, dbUserId: dbUser.id, bookId, printOrderId: activeOrder.id, orderStatus: activeOrder.status },
+        {
+          clerkId,
+          dbUserId: dbUser.id,
+          bookId,
+          printOrderId: activeOrder.id,
+          orderStatus: activeOrder.status,
+        },
         'API: Book delete blocked - print order in flight.',
       );
       return NextResponse.json(
@@ -362,10 +399,7 @@ export async function DELETE(
       select: { publicId: true },
     });
     const publicIds = Array.from(
-      new Set([
-        ...deletableAssets.map((a) => a.publicId),
-        ...collectBookGeneratedPublicIds(book),
-      ]),
+      new Set([...deletableAssets.map((a) => a.publicId), ...collectBookGeneratedPublicIds(book)]),
     );
     const prefixes = [bookGeneratedFolderPrefix(bookId)];
 
@@ -398,8 +432,14 @@ export async function DELETE(
       await prisma.appEvent
         .deleteMany({ where: { name: ASSET_CLEANUP_PENDING_EVENT, bookId } })
         .catch(() => {});
-      logger.warn({ clerkId, dbUserId: dbUser.id, bookId }, 'API: Book delete failed - Book not found or user does not own it.');
-      const bookExists = await prisma.book.findUnique({ where: { id: bookId }, select: { id: true } });
+      logger.warn(
+        { clerkId, dbUserId: dbUser.id, bookId },
+        'API: Book delete failed - Book not found or user does not own it.',
+      );
+      const bookExists = await prisma.book.findUnique({
+        where: { id: bookId },
+        select: { id: true },
+      });
       const status = bookExists ? 403 : 404;
       const message = bookExists ? 'Permission denied' : 'Book not found';
       return NextResponse.json({ error: message }, { status });
@@ -443,15 +483,18 @@ export async function DELETE(
     }
 
     logger.info({ clerkId, dbUserId: dbUser.id, bookId }, 'API: Book deleted successfully.');
-    return NextResponse.json({ success: true, message: 'Book deleted successfully' }, { status: 200 });
-
+    return NextResponse.json(
+      { success: true, message: 'Book deleted successfully' },
+      { status: 200 },
+    );
   } catch (error) {
     // Handle authentication errors
-    if (error instanceof Error && (
-      error.message.includes('not authenticated') ||
-      error.message.includes('ID mismatch') ||
-      error.message.includes('primary email not found')
-    )) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('not authenticated') ||
+        error.message.includes('ID mismatch') ||
+        error.message.includes('primary email not found'))
+    ) {
       logger.warn('API: Book delete attempt without authentication.');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

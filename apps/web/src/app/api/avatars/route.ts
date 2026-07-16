@@ -57,10 +57,7 @@ export async function POST(request: NextRequest) {
 
     const verdict = await assertCanCreateAvatar(dbUser.id);
     if (!verdict.allowed) {
-      return NextResponse.json(
-        { error: 'avatar_cap', cap: verdict.cap },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: 'avatar_cap', cap: verdict.cap }, { status: 403 });
     }
 
     // Ownership pin: every staged photo must be the caller's own upload.

@@ -17,10 +17,7 @@ type BookWithPages = Book & { pages: (Page & { asset?: { url: string } | null })
  *
  * POST /api/book/[bookId]/export/lulu-interior
  */
-export async function POST(
-  _request: Request,
-  { params }: { params: Promise<{ bookId: string }> }
-) {
+export async function POST(_request: Request, { params }: { params: Promise<{ bookId: string }> }) {
   const { bookId } = await params;
 
   try {
@@ -30,7 +27,10 @@ export async function POST(
       return NextResponse.json({ error: 'Missing bookId parameter' }, { status: 400 });
     }
 
-    logger.info({ clerkId, dbUserId: dbUser.id, bookId }, 'Lulu interior PDF export request received.');
+    logger.info(
+      { clerkId, dbUserId: dbUser.id, bookId },
+      'Lulu interior PDF export request received.',
+    );
 
     // Fetch the book data with pages
     const bookData = await prisma.book.findUnique({
@@ -59,13 +59,16 @@ export async function POST(
             moderationReason: true,
             illustrationNotes: true,
             asset: { select: { url: true } },
-          }
+          },
         },
       },
     });
 
     if (!bookData) {
-      logger.warn({ clerkId, dbUserId: dbUser.id, bookId }, 'Book not found or access denied for Lulu export.');
+      logger.warn(
+        { clerkId, dbUserId: dbUser.id, bookId },
+        'Book not found or access denied for Lulu export.',
+      );
       return NextResponse.json({ error: 'Book not found or access denied' }, { status: 404 });
     }
 
@@ -73,25 +76,28 @@ export async function POST(
     if (bookData.status !== 'COMPLETED' && bookData.status !== 'PARTIAL') {
       return NextResponse.json(
         { error: `Book is not ready for printing. Current status: ${bookData.status}` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // All pages (including cover photo) appear in the interior
     const storyPages = bookData.pages;
 
-    logger.info({
-      bookId,
-      totalPages: bookData.pages.length,
-      storyPages: storyPages.length,
-      coverAssetId: bookData.coverAssetId,
-    }, 'Preparing pages for Lulu interior (all pages included)');
+    logger.info(
+      {
+        bookId,
+        totalPages: bookData.pages.length,
+        storyPages: storyPages.length,
+        coverAssetId: bookData.coverAssetId,
+      },
+      'Preparing pages for Lulu interior (all pages included)',
+    );
 
     if (storyPages.length === 0) {
       logger.warn({ bookId }, 'No pages found for interior PDF');
       return NextResponse.json(
         { error: 'No pages found. Book must have at least one page for interior PDF.' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -101,23 +107,28 @@ export async function POST(
     // flag is off or the 48-page cap would be exceeded (N=23).
     const counts = printPageCounts(
       bookData.pages.length,
-      process.env.COLLAGE_PAGES_ENABLED === 'true'
+      process.env.COLLAGE_PAGES_ENABLED === 'true',
     );
     const interiorPdfPageCount = counts.interiorPages;
     const paddedPageCount = counts.paddedPages;
 
-    logger.info({
-      bookId,
-      storyPages: storyPages.length,
-      interiorPdfPages: interiorPdfPageCount,
-      paddedPages: paddedPageCount,
-    }, 'Generating interleaved interior PDF for Lulu...');
+    logger.info(
+      {
+        bookId,
+        storyPages: storyPages.length,
+        interiorPdfPages: interiorPdfPageCount,
+        paddedPages: paddedPageCount,
+      },
+      'Generating interleaved interior PDF for Lulu...',
+    );
 
     // Validate Lulu page count constraints (min 4, max 48 for saddle stitch)
     if (paddedPageCount > 48) {
       return NextResponse.json(
-        { error: `Too many pages for saddle stitch binding (${paddedPageCount} pages, max 48). Reduce the number of photos.` },
-        { status: 400 }
+        {
+          error: `Too many pages for saddle stitch binding (${paddedPageCount} pages, max 48). Reduce the number of photos.`,
+        },
+        { status: 400 },
       );
     }
 
@@ -128,7 +139,7 @@ export async function POST(
         ...bookData,
         pages: storyPages,
       } as BookWithPages,
-      { fonts: loadWebPdfFonts(), includeCollage: counts.collagePages > 0, logger }
+      { fonts: loadWebPdfFonts(), includeCollage: counts.collagePages > 0, logger },
     );
 
     // Upload to Dropbox with public shared link (avoids Cloudinary 10MB limit)
@@ -141,27 +152,30 @@ export async function POST(
       success: true,
       url: uploadResult.url,
       dropboxPath: uploadResult.path,
-      pageCount: paddedPageCount,  // Return padded PDF page count
+      pageCount: paddedPageCount, // Return padded PDF page count
     });
-
   } catch (error) {
     // Handle authentication errors
-    if (error instanceof Error && (
-      error.message.includes('not authenticated') ||
-      error.message.includes('ID mismatch') ||
-      error.message.includes('primary email not found')
-    )) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('not authenticated') ||
+        error.message.includes('ID mismatch') ||
+        error.message.includes('primary email not found'))
+    ) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorStack = error instanceof Error ? error.stack : undefined;
 
-    logger.error({
-      bookId,
-      errorMessage,
-      errorStack
-    }, 'Error generating Lulu interior PDF.');
+    logger.error(
+      {
+        bookId,
+        errorMessage,
+        errorStack,
+      },
+      'Error generating Lulu interior PDF.',
+    );
     return NextResponse.json({ error: 'Failed to generate interior PDF' }, { status: 500 });
   }
 }

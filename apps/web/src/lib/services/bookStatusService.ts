@@ -68,9 +68,9 @@ export class BookStatusService {
       if (!book) return null;
 
       const totalPages = book.pages.length;
-      const pagesWithText = book.pages.filter(p => p.text && p.text.trim().length > 0).length;
-      const pagesWithIllustrations = book.pages.filter(p => p.generatedImageUrl).length;
-      const failedPages = book.pages.filter(p => p.moderationStatus === 'FAILED').length;
+      const pagesWithText = book.pages.filter((p) => p.text && p.text.trim().length > 0).length;
+      const pagesWithIllustrations = book.pages.filter((p) => p.generatedImageUrl).length;
+      const failedPages = book.pages.filter((p) => p.moderationStatus === 'FAILED').length;
 
       // Calculate percentage based on current status
       let percentComplete = 0;

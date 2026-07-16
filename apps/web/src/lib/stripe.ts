@@ -21,4 +21,3 @@ export function getStripe(): Stripe {
   }
   return _stripe;
 }
-

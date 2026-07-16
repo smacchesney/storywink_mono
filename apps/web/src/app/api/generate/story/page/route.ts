@@ -41,8 +41,10 @@ export async function POST(req: NextRequest) {
 
     if (book.status !== BookStatus.PARTIAL) {
       return NextResponse.json(
-        { error: `Single-page text generation only available for PARTIAL books (current: ${book.status})` },
-        { status: 409 }
+        {
+          error: `Single-page text generation only available for PARTIAL books (current: ${book.status})`,
+        },
+        { status: 409 },
       );
     }
 
@@ -68,23 +70,29 @@ export async function POST(req: NextRequest) {
       {
         attempts: 3,
         backoff: { type: 'exponential', delay: 10000 },
-      }
+      },
     );
 
     logger.info(
       { clerkId, dbUserId: dbUser.id, bookId, pageId, jobId: job.id },
-      'API: Queued single-page text generation job'
+      'API: Queued single-page text generation job',
     );
 
-    return NextResponse.json({
-      message: 'Single-page text generation started',
-      bookId,
-      pageId,
-      jobId: job.id,
-    }, { status: 202 });
+    return NextResponse.json(
+      {
+        message: 'Single-page text generation started',
+        bookId,
+        pageId,
+        jobId: job.id,
+      },
+      { status: 202 },
+    );
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid request data', details: error.errors }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid request data', details: error.errors },
+        { status: 400 },
+      );
     }
 
     if (

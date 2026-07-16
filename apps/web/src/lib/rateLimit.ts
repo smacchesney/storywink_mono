@@ -65,7 +65,7 @@ export interface RateLimitResult {
 export async function checkRateLimit(
   key: string,
   max: number,
-  windowSec: number
+  windowSec: number,
 ): Promise<RateLimitResult> {
   const client = getRedis();
   if (!client) {
@@ -90,7 +90,7 @@ export async function checkRateLimit(
     // Fail-open: never block a request because rate limiting itself failed.
     logger.warn(
       { err: err instanceof Error ? err.message : String(err), key },
-      'Rate limit check failed — allowing request (fail-open)'
+      'Rate limit check failed — allowing request (fail-open)',
     );
     return { allowed: true, remaining: max };
   }

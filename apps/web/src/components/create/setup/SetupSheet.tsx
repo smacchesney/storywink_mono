@@ -17,9 +17,7 @@ import LibrarianStrip from '@/components/create/setup/LibrarianStrip';
 import StoryFraming from '@/components/create/setup/StoryFraming';
 import type { StripPhase } from '@/components/create/setup/strip-phase';
 import AvatarMatchChip from '@/components/create/setup/AvatarMatchChip';
-import CaptureChips, {
-  CaptureQuestion,
-} from '@/components/create/setup/CaptureChips';
+import CaptureChips, { CaptureQuestion } from '@/components/create/setup/CaptureChips';
 
 export interface SetupFormState {
   childName: string;
@@ -56,10 +54,7 @@ interface SetupSheetProps {
   onReorder: (photos: StripPhoto[]) => void;
   /** Refetch trigger after photos are added/removed inline. */
   onPhotosChanged?: () => void | Promise<void>;
-  onChange: <K extends keyof SetupFormState>(
-    key: K,
-    value: SetupFormState[K],
-  ) => void;
+  onChange: <K extends keyof SetupFormState>(key: K, value: SetupFormState[K]) => void;
   onSubmit: () => void;
 }
 
@@ -102,9 +97,8 @@ export function SetupSheet({
         ...(bookId ? { bookId } : {}),
         props: {
           reviewFirst: form.reviewFirst,
-          chipsAnswered: form.captureQuestions.filter(
-            (q) => q.answer && q.answer !== '__skip__',
-          ).length,
+          chipsAnswered: form.captureQuestions.filter((q) => q.answer && q.answer !== '__skip__')
+            .length,
           ...(form.tone ? { tone: form.tone } : {}),
           stripPhaseAtSubmit: stripPhase,
           summaryEdited,
@@ -115,12 +109,10 @@ export function SetupSheet({
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 pb-28 pt-4">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 pt-4 pb-28">
       {/* Photos */}
       <section className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-gray-600">
-          {t('photosLabel')}
-        </label>
+        <label className="text-sm font-medium text-gray-600">{t('photosLabel')}</label>
         <PhotoStrip
           photos={photos}
           onReorder={onReorder}
@@ -132,18 +124,12 @@ export function SetupSheet({
       {/* Librarian strip — narrates the perception pass; never mounts when
           nothing is plausibly in flight, never collapses once mounted. */}
       {stripPhase !== 'hidden' && (
-        <LibrarianStrip
-          phase={stripPhase}
-          questionCount={form.captureQuestions.length}
-        />
+        <LibrarianStrip phase={stripPhase} questionCount={form.captureQuestions.length} />
       )}
 
       {/* Child name — the one required field */}
       <section className="flex flex-col gap-1.5">
-        <label
-          htmlFor="childName"
-          className="text-sm font-medium text-gray-600"
-        >
+        <label htmlFor="childName" className="text-sm font-medium text-gray-600">
           {t('childNameLabel')}
         </label>
         <Input
@@ -157,17 +143,13 @@ export function SetupSheet({
             showNameError && 'border-coral focus-visible:ring-coral',
           )}
         />
-        {showNameError && (
-          <p className="text-xs text-coral">{t('childNameRequired')}</p>
+        {showNameError && <p className="text-xs text-coral">{t('childNameRequired')}</p>}
+        {!showNameError && prefilledName && form.childName === prefilledName && (
+          <p className="text-xs text-gray-500">
+            <Sparkles className="mr-1 inline h-3 w-3 text-coral" />
+            {t('childNameAgain', { name: prefilledName })}
+          </p>
         )}
-        {!showNameError &&
-          prefilledName &&
-          form.childName === prefilledName && (
-            <p className="text-xs text-gray-500">
-              <Sparkles className="mr-1 inline h-3 w-3 text-coral" />
-              {t('childNameAgain', { name: prefilledName })}
-            </p>
-          )}
       </section>
 
       {/* Title — AI-prefilled with a thinking shimmer */}
@@ -187,9 +169,7 @@ export function SetupSheet({
           {titlePending && !form.title && (
             <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center gap-2 text-gray-400">
               <Storydust variant="twinkle" size="inline" />
-              <span className="font-playful text-sm">
-                {t('titleThinking')}
-              </span>
+              <span className="font-playful text-sm">{t('titleThinking')}</span>
             </div>
           )}
         </div>
@@ -272,13 +252,8 @@ export function SetupSheet({
 
       {/* Art style */}
       <section className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-gray-600">
-          {t('artStyleLabel')}
-        </label>
-        <ArtStyleStrip
-          value={form.artStyle}
-          onChange={(s) => onChange('artStyle', s)}
-        />
+        <label className="text-sm font-medium text-gray-600">{t('artStyleLabel')}</label>
+        <ArtStyleStrip value={form.artStyle} onChange={(s) => onChange('artStyle', s)} />
       </section>
 
       {/* Review-first toggle — quiet / tertiary */}

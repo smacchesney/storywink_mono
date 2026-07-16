@@ -13,10 +13,10 @@ const updatePageSchema = z.object({
 
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ bookId: string, pageId: string }> }
+  { params }: { params: Promise<{ bookId: string; pageId: string }> },
 ) {
-  const { bookId, pageId } = await params; 
-  
+  const { bookId, pageId } = await params;
+
   try {
     const { dbUser } = await getAuthenticatedUser();
 
@@ -38,7 +38,10 @@ export async function PATCH(
       validatedData = updatePageSchema.parse(requestBody);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return NextResponse.json({ error: 'Invalid request data', details: error.errors }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Invalid request data', details: error.errors },
+          { status: 400 },
+        );
       }
       return NextResponse.json({ error: 'Validation failed' }, { status: 400 });
     }
@@ -52,7 +55,10 @@ export async function PATCH(
     });
 
     if (!bookOwnerCheck) {
-      return NextResponse.json({ error: 'Book not found or you do not have permission.' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Book not found or you do not have permission.' },
+        { status: 403 },
+      );
     }
 
     // Update the page text using updateMany to ensure the page belongs to the correct book
@@ -71,21 +77,24 @@ export async function PATCH(
     // Check if any record was actually updated
     if (updateResult.count === 0) {
       // Check if the page exists at all to differentiate 404 vs 403
-      const pageExists = await prisma.page.findUnique({ where: { id: pageId }, select: { id: true } });
+      const pageExists = await prisma.page.findUnique({
+        where: { id: pageId },
+        select: { id: true },
+      });
       const status = pageExists ? 403 : 404;
       const message = pageExists ? 'Page does not belong to this book' : 'Page not found';
       return NextResponse.json({ error: message }, { status });
     }
 
     return NextResponse.json({ message: 'Page updated successfully' }, { status: 200 });
-
   } catch (error) {
     // Handle authentication errors
-    if (error instanceof Error && (
-      error.message.includes('not authenticated') ||
-      error.message.includes('ID mismatch') ||
-      error.message.includes('primary email not found')
-    )) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('not authenticated') ||
+        error.message.includes('ID mismatch') ||
+        error.message.includes('primary email not found'))
+    ) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -104,7 +113,7 @@ export async function PATCH(
  */
 export async function DELETE(
   _request: Request,
-  { params }: { params: Promise<{ bookId: string; pageId: string }> }
+  { params }: { params: Promise<{ bookId: string; pageId: string }> },
 ) {
   const { bookId, pageId } = await params;
 
@@ -131,8 +140,14 @@ export async function DELETE(
     });
 
     if (!book) {
-      logger.warn({ clerkId, dbUserId: dbUser.id, bookId }, 'API: Deletion failed - Book not found or unauthorized');
-      return NextResponse.json({ error: 'Book not found or you do not have permission.' }, { status: 403 });
+      logger.warn(
+        { clerkId, dbUserId: dbUser.id, bookId },
+        'API: Deletion failed - Book not found or unauthorized',
+      );
+      return NextResponse.json(
+        { error: 'Book not found or you do not have permission.' },
+        { status: 403 },
+      );
     }
 
     // Find the page to delete
@@ -155,24 +170,33 @@ export async function DELETE(
     if (isCoverPage) {
       logger.warn({ clerkId, bookId, pageId }, 'API: Cannot delete cover page');
       return NextResponse.json(
-        { code: 'COVER_LOCKED', error: 'Cannot delete the cover photo. Please select a different cover first.' },
-        { status: 400 }
+        {
+          code: 'COVER_LOCKED',
+          error: 'Cannot delete the cover photo. Please select a different cover first.',
+        },
+        { status: 400 },
       );
     }
 
     // CONSTRAINT 2: Must have at least 2 pages after deletion. The guard
     // counts PAGES (bridge pages included), not photos — the copy must too.
     if (book.pages.length <= 2) {
-      logger.warn({ clerkId, bookId, pageId, currentCount: book.pages.length }, 'API: Cannot delete - minimum pages required');
+      logger.warn(
+        { clerkId, bookId, pageId, currentCount: book.pages.length },
+        'API: Cannot delete - minimum pages required',
+      );
       return NextResponse.json(
         { code: 'MIN_PAGES', error: 'Cannot delete. Your book must keep at least 2 pages.' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Use transaction to ensure atomicity
     await prisma.$transaction(async (tx) => {
-      logger.info({ clerkId, dbUserId: dbUser.id, bookId, pageId }, 'API: Starting page deletion transaction');
+      logger.info(
+        { clerkId, dbUserId: dbUser.id, bookId, pageId },
+        'API: Starting page deletion transaction',
+      );
 
       // Delete the page
       await tx.page.delete({
@@ -211,7 +235,7 @@ export async function DELETE(
 
       logger.info(
         { clerkId, dbUserId: dbUser.id, bookId, pageId, remainingCount: remainingPages.length },
-        'API: Page deletion transaction committed'
+        'API: Page deletion transaction committed',
       );
     });
 
@@ -227,10 +251,13 @@ export async function DELETE(
             backoff: { type: 'exponential', delay: 5000 },
             removeOnComplete: { count: 100 },
             removeOnFail: { count: 500 },
-          }
+          },
         );
       } catch (queueError) {
-        logger.error({ bookId, error: queueError }, 'Failed to enqueue perception refresh (non-fatal)');
+        logger.error(
+          { bookId, error: queueError },
+          'Failed to enqueue perception refresh (non-fatal)',
+        );
       }
     }
 
@@ -245,16 +272,17 @@ export async function DELETE(
         select: { moderationStatus: true, generatedImageUrl: true, isTitlePage: true },
       });
 
-      const allOk = remainingPages.every(
-        (p) => p.moderationStatus === 'OK' && p.generatedImageUrl
-      );
+      const allOk = remainingPages.every((p) => p.moderationStatus === 'OK' && p.generatedImageUrl);
 
       if (allOk) {
         await prisma.book.update({
           where: { id: bookId },
           data: { status: BookStatus.COMPLETED },
         });
-        logger.info({ bookId, previousStatus: book.status }, 'API: Book auto-completed after removing failed page');
+        logger.info(
+          { bookId, previousStatus: book.status },
+          'API: Book auto-completed after removing failed page',
+        );
       }
     }
 
@@ -274,4 +302,4 @@ export async function DELETE(
     logger.error({ bookId, pageId, error }, 'API: Error during page deletion');
     return NextResponse.json({ error: 'Failed to delete page' }, { status: 500 });
   }
-} 
+}

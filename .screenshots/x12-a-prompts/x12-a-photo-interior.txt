@@ -1,0 +1,54 @@
+Create a children's picture book illustration using the 4 images provided. The first image shows the scene/subjects, the following 3 image(s) show the artistic style to apply. Use all style reference images for comprehensive style matching. ARTISTIC STYLE (Primary directive): Fully transform this into a hand-drawn/painted children's book illustration matching the style from the reference image(s). Apply its complete aesthetic: color palette, brush techniques, line work, textures, shading, and lighting approach. The final image must look like a hand-illustrated children's book page, not a filtered photograph—while keeping people precisely recognizable. Replace all photographic elements (realistic textures, camera lighting, photo grain) with illustrated equivalents. Backgrounds should be simplified into clean illustrated shapes and forms. Style emphasis: Create a vignette-style illustration with soft, organic edges that fade into PURE WHITE (#FFFFFF). The vignette edges and any background showing through must be pure white, not off-white, cream, or gray. Match the watercolor/pencil aesthetic, warm color palette, and hand-drawn quality shown in the reference images. Fill the entire canvas with the illustration. SCENE INTERPRETATION (Secondary directive): Use the first image as reference for: character/subject identity and their pose, the spatial layout and composition, key recognizable objects that establish the setting. Translate these elements into illustration form - a wooden fence becomes illustrated wood with simple line work, not photographic grain; metal becomes clean illustrated surfaces with simple highlights, not realistic reflections. Simplify complex backgrounds into essential illustrated elements while keeping the scene recognizable. FACIAL RENDERING STYLE (critical for consistency across pages):
+Render ALL faces using a simplified children's book style as shown in the reference images:
+- Eyes: small, simple dots or short curved lines — NOT detailed realistic eyes
+- Nose: tiny dot, small L-shape, or simple curved line — minimal and understated
+- Mouth: simple curved line for smiles, small open shape for expressions
+- Cheeks: soft rosy circles on cheeks for warmth
+- Keep facial details minimal and consistent — simpler faces are more consistent across pages
+This simplified face style must be applied uniformly to every person (adults and children alike) while still preserving each person's distinguishing features (hair, skin tone, face shape, glasses, facial hair, etc.) so they remain recognizable. A parent must look at your illustration and instantly recognize their child and family. PEOPLE - SOURCE HIERARCHY (non-negotiable):
+Every person in the illustration must be immediately recognizable to their own family.
+Two sources describe the people in this scene. Apply them in this exact order:
+1. IDENTITY — face shape, hair color/style/length, skin tone, and distinguishing features (glasses, freckles, dimples): follow the CHARACTER IDENTITY reference when one is provided below. It is the canonical source; when the photo is ambiguous or disagrees on these features (lighting, angle, shadow, hat), the CHARACTER IDENTITY reference wins.
+2. THIS PAGE'S PHOTO — pose, body position, expression, clothing, other people present, and scene composition: follow the photo exactly. Never copy clothing, poses, or people from any style reference image.
+If no CHARACTER IDENTITY reference is provided, match every feature to the photo. If a feature is hidden in the photo (hat, angle, shadow) and no reference describes it, keep it hidden — never invent. DYNAMIC EFFECTS: Add visual effects to enhance the action. Keep effects minimal (under 15% of image area) and directly relevant to the scene - avoid generic sparkles unless the scene involves magic or wonder. Do not alter character faces or poses. Specific effect to add: Add gentle road-hum wiggle lines near the windows and a tiny sound-effect energy by the bunny-finger gesture. — expressed purely as a visual effect; if the note names a sound or word, depict its energy with motion or particles, never letters. COMPOSITION: Fill the entire image canvas with the illustration. No empty space or text areas needed. The illustration should extend to all edges. CHARACTER IDENTITY (canonical reference — wins on face, hair, and skin):
+The following characters appear in this scene. Their face shape, hair, skin tone, and distinguishing features MUST match these descriptions on every page; when the photo is ambiguous or disagrees on those features (lighting, angle, shadow), these descriptions win. Pose, clothing, and scene composition follow this page's photo:
+- Kai (main_child):
+  Age: about 2–4 years old
+  Hair: jet black, classic straight bowl cut — heavy blunt fringe across forehead, sides even length, glossy
+  Skin tone: warm light-medium (Asian complexion)
+  Build: typical toddler build — slightly rounded/soft
+  Distinguishing features: very expressive eyebrows and wide eyes, round cheeks, frequently barefoot in playground photo
+  Typical clothing (this page's photo takes precedence): often short-sleeve striped polo or a blue long-sleeve rashguard with playful prints; in other photos he wears light shorts and colorful toddler sneakers with velcro straps
+  Style rendering: draw as a compact, round-faced toddler with a pronounced bowl haircut, oversized head-to-body ratio, cotton-texture clothing (striped polo or print rashguard), bright Velcro sneakers; use saturated friendly colors and soft outlines to emphasize his expressions and hands
+- adult_grandpa (grandparent):
+  Age: late 60s - early 70s
+  Hair: silver-grey, short, slightly wavy at the sides
+  Skin tone: warm-medium with visible age lines
+  Build: average build
+  Distinguishing features: full grey moustache and small goatee, prominent smile lines around eyes
+  Typical clothing (this page's photo takes precedence): patterned short-sleeve button shirt in the car selfie
+  Style rendering: draw with gentle wrinkle lines, grey stubble/moustache, and a patterned shirt; use soft, warm shading to make him feel kindly and familiar
+- adult_frontman_black (relative/family friend (front passenger in car)):
+  Age: late 20s - early 30s
+  Hair: dark brown (almost black), short, slightly wavy/curly
+  Skin tone: light-medium
+  Build: average
+  Distinguishing features: short facial stubble, wears a simple black t-shirt
+  Typical clothing (this page's photo takes precedence): black t-shirt, wristwatch
+  Style rendering: render as a casual young man with short curly hair, relaxed pose and a small stubble; keep features simplified for vignette style
+- adult_sunglass (relative/family friend (backseat, sunglasses)):
+  Age: late 20s - 30s
+  Hair: medium brown, long, worn under a baseball cap in car selfie, often tied back
+  Skin tone: warm light
+  Build: slender
+  Distinguishing features: often wears a baseball cap and dark sunglasses
+  Typical clothing (this page's photo takes precedence): baseball cap and sunglasses, casual top
+  Style rendering: silhouette includes cap and sunglasses to identify her quickly in vignettes; use a simple cap shape and dark lens for recognition
+- adult_grandma (grandparent):
+  Age: late 60s
+  Hair: short silver-grey, short bob / cropped
+  Skin tone: warm-medium
+  Build: average
+  Distinguishing features: short grey bob haircut, friendly open smile
+  Typical clothing (this page's photo takes precedence): simple casual t-shirt in the car
+  Style rendering: draw with a short grey bob and open expression, slightly softer posture; keep details minimal for vignette style ABSOLUTELY NO TEXT: Do not render any letters, words, numbers, captions, labels, speech bubbles, sound effects, or title text anywhere in the image. This is a wordless illustration.

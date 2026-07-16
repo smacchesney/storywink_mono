@@ -38,7 +38,7 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
   // Build interleaved display pages (same logic as FlipbookViewer)
   const displayPages = useMemo(
     () => buildDisplayPages(pages, { childName, bookTitle, language, layout }),
-    [pages, childName, bookTitle, language, layout]
+    [pages, childName, bookTitle, language, layout],
   );
 
   // Scroll active thumbnail into view when it changes
@@ -51,22 +51,23 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
       const containerWidth = container.offsetWidth;
       const thumbLeft = thumb.offsetLeft;
       const thumbWidth = thumb.offsetWidth;
-      const centerPosition = thumbLeft - (containerWidth / 2) + (thumbWidth / 2);
+      const centerPosition = thumbLeft - containerWidth / 2 + thumbWidth / 2;
 
       // Smooth scroll to position
       container.scrollTo({
         left: centerPosition,
-        behavior: 'smooth'
+        behavior: 'smooth',
       });
     }
   }, [currentDisplayIndex]);
 
   // Filter out blank pages but keep original indices for navigation
   const galleryPages = useMemo(
-    () => displayPages
-      .map((dp, index) => ({ dp, originalIndex: index }))
-      .filter(({ dp }) => dp.type !== 'blank'),
-    [displayPages]
+    () =>
+      displayPages
+        .map((dp, index) => ({ dp, originalIndex: index }))
+        .filter(({ dp }) => dp.type !== 'blank'),
+    [displayPages],
   );
 
   /** Get the aria-label for a display page */
@@ -105,11 +106,11 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
     <div className="w-full py-2" aria-label="Page gallery">
       <div
         ref={scrollContainerRef}
-        className="flex px-4 py-2 gap-3 overflow-x-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent snap-x snap-mandatory mx-auto"
+        className="scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent mx-auto flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 py-2"
         style={{ scrollbarWidth: 'thin' }}
       >
         {/* Spacer at the start to prevent first thumbnail border clipping */}
-        <div className="flex-shrink-0 w-1"></div>
+        <div className="w-1 flex-shrink-0"></div>
 
         {galleryPages.map(({ dp, originalIndex }) => {
           const displayIndex = originalIndex + 1; // 1-based, matches flipbook indexing
@@ -127,8 +128,8 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
               key={getKey(dp, originalIndex)}
               className={cn(
                 'flex-shrink-0 snap-center',
-                'w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20',
-                isActive ? 'p-1' : 'p-0.5'
+                'h-16 w-16 sm:h-18 sm:w-18 md:h-20 md:w-20',
+                isActive ? 'p-1' : 'p-0.5',
               )}
             >
               <button
@@ -137,13 +138,13 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
                 onClick={() => onDisplayPageSelect(displayIndex)}
                 disabled={hasArt && (isPending || isFailed)}
                 className={cn(
-                  'w-full h-full relative rounded-md overflow-hidden',
+                  'relative h-full w-full overflow-hidden rounded-md',
                   'focus:outline-none focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2',
                   'touch-manipulation',
                   isActive
-                    ? 'ring-2 ring-coral shadow-md transition-all duration-200 ease-in-out'
-                    : 'ring-1 ring-muted/40 hover:ring-coral/50 transition-all duration-150',
-                  (hasArt && (isPending || isFailed)) && 'cursor-default'
+                    ? 'shadow-md ring-2 ring-coral transition-all duration-200 ease-in-out'
+                    : 'ring-1 ring-muted/40 transition-all duration-150 hover:ring-coral/50',
+                  hasArt && (isPending || isFailed) && 'cursor-default',
                 )}
                 aria-label={getAriaLabel(dp, isActive)}
                 aria-current={isActive}
@@ -154,22 +155,22 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
               >
                 {dp.type === 'dedication' ? (
                   // Dedication page thumbnail
-                  <div className="w-full h-full bg-white flex items-center justify-center">
+                  <div className="flex h-full w-full items-center justify-center bg-white">
                     <Heart className="h-5 w-5 text-coral" />
                   </div>
                 ) : dp.type === 'ending' ? (
                   // Ending page thumbnail
-                  <div className="w-full h-full bg-white flex items-center justify-center">
+                  <div className="flex h-full w-full items-center justify-center bg-white">
                     <Star className="h-5 w-5 text-coral" />
                   </div>
                 ) : dp.type === 'back-cover' ? (
                   // Back cover thumbnail
-                  <div className="w-full h-full bg-white flex items-center justify-center">
+                  <div className="flex h-full w-full items-center justify-center bg-white">
                     <BookOpen className="h-5 w-5 text-[#1a1a1a]/60" />
                   </div>
                 ) : dp.type === 'text' ? (
                   // Text page thumbnail - white with text icon
-                  <div className="w-full h-full bg-white flex items-center justify-center">
+                  <div className="flex h-full w-full items-center justify-center bg-white">
                     <Type className="h-5 w-5 text-[#1a1a1a]/60" />
                   </div>
                 ) : hasImage ? (
@@ -177,25 +178,28 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
                     src={dp.page.generatedImageUrl!}
                     alt={`Page ${dp.page.pageNumber}`}
                     sizes="(max-width: 768px) 64px, 80px"
-                    className={cn(
-                      !isActive && "hover:opacity-90 transition-opacity"
-                    )}
+                    className={cn(!isActive && 'transition-opacity hover:opacity-90')}
                   />
                 ) : isPending ? (
-                   <div className="w-full h-full bg-coral-soft/50 flex items-center justify-center">
-                     <Storydust variant="twinkle" size="inline" label={t('pageCooking')} />
-                   </div>
+                  <div className="flex h-full w-full items-center justify-center bg-coral-soft/50">
+                    <Storydust variant="twinkle" size="inline" label={t('pageCooking')} />
+                  </div>
                 ) : isFailed ? (
-                   <div className="w-full h-full bg-destructive/10 flex items-center justify-center" title="Illustration failed">
-                      <AlertTriangle className="h-4 w-4 text-destructive" />
-                   </div>
+                  <div
+                    className="flex h-full w-full items-center justify-center bg-destructive/10"
+                    title="Illustration failed"
+                  >
+                    <AlertTriangle className="h-4 w-4 text-destructive" />
+                  </div>
                 ) : null}
 
-                <div className={cn(
-                  "absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] py-0.5 font-medium text-center",
-                  isActive && "bg-coral/80"
-                )}>
-                   {getThumbLabel(dp)}
+                <div
+                  className={cn(
+                    'absolute right-0 bottom-0 left-0 bg-black/50 py-0.5 text-center text-[10px] font-medium text-white',
+                    isActive && 'bg-coral/80',
+                  )}
+                >
+                  {getThumbLabel(dp)}
                 </div>
               </button>
             </div>
@@ -203,7 +207,7 @@ const BookPageGallery: React.FC<BookPageGalleryProps> = ({
         })}
 
         {/* Spacer at the end to prevent last thumbnail border clipping */}
-        <div className="flex-shrink-0 w-1"></div>
+        <div className="w-1 flex-shrink-0"></div>
       </div>
     </div>
   );

@@ -44,9 +44,9 @@ function subject(overrides: Partial<DetectedSubject> = {}): DetectedSubject {
 
 describe('detectRequestSchema', () => {
   it('accepts 1..10 owned-looking asset ids and an optional language', () => {
-    expect(
-      detectRequestSchema.safeParse({ assetIds: [cuid(1)], language: 'ja' }).success,
-    ).toBe(true);
+    expect(detectRequestSchema.safeParse({ assetIds: [cuid(1)], language: 'ja' }).success).toBe(
+      true,
+    );
     expect(detectRequestSchema.safeParse({ assetIds: [] }).success).toBe(false);
   });
 
@@ -171,7 +171,10 @@ describe('subjectAssetIds', () => {
   const assetIds = [cuid(1), cuid(2), cuid(3), cuid(4), cuid(5)];
 
   it('leads with the best photo, keeps at most 3, all from the uploaded set', () => {
-    const ids = subjectAssetIds(subject({ photoIndexes: [1, 3, 4, 5], bestPhotoIndex: 3 }), assetIds);
+    const ids = subjectAssetIds(
+      subject({ photoIndexes: [1, 3, 4, 5], bestPhotoIndex: 3 }),
+      assetIds,
+    );
     expect(ids.length).toBe(MAX_ASSETS_PER_SUBJECT);
     expect(ids[0]).toBe(assetIds[2]); // best photo (index 3, 1-based) first
     expect(new Set(ids).size).toBe(ids.length);

@@ -6,7 +6,9 @@ const appSecret = process.env.DROPBOX_APP_SECRET;
 const refreshToken = process.env.DROPBOX_REFRESH_TOKEN;
 
 if (!appKey || !appSecret || !refreshToken) {
-  logger.error('Missing Dropbox credentials: DROPBOX_APP_KEY, DROPBOX_APP_SECRET, or DROPBOX_REFRESH_TOKEN');
+  logger.error(
+    'Missing Dropbox credentials: DROPBOX_APP_KEY, DROPBOX_APP_SECRET, or DROPBOX_REFRESH_TOKEN',
+  );
 }
 
 // Create auth instance with refresh token - automatically handles token refresh
@@ -32,10 +34,12 @@ const dbx = new Dropbox({ auth: dbxAuth, fetch: fetch });
 export async function uploadPdfToDropbox(
   buffer: Buffer,
   bookId: string,
-  filename: 'interior.pdf' | 'cover.pdf'
+  filename: 'interior.pdf' | 'cover.pdf',
 ): Promise<{ url: string; path: string }> {
   if (!appKey || !appSecret || !refreshToken) {
-    throw new Error('Dropbox not configured: Missing DROPBOX_APP_KEY, DROPBOX_APP_SECRET, or DROPBOX_REFRESH_TOKEN');
+    throw new Error(
+      'Dropbox not configured: Missing DROPBOX_APP_KEY, DROPBOX_APP_SECRET, or DROPBOX_REFRESH_TOKEN',
+    );
   }
 
   const dropboxPath = `/Apps/Storywink/lulu-prints/${bookId}/${filename}`;
@@ -87,7 +91,7 @@ export async function uploadPdfToDropbox(
 
   logger.info(
     { bookId, dropboxPath, url: directDownloadUrl },
-    `Successfully uploaded ${filename} to Dropbox`
+    `Successfully uploaded ${filename} to Dropbox`,
   );
 
   return {

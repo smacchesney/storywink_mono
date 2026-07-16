@@ -46,7 +46,7 @@ const PageCard = ({
   isSaving,
   bookId: _bookId,
   onTextChange,
-  onSave
+  onSave,
 }: PageCardProps) => {
   const t = useTranslations('review');
   const tc = useTranslations('common');
@@ -70,19 +70,21 @@ const PageCard = ({
   };
 
   return (
-    <div className="page-card flex flex-col p-4 bg-white rounded-md shadow-sm">
+    <div className="page-card flex flex-col rounded-md bg-white p-4 shadow-sm">
       {/* Page Label - Centered above image */}
-      <div className="text-center mb-3 flex items-center justify-center gap-2">
+      <div className="mb-3 flex items-center justify-center gap-2 text-center">
         <h3
           className="text-sm font-medium text-coral"
-          aria-label={isTitlePage ? `${t('page', { n: pageNumber })}, ${t('coverBadge')}` : undefined}
+          aria-label={
+            isTitlePage ? `${t('page', { n: pageNumber })}, ${t('coverBadge')}` : undefined
+          }
         >
           {t('page', { n: pageNumber })}
         </h3>
         {isTitlePage && (
           <span
             aria-hidden="true"
-            className="text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-coral/10 text-[#B8483E] border border-coral/40"
+            className="rounded-full border border-coral/40 bg-coral/10 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-[#B8483E] uppercase"
           >
             {t('coverBadge')}
           </span>
@@ -90,7 +92,7 @@ const PageCard = ({
       </div>
 
       {/* Image Container */}
-      <div className="image-container h-[35vh] relative bg-muted rounded-md mb-4">
+      <div className="image-container relative mb-4 h-[35vh] rounded-md bg-muted">
         {imageUrl ? (
           <Image
             src={coolifyImageUrl(imageUrl)}
@@ -104,43 +106,41 @@ const PageCard = ({
           // Bridge pages have no photo before illustration — the branded
           // fallback explains the page the app added instead of showing a
           // blank "Page N" card.
-          <div className="w-full h-full flex flex-col items-center justify-center gap-3 rounded-md border-2 border-dashed border-coral/40 bg-coral/5 px-6 text-center">
+          <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-md border-2 border-dashed border-coral/40 bg-coral/5 px-6 text-center">
             <Image src={MASCOT_CATS_SLEEPING} alt="" width={56} height={56} className="h-14 w-14" />
-            <span className="font-playful text-sm text-gray-700">
-              {t('bridgePlaceholder')}
-            </span>
+            <span className="font-playful text-sm text-gray-700">{t('bridgePlaceholder')}</span>
           </div>
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
+          <div className="flex h-full w-full items-center justify-center">
             <span className="text-2xl font-semibold text-muted-foreground">
               {t('page', { n: pageNumber })}
             </span>
           </div>
         )}
-        
+
         {/* Moderation Warning */}
         {moderationStatus === 'FLAGGED' && (
-          <div className="absolute bottom-2 left-2 bg-warn-soft text-coral-ink px-2 py-1 rounded-md text-xs flex items-center">
-            <AlertTriangle className="h-3 w-3 mr-1" />
+          <div className="absolute bottom-2 left-2 flex items-center rounded-md bg-warn-soft px-2 py-1 text-xs text-coral-ink">
+            <AlertTriangle className="mr-1 h-3 w-3" />
             <span>{t('contentFlagged')}</span>
           </div>
         )}
       </div>
-      
+
       {/* Action Row — just Edit; the old Confirm tap is gone. */}
       {!isEditing && (
-        <div className="flex gap-2 mb-3">
+        <div className="mb-3 flex gap-2">
           <Button
             variant="ghost"
             onClick={() => setIsEditing(true)}
             disabled={isSaving || isEditing}
             className="px-3 text-gray-600 hover:bg-gray-100"
           >
-            <Pencil className="h-4 w-4 mr-1" /> {t('edit')}
+            <Pencil className="mr-1 h-4 w-4" /> {t('edit')}
           </Button>
         </div>
       )}
-      
+
       {/* Text Area */}
       <div className="text-editor flex-1">
         {isEditing ? (
@@ -148,16 +148,16 @@ const PageCard = ({
             <Textarea
               value={editedText}
               onChange={(e) => setEditedText(e.target.value)}
-              className="w-full min-h-[100px] p-3"
+              className="min-h-[100px] w-full p-3"
               placeholder={t('enterPageText', { n: pageNumber })}
             />
             {/* Edit mode buttons */}
-            <div className="flex gap-2 mt-4">
+            <div className="mt-4 flex gap-2">
               <Button
                 variant="outline"
                 onClick={() => {
                   setIsEditing(false);
-                  setEditedText(text || "");
+                  setEditedText(text || '');
                 }}
                 className="flex-1"
               >
@@ -166,7 +166,7 @@ const PageCard = ({
               <Button
                 onClick={handleSaveText}
                 disabled={isSaving}
-                className="flex-1 bg-coral hover:bg-coral/90 text-white"
+                className="flex-1 bg-coral text-white hover:bg-coral/90"
               >
                 {isSaving ? (
                   <>
@@ -180,7 +180,7 @@ const PageCard = ({
             </div>
           </>
         ) : (
-          <div className="text-content p-3 max-h-[35vh] overflow-y-auto border rounded-md bg-white">
+          <div className="text-content max-h-[35vh] overflow-y-auto rounded-md border bg-white p-3">
             {text || t('noTextYet')}
           </div>
         )}
@@ -189,4 +189,4 @@ const PageCard = ({
   );
 };
 
-export default PageCard; 
+export default PageCard;

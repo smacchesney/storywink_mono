@@ -1,13 +1,19 @@
-"use client";
+'use client';
 
 import React, { useState, useMemo, useTransition, useEffect, useCallback, useRef } from 'react';
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import Image from "next/image";
-import BookCard from "@/components/book-card";
-import { apiClient } from "@/lib/api-client";
-import { useAuth } from "@clerk/nextjs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import Image from 'next/image';
+import BookCard from '@/components/book-card';
+import { apiClient } from '@/lib/api-client';
+import { useAuth } from '@clerk/nextjs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,7 +23,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from '@/components/ui/alert-dialog';
 import { showError, showErrorWithRetry } from '@/lib/toast-utils';
 import { resolveCoverImageUrl } from '@/lib/book-display';
 import { useRouter } from 'next/navigation';
@@ -37,7 +43,8 @@ const LIBRARY_GRID_CLASSES =
 const POLLING_INTERVAL = 5000;
 
 // Define BookStatus inline (can't import from Prisma in client components)
-type BookStatus = "DRAFT" | "GENERATING" | "STORY_READY" | "ILLUSTRATING" | "COMPLETED" | "FAILED" | "PARTIAL";
+type BookStatus =
+  'DRAFT' | 'GENERATING' | 'STORY_READY' | 'ILLUSTRATING' | 'COMPLETED' | 'FAILED' | 'PARTIAL';
 
 // Every book the parent owns belongs on the shelf — an abandoned draft or a
 // book mid-generation is otherwise unreachable (no resume, no delete).
@@ -85,36 +92,39 @@ export function LibraryClientView() {
   const tokenRef = useRef<string | null>(null);
 
   // Fetch books from API
-  const fetchBooks = useCallback(async (showLoadingState = true) => {
-    if (!isLoaded) return;
+  const fetchBooks = useCallback(
+    async (showLoadingState = true) => {
+      if (!isLoaded) return;
 
-    try {
-      const token = await getToken();
-      if (!token) {
-        router.push('/sign-in');
-        return;
-      }
+      try {
+        const token = await getToken();
+        if (!token) {
+          router.push('/sign-in');
+          return;
+        }
 
-      // Store token for polling
-      tokenRef.current = token;
+        // Store token for polling
+        tokenRef.current = token;
 
-      const response = await apiClient.getBooks(token);
-      if (response.success && response.data) {
-        setBooks(response.data as LibraryBook[]);
-      } else if (showLoadingState) {
-        showError(response.error || 'Failed to load books', t('unableToLoad'));
+        const response = await apiClient.getBooks(token);
+        if (response.success && response.data) {
+          setBooks(response.data as LibraryBook[]);
+        } else if (showLoadingState) {
+          showError(response.error || 'Failed to load books', t('unableToLoad'));
+        }
+      } catch (error) {
+        console.error('Error fetching books:', error);
+        if (showLoadingState) {
+          showErrorWithRetry(error, t('unableToLoad'), () => window.location.reload(), tc('retry'));
+        }
+      } finally {
+        if (showLoadingState) {
+          setIsLoading(false);
+        }
       }
-    } catch (error) {
-      console.error('Error fetching books:', error);
-      if (showLoadingState) {
-        showErrorWithRetry(error, t('unableToLoad'), () => window.location.reload(), tc('retry'));
-      }
-    } finally {
-      if (showLoadingState) {
-        setIsLoading(false);
-      }
-    }
-  }, [isLoaded, getToken, router]);
+    },
+    [isLoaded, getToken, router],
+  );
 
   // Initial fetch
   useEffect(() => {
@@ -123,7 +133,7 @@ export function LibraryClientView() {
 
   // Filter to only show visible statuses and sort
   const visibleBooks = useMemo(() => {
-    return books.filter(book => VISIBLE_STATUSES.includes(book.status));
+    return books.filter((book) => VISIBLE_STATUSES.includes(book.status));
   }, [books]);
 
   const sortedBooks = useMemo(() => {
@@ -140,10 +150,11 @@ export function LibraryClientView() {
   // moves a book to GENERATING, and stopping the poll there would leave the
   // card looking stuck until a manual refresh.
   const hasIllustratingBooks = useMemo(() => {
-    return books.some(book =>
-      book.status === 'ILLUSTRATING' ||
-      book.status === 'GENERATING' ||
-      book.status === 'STORY_READY'
+    return books.some(
+      (book) =>
+        book.status === 'ILLUSTRATING' ||
+        book.status === 'GENERATING' ||
+        book.status === 'STORY_READY',
     );
   }, [books]);
 
@@ -173,7 +184,7 @@ export function LibraryClientView() {
 
         const response = await apiClient.deleteBook(bookToDelete.id, token);
         if (response.success) {
-          setBooks(books.filter(book => book.id !== bookToDelete.id));
+          setBooks(books.filter((book) => book.id !== bookToDelete.id));
           setIsDeleteDialogOpen(false);
           setBookToDelete(null);
         } else if (response.code === 'PRINT_ORDER_IN_FLIGHT') {
@@ -229,7 +240,7 @@ export function LibraryClientView() {
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-6">
+        <div className="mb-6 flex items-center justify-between">
           <Skeleton className="h-8 w-32" />
           <Skeleton className="h-10 w-40" />
         </div>
@@ -245,7 +256,7 @@ export function LibraryClientView() {
                   viewBox="0 0 24 24"
                   fill="currentColor"
                   aria-hidden="true"
-                  className="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-coral opacity-15"
+                  className="absolute top-1/2 left-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-coral opacity-15"
                 >
                   <path d={STAR5} />
                 </svg>
@@ -261,7 +272,7 @@ export function LibraryClientView() {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           <Image
             src="https://res.cloudinary.com/storywink/image/upload/v1772291377/Screenshot_2026-02-28_at_10.58.09_PM_gnknk5.png"
@@ -270,14 +281,14 @@ export function LibraryClientView() {
             height={60}
             className="h-12 w-12 md:h-15 md:w-15"
           />
-          <h1 className="text-2xl font-bold font-playful text-ink">{t('yourLibrary')}</h1>
+          <h1 className="font-playful text-2xl font-bold text-ink">{t('yourLibrary')}</h1>
         </div>
-        
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+
+        <div className="flex w-full flex-col gap-4 sm:w-auto sm:flex-row">
           {/* Sort selector */}
           <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
             <SelectTrigger className="w-full sm:w-[180px]">
-              <SortDesc className="h-4 w-4 mr-2" />
+              <SortDesc className="mr-2 h-4 w-4" />
               <SelectValue placeholder={t('sortBy')} />
             </SelectTrigger>
             <SelectContent>
@@ -298,7 +309,10 @@ export function LibraryClientView() {
           )}
           {/* Create new book button */}
           <Link href="/create">
-            <Button size="sm" className="w-full sm:w-auto bg-coral hover:bg-[#E55A4C] text-white rounded-full font-playful group">
+            <Button
+              size="sm"
+              className="group w-full rounded-full bg-coral font-playful text-white hover:bg-[#E55A4C] sm:w-auto"
+            >
               <svg
                 className="mr-2 h-4 w-4 transition-transform group-hover:scale-125 group-hover:rotate-12"
                 viewBox="0 0 24 24"
@@ -373,10 +387,12 @@ function BookGrid({
           height={160}
           className="h-28 w-auto"
         />
-        <p className="mt-5 font-playful text-lg text-[#1a1a1a] dark:text-white">{t('emptyTitle')}</p>
+        <p className="mt-5 font-playful text-lg text-[#1a1a1a] dark:text-white">
+          {t('emptyTitle')}
+        </p>
         <Button
           asChild
-          className="mt-6 rounded-full bg-coral hover:bg-[#E55A4C] px-6 font-playful text-white"
+          className="mt-6 rounded-full bg-coral px-6 font-playful text-white hover:bg-[#E55A4C]"
         >
           <Link href="/create">{t('emptyCta')}</Link>
         </Button>

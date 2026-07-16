@@ -28,8 +28,7 @@ export function deepMergeMessages(
 
 export default getRequestConfig(async () => {
   const locale = await getUserLocale();
-  const enMessages = (await import('../../messages/en.json'))
-    .default as AbstractIntlMessages;
+  const enMessages = (await import('../../messages/en.json')).default as AbstractIntlMessages;
 
   if (locale === DEFAULT_LOCALE) {
     return { locale, messages: enMessages };

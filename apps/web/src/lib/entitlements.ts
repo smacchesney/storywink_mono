@@ -19,8 +19,7 @@ export function avatarFreeCap(): number {
 }
 
 export type EntitlementVerdict =
-  | { allowed: true }
-  | { allowed: false; reason: 'avatar_cap'; cap: number };
+  { allowed: true } | { allowed: false; reason: 'avatar_cap'; cap: number };
 
 /** Gate for creating a new avatar (studio and promotion both check this). */
 export async function assertCanCreateAvatar(dbUserId: string): Promise<EntitlementVerdict> {

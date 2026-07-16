@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
 import RoughBorder from './rough-border';
@@ -50,10 +50,7 @@ const StorybookFrame: React.FC<StorybookFrameProps> = ({
   return (
     <div
       ref={containerRef}
-      className={cn(
-        "relative rounded-lg overflow-hidden",
-        className
-      )}
+      className={cn('relative overflow-hidden rounded-lg', className)}
       style={{ backgroundColor }}
     >
       {/* Rough.js hand-drawn border */}
@@ -71,16 +68,15 @@ const StorybookFrame: React.FC<StorybookFrameProps> = ({
       )}
 
       {/* Content */}
-      <div className="relative z-10 p-2">
-        {children}
-      </div>
+      <div className="relative z-10 p-2">{children}</div>
 
       {/* Page curl effect - subtle shadow in bottom right */}
       {showPageCurl && (
         <div
-          className="absolute bottom-0 right-0 w-8 h-8 pointer-events-none"
+          className="pointer-events-none absolute right-0 bottom-0 h-8 w-8"
           style={{
-            background: 'linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.05) 50%, rgba(0,0,0,0.1) 100%)',
+            background:
+              'linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.05) 50%, rgba(0,0,0,0.1) 100%)',
             borderTopLeftRadius: '100%',
           }}
           aria-hidden="true"

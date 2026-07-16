@@ -42,9 +42,9 @@ export function LandingCta({
         size="lg"
         variant={variant === 'ghost' ? 'outline' : 'default'}
         className={cn(
-          'group w-full sm:w-auto px-9 py-4 text-lg md:text-xl font-playful',
+          'group w-full px-9 py-4 font-playful text-lg sm:w-auto md:text-xl',
           variant === 'primary' && 'shadow-md shadow-coral/25',
-          buttonClassName
+          buttonClassName,
         )}
         onClick={onClick}
       >

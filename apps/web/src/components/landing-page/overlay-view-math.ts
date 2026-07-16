@@ -27,20 +27,15 @@ export interface ViewState {
 export function computeViewState(
   layout: BookLayout,
   displayCount: number,
-  displayIndex: number
+  displayIndex: number,
 ): ViewState {
   if (displayCount <= 0) {
     return { totalViews: 0, currentView: 0, isAtEnd: false };
   }
-  const totalViews =
-    layout === 'portrait' ? displayCount : 1 + Math.ceil((displayCount - 1) / 2);
+  const totalViews = layout === 'portrait' ? displayCount : 1 + Math.ceil((displayCount - 1) / 2);
   const clampedIndex = Math.max(0, Math.min(displayIndex, displayCount - 1));
   const currentView =
-    layout === 'portrait'
-      ? clampedIndex
-      : clampedIndex === 0
-        ? 0
-        : Math.ceil(clampedIndex / 2);
+    layout === 'portrait' ? clampedIndex : clampedIndex === 0 ? 0 : Math.ceil(clampedIndex / 2);
   return { totalViews, currentView, isAtEnd: currentView >= totalViews - 1 };
 }
 
@@ -51,7 +46,7 @@ export function computeViewState(
 export function computeDots(
   totalViews: number,
   currentView: number,
-  cap = 12
+  cap = 12,
 ): { dotCount: number; activeDot: number } {
   const dotCount = Math.min(Math.max(totalViews, 0), cap);
   const activeDot =

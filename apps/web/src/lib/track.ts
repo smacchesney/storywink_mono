@@ -6,7 +6,7 @@
  */
 export function track(
   name: string,
-  options: { bookId?: string; props?: Record<string, unknown> } = {}
+  options: { bookId?: string; props?: Record<string, unknown> } = {},
 ): void {
   try {
     void fetch('/api/events', {

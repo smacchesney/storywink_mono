@@ -7,7 +7,7 @@ interface RequestOptions extends RequestInit {
 class ApiClient {
   private async request<T>(
     endpoint: string,
-    options: RequestOptions = {}
+    options: RequestOptions = {},
   ): Promise<ApiResponse<T>> {
     const { token, ...fetchOptions } = options;
 

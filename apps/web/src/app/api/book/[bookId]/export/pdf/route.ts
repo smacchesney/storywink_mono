@@ -11,10 +11,7 @@ import { optimizeForScreen, pdfContentDisposition } from '@/lib/pdf-export';
 // Define the expected Book type with Pages for the PDF generator
 type BookWithPages = Book & { pages: (Page & { asset?: { url: string } | null })[] };
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ bookId: string }> }
-) {
+export async function GET(_request: Request, { params }: { params: Promise<{ bookId: string }> }) {
   const { bookId } = await params;
 
   try {
@@ -24,7 +21,7 @@ export async function GET(
       return NextResponse.json({ error: 'Missing bookId parameter' }, { status: 400 });
     }
 
-    logger.info({ clerkId, dbUserId: dbUser.id, bookId }, "PDF export request received.");
+    logger.info({ clerkId, dbUserId: dbUser.id, bookId }, 'PDF export request received.');
 
     // 1. Fetch the full book data, including pages with text and generated URLs
     const bookData = await prisma.book.findUnique({
@@ -53,13 +50,16 @@ export async function GET(
             moderationReason: true,
             illustrationNotes: true,
             asset: { select: { url: true } },
-          }
+          },
         },
       },
     });
 
     if (!bookData) {
-      logger.warn({ clerkId, dbUserId: dbUser.id, bookId }, "Book not found or user does not have permission for PDF export.");
+      logger.warn(
+        { clerkId, dbUserId: dbUser.id, bookId },
+        'Book not found or user does not have permission for PDF export.',
+      );
       return NextResponse.json({ error: 'Book not found or access denied' }, { status: 404 });
     }
 
@@ -68,31 +68,30 @@ export async function GET(
     // with Book.coverImageUrl below carrying the generated painted-title cover).
     const coverPage = resolveCoverPage(bookData.pages, bookData.coverAssetId, bookData.bookType);
     // Use coverImageUrl (dedicated cover illustration) if available, otherwise fall back to page illustration
-    const titlePageForPdf = coverPage ? {
-      ...coverPage,
-      generatedImageUrl: bookData.coverImageUrl || coverPage.generatedImageUrl,
-    } : undefined;
+    const titlePageForPdf = coverPage
+      ? {
+          ...coverPage,
+          generatedImageUrl: bookData.coverImageUrl || coverPage.generatedImageUrl,
+        }
+      : undefined;
 
     // 2. Generate the PDF buffer (user mode: title → dedication → ALL stories → back cover).
     // optimizeForScreen swaps Cloudinary's f_auto (WebP → ~9MB lossless flate
     // per page in the PDF) for JPEG passthrough at illustrator-native 2048px.
     const startedAt = Date.now();
-    const pdfBuffer = await generateBookPdf(
-      bookData as BookWithPages,
-      {
-        fonts: loadWebPdfFonts(),
-        titlePage: titlePageForPdf as Page | undefined,
-        includeBackCover: true,
-        padToFour: false,
-        includeCollage: process.env.COLLAGE_PAGES_ENABLED === 'true',
-        imageUrlTransform: optimizeForScreen,
-        logger,
-      }
-    );
+    const pdfBuffer = await generateBookPdf(bookData as BookWithPages, {
+      fonts: loadWebPdfFonts(),
+      titlePage: titlePageForPdf as Page | undefined,
+      includeBackCover: true,
+      padToFour: false,
+      includeCollage: process.env.COLLAGE_PAGES_ENABLED === 'true',
+      imageUrlTransform: optimizeForScreen,
+      logger,
+    });
 
     logger.info(
       { bookId, durationMs: Date.now() - startedAt, bufferSize: pdfBuffer.length },
-      'User PDF export generated.'
+      'User PDF export generated.',
     );
 
     // 3. Send the PDF as response
@@ -102,25 +101,28 @@ export async function GET(
         'Content-Disposition': pdfContentDisposition(bookData.title),
       },
     });
-
   } catch (error) {
     // Handle authentication errors
-    if (error instanceof Error && (
-      error.message.includes('not authenticated') ||
-      error.message.includes('ID mismatch') ||
-      error.message.includes('primary email not found')
-    )) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('not authenticated') ||
+        error.message.includes('ID mismatch') ||
+        error.message.includes('primary email not found'))
+    ) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorStack = error instanceof Error ? error.stack : undefined;
 
-    logger.error({
-      bookId,
-      errorMessage,
-      errorStack
-    }, "Error generating PDF.");
+    logger.error(
+      {
+        bookId,
+        errorMessage,
+        errorStack,
+      },
+      'Error generating PDF.',
+    );
     return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });
   }
-} 
+}
