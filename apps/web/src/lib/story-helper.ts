@@ -142,20 +142,72 @@ export const STORY_PROPOSAL_RESPONSE_SCHEMA = {
 } as const;
 
 /**
+ * Sentence terminators we back-truncate to. Includes the Japanese full stop (。)
+ * and full-width ！？ so a ja storyline ends on a real sentence, not a clipped
+ * clause. (ja carries no spaces, so the terminator IS the only clean cut.)
+ */
+const SENTENCE_TERMINATORS = /[.!?。！？]/;
+
+/**
+ * Below this many characters a sentence terminator is too early to cut at:
+ * ending there would leave a stub, so we prefer a word boundary near the cap.
+ */
+const STORYLINE_TRUNCATE_FLOOR = 140;
+
+/**
+ * X13 V polish: shorten an over-long storyline WITHOUT clipping mid-word. The
+ * prod wart was a hard `slice(0, 280)` that severed a sentence ("…comforts
+ * Biscuit from a scared"). Input at or under the cap is returned untouched.
+ * Over it: prefer the last sentence terminator inside the cap that clears the
+ * floor; else the last word boundary + an ellipsis; else (a spaceless token
+ * with no terminator) a hard slice as a final resort. Pure, never throws.
+ */
+export function truncateStoryline(input: string): string {
+  const trimmed = input.trim();
+  if (trimmed.length <= STORYLINE_MAX) return trimmed;
+
+  const window = trimmed.slice(0, STORYLINE_MAX);
+
+  let lastTerminator = -1;
+  for (let i = window.length - 1; i >= 0; i--) {
+    if (SENTENCE_TERMINATORS.test(window[i])) {
+      lastTerminator = i;
+      break;
+    }
+  }
+  if (lastTerminator >= STORYLINE_TRUNCATE_FLOOR) {
+    return window.slice(0, lastTerminator + 1);
+  }
+
+  let lastSpace = -1;
+  for (let i = window.length - 1; i >= 0; i--) {
+    if (/\s/.test(window[i])) {
+      lastSpace = i;
+      break;
+    }
+  }
+  if (lastSpace > 0) {
+    return `${window.slice(0, lastSpace).trimEnd()}…`;
+  }
+
+  return window;
+}
+
+/**
  * D3: enforce every bound the OpenAI strict json_schema cannot express (strict
  * mode rejects minItems/maxItems/minLength/maxLength). The model returns plain
- * strings and an unbounded string array; this clamps the storyline to 280
- * chars, keeps at most 2 non-empty alternates, and drops everything else.
- * Untrusted input: coerces types and never throws.
+ * strings and an unbounded string array; this shortens the storyline to 280
+ * chars at a clean sentence or word boundary (never mid-word, see
+ * truncateStoryline), keeps at most 2 non-empty alternates, and drops
+ * everything else. Untrusted input: coerces types and never throws.
  */
 export function sanitizeStoryProposal(raw: unknown): StoryProposal {
   const obj = (raw ?? {}) as { storyline?: unknown; alternates?: unknown };
-  const clamp = (s: string) => s.trim().slice(0, STORYLINE_MAX);
-  const storyline = typeof obj.storyline === 'string' ? clamp(obj.storyline) : '';
+  const storyline = typeof obj.storyline === 'string' ? truncateStoryline(obj.storyline) : '';
   const alternates = Array.isArray(obj.alternates)
     ? obj.alternates
         .filter((a): a is string => typeof a === 'string')
-        .map(clamp)
+        .map(truncateStoryline)
         .filter((a) => a.length > 0)
         .slice(0, 2)
     : [];
@@ -192,9 +244,12 @@ export const STORY_PROPOSAL_SYSTEM_PROMPT =
   "You are a warm picture-book story consultant for a children's book studio. A parent gives you their own little story idea and the cast of characters. Their idea may be a child's spoken ramble: half-finished, out of order, more feeling than plot. Find the story inside it (the characters' goal and the fun bits) and keep the parent's own words wherever they sparkle. You grow it into ONE inviting storyline the parent will instantly recognize as their idea, never replacing it, only shaping it into a clear beginning, middle, and end a small child would love. You stay grounded in what the parent said and keep every character they named.";
 
 /**
- * Build the propose user prompt. Requiring the storyline to NAME the star's
- * goal is deliberate: it seeds the agency arc Track S leans on (a doer with one
- * clear goal), so the wizard proposal and the final story pull the same way.
+ * Build the propose user prompt. The star's want must surface NATURALLY in the
+ * story's action. The old labelling instruction leaked into the surface text
+ * ("Rosie's goal is to find..."), so the prompt now forbids the word "goal" and
+ * asks for the want to be shown, not named. It still seeds the agency arc Track
+ * S leans on (a doer pulling toward one clear want). The ~240-char aim, under
+ * the 280 hard bound, keeps every take off the cap so it rarely needs clipping.
  */
 export function buildStoryProposalPrompt(input: StoryProposalInput): string {
   const castLines = input.cast
@@ -210,8 +265,8 @@ The cast for this ${input.pageLength}-page picture book:
 ${castLines}
 
 Shape their idea into a storyline:
-- "storyline": ONE short paragraph (at most ${STORYLINE_MAX} characters) that keeps the parent's idea and every named character, and NAMES what the star is trying to do (their goal), with a clear beginning, a middle, and an ending that pays off the idea a small child would enjoy. Recognizably THEIR story, grown, not a new one.
-- "alternates": exactly TWO other short takes on the SAME idea and cast (each at most ${STORYLINE_MAX} characters), each a genuinely different direction.
+- "storyline": ONE short paragraph (aim for about 240 characters, at most ${STORYLINE_MAX} characters) that keeps the parent's idea and every named character. Let what the star wants ripple through the story's action so a reader feels it without being told; never label it or use the word "goal". Give it a clear beginning, a middle, and an ending that pays off the idea a small child would enjoy. Recognizably THEIR story, grown, not a new one.
+- "alternates": exactly TWO other short takes on the SAME idea and cast (each aiming for about 240 characters, at most ${STORYLINE_MAX} characters), each a genuinely different direction.
 
 ${langNote}`;
 }

@@ -7,6 +7,7 @@ import {
   prevStep,
   storyProposalSignature,
   sanitizeStoryProposal,
+  truncateStoryline,
   finalPremiseFor,
   nextIdeaIndex,
   STORYLINE_MAX,
@@ -151,6 +152,66 @@ describe('sanitizeStoryProposal (D3 post-parse bounds)', () => {
   });
 });
 
+describe('truncateStoryline (smart truncation, X13 V polish)', () => {
+  it('leaves input at or under the cap untouched', () => {
+    const short = 'Maya and Rex find the lost kite behind the shed and fly it high.';
+    expect(truncateStoryline(short)).toBe(short);
+    const exact = 'a'.repeat(STORYLINE_MAX);
+    expect(truncateStoryline(exact)).toBe(exact);
+    expect(truncateStoryline(exact).length).toBe(STORYLINE_MAX);
+  });
+
+  it('backs a mid-sentence overflow up to the last sentence boundary (no clip)', () => {
+    const sentence1 =
+      'Rosie the brave little puppy searches every corner of the sunny garden for her lost red ball, sniffing under the bushes and behind the old shed until she finally digs it free with a happy bark.';
+    const sentence2 =
+      ' Then Rosie carries the ball home to show her best friend Biscuit, who has waited by the door all afternoon with a hopeful, thumping wag.';
+    const input = sentence1 + sentence2;
+    // guards: this really overflows and the first sentence sits past the floor
+    expect(input.length).toBeGreaterThan(STORYLINE_MAX);
+    expect(sentence1.length).toBeGreaterThan(140);
+    expect(sentence1.length).toBeLessThan(STORYLINE_MAX);
+    const out = truncateStoryline(input);
+    expect(out).toBe(sentence1); // ends exactly on the first sentence's period
+    expect(out.endsWith('.')).toBe(true);
+    expect(out.length).toBeLessThanOrEqual(STORYLINE_MAX);
+  });
+
+  it('falls back to the last word boundary + ellipsis when no sentence end exists', () => {
+    const input = 'tiny '.repeat(70); // 350 chars, spaces but no terminators
+    const out = truncateStoryline(input);
+    expect(out.endsWith('…')).toBe(true);
+    expect(out.length).toBeLessThanOrEqual(STORYLINE_MAX);
+    expect(out.length).toBeLessThan(input.length);
+    const body = out.slice(0, -1);
+    expect(body).toBe(body.trimEnd()); // no dangling space before the ellipsis
+    expect(input.startsWith(body)).toBe(true); // a clean prefix
+    expect(input[body.length]).toBe(' '); // cut fell on a whole-word boundary
+  });
+
+  it('ignores a sentence terminator that sits before the floor (would be a stub)', () => {
+    const input = 'Go. ' + Array(60).fill('adventure').join(' ');
+    const out = truncateStoryline(input);
+    expect(out).not.toBe('Go.'); // did NOT cut at the too-early period
+    expect(out.endsWith('…')).toBe(true);
+    expect(out.length).toBeLessThanOrEqual(STORYLINE_MAX);
+  });
+
+  it('respects Japanese sentence enders (。) past the floor', () => {
+    const s1 = 'ゆ'.repeat(150) + '。'; // 151 chars, 。 clears the 140 floor
+    const s2 = 'め'.repeat(150) + '。'; // second sentence tips the total past 280
+    const input = s1 + s2;
+    expect(input.length).toBeGreaterThan(STORYLINE_MAX);
+    const out = truncateStoryline(input);
+    expect(out).toBe(s1);
+    expect(out.endsWith('。')).toBe(true);
+  });
+
+  it('hard-slices a spaceless token with no terminator (pathological floor)', () => {
+    expect(truncateStoryline('x'.repeat(400))).toBe('x'.repeat(STORYLINE_MAX));
+  });
+});
+
 describe('nextIdeaIndex (pool-only "More ideas")', () => {
   it('advances through the pool and wraps at the end', () => {
     expect(nextIdeaIndex(3, 0)).toBe(1);
@@ -195,9 +256,16 @@ describe('buildStoryProposalPrompt (goal + cast pins)', () => {
     language: 'en',
   };
 
-  it('requires the storyline to name the star’s goal', () => {
+  it("asks the star's want to surface naturally, never as a labelled 'goal'", () => {
     const out = buildStoryProposalPrompt(input);
-    expect(out).toContain('NAMES what the star is trying to do (their goal)');
+    expect(out).toContain('what the star wants');
+    expect(out).toContain('never label it or use the word "goal"');
+  });
+
+  it('nudges toward ~240 characters while keeping the 280 hard bound', () => {
+    const out = buildStoryProposalPrompt(input);
+    expect(out).toContain('about 240 characters');
+    expect(out).toContain(`at most ${STORYLINE_MAX} characters`);
   });
 
   it('quotes the premise and lists the cast with the star marked', () => {
