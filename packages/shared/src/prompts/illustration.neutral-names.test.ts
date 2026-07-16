@@ -235,6 +235,21 @@ describe('createIllustrationPrompt — neutralizeCharacterNames (avatar interior
     expect(neutral).not.toContain('Character 1to'); // "Kaito" must never be chewed by "Kai"
   });
 
+  it('tokenizes cast names inside the L1 focus directive (plan-mandated pin)', () => {
+    // scene.focus names cast members verbatim ("Kai reaching past Grypho") —
+    // the whole scene section rides through neutralize(), so the directive
+    // must emit Character-N tokens, never a display-name prior.
+    const withFocus = createIllustrationPrompt({
+      ...baseOpts,
+      neutralizeCharacterNames: true,
+      bridgeScene: { ...scene, mood: 'hushed wonder', focus: 'Kai reaching past Grypho' },
+    });
+    expect(withFocus).toContain('Center the composition on Character 1 reaching past Character 3.');
+    expect(withFocus).toContain('The mood of this moment: hushed wonder.');
+    expect(withFocus).not.toContain('Center the composition on Kai');
+    expect(withFocus).not.toContain('Grypho');
+  });
+
   it('tokenizes identity headers and style-rendering descriptions', () => {
     expect(neutral).toContain('- Character 1 (main_child):');
     expect(neutral).toContain('Center Character 1 in the vignette.');

@@ -181,10 +181,10 @@ export interface QcClassFlagFeed {
   cast: Array<{ name: string; species: string }>;
   /** Holder-annotated props fed (empty = prop-holder was a no-op). */
   props: string[];
-  /** X13 Track L: stated mood fed (null/blank = moodMismatch was a no-op). */
-  mood?: string | null;
-  /** X13 Track L: composition focus fed (sharpens focalActionMismatch). */
-  focus?: string | null;
+  /** X13 Track L: stated mood fed (null = moodMismatch was a no-op). */
+  mood: string | null;
+  /** X13 Track L: composition focus fed (null = none; sharpens focalActionMismatch). */
+  focus: string | null;
 }
 
 /** One searchable per-page telemetry record carrying every class flag. */
