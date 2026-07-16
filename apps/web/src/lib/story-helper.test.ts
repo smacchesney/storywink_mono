@@ -12,6 +12,10 @@ import {
   STORYLINE_MAX,
   STORY_PROPOSAL_SYSTEM_PROMPT,
   buildStoryProposalPrompt,
+  buildStoryProposalEventProps,
+  STORY_PROPOSAL_REASONING_EFFORT,
+  STORY_PROPOSAL_MAX_OUTPUT_TOKENS,
+  STORY_PROPOSAL_RESPONSE_SCHEMA,
   type StoryProposalInput,
 } from './story-helper';
 
@@ -252,5 +256,57 @@ describe('finalPremiseFor (X11 accept→preset guard)', () => {
     expect(finalPremiseFor(true, 'freshly re-authored', 'my custom spark')).toBe(
       'freshly re-authored',
     );
+  });
+});
+
+describe('propose call latency knobs (X13 V)', () => {
+  it('pins the reasoning effort to the lowest tier gpt-5-mini supports', () => {
+    // Default effort burned most of the ~21s p50 that overran the 6s client
+    // abort. If this ever changes, the latency budget changes with it.
+    expect(STORY_PROPOSAL_REASONING_EFFORT).toBe('minimal');
+  });
+
+  it('caps output well above the ~900-char JSON response with headroom', () => {
+    expect(STORY_PROPOSAL_MAX_OUTPUT_TOKENS).toBe(2000);
+    expect(STORY_PROPOSAL_MAX_OUTPUT_TOKENS).toBeGreaterThan(1000);
+  });
+});
+
+describe('STORY_PROPOSAL_RESPONSE_SCHEMA (strict-mode shape pins)', () => {
+  it('is a closed object requiring storyline + alternates', () => {
+    expect(STORY_PROPOSAL_RESPONSE_SCHEMA.type).toBe('object');
+    expect(STORY_PROPOSAL_RESPONSE_SCHEMA.additionalProperties).toBe(false);
+    expect(STORY_PROPOSAL_RESPONSE_SCHEMA.required).toEqual(['storyline', 'alternates']);
+  });
+
+  it('carries no min/max keywords (strict mode rejects them; bounds live in sanitize)', () => {
+    const json = JSON.stringify(STORY_PROPOSAL_RESPONSE_SCHEMA);
+    expect(json).not.toMatch(/minItems|maxItems|minLength|maxLength|minimum|maximum/);
+  });
+});
+
+describe('buildStoryProposalEventProps (durationMs telemetry, X13 V)', () => {
+  const input: StoryProposalInput = {
+    cast: [{ name: 'Maya', kind: 'CHILD', isStar: true }],
+    premise: 'a puddle rescue',
+    pageLength: 12,
+    language: 'en',
+  };
+  const proposal = { storyline: 'Maya saves a puddle', alternates: ['one', 'two'] };
+
+  it('threads a numeric durationMs onto the props', () => {
+    const props = buildStoryProposalEventProps({ input, proposal, durationMs: 1234 });
+    expect(props.durationMs).toBe(1234);
+    expect(typeof props.durationMs).toBe('number');
+  });
+
+  it('carries the request and sanitized result through unchanged', () => {
+    const props = buildStoryProposalEventProps({ input, proposal, durationMs: 0 });
+    expect(props.cast).toEqual(input.cast);
+    expect(props.premise).toBe('a puddle rescue');
+    expect(props.pageLength).toBe(12);
+    expect(props.language).toBe('en');
+    expect(props.storyline).toBe('Maya saves a puddle');
+    expect(props.alternates).toEqual(['one', 'two']);
   });
 });

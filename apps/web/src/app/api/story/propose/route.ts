@@ -11,6 +11,10 @@ import {
   sanitizeStoryProposal,
   STORY_PROPOSAL_SYSTEM_PROMPT,
   buildStoryProposalPrompt,
+  buildStoryProposalEventProps,
+  STORY_PROPOSAL_REASONING_EFFORT,
+  STORY_PROPOSAL_MAX_OUTPUT_TOKENS,
+  STORY_PROPOSAL_RESPONSE_SCHEMA,
 } from '@/lib/story-helper';
 
 // Perception tier — the same gpt-5-mini the detect route runs on.
@@ -42,19 +46,6 @@ const proposeRequestSchema = z.object({
     ),
   language: z.enum(['en', 'ja']).default('en'),
 });
-
-// Strict json_schema: NO min/max keywords (strict mode rejects them). Plain
-// strings and an unbounded string array, every property required,
-// additionalProperties false. Every bound lives in sanitizeStoryProposal.
-const STORY_PROPOSAL_RESPONSE_SCHEMA = {
-  type: 'object',
-  properties: {
-    storyline: { type: 'string' },
-    alternates: { type: 'array', items: { type: 'string' } },
-  },
-  required: ['storyline', 'alternates'],
-  additionalProperties: false,
-} as const;
 
 /**
  * D3: proposal-only story helper. One gpt-5-mini call turns the parent's raw
@@ -89,8 +80,16 @@ export async function POST(request: NextRequest) {
     const input = parsed.data;
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    // Time the OpenAI call in isolation — the durationMs on the telemetry row is
+    // the number the latency runbook re-measures against the 6s client abort.
+    const startedAt = Date.now();
     const response = await openai.responses.create({
       model: ANALYSIS_MODEL,
+      // The task is tiny (a short storyline + two alternates), so run the model
+      // at its lowest reasoning tier and cap the output — default effort burned
+      // most of the latency that pushed prod p50 past the client abort.
+      reasoning: { effort: STORY_PROPOSAL_REASONING_EFFORT },
+      max_output_tokens: STORY_PROPOSAL_MAX_OUTPUT_TOKENS,
       input: [
         { role: 'system', content: [{ type: 'input_text', text: STORY_PROPOSAL_SYSTEM_PROMPT }] },
         { role: 'user', content: [{ type: 'input_text', text: buildStoryProposalPrompt(input) }] },
@@ -104,6 +103,7 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+    const durationMs = Date.now() - startedAt;
 
     // Model output is untrusted — every bound is enforced here, not in the schema.
     const proposal = sanitizeStoryProposal(JSON.parse(response.output_text));
@@ -119,14 +119,7 @@ export async function POST(request: NextRequest) {
         data: {
           name: STORY_PROPOSAL_EVENT,
           userId: dbUser.id,
-          props: {
-            cast: input.cast,
-            premise: input.premise,
-            pageLength: input.pageLength,
-            language: input.language,
-            storyline: proposal.storyline,
-            alternates: proposal.alternates,
-          },
+          props: buildStoryProposalEventProps({ input, proposal, durationMs }),
         },
       })
       .catch((error) =>

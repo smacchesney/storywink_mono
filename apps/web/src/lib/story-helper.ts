@@ -107,6 +107,41 @@ export function nextIdeaIndex(poolLength: number, index: number): number {
 export const STORYLINE_MAX = 280;
 
 /**
+ * D3 latency (X13 V): reasoning effort for the propose call. The task is tiny —
+ * a <=280-char storyline plus two alternates — so the model needs no deep chain
+ * of thought. `minimal` is the lowest tier gpt-5-mini supports and cuts the
+ * reasoning tokens that pushed prod p50 to ~21s (past the client's 6s abort).
+ * Typed as a literal so the route binds it to the OpenAI SDK's ReasoningEffort
+ * at the call site — a bad value fails type-check there, not at runtime.
+ */
+export const STORY_PROPOSAL_REASONING_EFFORT = 'minimal' as const;
+
+/**
+ * D3 latency (X13 V): output cap for the propose call. The response is ~900
+ * chars of JSON (storyline + two alternates); 2000 tokens leaves generous
+ * headroom while bounding a runaway generation.
+ */
+export const STORY_PROPOSAL_MAX_OUTPUT_TOKENS = 2000;
+
+/**
+ * Strict json_schema for the propose call: NO min/max keywords (strict mode
+ * rejects them). Plain strings and an unbounded string array, every property
+ * required, additionalProperties false. Every bound lives in
+ * sanitizeStoryProposal — this only pins the shape. Kept here with the other
+ * pure propose helpers so route.ts stays handlers-only and the schema is
+ * pinnable without hitting OpenAI.
+ */
+export const STORY_PROPOSAL_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    storyline: { type: 'string' },
+    alternates: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['storyline', 'alternates'],
+  additionalProperties: false,
+} as const;
+
+/**
  * D3: enforce every bound the OpenAI strict json_schema cannot express (strict
  * mode rejects minItems/maxItems/minLength/maxLength). The model returns plain
  * strings and an unbounded string array; this clamps the storyline to 280
@@ -127,12 +162,16 @@ export function sanitizeStoryProposal(raw: unknown): StoryProposal {
   return { storyline, alternates };
 }
 
-/** The shape of one cast member the propose prompt names. */
-export interface StoryProposalCastMember {
+/**
+ * The shape of one cast member the propose prompt names. A `type` alias (not an
+ * interface) so an array of these stays assignable to Prisma's Json input type
+ * when the props builder spreads the cast onto the telemetry row.
+ */
+export type StoryProposalCastMember = {
   name: string;
   kind: CastKind;
   isStar: boolean;
-}
+};
 
 /** Everything the propose prompt needs — mirrors the route's request schema. */
 export interface StoryProposalInput {
@@ -175,4 +214,46 @@ Shape their idea into a storyline:
 - "alternates": exactly TWO other short takes on the SAME idea and cast (each at most ${STORYLINE_MAX} characters), each a genuinely different direction.
 
 ${langNote}`;
+}
+
+/**
+ * The tuning row the route writes after a successful propose call. A `type`
+ * alias (not an interface) so it stays assignable to Prisma's Json input type,
+ * which needs a closed, index-signature-compatible shape.
+ */
+export type StoryProposalEventProps = {
+  cast: StoryProposalCastMember[];
+  premise: string;
+  pageLength: number;
+  language: 'en' | 'ja';
+  storyline: string;
+  alternates: string[];
+  /**
+   * X13 V: wall-clock latency of the OpenAI call in milliseconds. Additive to
+   * the JSON props (no schema change) so the latency runbook can read propose
+   * durations straight off the AppEvent rows instead of Railway logs.
+   */
+  durationMs: number;
+};
+
+/**
+ * Build the `story_proposal` AppEvent props (request + sanitized result +
+ * server-timed durationMs). Pure so the durationMs field is pinnable without a
+ * route harness — the route only supplies the measured elapsed time.
+ */
+export function buildStoryProposalEventProps(args: {
+  input: StoryProposalInput;
+  proposal: StoryProposal;
+  durationMs: number;
+}): StoryProposalEventProps {
+  const { input, proposal, durationMs } = args;
+  return {
+    cast: input.cast,
+    premise: input.premise,
+    pageLength: input.pageLength,
+    language: input.language,
+    storyline: proposal.storyline,
+    alternates: proposal.alternates,
+    durationMs,
+  };
 }
