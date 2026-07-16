@@ -294,6 +294,40 @@ export interface CharacterDescription {
 }
 
 /**
+ * Per-page defect-class flags (X12-C rubric v2). Each flag is judged against
+ * the per-page context (expected cast + story text) and the reference sheets.
+ * Convention: `true` ALWAYS means "the defect IS present". The two nullable
+ * flags carry `null` for the no-op case (nothing to judge), so a class that
+ * cannot be evaluated on a page is distinguishable from one judged clean.
+ *
+ * The blocking-vs-telemetry split lives in `QC_BLOCKING_CLASSES`
+ * (`prompts/quality-check`), NOT here — the shape is stable while the gating
+ * posture evolves.
+ */
+export interface QcClassFlags {
+  /** BLOCKING: any rendered lettering at all, sound/onomatopoeia words included. */
+  renderedText: boolean;
+  /** BLOCKING: the SAME character drawn more than once in one image. */
+  intraImageDuplicate: boolean;
+  /** Telemetry: a character in the page's expected cast is absent from the art. */
+  missingExpectedCast: boolean;
+  /** Telemetry: a named character rendered as the wrong kind of creature (griffin-class). */
+  speciesMismatch: boolean;
+  /** Telemetry: one figure fusing two cast members, or a cast member fused with a non-cast creature. */
+  characterHybrid: boolean;
+  /**
+   * Telemetry: a held prop drawn with the wrong holder. `null` when the page's
+   * props carry no holder phrasing to judge (the no-op case).
+   */
+  propHolderMismatch: boolean | null;
+  /**
+   * Telemetry (B4): the art does NOT depict the page text's who-does-what.
+   * `null` when the page has no story text to judge against.
+   */
+  focalActionMismatch: boolean | null;
+}
+
+/**
  * QC result for a single page illustration
  */
 export interface PageQCResult {
@@ -305,6 +339,12 @@ export interface PageQCResult {
   styleConsistencyScore: number;
   overallScore: number;
   suggestedPromptAdditions: string | null;
+  /**
+   * Per-page defect-class flags (rubric v2). Sentinel (qc_error) rows carry the
+   * all-clean/null default (`emptyQcClassFlags()`) — an unscored page, not a
+   * clean verdict.
+   */
+  classFlags: QcClassFlags;
 }
 
 /**

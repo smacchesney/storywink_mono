@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { createQCPrompt, QC_RESPONSE_SCHEMA } from './quality-check.js';
+import {
+  createQCPrompt,
+  QC_RESPONSE_SCHEMA,
+  QC_CLASSES,
+  QC_BLOCKING_CLASSES,
+  emptyQcClassFlags,
+  type QcPageContext,
+} from './quality-check.js';
 
 describe('createQCPrompt (baseline, no sheets or cover)', () => {
   const prompt = createQCPrompt(null, 8);
@@ -60,6 +67,122 @@ describe('createQCPrompt cover rubric variant', () => {
   });
 });
 
+describe('createQCPrompt cover-only framing (pageCount 0)', () => {
+  const prompt = createQCPrompt(null, 0, 'en', {
+    sheetCount: 1,
+    cover: { expectedTitle: 'Coral' },
+  });
+
+  it('drops the interior page-ordinal framing entirely', () => {
+    // The Task-1 defect: "these 0 children's book illustrations … page 1 through page 0".
+    expect(prompt).not.toContain('these 0');
+    expect(prompt).not.toContain('page 1 through page 0');
+    expect(prompt).not.toContain('"PAGE n"');
+  });
+
+  it('gives the cover its own opening and routes to an empty pageResults', () => {
+    expect(prompt).toContain('Evaluate this book cover illustration');
+    expect(prompt).toContain('empty "pageResults" array');
+  });
+
+  it('still carries the cover rubric variant', () => {
+    expect(prompt).toContain('labeled "COVER"');
+    expect(prompt).toContain(`EXACTLY "Coral"`);
+  });
+});
+
+describe('createQCPrompt rendered-text tightening (rubric v2)', () => {
+  const prompt = createQCPrompt(null, 8, 'en', {});
+
+  it('drops the onomatopoeia grandfather clause', () => {
+    expect(prompt).not.toContain('Intentional onomatopoeia');
+    expect(prompt).not.toContain('onomatopoeia sound effects are allowed');
+    expect(prompt).not.toContain('correctly spelled');
+  });
+
+  it('forbids ANY lettering, sound words included', () => {
+    expect(prompt).toContain('NO lettering of ANY kind');
+    expect(prompt).toContain('NO exception for sound words');
+    expect(prompt).toContain('classFlags.renderedText=true');
+    expect(prompt).toContain('cap OVERALL QUALITY at 4');
+  });
+
+  it('keeps the anatomy cap', () => {
+    expect(prompt).toContain('ANATOMY');
+    expect(prompt).toContain('cap OVERALL QUALITY at 5');
+  });
+});
+
+describe('createQCPrompt per-page defect-class rubric (items 3-8)', () => {
+  const prompt = createQCPrompt(null, 8, 'en', {});
+
+  it('names every classFlags dimension', () => {
+    for (const cls of QC_CLASSES) {
+      expect(prompt).toContain(cls);
+    }
+  });
+
+  it('describes exact-cast presence and species/kind match with the griffin case', () => {
+    expect(prompt).toContain('missingExpectedCast');
+    expect(prompt).toContain('speciesMismatch');
+    expect(prompt).toContain('griffin');
+    expect(prompt).toContain('judge the KIND against the Expected cast species');
+  });
+
+  it('describes the whole-creature hybrid case as broader than the anatomy cap', () => {
+    expect(prompt).toContain('characterHybrid');
+    expect(prompt).toContain('WHOLE-creature case');
+  });
+
+  it('makes prop-holder and focal-action null-when-nothing-to-judge', () => {
+    expect(prompt).toContain('propHolderMismatch');
+    expect(prompt).toContain('focalActionMismatch');
+    expect(prompt).toContain('Set null when no Held props line assigns a holder');
+    expect(prompt).toContain('Set null when the page has no Story text');
+  });
+});
+
+describe('createQCPrompt per-page context feed', () => {
+  const pageContext: QcPageContext[] = [
+    {
+      ordinal: 1,
+      text: 'Kai splashed into the puddle with a grin.',
+      cast: [
+        { name: 'Kai', species: 'a young boy' },
+        { name: 'Grypho', species: 'a green toy crocodile' },
+      ],
+      props: ['lantern held by Kai'],
+    },
+    { ordinal: 2, text: null, cast: [{ name: 'Kai', species: 'a young boy' }] },
+  ];
+  const prompt = createQCPrompt(null, 2, 'en', { sheetCount: 1, pageContext });
+
+  it('feeds each page its expected cast (real names + species phrases)', () => {
+    expect(prompt).toContain('PER-PAGE CONTEXT FEED');
+    expect(prompt).toContain('Kai (a young boy)');
+    expect(prompt).toContain('Grypho (a green toy crocodile)');
+  });
+
+  it('feeds each page its story text and marks empty text', () => {
+    expect(prompt).toContain('Kai splashed into the puddle with a grin.');
+    expect(prompt).toContain('(no story text on this page)');
+  });
+
+  it('feeds holder-annotated props when present', () => {
+    expect(prompt).toContain('Held props: lantern held by Kai.');
+  });
+
+  it('states the real-names-are-intentional rationale in the feed header', () => {
+    expect(prompt).toContain('REAL character names');
+    expect(prompt).toContain("judge each named character's APPEARANCE");
+  });
+
+  it('omits the context feed section entirely when no page context is supplied', () => {
+    const bare = createQCPrompt(null, 2, 'en', { sheetCount: 1 });
+    expect(bare).not.toContain('PER-PAGE CONTEXT FEED');
+  });
+});
+
 describe('QC_RESPONSE_SCHEMA coverResult extension', () => {
   it('keeps strict-mode invariants (all properties required, no additionals)', () => {
     expect(QC_RESPONSE_SCHEMA.required).toContain('coverResult');
@@ -74,6 +197,60 @@ describe('QC_RESPONSE_SCHEMA coverResult extension', () => {
     expect(QC_RESPONSE_SCHEMA.properties.coverResult.properties.titleMatches).toEqual({
       type: 'boolean',
     });
+  });
+});
+
+describe('QC_RESPONSE_SCHEMA classFlags extension (strict-mode-safe)', () => {
+  const item = QC_RESPONSE_SCHEMA.properties.pageResults.items;
+  const classFlags = item.properties.classFlags;
+
+  it('requires classFlags on every page result', () => {
+    expect(item.required).toContain('classFlags');
+    expect(item.additionalProperties).toBe(false);
+  });
+
+  it('lists exactly the QC_CLASSES keys, all required', () => {
+    expect(Object.keys(classFlags.properties)).toEqual([...QC_CLASSES]);
+    expect(classFlags.required).toEqual(Object.keys(classFlags.properties));
+    expect(classFlags.additionalProperties).toBe(false);
+  });
+
+  it('models the two no-op classes as nullable booleans', () => {
+    expect(classFlags.properties.propHolderMismatch).toEqual({ type: ['boolean', 'null'] });
+    expect(classFlags.properties.focalActionMismatch).toEqual({ type: ['boolean', 'null'] });
+  });
+
+  it('models the blocking classes as plain booleans', () => {
+    expect(classFlags.properties.renderedText).toEqual({ type: 'boolean' });
+    expect(classFlags.properties.intraImageDuplicate).toEqual({ type: 'boolean' });
+  });
+});
+
+describe('QC class taxonomy + gating constants', () => {
+  it('the blocking set is a subset of the full taxonomy', () => {
+    for (const cls of QC_BLOCKING_CLASSES) {
+      expect(QC_CLASSES).toContain(cls);
+    }
+  });
+
+  it('day-one blocking is exactly rendered-text + intra-image-duplicate', () => {
+    expect([...QC_BLOCKING_CLASSES]).toEqual(['renderedText', 'intraImageDuplicate']);
+  });
+
+  it('emptyQcClassFlags is the all-clean / null default (an unjudged page)', () => {
+    expect(emptyQcClassFlags()).toEqual({
+      renderedText: false,
+      intraImageDuplicate: false,
+      missingExpectedCast: false,
+      speciesMismatch: false,
+      characterHybrid: false,
+      propHolderMismatch: null,
+      focalActionMismatch: null,
+    });
+  });
+
+  it('emptyQcClassFlags covers every taxonomy key', () => {
+    expect(Object.keys(emptyQcClassFlags()).sort()).toEqual([...QC_CLASSES].sort());
   });
 });
 

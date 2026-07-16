@@ -35,6 +35,10 @@ export default defineConfig({
         find: '@storywink/shared/prompts/character-identity',
         replacement: sharedSrc('prompts/character-identity.ts'),
       },
+      {
+        find: '@storywink/shared/prompts/quality-check',
+        replacement: sharedSrc('prompts/quality-check.ts'),
+      },
       { find: '@storywink/shared/prompts', replacement: sharedSrc('prompts/index.ts') },
       { find: '@storywink/shared', replacement: sharedSrc('index.ts') },
     ],

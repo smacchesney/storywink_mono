@@ -5,10 +5,80 @@
  * Produces specific, actionable per-page feedback that feeds back into re-generation prompts.
  */
 
-import type { CharacterIdentity } from '../types.js';
+import type { CharacterIdentity, QcClassFlags } from '../types.js';
 
 export const QC_SYSTEM_PROMPT =
   "You are a quality assurance specialist for children's picture books. Your task is to evaluate generated illustrations for consistency, quality, and adherence to character identity across all pages of a book.";
+
+/**
+ * The rubric-v2 defect classes the judge scores per page (`classFlags`). These
+ * keys are the single source of truth shared by the response schema, the
+ * `QcClassFlags` type, and the worker's gating — a class named here must exist
+ * in all three.
+ */
+export const QC_CLASSES = [
+  'renderedText',
+  'intraImageDuplicate',
+  'missingExpectedCast',
+  'speciesMismatch',
+  'characterHybrid',
+  'propHolderMismatch',
+  'focalActionMismatch',
+] as const;
+export type QcClass = (typeof QC_CLASSES)[number];
+
+/**
+ * GATING POSTURE (X12-C C4). The declared BLOCKING set: a page carrying any of
+ * these flags is re-queued for re-illustration (bounded by MAX_QC_ROUNDS).
+ * Everything else in `QC_CLASSES` is TELEMETRY-ONLY for now — logged per page
+ * (`qc_class_flags`), never blocking.
+ *
+ * Owner mandate: ALL classes end up gated; telemetry-first is a stepping stone,
+ * not an end state.
+ *
+ * PROMOTION CRITERION (documented, not implemented here): a telemetry class
+ * promotes into this set once it holds >=90% human-reviewed precision over
+ * >=10 finalized books OR 2 weeks of `qc_class_flags` data, whichever comes
+ * first. The QC ledger owns tracking that precision. Promotion itself is a
+ * one-line change: add the class id to this array. Nothing else in the split
+ * needs to move — the worker derives requeue purely from this constant.
+ */
+export const QC_BLOCKING_CLASSES = ['renderedText', 'intraImageDuplicate'] as const;
+export type QcBlockingClass = (typeof QC_BLOCKING_CLASSES)[number];
+
+/**
+ * The all-clean default for a page that was never scored (a qc_error sentinel)
+ * or whose classFlags the judge omitted. The two nullable classes default to
+ * `null` (no-op / nothing judged), the rest to `false` (defect absent). NEVER
+ * use this to stand in for a real clean verdict — it means "unjudged".
+ */
+export function emptyQcClassFlags(): QcClassFlags {
+  return {
+    renderedText: false,
+    intraImageDuplicate: false,
+    missingExpectedCast: false,
+    speciesMismatch: false,
+    characterHybrid: false,
+    propHolderMismatch: null,
+    focalActionMismatch: null,
+  };
+}
+
+/** One page's context fed to the judge: expected cast, story text, held props. */
+export interface QcPageContext {
+  /** The 1-based "PAGE n" presentation ordinal this context belongs to. */
+  ordinal: number;
+  /** The page's story text (the overlay copy), or null when the page has none. */
+  text: string | null;
+  /** Expected cast — REAL names + species/kind phrases (see the payload comment). */
+  cast: Array<{ name: string; species: string }>;
+  /**
+   * Held props with holder phrasing (e.g. "lantern held by Kai"). Optional and
+   * usually empty today — the prop-holder class is a no-op until Track B
+   * enriches props with holders.
+   */
+  props?: string[];
+}
 
 export interface QCPromptOptions {
   /**
@@ -33,6 +103,13 @@ export interface QCPromptOptions {
    * failure check against the neighboring pages.
    */
   bridgePageOrdinals?: number[];
+  /**
+   * Per-page context (rubric v2): the expected cast, story text, and any
+   * holder-annotated props for each "PAGE n" in this call. Feeds the exact-cast,
+   * species-match, focal-action, and prop-holder classes. Empty/omitted on the
+   * cover-only call and on any book whose worker did not build the feed.
+   */
+  pageContext?: QcPageContext[];
 }
 
 export function createQCPrompt(
@@ -77,18 +154,58 @@ The cover PASSES only if titleMatches is true AND overall score >= 6 AND charact
 - ALSO FAIL the page if it is a near-duplicate of a neighboring page's composition (same pose, same framing, same moment) — a bridge page must depict its own new moment, not restate the neighboring illustration.\n`
       : '';
 
-  return `Evaluate these ${pageCount} children's book illustrations for quality and consistency.
+  // Per-page context feed (rubric v2). The names + species below are the REAL
+  // character names/kinds. The judge legitimately receives them: it scores
+  // APPEARANCE against the reference sheets, so it needs to know which named
+  // character to expect and what kind of creature each is. This does NOT
+  // conflict with name-neutralization — the illustration prompts sent to the
+  // OpenAI renderer are name-neutralized, but that neutralization is a
+  // render-time concern and never reaches this evaluation payload.
+  const pageContext = options.pageContext ?? [];
+  const pageContextSection =
+    pageContext.length > 0
+      ? `\nPER-PAGE CONTEXT FEED — the expected cast and story text for each "PAGE n" image (match by ordinal). The names and species are the REAL character names/kinds, provided so you can judge each named character's APPEARANCE${sheetCount > 0 ? ' against the REFERENCE SHEETS' : ' against the canonical descriptions below'}:
+${pageContext
+  .map((p) => {
+    const cast = p.cast.length
+      ? p.cast.map((c) => `${c.name} (${c.species})`).join(', ')
+      : '(none expected)';
+    const props = p.props && p.props.length ? `\n  Held props: ${p.props.join('; ')}.` : '';
+    const text = p.text && p.text.trim() ? `"${p.text.trim()}"` : '(no story text on this page)';
+    return `PAGE ${p.ordinal} — Expected cast: ${cast}.${props}\n  Story text: ${text}`;
+  })
+  .join('\n')}\n`
+      : '';
 
-The page images are provided in page order (page 1 through page ${pageCount}), and each page image is immediately preceded by a text label "PAGE n". In every result, set "pageNumber" to the n from that image's label — never renumber or reorder.
-${sheetSection}${coverSection}${bridgeSection}
+  // Cover-only calls carry pageCount 0 (only the COVER image). The interior
+  // "these N illustrations … page 1 through page N" framing is nonsense there,
+  // so give the cover its own opening and route the judge to coverResult.
+  const isCoverOnly = pageCount === 0;
+  const framing = isCoverOnly
+    ? `Evaluate this book cover illustration for quality and consistency. This call carries NO interior story-page images — score ONLY the cover in "coverResult" and return an empty "pageResults" array.`
+    : `Evaluate these ${pageCount} children's book illustrations for quality and consistency.
+
+The page images are provided in page order (page 1 through page ${pageCount}), and each page image is immediately preceded by a text label "PAGE n". In every result, set "pageNumber" to the n from that image's label — never renumber or reorder.`;
+
+  return `${framing}
+${sheetSection}${coverSection}${bridgeSection}${pageContextSection}
 ${characterSection}
 
 For each illustration, evaluate:
 1. CHARACTER CONSISTENCY (0-10): Do characters match the descriptions above? Are they recognizable as the same person across pages? Check hair color, skin tone, face shape, proportions.
 2. STYLE CONSISTENCY (0-10): Does the illustration match the established art style? Is the construction method, lighting, and material rendering consistent with other pages?
 3. OVERALL QUALITY (0-10): General illustration quality, composition, absence of artifacts or distortions. Apply these hard caps:
-   - STRAY TEXT: Any unintended text, garbled or half-formed letters, captions, or watermark-like marks caps OVERALL QUALITY at 4. (Intentional onomatopoeia sound effects are allowed — but they must be correctly spelled and in the right script: ${language === 'ja' ? 'Japanese kana (e.g. ざぶーん, わーい) — Latin-alphabet sound effects are a FAILURE' : 'the Latin alphabet (e.g. SPLASH!, WHEE!) — non-Latin scripts are a FAILURE'}.)
+   - RENDERED TEXT: Interior page illustrations must contain NO lettering of ANY kind. Any rendered text — words, captions, labels, signage, watermark-like marks, garbled or half-formed letters, AND sound-effect / onomatopoeia words (${language === 'ja' ? 'e.g. ざぶーん, わーい, SPLASH' : 'e.g. SPLASH!, WHEE!, ざぶーん'}) — is a FAILURE. There is NO exception for sound words or onomatopoeia: the story's words live in a separate text overlay outside the art, so any lettering inside the illustration is a defect. Set classFlags.renderedText=true and cap OVERALL QUALITY at 4.
    - ANATOMY: Clearly visible anatomical errors — wrong number of fingers, extra or missing limbs, fused or melted facial features, impossible joints — cap OVERALL QUALITY at 5.
+
+PER-PAGE DEFECT CLASSES — for EACH interior page, set every field of "classFlags". Judge these against each page's expected cast, story text, and any held props (fed above when present)${sheetCount > 0 ? ', and the REFERENCE SHEETS' : ''}. Convention: true = the defect IS present in that page's art.
+- renderedText (boolean): true if the page contains ANY rendered lettering, sound words included (same as the RENDERED TEXT cap above).
+- intraImageDuplicate (boolean): true if the SAME character is drawn more than once in the one image (e.g. two copies of the same child side by side).
+- missingExpectedCast (boolean): true if a character listed in this page's Expected cast is ABSENT from the art.
+- speciesMismatch (boolean): true if a named character is rendered as the WRONG kind of creature — judge the KIND against the Expected cast species, never the name. Example: a character listed as "a green toy crocodile" drawn as a griffin, dragon, or dog is a speciesMismatch.
+- characterHybrid (boolean): true if ONE figure fuses two cast members' bodies together, OR fuses a cast member with a non-cast creature into a single whole creature. This is the WHOLE-creature case — broader than the ANATOMY cap's fused facial features.
+- propHolderMismatch (boolean or null): only when this page's Held props line names WHO holds a prop, set true if that prop is drawn held by the WRONG character. Set null when no Held props line assigns a holder — there is nothing to judge.
+- focalActionMismatch (boolean or null): compare the art to this page's Story text — set true if the art does NOT depict the text's main who-does-what (the subject performing the described action). Set null when the page has no Story text.
 
 A page PASSES if overall score >= 6.
 A page FAILS if overall score < 6 OR character consistency < 5.
@@ -108,7 +225,7 @@ Focus on these critical attributes (in priority order):
 4. Body proportions (head-to-body ratio)
 5. Clothing accuracy vs reference photo
 6. Art style consistency (construction method, texture, lighting)
-7. Stray/garbled text and anatomical errors (see hard caps above) — when present, name them explicitly in "issues" and in "suggestedPromptAdditions" (e.g. "REMOVE STRAY TEXT: garbled lettering in top-right corner", "HANDS: left hand rendered with six fingers, must be five").`;
+7. Rendered text and anatomical errors (see hard caps above) — when present, name them explicitly in "issues" and in "suggestedPromptAdditions" (e.g. "REMOVE ALL TEXT: sound word 'SPLASH' rendered in the water, no lettering is allowed", "HANDS: left hand rendered with six fingers, must be five").`;
 }
 
 export const QC_RESPONSE_SCHEMA = {
@@ -151,6 +268,31 @@ export const QC_RESPONSE_SCHEMA = {
           overallScore: { type: 'number' },
           issues: { type: 'array', items: { type: 'string' } },
           suggestedPromptAdditions: { type: ['string', 'null'] },
+          // Rubric-v2 defect classes. Every field is required (strict mode);
+          // the two nullable classes carry null for the no-op case. Keys must
+          // stay in lockstep with QC_CLASSES and the QcClassFlags type.
+          classFlags: {
+            type: 'object',
+            properties: {
+              renderedText: { type: 'boolean' },
+              intraImageDuplicate: { type: 'boolean' },
+              missingExpectedCast: { type: 'boolean' },
+              speciesMismatch: { type: 'boolean' },
+              characterHybrid: { type: 'boolean' },
+              propHolderMismatch: { type: ['boolean', 'null'] },
+              focalActionMismatch: { type: ['boolean', 'null'] },
+            },
+            required: [
+              'renderedText',
+              'intraImageDuplicate',
+              'missingExpectedCast',
+              'speciesMismatch',
+              'characterHybrid',
+              'propHolderMismatch',
+              'focalActionMismatch',
+            ],
+            additionalProperties: false,
+          },
         },
         required: [
           'pageNumber',
@@ -160,6 +302,7 @@ export const QC_RESPONSE_SCHEMA = {
           'overallScore',
           'issues',
           'suggestedPromptAdditions',
+          'classFlags',
         ],
         additionalProperties: false,
       },
