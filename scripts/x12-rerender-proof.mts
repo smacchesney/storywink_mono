@@ -98,10 +98,27 @@ const SET = process.env.X12_SET || '';
 // aborts the run with zero generate() calls for that page.
 const STAGE1 = process.argv.includes('--stage1');
 
+// X12-D — `--label <name>` (or `--label=<name>`) overrides the Stage 1 output
+// prefix (default `s1`). Used for the OPENAI_IMAGE_QUALITY A/B: rendering the
+// same Stage 1 pages with `--stage1 --label s1med` writes
+// x12-d-s1med-<slug>.png / prompt dumps s1med-<slug>.txt so a medium-quality
+// re-render sits BESIDE its high (`s1`) sibling instead of overwriting it.
+// Output-only; the DB path stays read-only.
+function parseLabel(args: string[]): string {
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === '--label') return (args[i + 1] || '').trim();
+    const eq = a.match(/^--label=(.+)$/);
+    if (eq) return eq[1].trim();
+  }
+  return '';
+}
+const STAGE1_LABEL = parseLabel(process.argv) || 's1';
+
 const dPng = (slug: string) =>
-  STAGE1 ? `x12-d-s1-${slug}` : SET ? `x12-d-${SET}-${slug}` : pngName(slug);
+  STAGE1 ? `x12-d-${STAGE1_LABEL}-${slug}` : SET ? `x12-d-${SET}-${slug}` : pngName(slug);
 const dPrompt = (slug: string) =>
-  STAGE1 ? `s1-${slug}` : SET ? `x12-d-${SET}-${slug}` : promptName(slug);
+  STAGE1 ? `${STAGE1_LABEL}-${slug}` : SET ? `x12-d-${SET}-${slug}` : promptName(slug);
 const RESULTS_JSON = path.join(SCREENSHOTS, 'x12-d-results.json');
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'warn' });
@@ -144,7 +161,7 @@ async function renderOne(opts: {
 }): Promise<Buffer | null> {
   const illustrator = getIllustrator();
   const rec: RenderRecord = {
-    set: STAGE1 ? 's1' : SET || '(none)',
+    set: STAGE1 ? STAGE1_LABEL : SET || '(none)',
     page: opts.pageLabel,
     provider: illustrator.name,
     model: illustrator.modelId,
