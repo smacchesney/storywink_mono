@@ -43,7 +43,7 @@
 // .mts ESM entry. Read-only use only — findUnique/findMany.
 import prisma from '../apps/workers/src/database/index.js';
 import pino from 'pino';
-import { writeFileSync, mkdirSync } from 'fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'fs';
 import path from 'path';
 import {
   createIllustrationPrompt,
@@ -79,9 +79,149 @@ const LABEL = process.env.X12_LABEL || '';
 const pngName = (slug: string) => (LABEL ? `x12-a-${LABEL}-${slug}` : `x12-a-${slug}`);
 const promptName = (slug: string) => (LABEL ? `${LABEL}-${slug}` : `x12-a-${slug}`);
 
+// X12 Track D — provider-validation set label. When X12_SET is set (e.g.
+// `openai`, `gemini-ga`, `photo-openai`), output PNGs become
+// `x12-d-<set>-<slug>.png` and prompt dumps `x12-d-<set>-<slug>.txt`, and every
+// render is timed into the machine-readable results JSON. Output-only; the DB
+// path stays read-only. Unset preserves the Track A x12-a naming.
+const SET = process.env.X12_SET || '';
+const dPng = (slug: string) => (SET ? `x12-d-${SET}-${slug}` : pngName(slug));
+const dPrompt = (slug: string) => (SET ? `x12-d-${SET}-${slug}` : promptName(slug));
+const RESULTS_JSON = path.join(SCREENSHOTS, 'x12-d-results.json');
+
 const logger = pino({ level: process.env.LOG_LEVEL || 'warn' });
 
 let generateCalls = 0;
+
+// --- D: per-render measurement (latency, outcome, cost inputs) -------------
+type RenderRecord = {
+  set: string;
+  page: string; // pageLabel: 'title' | 'p3' | 'cover' | 'photo-interior' | ...
+  provider: string;
+  model: string;
+  size: string;
+  quality?: string; // OpenAI only
+  concurrency?: number; // batch width when rendered in a --concurrency pool
+  ms: number; // wall-clock of the illustrator.generate() call
+  outcome: 'ok' | 'blocked' | 'error';
+  blockedReason?: string; // content-policy / safety block (moderation)
+  errorStatus?: number; // HTTP status on a thrown error (429 = rate limit)
+  errorMessage?: string;
+  file?: string; // output PNG basename on success
+  timestamp: string;
+};
+const records: RenderRecord[] = [];
+
+/**
+ * Single render with first-class measurement. Times the generate() call,
+ * classifies the outcome (ok / blocked / thrown error), saves the PNG on
+ * success, and pushes one RenderRecord. Thrown errors (429/backoff/5xx) are
+ * CAUGHT and recorded — a concurrent batch keeps going so one page's rate-limit
+ * failure is an observation, not a run abort. Returns the image Buffer on
+ * success (the cover anchor needs it), else null. Spend still flows through the
+ * single counted choke point (countedGenerate).
+ */
+async function renderOne(opts: {
+  pageLabel: string;
+  slug: string;
+  input: IllustrationInput;
+  concurrency?: number;
+}): Promise<Buffer | null> {
+  const illustrator = getIllustrator();
+  const rec: RenderRecord = {
+    set: SET || '(none)',
+    page: opts.pageLabel,
+    provider: illustrator.name,
+    model: illustrator.modelId,
+    size: illustrator.name === 'openai' ? '2048x2048' : '2K',
+    ...(illustrator.name === 'openai'
+      ? { quality: (process.env.OPENAI_IMAGE_QUALITY ?? 'high').toLowerCase() }
+      : {}),
+    ...(opts.concurrency ? { concurrency: opts.concurrency } : {}),
+    ms: 0,
+    outcome: 'error',
+    timestamp: new Date().toISOString(),
+  };
+  const started = performance.now();
+  try {
+    const out = await countedGenerate(opts.pageLabel, opts.input);
+    rec.ms = Math.round(performance.now() - started);
+    if (out.imageBase64) {
+      const name = dPng(opts.slug);
+      savePng(name, out.imageBase64);
+      rec.outcome = 'ok';
+      rec.file = `${name}.png`;
+      console.log(`  OK ${opts.pageLabel}: ${rec.ms} ms`);
+      records.push(rec);
+      flushRecords();
+      return Buffer.from(out.imageBase64, 'base64');
+    }
+    rec.outcome = 'blocked';
+    rec.blockedReason = out.blockedReason;
+    console.log(`  BLOCKED ${opts.pageLabel} (${rec.ms} ms): ${out.blockedReason}`);
+    records.push(rec);
+    flushRecords();
+    return null;
+  } catch (err: any) {
+    rec.ms = Math.round(performance.now() - started);
+    const status = err?.status ?? err?.response?.status;
+    rec.outcome = 'error';
+    if (typeof status === 'number') rec.errorStatus = status;
+    rec.errorMessage = String(err?.message ?? err);
+    console.log(
+      `  ERROR ${opts.pageLabel} (${rec.ms} ms, status=${status ?? '?'}): ${rec.errorMessage}`,
+    );
+    if (status === 429) {
+      const retryAfter =
+        err?.headers?.['retry-after'] ?? err?.response?.headers?.get?.('retry-after');
+      console.log(
+        `  >>> RATE LIMIT (429) observed on ${opts.pageLabel}; retry-after=${retryAfter ?? 'n/a'} <<<`,
+      );
+    }
+    records.push(rec);
+    flushRecords();
+    return null;
+  }
+}
+
+/** Bounded-concurrency pool: run fn over items, at most n in flight. */
+async function runPool<T>(items: T[], n: number, fn: (item: T, i: number) => Promise<void>) {
+  let idx = 0;
+  const width = Math.max(1, Math.min(n, items.length));
+  const lanes = Array.from({ length: width }, async () => {
+    while (idx < items.length) {
+      const i = idx++;
+      await fn(items[i], i);
+    }
+  });
+  await Promise.all(lanes);
+}
+
+// Records already on disk from prior invocations, loaded ONCE. Kept separate
+// from this run's `records` so flushRecords() is idempotent — it always writes
+// base + records (overwrite, never append), so it is safe to call after every
+// render (crash/timeout insurance) without duplicating rows.
+let persistedBase: RenderRecord[] | null = null;
+
+/** Idempotent overwrite of the results JSON (base-on-disk + this run's rows). */
+function flushRecords(verbose = false) {
+  if (records.length === 0) return;
+  mkdirSync(SCREENSHOTS, { recursive: true });
+  if (persistedBase === null) {
+    try {
+      const parsed = JSON.parse(readFileSync(RESULTS_JSON, 'utf8'));
+      persistedBase = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      persistedBase = [];
+    }
+  }
+  const merged = [...persistedBase, ...records];
+  writeFileSync(RESULTS_JSON, JSON.stringify(merged, null, 2));
+  if (verbose)
+    console.log(
+      `  results -> ${RESULTS_JSON} (this run ${records.length}, total ${merged.length})`,
+    );
+}
 
 /** The single choke point for real spend. Counts + logs every provider call. */
 async function countedGenerate(name: string, input: IllustrationInput) {
@@ -267,7 +407,8 @@ async function buildAvatarCover(
   // Cover keeps ALL cast sheets (title page is exempt from present-cast filter).
   const ordered = orderCharacterSheets(sheetStack, starId);
   const allSheetRefs: IllustrationImageInput[] = [];
-  for (const s of ordered) allSheetRefs.push(await fetchImageInput(optimizeCloudinaryUrlForVision(s.url)));
+  for (const s of ordered)
+    allSheetRefs.push(await fetchImageInput(optimizeCloudinaryUrlForVision(s.url)));
 
   // Worker: interiorRenderBuffer is upscaled for print, then downscaled to a
   // reference; for avatar covers it becomes image 1 (contentAnchor 'interior').
@@ -432,7 +573,9 @@ async function prep() {
   }
 
   const ph = await loadPhotoBook();
-  console.log(`\nPhoto book: "${ph.book.title}"  interior=p${ph.interior?.pageNumber}  cover=p${ph.cover?.pageNumber}`);
+  console.log(
+    `\nPhoto book: "${ph.book.title}"  interior=p${ph.interior?.pageNumber}  cover=p${ph.cover?.pageNumber}`,
+  );
   if (ph.interior) savePrompt('x12-a-photo-interior', (await buildPhotoInterior(ph)).prompt);
   if (ph.cover) savePrompt('x12-a-photo-cover', (await buildPhotoCover(ph)).prompt);
 
@@ -442,13 +585,14 @@ async function prep() {
 // ---------------------------------------------------------------------------
 // RENDER mode: only the explicitly listed targets.
 // ---------------------------------------------------------------------------
-async function render(targets: string[]) {
-  console.log(`=== RENDER targets: ${targets.join(', ')} ===`);
+async function render(targets: string[], concurrency: number) {
+  console.log(`=== RENDER targets: ${targets.join(', ')} (concurrency ${concurrency}) ===`);
   const av = await loadAvatarBook();
   const pagesByNum = new Map(av.book.pages.map((p) => [p.pageNumber, p]));
   const titlePage = av.book.pages.find((p) => p.isTitlePage)!;
 
-  // avatar-cover needs the title-interior buffer as its anchor.
+  // avatar-cover needs the title-interior buffer as its anchor. Title + cover
+  // stay strictly sequential (the cover render is anchored on the title render).
   const needTitleInterior =
     targets.includes('avatar-title-interior') || targets.includes('avatar-cover');
   let titleInteriorBuffer: Buffer | null = null;
@@ -456,72 +600,82 @@ async function render(targets: string[]) {
   if (needTitleInterior) {
     console.log(`\n[avatar-title-interior] p${titlePage.pageNumber}`);
     const built = await buildAvatarInterior(av, titlePage);
-    savePrompt(promptName('title-interior'), built.prompt);
-    const out = await countedGenerate('avatar-title-interior', built.input);
-    if (out.imageBase64) {
-      savePng(pngName('title-interior'), out.imageBase64);
-      titleInteriorBuffer = Buffer.from(out.imageBase64, 'base64');
+    savePrompt(dPrompt('title'), built.prompt);
+    titleInteriorBuffer = await renderOne({
+      pageLabel: 'title',
+      slug: 'title',
+      input: built.input,
+    });
+  }
+
+  if (targets.includes('avatar-cover')) {
+    if (!titleInteriorBuffer) {
+      console.log('  avatar-cover skipped: title-interior render did not produce an image');
     } else {
-      console.log(`  BLOCKED: ${out.blockedReason}`);
+      console.log(`\n[avatar-cover]`);
+      const built = await buildAvatarCover(av, titlePage, titleInteriorBuffer);
+      savePrompt(dPrompt('cover'), built.prompt);
+      await renderOne({ pageLabel: 'cover', slug: 'cover', input: built.input });
     }
   }
 
-  for (const t of targets) {
-    if (t === 'avatar-title-interior') continue; // handled above
-    if (t === 'avatar-cover') {
-      if (!titleInteriorBuffer) {
-        console.log('  avatar-cover skipped: title-interior render did not produce an image');
-        continue;
-      }
-      console.log(`\n[avatar-cover]`);
-      const built = await buildAvatarCover(av, titlePage, titleInteriorBuffer);
-      savePrompt(promptName('cover'), built.prompt);
-      const out = await countedGenerate('avatar-cover', built.input);
-      if (out.imageBase64) savePng(pngName('cover'), out.imageBase64);
-      else console.log(`  BLOCKED: ${out.blockedReason}`);
-      continue;
-    }
-    const m = t.match(/^avatar-p(\d+)$/);
-    if (m) {
-      const n = Number(m[1]);
+  // Interior avatar pages — the set that measures per-page latency + rate-limit
+  // behavior. Run N-at-a-time so a --concurrency 3 batch mirrors the prod
+  // ILLUSTRATION_CONCURRENCY and surfaces any 429/backoff.
+  const pageTargets = targets
+    .map((t) => t.match(/^avatar-p(\d+)$/))
+    .filter((m): m is RegExpMatchArray => Boolean(m))
+    .map((m) => Number(m[1]));
+
+  if (pageTargets.length > 0) {
+    console.log(`\n[avatar interiors] pages=${pageTargets.join(',')} concurrency=${concurrency}`);
+    await runPool(pageTargets, concurrency, async (n) => {
       const page = pagesByNum.get(n);
       if (!page) {
         console.log(`  avatar-p${n}: page not found`);
-        continue;
+        return;
       }
-      console.log(`\n[avatar-p${n}]`);
       const built = await buildAvatarInterior(av, page);
-      const slug = TAXO[n] ?? `p${n}`;
-      savePrompt(promptName(slug), built.prompt);
-      const out = await countedGenerate(`avatar-p${n}`, built.input);
-      if (out.imageBase64) savePng(pngName(slug), out.imageBase64);
-      else console.log(`  BLOCKED: ${out.blockedReason}`);
-      continue;
-    }
-    if (t === 'photo-interior' || t === 'photo-cover') continue; // handled below
-    console.log(`  unknown target: ${t}`);
+      const slug = SET ? `p${n}` : (TAXO[n] ?? `p${n}`);
+      savePrompt(dPrompt(slug), built.prompt);
+      await renderOne({
+        pageLabel: `p${n}`,
+        slug,
+        input: built.input,
+        ...(concurrency > 1 ? { concurrency } : {}),
+      });
+    });
   }
+
+  const unknown = targets.filter(
+    (t) =>
+      t !== 'avatar-title-interior' &&
+      t !== 'avatar-cover' &&
+      t !== 'photo-interior' &&
+      t !== 'photo-cover' &&
+      !/^avatar-p\d+$/.test(t),
+  );
+  for (const t of unknown) console.log(`  unknown target: ${t}`);
 
   if (targets.includes('photo-interior') || targets.includes('photo-cover')) {
     const ph = await loadPhotoBook();
     if (targets.includes('photo-interior')) {
       console.log(`\n[photo-interior] p${ph.interior?.pageNumber}`);
       const built = await buildPhotoInterior(ph);
-      savePrompt('x12-a-photo-interior', built.prompt);
-      const out = await countedGenerate('photo-interior', built.input);
-      if (out.imageBase64) savePng('x12-a-photo-interior', out.imageBase64);
-      else console.log(`  BLOCKED: ${out.blockedReason}`);
+      savePrompt(dPrompt('photo-interior'), built.prompt);
+      // D5 refusal check: a moderation block here is the data point, NOT a retry
+      // candidate. renderOne records blockedReason; do not re-invoke.
+      await renderOne({ pageLabel: 'photo-interior', slug: 'photo-interior', input: built.input });
     }
     if (targets.includes('photo-cover')) {
       console.log(`\n[photo-cover] p${ph.cover?.pageNumber}`);
       const built = await buildPhotoCover(ph);
-      savePrompt('x12-a-photo-cover', built.prompt);
-      const out = await countedGenerate('photo-cover', built.input);
-      if (out.imageBase64) savePng('x12-a-photo-cover', out.imageBase64);
-      else console.log(`  BLOCKED: ${out.blockedReason}`);
+      savePrompt(dPrompt('photo-cover'), built.prompt);
+      await renderOne({ pageLabel: 'photo-cover', slug: 'photo-cover', input: built.input });
     }
   }
 
+  flushRecords(true);
   console.log(`\nRENDER done. Total generate() calls this run: ${generateCalls}.`);
 }
 
@@ -539,19 +693,37 @@ const TAXO: Record<number, string> = {
   10: 'p22-trapjaw-trex',
 };
 
+/** Parse `--concurrency N` / `--concurrency=N` (else X12_CONCURRENCY, else 1). */
+function parseConcurrency(args: string[]): number {
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === '--concurrency') return Math.max(1, parseInt(args[i + 1] || '1', 10) || 1);
+    const eq = a.match(/^--concurrency=(\d+)$/);
+    if (eq) return Math.max(1, parseInt(eq[1], 10));
+  }
+  return Math.max(1, parseInt(process.env.X12_CONCURRENCY || '1', 10) || 1);
+}
+
 async function main() {
   const mode = process.argv[2];
   if (mode === 'prep') {
     await prep();
   } else if (mode === 'render') {
-    const targets = (process.argv[3] || '').split(',').map((s) => s.trim()).filter(Boolean);
+    const rest = process.argv.slice(3);
+    // First non-flag arg is the comma-separated target list.
+    const targetArg = rest.find((a) => !a.startsWith('--')) || '';
+    const targets = targetArg
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
     if (targets.length === 0) {
       console.error('render mode needs a comma-separated target list');
       process.exit(1);
     }
-    await render(targets);
+    const concurrency = parseConcurrency(rest);
+    await render(targets, concurrency);
   } else {
-    console.error('Usage: x12-rerender-proof.ts <prep|render <targets>>');
+    console.error('Usage: x12-rerender-proof.ts <prep | render <targets> [--concurrency N]>');
     process.exit(1);
   }
 }
