@@ -8,6 +8,7 @@ import {
 } from '../lib/illustrators/index.js';
 import type { IllustrationInput, IllustrationProvider } from '../lib/illustrators/index.js';
 import { maybeGeminiFallback } from '../lib/illustrators/fallback.js';
+import { shouldNeutralizeNames } from '../lib/illustrators/neutralize.js';
 import type { EscalationJobFields } from '../lib/escalation.js';
 import { v2 as cloudinary } from 'cloudinary';
 import pino from 'pino';
@@ -635,6 +636,13 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       bridgeScene,
       ...(sheetAnchored ? { contentAnchor: 'sheet' as const } : {}),
       ...(sheetRoster ? { sheetRoster } : {}),
+      // Neutralize roster names iff the provider that renders this page is
+      // OpenAI. `illustrator` already reflects the QC escalation override, so
+      // an OpenAI escalation neutralizes and a Gemini escalation does not. The
+      // D5 Gemini content-policy fallback REUSES this prompt verbatim (it never
+      // rebuilds mid-flight); a neutral prompt is valid on Gemini — just not
+      // required — so reuse is correct. No-op on the photo path / when off.
+      neutralizeCharacterNames: shouldNeutralizeNames(illustrator.name),
     };
 
     logger.info(

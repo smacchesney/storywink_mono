@@ -18,6 +18,7 @@ import {
 } from '@storywink/shared/prompts/illustration';
 import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
 import { getIllustrator } from './illustrators/index.js';
+import { shouldNeutralizeNames } from './illustrators/neutralize.js';
 import type { IllustrationImageInput } from './illustrators/index.js';
 import { fetchImageInput } from './images.js';
 import { addLogoToTitlePage, upscaleForPrint } from '../utils/image-processing.js';
@@ -102,6 +103,12 @@ export async function generateAndStoreCover(
 
   const coverRefBuffers = await Promise.all(coverStyleRefUrls.map(fetchImageInput));
 
+  // The cover is always rendered by the default provider. Derive neutral mode
+  // from it BEFORE building the prompt (tokenized cast + verbatim title are
+  // already implemented in shared — this only threads the flag). No-op on the
+  // photo-book cover (contentAnchor 'photo'); applies to avatar covers.
+  const illustrator = getIllustrator();
+
   const coverPromptInput: IllustrationPromptOptions = {
     style: styleKey,
     pageText,
@@ -118,10 +125,10 @@ export async function generateAndStoreCover(
     ...(opts.contentAnchor && opts.contentAnchor !== 'photo'
       ? { contentAnchor: opts.contentAnchor }
       : {}),
+    neutralizeCharacterNames: shouldNeutralizeNames(illustrator.name),
   };
   const coverTextPrompt = createIllustrationPrompt(coverPromptInput);
 
-  const illustrator = getIllustrator();
   const coverResult = await illustrator.generate({
     contentImage,
     characterRefs: [...characterSheetRefs, ...(interiorRenderRef ? [interiorRenderRef] : [])],

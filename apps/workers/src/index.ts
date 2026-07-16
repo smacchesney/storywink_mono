@@ -230,7 +230,12 @@ const illustrationWorker = new Worker(
   {
     connection: redis,
     concurrency: ILLUSTRATION_CONCURRENCY,
-    lockDuration: 300000, // 5 minutes (handles 100s+ API + upload times safely)
+    // 10 minutes. OpenAI renders measured 96-266s, and one job can stack a
+    // content-policy retry (+ the D5 Gemini fallback) plus upscale/upload on
+    // top of that — enough to pass the old 300s lock and let BullMQ hand the
+    // job to a second worker. maxStalledCount: 0 means a lost lock is NOT
+    // re-attempted, so the lock must outlast the worst-case single run.
+    lockDuration: 600000,
     maxStalledCount: 0, // Disable auto-retry on stall (prevents duplicate processing)
   },
 );
