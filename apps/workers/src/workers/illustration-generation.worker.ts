@@ -1,8 +1,13 @@
 import { Job } from 'bullmq';
 import prisma from '../database/index.js';
 import { IllustrationGenerationJobV2 } from '@storywink/shared/types';
-import { getEscalationIllustrator, getIllustrator } from '../lib/illustrators/index.js';
-import type { IllustrationInput } from '../lib/illustrators/index.js';
+import {
+  getEscalationIllustrator,
+  getGeminiFallbackIllustrator,
+  getIllustrator,
+} from '../lib/illustrators/index.js';
+import type { IllustrationInput, IllustrationProvider } from '../lib/illustrators/index.js';
+import { maybeGeminiFallback } from '../lib/illustrators/fallback.js';
 import type { EscalationJobFields } from '../lib/escalation.js';
 import { v2 as cloudinary } from 'cloudinary';
 import pino from 'pino';
@@ -643,6 +648,13 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     let moderationBlocked = false;
     let moderationReasonText: string | null = null;
 
+    // The provider whose render is actually stored — swapped to Gemini only
+    // when the dark content-policy fallback succeeds (attribution stamps below
+    // must reflect who drew the page, not who was asked first).
+    let renderProvider: IllustrationProvider = illustrator;
+    // At most ONE Gemini fallback per page per job run.
+    let geminiFallbackAttempted = false;
+
     const MAX_CONTENT_POLICY_RETRIES = 2;
     for (
       let contentPolicyAttempt = 0;
@@ -716,6 +728,31 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
             },
             'Illustration provider reported content block or no image data.',
           );
+
+          // Dark per-page content-policy fallback
+          // (ILLUSTRATION_OPENAI_FALLBACK_GEMINI): on an OpenAI block, make ONE
+          // Gemini re-attempt on the SAME inputs before the retry/FLAGGED path.
+          // Returns null (no-op) when the flag is off or the provider is not
+          // OpenAI, so default behavior is byte-identical. At most one attempt
+          // per page per job run.
+          if (!geminiFallbackAttempted) {
+            geminiFallbackAttempted = true;
+            const fallback = await maybeGeminiFallback({
+              providerName: illustrator.name,
+              blockedReason: result.blockedReason,
+              input: illustrationInput,
+              env: process.env,
+              makeGemini: getGeminiFallbackIllustrator,
+              logger,
+              logContext: { jobId: job.id, pageId, pageNumber },
+            });
+            if (fallback) {
+              generatedImageBase64 = fallback.imageBase64;
+              renderProvider = fallback.provider;
+              moderationBlocked = false;
+              moderationReasonText = null;
+            }
+          }
         }
       } catch (apiError: any) {
         // Extract detailed error information from illustration provider response
@@ -900,8 +937,10 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
                 generatedImageUrl: finalImageUrl,
                 // Render-time attribution stamps: finalize persists QC
                 // rows from these; it cannot infer provider/model.
-                lastRenderProvider: illustrator.name,
-                lastRenderModel: illustrator.modelId,
+                // renderProvider reflects the Gemini fallback when it drew the
+                // page, otherwise the primary illustrator.
+                lastRenderProvider: renderProvider.name,
+                lastRenderModel: renderProvider.modelId,
                 // sheetRefs is what this render actually conditioned
                 // on (truthful even when a sheet fetch degraded), so
                 // QC ground truth can be derived per render, not from

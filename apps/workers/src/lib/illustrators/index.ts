@@ -61,7 +61,10 @@ export function getEscalationIllustrator(model: string): IllustrationProvider {
 
   const provider =
     providerNameForModel(model) === 'openai'
-      ? new OpenAIProvider({ quality: 'medium' })
+      ? // Pass the resolved gpt- id through so ILLUSTRATION_ESCALATION_MODEL
+        // actually reaches the provider (constructor default would otherwise
+        // silently win). Escalation still runs OpenAI at quality medium.
+        new OpenAIProvider({ quality: 'medium', modelId: model })
       : new GeminiProvider({ modelId: model });
   escalationProviders.set(model, provider);
   logger.info(
@@ -69,4 +72,19 @@ export function getEscalationIllustrator(model: string): IllustrationProvider {
     'Escalation illustration provider created',
   );
   return provider;
+}
+
+let cachedGeminiFallback: IllustrationProvider | null = null;
+
+/**
+ * Gemini provider used ONLY for the dark per-page content-policy fallback
+ * (ILLUSTRATION_OPENAI_FALLBACK_GEMINI). Runs the GA/env Gemini image model
+ * (GEMINI_IMAGE_MODEL / default), independent of the primary-provider cache so
+ * it stays available even when ILLUSTRATION_PROVIDER=openai. Memoized; throws
+ * when GOOGLE_API_KEY is missing — the caller treats that as "no fallback".
+ */
+export function getGeminiFallbackIllustrator(): IllustrationProvider {
+  if (cachedGeminiFallback) return cachedGeminiFallback;
+  cachedGeminiFallback = new GeminiProvider();
+  return cachedGeminiFallback;
 }

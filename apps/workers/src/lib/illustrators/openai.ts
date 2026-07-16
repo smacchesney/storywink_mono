@@ -34,9 +34,15 @@ function isContentPolicyBlock(err: any): boolean {
   );
 }
 
+// Default stays on the launch id. OPENAI_IMAGE_MODEL exists so a newer image
+// model (verified against the live /v1/models endpoint at flip time) is an env
+// flip with instant rollback — the same operational pattern as
+// GEMINI_IMAGE_MODEL and ILLUSTRATION_PROVIDER. Never hardcode an unverified id.
+const DEFAULT_OPENAI_IMAGE_MODEL = 'gpt-image-2';
+
 export class OpenAIProvider implements IllustrationProvider {
   readonly name = 'openai' as const;
-  readonly modelId = 'gpt-image-2';
+  readonly modelId: string;
   private readonly client: OpenAI;
   private readonly quality: QualityLevel;
   private readonly thinking: boolean;
@@ -45,14 +51,19 @@ export class OpenAIProvider implements IllustrationProvider {
    * `quality` override serves the QC escalation ladder (gpt-image-2 at
    * medium for a page's final re-render); without it OPENAI_IMAGE_QUALITY
    * applies as before.
+   *
+   * `modelId` override serves the escalation ladder too (a gpt- escalation id
+   * from ILLUSTRATION_ESCALATION_MODEL); without it OPENAI_IMAGE_MODEL / the
+   * launch default applies.
    */
-  constructor(opts?: { quality?: QualityLevel }) {
+  constructor(opts?: { quality?: QualityLevel; modelId?: string }) {
     if (!process.env.OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY is required when ILLUSTRATION_PROVIDER=openai');
     }
     this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     this.quality = opts?.quality ?? readQuality();
     this.thinking = readThinking();
+    this.modelId = opts?.modelId || process.env.OPENAI_IMAGE_MODEL || DEFAULT_OPENAI_IMAGE_MODEL;
   }
 
   async generate(input: IllustrationInput): Promise<IllustrationOutput> {
