@@ -107,7 +107,7 @@ export function nextIdeaIndex(poolLength: number, index: number): number {
 export const STORYLINE_MAX = 280;
 
 /**
- * D3 latency (X13 V): reasoning effort for the propose call. The task is tiny —
+ * X13-V flip runbook (latency): reasoning effort for the propose call. The task is tiny —
  * a <=280-char storyline plus two alternates — so the model needs no deep chain
  * of thought. `minimal` is the lowest tier gpt-5-mini supports and cuts the
  * reasoning tokens that pushed prod p50 to ~21s (past the client's 6s abort).
@@ -117,7 +117,7 @@ export const STORYLINE_MAX = 280;
 export const STORY_PROPOSAL_REASONING_EFFORT = 'minimal' as const;
 
 /**
- * D3 latency (X13 V): output cap for the propose call. The response is ~900
+ * X13-V flip runbook (latency): output cap for the propose call. The response is ~900
  * chars of JSON (storyline + two alternates); 2000 tokens leaves generous
  * headroom while bounding a runaway generation.
  */
