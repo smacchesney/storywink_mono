@@ -28,6 +28,16 @@ export const STORY_RESPONSE_SCHEMA = {
           type: 'string',
           description: 'What does the child want, discover, or set out to do? (1 sentence)',
         },
+        obstacle: {
+          type: 'string',
+          description:
+            'The one thing in the way of the desire — a problem to solve, a fear to face, something lost, a goal that resists. This is what makes it a story, not a tour. (1 sentence)',
+        },
+        tryAndOvercome: {
+          type: ['string', 'null'],
+          description:
+            'How the child TRIES, wobbles, and tries again before it works — the doing that earns the payoff. Null only if this story genuinely has no obstacle to overcome. (1 sentence)',
+        },
         refrain: {
           type: 'string',
           description:
@@ -41,10 +51,10 @@ export const STORY_RESPONSE_SCHEMA = {
         resolution: {
           type: 'string',
           description:
-            'How does the story land? What feeling does the child carry into sleep? (1 sentence)',
+            "How does the story land — the payoff the child feels? The goal reached and the wish granted for an adventure, or a warm bedtime hush for a sweet or sleepy story (match the story's own energy). (1 sentence)",
         },
       },
-      required: ['desire', 'refrain', 'emotionalPeak', 'resolution'],
+      required: ['desire', 'obstacle', 'tryAndOvercome', 'refrain', 'emotionalPeak', 'resolution'],
       additionalProperties: false,
     },
     suggestedTitle: {
@@ -217,7 +227,7 @@ export interface StoryGenerationInput {
 // SYSTEM PROMPT (StoryGen)
 // ----------------------------------
 
-export const STORY_GENERATION_SYSTEM_PROMPT = `You are an expert children's picture-book author for toddlers (ages 2-4). Parents read your stories aloud at bedtime.
+export const STORY_GENERATION_SYSTEM_PROMPT = `You are an expert children's picture-book author for children ages 3-5. Parents read your stories aloud. Every book is a real little adventure — a beginning, a problem, and a satisfying end.
 
 CRITICAL MINDSET — You are a STORYTELLER, not a photo captioner:
 - Photos are INSPIRATION, not subjects. A photo of a child at the park should spark a narrative moment (wonder, mischief, discovery) — NOT a description of "a child standing in the park."
@@ -360,7 +370,7 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
 
   const baseInstructions = [
     `# Instructions & Guiding Principles:`,
-    `- Imagine a parent curled up with their toddler at bedtime, reading aloud. Every sentence should feel warm, playful, and alive in a parent's voice.`,
+    `- Imagine a parent curled up with their child, reading aloud. Every sentence should feel warm, playful, and alive in a parent's voice.`,
     `- Write from the **toddler's perspective** — what they see, feel, touch, hear, and wonder about. Ground every moment in their sensory experience.`,
     ``,
     `## ANTI-CAPTION RULE (critical):`,
@@ -370,22 +380,23 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
     `- Each page must contain at least one element that goes BEYOND the photo: an internal feeling, a question, a sensory detail, or an imaginative leap.`,
     ``,
     `## Narrative Architecture (OPENING → BUILDING → LANDING):`,
+    `- **The child is the DOER**: give them one clear goal, one thing in the way, and let them TRY, wobble, and try again before it works. The child acts ON the world — not just moving through it. That trying is what makes a story fun instead of a tour.`,
     `- **OPENING** (first ~20% of pages): Establish the child's world AND a small desire or question. What do they want, wonder about, or set out to do? Hook the listener.`,
-    `- **BUILDING** (middle ~60%): The desire meets the world. Each page should ESCALATE — new discoveries, small obstacles, mounting excitement or tenderness. This is where the refrain repeats and evolves.`,
-    `- **LANDING** (final ~20%): The emotional peak resolves into warmth and safety. The last page should feel like a soft exhale — a sentence a parent lingers on before closing the book.`,
+    `- **BUILDING** (middle ~60%): The desire meets the obstacle. Each page should ESCALATE — the child tries, it wobbles, they try again; new discoveries, mounting excitement or tenderness. This is where the refrain repeats and evolves.`,
+    `- **LANDING** (final ~20%): The goal is reached and the feeling pays off. Land on the WIN with a warm exhale — the last page a parent lingers on. Only sweet or sleepy stories drift into a bedtime hush; an adventure earns a satisfied, wide-awake glow. Read the story's own energy to choose which — never ask the parent.`,
     `- NEVER end with "What a wonderful day" or similar summary statements. Let the accumulated feeling speak for itself.`,
     `- Where pages carry an ARC ROLE note, use it: "opening" pages plant the desire, "rising" pages escalate, a "peak" page carries the emotional high point, "quiet" pages are a breath of tenderness, "closing" pages land the story. The roles are suggestions from the photos — honor their shape even while you interpret freely.`,
     ``,
     `## PAGE-TO-PAGE FLOW (critical — photos alone rarely tell a story):`,
     `- **Connective device**: If the photos read as a montage of separate moments rather than one continuous event, choose ONE thread and pull every page through it: a wondering question the child carries ("will the waves say hello back?"), a tiny quest, something the child is collecting or counting, or the refrain itself acting as a heartbeat. Never let pages sit side by side unconnected.`,
-    `- **Hand-off rule**: Every page except the last must END with something that leans into the next page — a sound getting closer, a glance toward something new, a question, a "and then...?" energy. The listener should NEED the page turn.`,
-    `- **Callbacks**: In the LANDING, echo one concrete detail from the OPENING (an object, a sound, the refrain in its softest form). This is what makes a story feel whole instead of a list of moments.`,
+    `- **Hand-off rule**: Every page except the last must END with something that leans into the next page — a shadow slipping across the floor, a glance toward something new, a question, an "and then...?" energy (a sound getting closer can work too, but don't lean on it). The listener should NEED the page turn.`,
+    `- **Callbacks**: In the LANDING, echo one concrete detail from the OPENING (an object, a gesture, the refrain in its softest form). This is what makes a story feel whole instead of a list of moments.`,
     ...(bridgeSection ? [bridgeSection] : []),
     ``,
     `## Recurring Refrain (REQUIRED):`,
     `- Create a short phrase (4-8 words) that echoes through the story at least 3 times.`,
     `- Vary it slightly each time — change one word, add emphasis, or whisper it the last time.`,
-    `- Great refrains feel like a heartbeat: "Splish, splash, one more splash!" → "Splish, splash, the biggest splash!" → "Splish... splash... goodnight, little splash."`,
+    `- Great refrains feel like a heartbeat — reach for an action, a feeling, or the child's name: "One more step, brave Kai!" → "Two more steps, brave Kai!" → "You did it, brave Kai!". At most one sound-based refrain per book, and only if it truly earns its place.`,
     `- Report this phrase in the "storyArc.refrain" field.`,
     ``,
     ...(input.learningWords?.length
@@ -404,19 +415,19 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
         ]
       : []),
     `## Voice & Rhythm (critical for read-aloud quality):`,
-    `- **Vary sentence structure**: mix short punchy fragments ("Splish!") with slightly longer flowing sentences. Avoid monotonous Subject-Verb-Object patterns.`,
-    `- **Onomatopoeia and sound words** should feel organic to the scene — rumble, swoosh, crunch, pitter-pat — not forced.`,
+    `- **Vary sentence structure**: mix short punchy fragments ("Up, up, up!") with slightly longer flowing sentences. Avoid monotonous Subject-Verb-Object patterns.`,
+    `- **Sound words are one spice among many** — reach for a vivid verb or an image first. Use AT MOST one sound word per page, and never as the page's main event.`,
     `- Sentences should have a **musical quality** when read aloud — rhythm matters more than vocabulary.`,
     `- Use concrete nouns and action verbs. No abstractions. One idea per sentence.`,
     ``,
     `## Dialogic Moments:`,
-    `- Include 2-3 questions across the whole book that invite the listening child to participate: "Can you see...?", "What do you think happens next?", "How many splashes was that?"`,
+    `- Include 2-3 questions across the whole book that invite the listening child to participate: "Can you see...?", "What do you think happens next?", "What do YOU think is behind the door?"`,
     `- Place these naturally — never more than one per page, and never on the final page.`,
     ``,
     `## Emotional Texture:`,
     `- Capture the **small moments** that make a toddler's day magical — the wonder of a new texture, the thrill of a puddle, the safety of a parent's hand.`,
     `- Show emotions through **actions and senses**, not labels: instead of "Kai was happy", write "Kai's eyes go wide. He squeezes Mama's hand tight."`,
-    `- Include **gentle humor** — mild mischief, silly surprises, funny sounds.`,
+    `- Include **gentle humor** that comes from the SITUATION, not sound effects — a silly predicament, a small joke that repeats and grows each time, or a character's surprised reaction.`,
     ``,
     `## Characters:`,
     characterInstruction,
@@ -476,9 +487,9 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
       ? [
           `\n## Language — Japanese (日本語):`,
           `- Write ALL story text ("text" field) in **Japanese**.`,
-          `- Use **hiragana** primarily, as this book is for toddlers (ages 2-4). **No kanji at all.** Katakana is OK for onomatopoeia and foreign words.`,
+          `- Use **hiragana** primarily, as this book is for young children (ages 3-5). **No kanji at all.** Katakana is fine for foreign words, and for the occasional sound word (keep to the one-per-page cap — never a page's main event).`,
           `- Maintain the same warm, playful, read-aloud quality described above, adapted for Japanese.`,
-          `- Use Japanese onomatopoeia naturally (ざぶーん, どきどき, ぴょんぴょん, きらきら, etc.).`,
+          `- Japanese sound words are one spice among many — at most one per page, never the page's main event (e.g. ざぶーん).`,
           `- Character names should remain as provided (do not transliterate to katakana unless they are clearly non-Japanese names).`,
           `- For unnamed people, use the warm hiragana relationship word a toddler would say (おばあちゃん、おじいちゃん、おかあさん、おとうさん、おねえちゃん、おにいちゃん、いもうと、おとうと) — NEVER invent a name. For unnamed pets use わんちゃん / ねこちゃん style words.`,
           `- **Length constraint (replaces the English rule above):** 2-4 sentences per page, **maximum 80 characters** per page.`,
@@ -503,9 +514,9 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
     `  - If no dynamic effect fits, set "illustrationNotes" to null or empty.`,
     `\n- Effects must feel playful but natural, blending into the scene without overwhelming it.`,
     `\n- Final Output:`,
-    `\nReturn ONLY a valid JSON object with a "storyArc" object, a "suggestedTitle" string, AND a "pages" array${bridgeSection ? ', AND a "bridgePages" array (empty when no bridges are needed — the usual case)' : ''}. Plan the storyArc FIRST (desire, refrain, emotionalPeak, resolution), then write pages that follow that arc.`,
+    `\nReturn ONLY a valid JSON object with a "storyArc" object, a "suggestedTitle" string, AND a "pages" array${bridgeSection ? ', AND a "bridgePages" array (empty when no bridges are needed — the usual case)' : ''}. Plan the storyArc FIRST (desire, obstacle, tryAndOvercome, refrain, emotionalPeak, resolution), then write pages that follow that arc.`,
     `Each page element must have "pageNumber" (number), "text" (string), and "illustrationNotes" (string or null).`,
-    `Example format: {"storyArc":{"desire":"...","refrain":"...","emotionalPeak":"...","resolution":"..."},"suggestedTitle":"...","pages":[{"pageNumber":1,"text":"Sample text...","illustrationNotes":"Suggestion..."}]}`,
+    `Example format: {"storyArc":{"desire":"...","obstacle":"...","tryAndOvercome":"...","refrain":"...","emotionalPeak":"...","resolution":"..."},"suggestedTitle":"...","pages":[{"pageNumber":1,"text":"Sample text...","illustrationNotes":"Suggestion..."}]}`,
   ].join('');
 
   parts.push({
@@ -526,6 +537,10 @@ export interface StoryPageResponse {
 
 export interface StoryArc {
   desire: string;
+  /** The one thing in the way of the desire — the problem that makes it a story. */
+  obstacle: string;
+  /** How the child tries, wobbles, and tries again. Null when there is no obstacle to overcome. */
+  tryAndOvercome: string | null;
   refrain: string;
   emotionalPeak: string;
   resolution: string;
@@ -648,7 +663,7 @@ export const STORY_RESPONSE_SCHEMA_AVATAR = {
   additionalProperties: false,
 } as const;
 
-export const AVATAR_STORY_SYSTEM_PROMPT = `You are an expert children's picture-book author for toddlers (ages 2-4). Parents read your stories aloud at bedtime.
+export const AVATAR_STORY_SYSTEM_PROMPT = `You are an expert children's picture-book author for children ages 3-5. Parents read your stories aloud. Every book is a real little adventure — a beginning, a problem, and a satisfying end.
 
 THIS BOOK IS DIFFERENT — there are no photos. The parent picked a cast of characters (real people, pets, and beloved toys from the child's life, drawn as storybook characters) and a story spark. You invent the whole adventure:
 - The cast are REAL to this child — their child, their grandma, their dog. Treat them with warmth and truth to their roles, then take them somewhere wonderful.
@@ -743,26 +758,27 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
 
   const baseInstructions = [
     `# Instructions & Guiding Principles:`,
-    `- Imagine a parent curled up with their toddler at bedtime, reading aloud. Every sentence should feel warm, playful, and alive in a parent's voice.`,
+    `- Imagine a parent curled up with their child, reading aloud. Every sentence should feel warm, playful, and alive in a parent's voice.`,
     `- Write from the **toddler's perspective** — what they see, feel, touch, hear, and wonder about. Ground every moment in their sensory experience.`,
     ``,
     sceneInstructions,
     ``,
     `## Narrative Architecture (OPENING → BUILDING → LANDING):`,
+    `- **The child is the DOER**: give them one clear goal, one thing in the way, and let them TRY, wobble, and try again before it works. The child acts ON the world — not just moving through it. That trying is what makes a story fun instead of a tour.`,
     `- **OPENING** (first ~20% of pages): Establish the child's world AND a small desire or question. What do they want, wonder about, or set out to do? Hook the listener.`,
-    `- **BUILDING** (middle ~60%): The desire meets the world. Each page should ESCALATE — new discoveries, small obstacles, mounting excitement or tenderness. This is where the refrain repeats and evolves.`,
-    `- **LANDING** (final ~20%): The emotional peak resolves into warmth and safety. The last page should feel like a soft exhale — a sentence a parent lingers on before closing the book.`,
+    `- **BUILDING** (middle ~60%): The desire meets the obstacle. Each page should ESCALATE — the child tries, it wobbles, they try again; new discoveries, mounting excitement or tenderness. This is where the refrain repeats and evolves.`,
+    `- **LANDING** (final ~20%): The goal is reached and the feeling pays off. Land on the WIN with a warm exhale — the last page a parent lingers on. Only sweet or sleepy stories drift into a bedtime hush; an adventure earns a satisfied, wide-awake glow. Read the story's own energy to choose which — never ask the parent.`,
     `- NEVER end with "What a wonderful day" or similar summary statements. Let the accumulated feeling speak for itself.`,
     ``,
     `## PAGE-TO-PAGE FLOW (critical):`,
     `- **Connective device**: choose ONE thread and pull every page through it: a wondering question the child carries, a tiny quest, something the child is collecting or counting, or the refrain itself acting as a heartbeat. Never let pages sit side by side unconnected.`,
-    `- **Hand-off rule**: Every page except the last must END with something that leans into the next page — a sound getting closer, a glance toward something new, a question, a "and then...?" energy. The listener should NEED the page turn.`,
-    `- **Callbacks**: In the LANDING, echo one concrete detail from the OPENING (an object, a sound, the refrain in its softest form). This is what makes a story feel whole instead of a list of moments.`,
+    `- **Hand-off rule**: Every page except the last must END with something that leans into the next page — a shadow slipping across the floor, a glance toward something new, a question, an "and then...?" energy (a sound getting closer can work too, but don't lean on it). The listener should NEED the page turn.`,
+    `- **Callbacks**: In the LANDING, echo one concrete detail from the OPENING (an object, a gesture, the refrain in its softest form). This is what makes a story feel whole instead of a list of moments.`,
     ``,
     `## Recurring Refrain (REQUIRED):`,
     `- Create a short phrase (4-8 words) that echoes through the story at least 3 times.`,
     `- Vary it slightly each time — change one word, add emphasis, or whisper it the last time.`,
-    `- Great refrains feel like a heartbeat: "Splish, splash, one more splash!" → "Splish, splash, the biggest splash!" → "Splish... splash... goodnight, little splash."`,
+    `- Great refrains feel like a heartbeat — reach for an action, a feeling, or the child's name: "One more step, brave Kai!" → "Two more steps, brave Kai!" → "You did it, brave Kai!". At most one sound-based refrain per book, and only if it truly earns its place.`,
     `- Report this phrase in the "storyArc.refrain" field.`,
     ``,
     ...(input.learningWords?.length
@@ -781,19 +797,19 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
         ]
       : []),
     `## Voice & Rhythm (critical for read-aloud quality):`,
-    `- **Vary sentence structure**: mix short punchy fragments ("Splish!") with slightly longer flowing sentences. Avoid monotonous Subject-Verb-Object patterns.`,
-    `- **Onomatopoeia and sound words** should feel organic to the scene — rumble, swoosh, crunch, pitter-pat — not forced.`,
+    `- **Vary sentence structure**: mix short punchy fragments ("Up, up, up!") with slightly longer flowing sentences. Avoid monotonous Subject-Verb-Object patterns.`,
+    `- **Sound words are one spice among many** — reach for a vivid verb or an image first. Use AT MOST one sound word per page, and never as the page's main event.`,
     `- Sentences should have a **musical quality** when read aloud — rhythm matters more than vocabulary.`,
     `- Use concrete nouns and action verbs. No abstractions. One idea per sentence.`,
     ``,
     `## Dialogic Moments:`,
-    `- Include 2-3 questions across the whole book that invite the listening child to participate: "Can you see...?", "What do you think happens next?", "How many splashes was that?"`,
+    `- Include 2-3 questions across the whole book that invite the listening child to participate: "Can you see...?", "What do you think happens next?", "What do YOU think is behind the door?"`,
     `- Place these naturally — never more than one per page, and never on the final page.`,
     ``,
     `## Emotional Texture:`,
     `- Capture the **small moments** that make a toddler's day magical — the wonder of a new texture, the thrill of a puddle, the safety of a parent's hand.`,
     `- Show emotions through **actions and senses**, not labels: instead of "Kai was happy", write "Kai's eyes go wide. He squeezes Mama's hand tight."`,
-    `- Include **gentle humor** — mild mischief, silly surprises, funny sounds.`,
+    `- Include **gentle humor** that comes from the SITUATION, not sound effects — a silly predicament, a small joke that repeats and grows each time, or a character's surprised reaction.`,
     ``,
     `## Title:`,
     input.suggestTitle
@@ -829,9 +845,9 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
       ? [
           `\n## Language — Japanese (日本語):`,
           `- Write ALL story text ("text" field) in **Japanese**.`,
-          `- Use **hiragana** primarily, as this book is for toddlers (ages 2-4). **No kanji at all.** Katakana is OK for onomatopoeia and foreign words.`,
+          `- Use **hiragana** primarily, as this book is for young children (ages 3-5). **No kanji at all.** Katakana is fine for foreign words, and for the occasional sound word (keep to the one-per-page cap — never a page's main event).`,
           `- Maintain the same warm, playful, read-aloud quality described above, adapted for Japanese.`,
-          `- Use Japanese onomatopoeia naturally (ざぶーん, どきどき, ぴょんぴょん, きらきら, etc.).`,
+          `- Japanese sound words are one spice among many — at most one per page, never the page's main event (e.g. ざぶーん).`,
           `- Character names should remain as provided (do not transliterate to katakana unless they are clearly non-Japanese names).`,
           `- For unnamed people, use the warm hiragana relationship word a toddler would say (おばあちゃん、おじいちゃん、おかあさん、おとうさん、おねえちゃん、おにいちゃん、いもうと、おとうと) — NEVER invent a name. For unnamed pets use わんちゃん / ねこちゃん style words.`,
           `- **Length constraint (replaces the English rule above):** 2-4 sentences per page, **maximum 80 characters** per page.`,
@@ -855,7 +871,7 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
     `  - If no dynamic effect fits, set "illustrationNotes" to null or empty.`,
     `\n- Effects must feel playful but natural, blending into the scene without overwhelming it.`,
     `\n- Final Output:`,
-    `\nReturn ONLY a valid JSON object with a "storyArc" object, a "suggestedTitle" string, AND a "pages" array. Plan the storyArc FIRST (desire, refrain, emotionalPeak, resolution), then write pages that follow that arc.`,
+    `\nReturn ONLY a valid JSON object with a "storyArc" object, a "suggestedTitle" string, AND a "pages" array. Plan the storyArc FIRST (desire, obstacle, tryAndOvercome, refrain, emotionalPeak, resolution), then write pages that follow that arc.`,
     `Each page element must have "pageNumber" (number), "text" (string), "illustrationNotes" (string or null), "learningWordsUsed" (array), and "scene" (object).`,
   ].join('');
 

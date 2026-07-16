@@ -10,6 +10,8 @@ import {
 const baseInput: AvatarStoryQCInput = {
   storyArc: {
     desire: 'Emma wants to rescue the soggy teddy',
+    obstacle: 'Teddy floated down the stream and out of reach',
+    tryAndOvercome: 'Emma reaches, then builds a leaf-boat, then Grandma lifts her closer',
     refrain: 'Drip, drop, off we go!',
     emotionalPeak: 'The teddy is found under the big leaf',
     resolution: 'Everyone dries off together',
@@ -54,6 +56,27 @@ describe('createAvatarStoryQCPrompt', () => {
     expect(failLine).toContain('lastPageLanding false');
   });
 
+  it('scores soundOverload and agency but keeps BOTH log-only on avatar (S2/S3)', () => {
+    const prompt = createAvatarStoryQCPrompt(baseInput);
+    expect(prompt).toContain('soundOverload (boolean)');
+    expect(prompt).toContain('agency (0-10)');
+    const failLine = prompt.split('\n').find((l) => l.startsWith('If ANY of these fail'));
+    expect(failLine).not.toContain('soundOverload');
+    expect(failLine).not.toContain('agency');
+  });
+
+  it('stops praising sound words in the rhythm rubric', () => {
+    const prompt = createAvatarStoryQCPrompt(baseInput);
+    expect(prompt).not.toContain('organic sound words score high');
+    expect(prompt).toContain('leaning on sound words does NOT');
+  });
+
+  it('renders the obstacle + try in the declared-arc block', () => {
+    const prompt = createAvatarStoryQCPrompt(baseInput);
+    expect(prompt).toContain('Obstacle:');
+    expect(prompt).toContain('Try:');
+  });
+
   it('adds the kanji rule for ja books only', () => {
     expect(createAvatarStoryQCPrompt(baseInput)).not.toContain('kanji');
     expect(createAvatarStoryQCPrompt({ ...baseInput, language: 'ja' })).toContain('NO kanji');
@@ -68,6 +91,16 @@ describe('AVATAR_STORY_QC_RESPONSE_SCHEMA', () => {
     expect('captionRisk' in pageItems.properties).toBe(false);
     expect(pageItems.required).toEqual(['pageNumber', 'issue']);
   });
+
+  it('adds soundOverload (required-nullable) and agency (required number) — S2/S3', () => {
+    expect(AVATAR_STORY_QC_RESPONSE_SCHEMA.required).toContain('soundOverload');
+    expect(AVATAR_STORY_QC_RESPONSE_SCHEMA.required).toContain('agency');
+    expect(AVATAR_STORY_QC_RESPONSE_SCHEMA.properties.soundOverload.type).toEqual([
+      'boolean',
+      'null',
+    ]);
+    expect(AVATAR_STORY_QC_RESPONSE_SCHEMA.properties.agency.type).toBe('number');
+  });
 });
 
 describe('thresholds and system prompt', () => {
@@ -78,5 +111,14 @@ describe('thresholds and system prompt', () => {
   it('system prompt frames the invented-adventure review', () => {
     expect(AVATAR_STORY_QC_SYSTEM_PROMPT).toContain('invented adventure');
     expect(AVATAR_STORY_QC_SYSTEM_PROMPT).not.toContain('caption');
+  });
+
+  it('judge shares the 3-5 adventure frame, not the toddler one (S4 alignment)', () => {
+    expect(AVATAR_STORY_QC_SYSTEM_PROMPT).toContain('ages 3-5');
+    expect(AVATAR_STORY_QC_SYSTEM_PROMPT).toContain('a beginning, a problem, and a satisfying end');
+    expect(AVATAR_STORY_QC_SYSTEM_PROMPT).not.toContain('toddlers (ages 2-4)');
+    const prompt = createAvatarStoryQCPrompt(baseInput);
+    expect(prompt).toContain('picture-book manuscript for children ages 3-5');
+    expect(prompt).not.toContain('toddler picture-book manuscript');
   });
 });

@@ -210,4 +210,75 @@ describe('AVATAR_STORY_SYSTEM_PROMPT', () => {
     expect(AVATAR_STORY_SYSTEM_PROMPT).toContain('there are no photos');
     expect(AVATAR_STORY_SYSTEM_PROMPT).toContain('re-read this 100 times');
   });
+
+  it('widens to ages 3-5 with the adventure north-star (S4)', () => {
+    expect(AVATAR_STORY_SYSTEM_PROMPT).toContain('ages 3-5');
+    expect(AVATAR_STORY_SYSTEM_PROMPT).toContain('a beginning, a problem, and a satisfying end');
+    expect(AVATAR_STORY_SYSTEM_PROMPT).not.toContain('toddlers (ages 2-4)');
+  });
+
+  it('drops the toddler-at-bedtime read-aloud frame from the instructions', () => {
+    const text = promptText(baseInput);
+    expect(text).toContain('curled up with their child, reading aloud');
+    expect(text).not.toContain('their toddler at bedtime');
+  });
+});
+
+describe('createAvatarStoryPrompt — S1 sound exemplars neutralized + cap', () => {
+  const text = promptText(baseInput);
+  const jaText = promptText({ ...baseInput, language: 'ja' });
+
+  it('drops every sound-pushing exemplar (shares the photo blocks verbatim)', () => {
+    expect(text).not.toContain('Splish, splash, one more splash!');
+    expect(text).not.toContain('("Splish!")');
+    expect(text).not.toContain('rumble, swoosh, crunch, pitter-pat');
+    expect(text).not.toContain('How many splashes was that?');
+    expect(text).not.toContain('funny sounds');
+    expect(jaText).not.toContain('Katakana is OK for onomatopoeia and foreign words');
+    expect(jaText).not.toContain('どきどき');
+    expect(jaText).not.toContain('ぴょんぴょん');
+    expect(jaText).not.toContain('きらきら');
+  });
+
+  it('carries the same one-sound-word-per-page cap', () => {
+    expect(text).toContain('AT MOST one sound word per page');
+    expect(text).toContain("never as the page's main event");
+    expect(text).toContain('one spice among many');
+    expect(jaText).toContain('at most one per page');
+  });
+
+  it('mirrors the neutralized refrain / fragment / hand-off / question examples', () => {
+    expect(text).toContain('One more step, brave Kai!');
+    expect(text).toContain('"Up, up, up!"');
+    expect(text).toContain('a shadow slipping across the floor');
+    expect(text).toContain('What do YOU think is behind the door?');
+  });
+});
+
+describe('createAvatarStoryPrompt — S3 agency arc', () => {
+  const text = promptText(baseInput);
+
+  it('names the child as the DOER and reframes humor as situation-driven', () => {
+    expect(text).toContain('The child is the DOER');
+    expect(text).toContain('comes from the SITUATION, not sound effects');
+  });
+
+  it('lands on the win with an inferred tone (never asks the parent)', () => {
+    expect(text).toContain('Land on the WIN');
+    expect(text).toContain('never ask the parent');
+  });
+
+  it('adds obstacle + tryAndOvercome to the storyArc planning instruction', () => {
+    expect(text).toContain('obstacle');
+    expect(text).toContain('tryAndOvercome');
+  });
+});
+
+describe('STORY_RESPONSE_SCHEMA_AVATAR — shared storyArc carries the agency fields', () => {
+  it('inherits obstacle + tryAndOvercome from the shared storyArc reference', () => {
+    const arc = STORY_RESPONSE_SCHEMA_AVATAR.properties.storyArc;
+    expect(arc.required).toContain('obstacle');
+    expect(arc.required).toContain('tryAndOvercome');
+    expect(arc).toBe(STORY_RESPONSE_SCHEMA.properties.storyArc);
+  });
 });

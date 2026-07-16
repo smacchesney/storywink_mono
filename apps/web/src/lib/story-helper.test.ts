@@ -214,8 +214,10 @@ describe('buildStoryProposalPrompt (goal + cast pins)', () => {
     expect(out).toContain('exactly TWO other short takes');
   });
 
-  it('keeps the original gentle-ending tone (any tone change belongs to Track S)', () => {
-    expect(buildStoryProposalPrompt(input)).toContain('a gentle ending');
+  it('frames the ending as a tone-neutral payoff, not a hardcoded gentle lull (Track S)', () => {
+    const out = buildStoryProposalPrompt(input);
+    expect(out).toContain('an ending that pays off the idea');
+    expect(out).not.toContain('a gentle ending');
   });
 
   it('switches the language note for ja', () => {

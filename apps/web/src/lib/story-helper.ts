@@ -210,7 +210,7 @@ The cast for this ${input.pageLength}-page picture book:
 ${castLines}
 
 Shape their idea into a storyline:
-- "storyline": ONE short paragraph (at most ${STORYLINE_MAX} characters) that keeps the parent's idea and every named character, and NAMES what the star is trying to do (their goal), with a clear beginning, a middle, and a gentle ending a small child would enjoy. Recognizably THEIR story, grown, not a new one.
+- "storyline": ONE short paragraph (at most ${STORYLINE_MAX} characters) that keeps the parent's idea and every named character, and NAMES what the star is trying to do (their goal), with a clear beginning, a middle, and an ending that pays off the idea a small child would enjoy. Recognizably THEIR story, grown, not a new one.
 - "alternates": exactly TWO other short takes on the SAME idea and cast (each at most ${STORYLINE_MAX} characters), each a genuinely different direction.
 
 ${langNote}`;
