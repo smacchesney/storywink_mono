@@ -12,6 +12,15 @@ export const AVATAR_STORY_PAGE_LENGTHS = [8, 12, 16] as const;
 export type AvatarStoryPageLength = (typeof AVATAR_STORY_PAGE_LENGTHS)[number];
 
 /**
+ * The spark/premise cap. Sized for a spoken ramble — roughly 90 seconds of a
+ * parent (or child) talking, so a dictated idea is never clipped mid-thought.
+ * The single source of truth for the wall: the create schema, the propose
+ * route, and the three client slices in the wizard all read this. Distinct
+ * from STORYLINE_MAX (280) — the helper's *output* stays tight on purpose.
+ */
+export const PREMISE_MAX_CHARS = 1500;
+
+/**
  * The whole cast (people + pets + toys) shares one ceiling. It is a technical
  * bound, not a taste one: the illustration flow feeds ONE character sheet per
  * cast member into every page render (illustration-generation.worker fetches

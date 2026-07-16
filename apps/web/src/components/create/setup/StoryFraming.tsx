@@ -77,17 +77,22 @@ export function StoryFraming({
         <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
       </div>
 
-      {/* Summary row — parent-editable AI text behind an explicit affordance. */}
+      {/* Summary row — parent-editable AI text behind an explicit affordance.
+          Same co-creation nudge as the avatar spark: a child-voiced placeholder
+          and a Geist hint that invites talking (dictation) or typing. */}
       {expanded ? (
-        <textarea
-          id="eventSummary"
-          value={eventSummary}
-          onChange={(e) => onSummaryChange(e.target.value)}
-          placeholder={t('eventSummaryPlaceholder')}
-          rows={3}
-          maxLength={500}
-          className="w-full resize-none rounded-xl border border-black/10 bg-white px-3 py-2 font-playful text-sm text-gray-800 focus:border-coral focus:ring-1 focus:ring-coral focus:outline-none"
-        />
+        <div className="flex flex-col gap-1.5">
+          <textarea
+            id="eventSummary"
+            value={eventSummary}
+            onChange={(e) => onSummaryChange(e.target.value)}
+            placeholder={t('eventSummaryPlaceholder')}
+            rows={3}
+            maxLength={500}
+            className="w-full resize-none rounded-xl border border-black/10 bg-white px-3 py-2 font-playful text-sm text-gray-800 focus:border-coral focus:ring-1 focus:ring-coral focus:outline-none"
+          />
+          <p className="px-1 text-xs text-gray-500">{t('eventSummaryHint')}</p>
+        </div>
       ) : hasSummary ? (
         <button
           type="button"

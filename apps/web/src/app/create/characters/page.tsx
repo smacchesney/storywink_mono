@@ -29,6 +29,7 @@ import {
   nextArrivalPollStart,
   MAX_CAST,
   CastKind,
+  PREMISE_MAX_CHARS,
 } from '@/lib/avatar-story';
 import StorybookFrame from '@/components/ui/storybook-frame';
 import { castTileState, isUsableAvatar } from '@/lib/characterPathDestination';
@@ -41,6 +42,7 @@ import {
   prevStep,
   storyProposalSignature,
   finalPremiseFor,
+  nextIdeaIndex,
   type AvatarStoryStep,
 } from '@/lib/story-helper';
 import { track } from '@/lib/track';
@@ -67,6 +69,17 @@ const SPARK_KEYS = [
   'sparkSock',
   'sparkDragon',
 ] as const;
+
+// Auto-grow the spark textarea: it rests at its rows height, grows with the
+// ramble, then caps so a long, dictated idea scrolls inside the field instead
+// of shoving the Next button off screen. No new dependency — a scrollHeight
+// measure is enough.
+const SPARK_MAX_HEIGHT_PX = 220;
+function growTextarea(el: HTMLTextAreaElement | null) {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = `${Math.min(el.scrollHeight, SPARK_MAX_HEIGHT_PX)}px`;
+}
 
 // The "More ideas" pool: trim, drop blanks, drop duplicates, keep order.
 function dedupeNonEmpty(values: string[]): string[] {
@@ -172,13 +185,12 @@ function AvatarStoryFlow() {
   ]);
 
   // Story-helper async plumbing (D2/D6). The prefetch's abort controller, the
-  // signature the cached proposal belongs to, whether the one exhaustion
-  // re-call has fired, whether story_helper_shown has fired for this proposal,
-  // and a step mirror so the 6s fail-open only advances when still on shape.
+  // signature the cached proposal belongs to, whether story_helper_shown has
+  // fired for this proposal, and a step mirror so the 6s fail-open only advances
+  // when still on shape.
   const proposalAbortRef = useRef<AbortController | null>(null);
   const proposalTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const proposalSigRef = useRef<string | null>(null);
-  const proposalRecalledRef = useRef(false);
   const shownFiredRef = useRef(false);
   const stepRef = useRef<Step>('cast');
   useEffect(() => {
@@ -194,6 +206,12 @@ function AvatarStoryFlow() {
       proposalAbortRef.current?.abort();
       if (proposalTimeoutRef.current) clearTimeout(proposalTimeoutRef.current);
     };
+  }, []);
+
+  // Size the spark textarea to its content the instant it mounts (e.g. stepping
+  // back to a ramble already typed); onChange keeps it in step after that.
+  const attachSpark = useCallback((el: HTMLTextAreaElement | null) => {
+    growTextarea(el);
   }, []);
 
   const load = useCallback(async () => {
@@ -431,19 +449,18 @@ function AvatarStoryFlow() {
   // (NOT the typed premise), so the dot count is stable across the spark step.
   const helperEnabled = helperStepEnabled(writingOwn, STORY_HELPER_FLAG);
 
-  // D2/D6: fire /api/story/propose. `initial` shows the twinkle and fails open
-  // to length on any non-2xx / 404 / 429 / 6s-abort; `append` is the single
-  // "More ideas" re-call and never blocks (it wraps the pool on failure).
-  const runProposal = async (mode: 'initial' | 'append') => {
+  // D2/D6: fire /api/story/propose ONCE per shape entry. Shows the twinkle and
+  // fails open to length on any non-2xx / 404 / 429 / 6s-abort. "More ideas"
+  // never re-calls; it cycles the alternates this one prefetch returned, so a
+  // tap is always instant (the whole pool is in hand before the card appears).
+  const runProposal = async () => {
     proposalAbortRef.current?.abort();
     const controller = new AbortController();
     proposalAbortRef.current = controller;
     const timeout = setTimeout(() => controller.abort(), 6000);
     proposalTimeoutRef.current = timeout;
-    if (mode === 'initial') {
-      setProposalLoading(true);
-      shownFiredRef.current = false;
-    }
+    setProposalLoading(true);
+    shownFiredRef.current = false;
     const firstChildIndex = cast.findIndex((a) => a.kind === 'CHILD');
     try {
       const res = await fetch('/api/story/propose', {
@@ -468,42 +485,22 @@ function AvatarStoryFlow() {
       const data = (await res.json()) as { storyline: string; alternates: string[] };
       const fresh = dedupeNonEmpty([data.storyline, ...(data.alternates ?? [])]);
       if (fresh.length === 0) throw new Error('empty proposal');
-      if (mode === 'append') {
-        const base = proposalOptions ?? [];
-        const merged = dedupeNonEmpty([...base, ...fresh]);
-        const firstNew = merged.findIndex((o) => !base.includes(o));
-        const idx = firstNew >= 0 ? firstNew : 0;
-        setProposalOptions(merged);
-        setOptionIndex(idx);
-        setShapeText(merged[idx]);
-        setShapeEdited(false);
-        setShapeEditing(false);
-      } else {
-        setProposalOptions(fresh);
-        setOptionIndex(0);
-        setShapeText(fresh[0]);
-        setShapeEdited(false);
-        setShapeEditing(false);
-        setProposalLoading(false);
-      }
+      setProposalOptions(fresh);
+      setOptionIndex(0);
+      setShapeText(fresh[0]);
+      setShapeEdited(false);
+      setShapeEditing(false);
+      setProposalLoading(false);
     } catch {
       clearTimeout(timeout);
       if (proposalTimeoutRef.current === timeout) proposalTimeoutRef.current = null;
       if (proposalAbortRef.current === controller) proposalAbortRef.current = null;
-      if (mode === 'initial') {
-        setProposalLoading(false);
-        // D6 fail-open: silently continue to length with the RAW premise, but
-        // only if the parent is still waiting on the shape step.
-        if (stepRef.current === 'shape') {
-          setAcceptedStoryline('');
-          setStep('length');
-        }
-      } else if (proposalOptions && proposalOptions.length > 0) {
-        // A "More ideas" re-call must never block a book — wrap to the pool.
-        setOptionIndex(0);
-        setShapeText(proposalOptions[0]);
-        setShapeEdited(false);
-        setShapeEditing(false);
+      setProposalLoading(false);
+      // D6 fail-open: silently continue to length with the RAW premise, but
+      // only if the parent is still waiting on the shape step.
+      if (stepRef.current === 'shape') {
+        setAcceptedStoryline('');
+        setStep('length');
       }
     }
   };
@@ -528,11 +525,10 @@ function AvatarStoryFlow() {
       setShapeText('');
       setShapeEdited(false);
       setShapeEditing(false);
-      proposalRecalledRef.current = false;
     }
     proposalSigRef.current = sig;
     setStep('shape');
-    void runProposal('initial');
+    void runProposal();
   };
 
   const onSparkNext = () => {
@@ -547,7 +543,7 @@ function AvatarStoryFlow() {
   };
 
   const acceptShape = () => {
-    const text = shapeText.trim().slice(0, 300);
+    const text = shapeText.trim().slice(0, PREMISE_MAX_CHARS);
     if (!text) {
       skipShape();
       return;
@@ -557,28 +553,17 @@ function AvatarStoryFlow() {
     setStep('length');
   };
 
+  // Pool-only: cycle the prefetched alternates (storyline + up to two) and wrap.
+  // Never a fresh API call — the whole pool is already in hand, so the tap is
+  // instant and can't stall the parent on the network.
   const moreIdeas = () => {
     const pool = proposalOptions ?? [];
-    const next = optionIndex + 1;
-    if (next < pool.length) {
-      setOptionIndex(next);
-      setShapeText(pool[next]);
-      setShapeEdited(false);
-      setShapeEditing(false);
-      return;
-    }
-    // Cached ideas exhausted — ONE re-call is allowed, then it wraps.
-    if (!proposalRecalledRef.current && proposalSigRef.current) {
-      proposalRecalledRef.current = true;
-      void runProposal('append');
-      return;
-    }
-    if (pool.length > 0) {
-      setOptionIndex(0);
-      setShapeText(pool[0]);
-      setShapeEdited(false);
-      setShapeEditing(false);
-    }
+    if (pool.length === 0) return;
+    const next = nextIdeaIndex(pool.length, optionIndex);
+    setOptionIndex(next);
+    setShapeText(pool[next]);
+    setShapeEdited(false);
+    setShapeEditing(false);
   };
 
   // story_helper_shown fires once per resolved proposal, when the card is
@@ -702,8 +687,9 @@ function AvatarStoryFlow() {
     if (isCreating || !artStyle || !premise || cast.length === 0) return;
     setIsCreating(true);
     // D5: the accepted/edited storyline REPLACES the premise (the create schema
-    // clamps ≤300); when nothing was accepted — skip or any fail-open — the raw
-    // premise proceeds exactly as today. Gated on writingOwn so a parent who
+    // caps it at PREMISE_MAX_CHARS); when nothing was accepted (Use my words or
+    // any fail-open) the raw premise proceeds exactly as today. Gated on
+    // writingOwn so a parent who
     // authored, accepted, then backed out and picked a PRESET gets the preset,
     // never the abandoned custom storyline (X11: belt half of the two-belt fix).
     const finalPremise = finalPremiseFor(writingOwn, acceptedStoryline, premise);
@@ -1049,7 +1035,6 @@ function AvatarStoryFlow() {
                     setShapeEdited(false);
                     setShapeEditing(false);
                     proposalSigRef.current = null;
-                    proposalRecalledRef.current = false;
                   }}
                   className={`min-h-[44px] rounded-full border px-4 py-2 font-playful text-sm transition-colors ${
                     active
@@ -1062,13 +1047,37 @@ function AvatarStoryFlow() {
               );
             })}
             {writingOwn ? (
-              <input
-                autoFocus
-                value={customSpark}
-                onChange={(e) => setCustomSpark(e.target.value.slice(0, 300))}
-                placeholder={t('sparkPlaceholder')}
-                className="min-h-[44px] w-full max-w-sm rounded-full border-2 border-coral bg-white px-4 py-2 font-playful text-sm text-[#1a1a1a] outline-none placeholder:text-gray-400"
-              />
+              // A ramble-ready field: rests at two lines (never a wall of white),
+              // grows as the parent talks or types. The placeholder MODELS a
+              // child-voiced idea; the co-creation nudge sits below in Geist (a
+              // form hint, not narration). Counter stays hidden until the wall
+              // is near. `basis-full` drops it onto its OWN flex row so a grown
+              // textarea never stretches a neighbouring chip (rounded-full + the
+              // row's default align-stretch would balloon that chip into a circle).
+              <div className="flex basis-full flex-col items-center">
+                <div className="w-full max-w-sm">
+                  <textarea
+                    ref={attachSpark}
+                    autoFocus
+                    value={customSpark}
+                    onChange={(e) => {
+                      setCustomSpark(e.target.value.slice(0, PREMISE_MAX_CHARS));
+                      growTextarea(e.currentTarget);
+                    }}
+                    rows={2}
+                    placeholder={t('sparkPlaceholder')}
+                    className="w-full resize-none overflow-y-auto rounded-2xl border-2 border-coral bg-white px-4 py-2.5 font-playful text-sm leading-relaxed text-[#1a1a1a] outline-none placeholder:text-gray-400"
+                  />
+                  <p className="mt-2 px-1 text-left text-xs text-gray-500">
+                    {t('sparkHintCoCreate')}
+                  </p>
+                  {PREMISE_MAX_CHARS - customSpark.length < 100 && (
+                    <p className="mt-1 px-1 text-right text-xs text-gray-400">
+                      {t('sparkCharsLeft', { count: PREMISE_MAX_CHARS - customSpark.length })}
+                    </p>
+                  )}
+                </div>
+              </div>
             ) : (
               // Clear outlined button, NOT a hero: solid coral fill is the
               // selected-preset signal and the Next CTA, so a filled/tinted
@@ -1098,7 +1107,9 @@ function AvatarStoryFlow() {
           <h1 className="text-center font-playful text-2xl font-bold text-[#1a1a1a]">
             {t('helperTitle')}
           </h1>
-          <p className="mx-auto mt-2 max-w-md text-center text-sm text-gray-500">
+          {/* line-clamp so a long ramble echoes as a few gray lines, never a
+              wall that buries the storyline below the fold. */}
+          <p className="mx-auto mt-2 line-clamp-3 max-w-md text-center text-sm text-gray-500">
             {t('helperFrom', { premise })}
           </p>
 
@@ -1117,7 +1128,7 @@ function AvatarStoryFlow() {
                     autoFocus
                     value={shapeText}
                     onChange={(e) => {
-                      setShapeText(e.target.value.slice(0, 300));
+                      setShapeText(e.target.value.slice(0, PREMISE_MAX_CHARS));
                       setShapeEdited(true);
                     }}
                     rows={5}

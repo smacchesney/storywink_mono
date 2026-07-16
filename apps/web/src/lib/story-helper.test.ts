@@ -8,7 +8,11 @@ import {
   storyProposalSignature,
   sanitizeStoryProposal,
   finalPremiseFor,
+  nextIdeaIndex,
   STORYLINE_MAX,
+  STORY_PROPOSAL_SYSTEM_PROMPT,
+  buildStoryProposalPrompt,
+  type StoryProposalInput,
 } from './story-helper';
 
 describe('helperStepEnabled', () => {
@@ -140,6 +144,77 @@ describe('sanitizeStoryProposal (D3 post-parse bounds)', () => {
       storyline: '',
       alternates: [],
     });
+  });
+});
+
+describe('nextIdeaIndex (pool-only "More ideas")', () => {
+  it('advances through the pool and wraps at the end', () => {
+    expect(nextIdeaIndex(3, 0)).toBe(1);
+    expect(nextIdeaIndex(3, 1)).toBe(2);
+    expect(nextIdeaIndex(3, 2)).toBe(0);
+  });
+
+  it('is a no-op-safe 0 for an empty or single-item pool', () => {
+    expect(nextIdeaIndex(0, 0)).toBe(0);
+    expect(nextIdeaIndex(1, 0)).toBe(0);
+  });
+});
+
+describe('STORY_PROPOSAL_SYSTEM_PROMPT (ramble handling pins)', () => {
+  it('tells the model the idea may be a spoken ramble', () => {
+    expect(STORY_PROPOSAL_SYSTEM_PROMPT).toContain('spoken ramble');
+  });
+
+  it("keeps the parent's own words where they sparkle", () => {
+    expect(STORY_PROPOSAL_SYSTEM_PROMPT).toContain("keep the parent's own words");
+    expect(STORY_PROPOSAL_SYSTEM_PROMPT).toContain('sparkle');
+  });
+
+  it('still forbids replacing the idea and keeps every named character', () => {
+    expect(STORY_PROPOSAL_SYSTEM_PROMPT).toContain('never replacing it');
+    expect(STORY_PROPOSAL_SYSTEM_PROMPT).toContain('keep every character they named');
+  });
+
+  it('never uses an em dash (house prose rule)', () => {
+    expect(STORY_PROPOSAL_SYSTEM_PROMPT).not.toContain('—');
+  });
+});
+
+describe('buildStoryProposalPrompt (goal + cast pins)', () => {
+  const input: StoryProposalInput = {
+    cast: [
+      { name: 'Maya', kind: 'CHILD', isStar: true },
+      { name: 'Rex', kind: 'PET', isStar: false },
+    ],
+    premise: 'a dragon scared of the dark',
+    pageLength: 12,
+    language: 'en',
+  };
+
+  it('requires the storyline to name the star’s goal', () => {
+    const out = buildStoryProposalPrompt(input);
+    expect(out).toContain('NAMES what the star is trying to do (their goal)');
+  });
+
+  it('quotes the premise and lists the cast with the star marked', () => {
+    const out = buildStoryProposalPrompt(input);
+    expect(out).toContain('"a dragon scared of the dark"');
+    expect(out).toContain('- Maya (child, the star)');
+    expect(out).toContain('- Rex (pet)');
+    expect(out).toContain('12-page picture book');
+  });
+
+  it('pins both length caps to STORYLINE_MAX and asks for exactly two alternates', () => {
+    const out = buildStoryProposalPrompt(input);
+    expect(out).toContain(`at most ${STORYLINE_MAX} characters`);
+    expect(out).toContain('exactly TWO other short takes');
+  });
+
+  it('switches the language note for ja', () => {
+    expect(buildStoryProposalPrompt(input)).toContain('warm, simple English');
+    expect(buildStoryProposalPrompt({ ...input, language: 'ja' })).toContain(
+      'natural, warm Japanese',
+    );
   });
 });
 

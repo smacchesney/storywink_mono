@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createAvatarBookSchema } from './avatar-story-schema';
+import { PREMISE_MAX_CHARS } from './avatar-story';
 
 const valid = {
   bookType: 'AVATAR_STORY' as const,
@@ -36,9 +37,16 @@ describe('createAvatarBookSchema', () => {
       }).success,
     ).toBe(false);
     expect(createAvatarBookSchema.safeParse({ ...valid, premise: '' }).success).toBe(false);
-    expect(createAvatarBookSchema.safeParse({ ...valid, premise: 'x'.repeat(301) }).success).toBe(
-      false,
-    );
+    // A ramble is welcome up to the 1500-char wall; one over is rejected.
+    expect(PREMISE_MAX_CHARS).toBe(1500);
+    expect(
+      createAvatarBookSchema.safeParse({ ...valid, premise: 'x'.repeat(PREMISE_MAX_CHARS) })
+        .success,
+    ).toBe(true);
+    expect(
+      createAvatarBookSchema.safeParse({ ...valid, premise: 'x'.repeat(PREMISE_MAX_CHARS + 1) })
+        .success,
+    ).toBe(false);
   });
 
   it('trims the premise and rejects whitespace-only sparks', () => {

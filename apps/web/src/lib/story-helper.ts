@@ -1,10 +1,12 @@
 /**
  * Story-helper (X11 D) pure helpers for the "Shape the story" wizard step and
  * the /api/story/propose route. Dependency-free per the repo's pure-helper
- * testing convention — every bound the strict json_schema can't express and
- * every step-machine transition lives here so it is unit-testable without
- * rendering the wizard.
+ * testing convention — every bound the strict json_schema can't express, every
+ * step-machine transition, and the propose prompt itself live here so they are
+ * unit-testable (and pinnable) without rendering the wizard or hitting OpenAI.
  */
+
+import type { CastKind } from './avatar-story';
 
 export type AvatarStoryStep = 'cast' | 'spark' | 'shape' | 'length';
 
@@ -90,6 +92,17 @@ export function finalPremiseFor(
   return writingOwn && accepted ? accepted : premise;
 }
 
+/**
+ * "More ideas" is pool-only: it cycles the alternates this shape entry already
+ * prefetched (storyline + up to two alternates) and wraps at the end — never a
+ * fresh API call from the button (a tap is always instant). Returns the next
+ * index, or 0 for an empty pool.
+ */
+export function nextIdeaIndex(poolLength: number, index: number): number {
+  if (poolLength <= 0) return 0;
+  return (index + 1) % poolLength;
+}
+
 /** Storyline length cap. Enforced here, never in the strict schema. */
 export const STORYLINE_MAX = 280;
 
@@ -112,4 +125,54 @@ export function sanitizeStoryProposal(raw: unknown): StoryProposal {
         .slice(0, 2)
     : [];
   return { storyline, alternates };
+}
+
+/** The shape of one cast member the propose prompt names. */
+export interface StoryProposalCastMember {
+  name: string;
+  kind: CastKind;
+  isStar: boolean;
+}
+
+/** Everything the propose prompt needs — mirrors the route's request schema. */
+export interface StoryProposalInput {
+  cast: StoryProposalCastMember[];
+  premise: string;
+  pageLength: number;
+  language: 'en' | 'ja';
+}
+
+/**
+ * The propose call's system prompt. Lives here (not in the route) so route.ts
+ * keeps exporting only handlers AND the prompt is pinnable. The ramble handling
+ * is load-bearing: the spark field now welcomes a spoken, half-finished idea,
+ * so the model is told to find the story inside it and keep the parent's own
+ * words where they sparkle, rather than expecting a tidy premise.
+ */
+export const STORY_PROPOSAL_SYSTEM_PROMPT =
+  "You are a warm picture-book story consultant for a children's book studio. A parent gives you their own little story idea and the cast of characters. Their idea may be a child's spoken ramble: half-finished, out of order, more feeling than plot. Find the story inside it (the characters' goal and the fun bits) and keep the parent's own words wherever they sparkle. You grow it into ONE inviting storyline the parent will instantly recognise as their idea, never replacing it, only shaping it into a clear beginning, middle, and end a small child would love. You stay grounded in what the parent said and keep every character they named.";
+
+/**
+ * Build the propose user prompt. Requiring the storyline to NAME the star's
+ * goal is deliberate: it seeds the agency arc Track S leans on (a doer with one
+ * clear goal), so the wizard proposal and the final story pull the same way.
+ */
+export function buildStoryProposalPrompt(input: StoryProposalInput): string {
+  const castLines = input.cast
+    .map((c) => `- ${c.name} (${c.kind.toLowerCase()}${c.isStar ? ', the star' : ''})`)
+    .join('\n');
+  const langNote =
+    input.language === 'ja'
+      ? 'Write the storyline and alternates in natural, warm Japanese for a toddler.'
+      : 'Write the storyline and alternates in warm, simple English for a toddler.';
+  return `The parent's story idea, in their words: "${input.premise}"
+
+The cast for this ${input.pageLength}-page picture book:
+${castLines}
+
+Shape their idea into a storyline:
+- "storyline": ONE short paragraph (at most ${STORYLINE_MAX} characters) that keeps the parent's idea and every named character, and NAMES what the star is trying to do (their goal), with a clear beginning, a middle, and a satisfying ending a small child would enjoy. Recognisably THEIR story, grown, not a new one.
+- "alternates": exactly TWO other short takes on the SAME idea and cast (each at most ${STORYLINE_MAX} characters), each a genuinely different direction.
+
+${langNote}`;
 }

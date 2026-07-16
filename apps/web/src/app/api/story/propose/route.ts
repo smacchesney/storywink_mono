@@ -6,8 +6,12 @@ import logger from '@/lib/logger';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { avatarsEnabled, storyHelperEnabled } from '@/lib/avatars';
 import { checkRateLimit } from '@/lib/rateLimit';
-import { AVATAR_STORY_PAGE_LENGTHS } from '@/lib/avatar-story';
-import { sanitizeStoryProposal } from '@/lib/story-helper';
+import { AVATAR_STORY_PAGE_LENGTHS, PREMISE_MAX_CHARS } from '@/lib/avatar-story';
+import {
+  sanitizeStoryProposal,
+  STORY_PROPOSAL_SYSTEM_PROMPT,
+  buildStoryProposalPrompt,
+} from '@/lib/story-helper';
 
 // Perception tier — the same gpt-5-mini the detect route runs on.
 const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'gpt-5-mini';
@@ -29,7 +33,7 @@ const proposeRequestSchema = z.object({
     )
     .min(1)
     .max(6),
-  premise: z.string().trim().min(1).max(300),
+  premise: z.string().trim().min(1).max(PREMISE_MAX_CHARS),
   pageLength: z
     .number()
     .int()
@@ -51,29 +55,6 @@ const STORY_PROPOSAL_RESPONSE_SCHEMA = {
   required: ['storyline', 'alternates'],
   additionalProperties: false,
 } as const;
-
-const STORY_PROPOSAL_SYSTEM_PROMPT =
-  "You are a warm picture-book story consultant for a children's book studio. A parent gives you their own little story idea and the cast of characters. You grow it into ONE inviting storyline the parent will instantly recognize as their idea — never replacing it, only shaping it into a clear beginning-middle-end a toddler would love. You stay grounded in what the parent said and keep every character they named.";
-
-function buildStoryProposalPrompt(input: z.infer<typeof proposeRequestSchema>): string {
-  const castLines = input.cast
-    .map((c) => `- ${c.name} (${c.kind.toLowerCase()}${c.isStar ? ', the star' : ''})`)
-    .join('\n');
-  const langNote =
-    input.language === 'ja'
-      ? 'Write the storyline and alternates in natural, warm Japanese for a toddler.'
-      : 'Write the storyline and alternates in warm, simple English for a toddler.';
-  return `The parent's story idea, in their words: "${input.premise}"
-
-The cast for this ${input.pageLength}-page picture book:
-${castLines}
-
-Shape their idea into a storyline:
-- "storyline": ONE short paragraph (at most 280 characters) that keeps the parent's idea and every named character, with a clear beginning, a middle, and a gentle ending a small child would enjoy. Recognisably THEIR story, grown — not a new one.
-- "alternates": exactly TWO other short takes on the SAME idea and cast (each at most 280 characters), each a genuinely different direction.
-
-${langNote}`;
-}
 
 /**
  * D3: proposal-only story helper. One gpt-5-mini call turns the parent's raw

@@ -146,7 +146,8 @@
     "titleLabel": "えほんの タイトル",
     "titlePlaceholder": "タイトルを つけましょう",
     "titleThinking": "タイトルを かんがえています…",
-    "eventSummaryPlaceholder": "なにが あったか おしえてください",
+    "eventSummaryPlaceholder": "おおきな すなの おしろを つくって、なみが きたの…",
+    "eventSummaryHint": "なにを おぼえているか お子さんに きいてみて。そのまま はなしても かいても いいよ。",
     "skip": "スキップ",
     "someoneElse": "そのほか…",
     "someoneElsePlaceholder": "よびかたを いれてね",
@@ -539,7 +540,9 @@
     "sparkTitle": "お話のたねをえらぼう",
     "sparkHint": "ここからお話がふくらみます",
     "sparkCustom": "じぶんで書く…",
-    "sparkPlaceholder": "どんなお話にする？",
+    "sparkPlaceholder": "くらやみがこわいドラゴンがいてね、マヤがナイトライトをさがしてあげるの…",
+    "sparkHintCoCreate": "まよったら、つぎに なにが おこるか お子さんに きいてみて。そのまま はなしても かいても いいよ。",
+    "sparkCharsLeft": "のこり{count}文字",
     "sparkRainy": "雨の日のだいさくせん",
     "sparkPicnic": "とんでいったピクニック",
     "sparkFort": "もうふのおしろ",
@@ -572,7 +575,7 @@
     "helperSounds": "いい感じ！",
     "helperMore": "ほかのアイデア",
     "helperEdit": "書きかえる",
-    "helperSkip": "スキップ",
+    "helperSkip": "じぶんのことばで",
     "helperThinking": "お話のアイデアを考えています…"
   }
 }

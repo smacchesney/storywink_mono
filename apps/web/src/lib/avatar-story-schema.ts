@@ -4,7 +4,7 @@
  * export handlers).
  */
 import { z } from 'zod';
-import { AVATAR_STORY_PAGE_LENGTHS } from './avatar-story';
+import { AVATAR_STORY_PAGE_LENGTHS, PREMISE_MAX_CHARS } from './avatar-story';
 
 export const createAvatarBookSchema = z.object({
   bookType: z.literal('AVATAR_STORY'),
@@ -12,7 +12,7 @@ export const createAvatarBookSchema = z.object({
     .array(z.string().cuid())
     .min(1, { message: 'Pick at least one character.' })
     .max(6, { message: 'Six characters at most.' }),
-  premise: z.string().trim().min(1).max(300),
+  premise: z.string().trim().min(1).max(PREMISE_MAX_CHARS),
   pageLength: z
     .number()
     .int()
