@@ -27,6 +27,8 @@ import {
   runQcBatches,
   selectRequeuePageIds,
   isQcErrorFeedback,
+  sentinelCoverResult,
+  buildQcRows,
   type QcBatchOutcome,
 } from '../lib/qc-batching.js';
 import { characterSheetsEnabled, sheetRefsForStyle } from '../lib/character-sheets.js';
@@ -124,32 +126,110 @@ async function runQualityCheck(
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  // Split the book into small batches so no single vision call carries the
-  // whole book (the oversized-call failure mode that shipped a book with ZERO
-  // QC rows). Each batch re-sends the sheets ground truth; the cover rides
-  // batch 0 only (it must be scored once, not once per batch).
-  const batches = partitionQcPages(illustratedPages);
-
-  const scoreBatch = async (
-    batch: typeof illustratedPages,
-    batchIndex: number,
-    includeCover: boolean,
-  ): Promise<QcBatchOutcome> => {
-    const contentParts: Array<
+  // One JSON-schema'd judge call, shared by the page batches and the isolated
+  // cover call. Throws on an empty response (an infra failure, not a pass) —
+  // callers catch and record a sentinel.
+  const callQcJudge = async (
+    contentParts: Array<
       | { type: 'input_text'; text: string }
       | { type: 'input_image'; image_url: string; detail: 'high' }
-    > = [...sheetParts];
+    >,
+  ): Promise<{
+    passed: boolean;
+    summary: string;
+    coverResult?: CoverQCResult | null;
+    pageResults: RawQcPageResult[];
+  }> => {
+    const result = await openai.responses.create({
+      model: ANALYSIS_MODEL,
+      instructions: QC_SYSTEM_PROMPT,
+      input: [{ role: 'user', content: contentParts }],
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'qc_response',
+          strict: true,
+          schema: QC_RESPONSE_SCHEMA as Record<string, unknown>,
+        },
+      },
+    });
+    const rawResult = result.output_text;
+    if (!rawResult) throw new Error('OpenAI QC returned empty response');
+    return JSON.parse(rawResult);
+  };
 
-    // The cover (non-numeric label too); scored via the coverResult schema
-    // field with its own rubric variant, never via pageResults. Only batch 0.
-    if (includeCover && cover) {
+  // COVER: its own ISOLATED scoring call (sheets + cover only, same rubric
+  // machinery) so a page-batch failure can never forfeit cover verification
+  // and a cover failure can never taint the pages. Throw/empty/omitted →
+  // cover sentinel, persisted like a page sentinel; the qc_error prefix keeps
+  // it from ever buying a regen off garbage feedback.
+  let coverResult: CoverQCResult | null = null;
+  if (cover) {
+    try {
+      const contentParts: typeof sheetParts = [...sheetParts];
+      // Non-numeric label; scored via the coverResult schema field with its
+      // own rubric variant, never via pageResults.
       contentParts.push({ type: 'input_text', text: 'COVER' });
       contentParts.push({
         type: 'input_image',
         image_url: optimizeCloudinaryUrlForVision(cover.url),
         detail: 'high',
       });
+      // pageCount 0: this call carries no "PAGE n" images — only the cover,
+      // whose rubric section instructs the judge to fill coverResult.
+      contentParts.push({
+        type: 'input_text',
+        text: createQCPrompt(characterIdentity, 0, language, {
+          sheetCount: sheets.length,
+          cover: { expectedTitle: cover.expectedTitle },
+        }),
+      });
+
+      const parsed = await callQcJudge(contentParts);
+      coverResult = parsed.coverResult ?? sentinelCoverResult('no cover result returned');
+    } catch (err) {
+      coverResult = sentinelCoverResult(err instanceof Error ? err.message : 'Unknown error');
     }
+
+    const coverErrored = isQcErrorFeedback(coverResult.suggestedPromptAdditions);
+    if (coverErrored) {
+      logger.error(
+        {
+          bookId,
+          event: 'qc_cover_result',
+          ok: false,
+          error: coverResult.suggestedPromptAdditions,
+        },
+        'QC cover call failed — sentinel recorded',
+      );
+    } else {
+      logger.info(
+        { bookId, event: 'qc_cover_result', ok: true, passed: coverResult.passed },
+        'QC cover scored',
+      );
+    }
+    console.log(
+      `[BookFinalize/QC] cover: ${
+        coverErrored
+          ? `error — ${coverResult.suggestedPromptAdditions}`
+          : coverResult.passed
+            ? 'passed'
+            : 'failed'
+      }`,
+    );
+  }
+
+  // Split the book into small batches so no single vision call carries the
+  // whole book (the oversized-call failure mode that shipped a book with ZERO
+  // QC rows). Each batch re-sends the sheets ground truth; batches carry
+  // pages ONLY (the cover was scored above).
+  const batches = partitionQcPages(illustratedPages);
+
+  const scoreBatch = async (
+    batch: typeof illustratedPages,
+    batchIndex: number,
+  ): Promise<QcBatchOutcome> => {
+    const contentParts: typeof sheetParts = [...sheetParts];
 
     // Per-batch "PAGE n" ordinals restart at 1 — the judge's echo indexes THIS
     // batch's local pageMapping, not a book-wide position. BRIDGE ordinals are
@@ -169,38 +249,13 @@ async function runQualityCheck(
 
     const promptText = createQCPrompt(characterIdentity, pageMapping.length, language, {
       sheetCount: sheets.length,
-      cover: includeCover && cover ? { expectedTitle: cover.expectedTitle } : null,
       // Books without BRIDGE rows yield an empty list and a byte-identical
       // prompt, so the flag-off default is untouched.
       ...(bridgePageOrdinals.length ? { bridgePageOrdinals } : {}),
     });
     contentParts.push({ type: 'input_text', text: promptText });
 
-    const result = await openai.responses.create({
-      model: ANALYSIS_MODEL,
-      instructions: QC_SYSTEM_PROMPT,
-      input: [{ role: 'user', content: contentParts }],
-      text: {
-        format: {
-          type: 'json_schema',
-          name: 'qc_response',
-          strict: true,
-          schema: QC_RESPONSE_SCHEMA as Record<string, unknown>,
-        },
-      },
-    });
-
-    const rawResult = result.output_text;
-    // Throw (caught by runQcBatches → sentinel rows) rather than silently
-    // dropping the batch: an empty response is an infra failure, not a pass.
-    if (!rawResult) throw new Error('OpenAI QC returned empty response');
-
-    const parsed = JSON.parse(rawResult) as {
-      passed: boolean;
-      summary: string;
-      coverResult?: CoverQCResult | null;
-      pageResults: RawQcPageResult[];
-    };
+    const parsed = await callQcJudge(contentParts);
 
     const { mapped, unmatchedEchoes } = mapQcResultsToPages(parsed.pageResults, pageMapping);
     if (unmatchedEchoes.length > 0) {
@@ -210,16 +265,13 @@ async function runQualityCheck(
       );
     }
 
-    return {
-      pageResults: mapped,
-      coverResult: includeCover && cover ? (parsed.coverResult ?? null) : null,
-    };
+    return { pageResults: mapped };
   };
 
   // Batch failures are isolated: one throwing batch yields sentinel rows for
   // its pages (persisted, never requeued) while the other batches' real
   // results stand. Guarantees exactly one page result per illustrated page.
-  const { pageResults, coverResult, logs } = await runQcBatches(batches, scoreBatch, (log) => {
+  const { pageResults, logs } = await runQcBatches(batches, scoreBatch, (log) => {
     if (log.ok) {
       logger.info({ bookId, ...log }, 'QC batch scored');
     } else {
@@ -250,9 +302,9 @@ async function runQualityCheck(
     pageResults,
     failedPageIds,
     summary: `${failedPageIds.length} genuine failure(s), ${sentinelCount} unverified page(s) across ${batches.length} batch(es) (${batchesFailed} batch error(s)).`,
-    // Only meaningful when a cover was in the call; ignore any hallucinated
-    // value otherwise. The cover rides batch 0.
-    coverResult: cover ? coverResult : null,
+    // From the isolated cover call: real verdict, or a qc_error sentinel when
+    // that call failed. Null only when no cover was in this QC run.
+    coverResult,
   };
 
   logger.info(
@@ -626,52 +678,25 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
               book.coverAssetId,
               book.bookType,
             );
+            // buildQcRows is the single place the row shape (and the qc_error
+            // sentinel's NULL scores) is defined — unit-tested directly.
             await prisma.illustrationQcResult.createMany({
-              data: [
-                ...qcResult.pageResults.map((r) => {
-                  // qc_error sentinel: the batch call threw/returned nothing.
-                  // Persist the row (invariant: every page has a QC row) but
-                  // with NULL scores — the placeholder 0s are not a verdict.
-                  const qcErrored = isQcErrorFeedback(r.suggestedPromptAdditions);
-                  const meta = renderMetaByPageId.get(r.pageId);
-                  return {
-                    bookId,
-                    pageId: r.pageId,
-                    target: 'page',
-                    qcRound,
-                    charScore: qcErrored ? null : r.characterConsistencyScore,
-                    styleScore: qcErrored ? null : r.styleConsistencyScore,
-                    overallScore: qcErrored ? null : r.overallScore,
-                    passed: r.passed,
-                    provider: meta?.provider ?? null,
-                    model: meta?.model ?? null,
-                    hadSheet: meta?.hadSheet ?? false,
-                    feedback: r.suggestedPromptAdditions,
-                  };
-                }),
-                // target='cover' keeps cover rows out of page-drift stats.
-                ...(coverForQc && qcResult.coverResult
-                  ? [
-                      {
-                        bookId,
-                        pageId: null,
-                        target: 'cover',
-                        qcRound,
-                        charScore: qcResult.coverResult.characterConsistencyScore,
-                        styleScore: qcResult.coverResult.styleConsistencyScore,
-                        overallScore: qcResult.coverResult.overallScore,
-                        passed: qcResult.coverResult.passed,
-                        provider: (titlePage as any)?.lastRenderProvider ?? null,
-                        model: (titlePage as any)?.lastRenderModel ?? null,
-                        // The cover is rendered by the same job as the interior
-                        // title page, so its sheet attribution follows the
-                        // title page's render-time stamp too.
-                        hadSheet: (titlePage as any)?.lastRenderHadSheet ?? false,
-                        feedback: qcResult.coverResult.suggestedPromptAdditions,
-                      },
-                    ]
-                  : []),
-              ],
+              data: buildQcRows({
+                bookId,
+                qcRound,
+                pageResults: qcResult.pageResults,
+                renderMetaByPageId,
+                // Real verdict OR qc_error sentinel — a cover that was in the
+                // run always leaves a row, even when its call failed.
+                coverResult: coverForQc ? (qcResult.coverResult ?? null) : null,
+                // The cover is rendered by the same job as the interior title
+                // page, so its attribution follows the title page's stamps.
+                coverMeta: {
+                  provider: (titlePage as any)?.lastRenderProvider ?? null,
+                  model: (titlePage as any)?.lastRenderModel ?? null,
+                  hadSheet: (titlePage as any)?.lastRenderHadSheet ?? false,
+                },
+              }),
             });
           } catch (persistError: any) {
             logger.warn(
@@ -693,10 +718,14 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
             !qcResult.passed &&
             book.pages.some((p: any) => p.isTitlePage && qcResult.failedPageIds.includes(p.id)),
         );
+        // A qc_error cover sentinel never buys a regen: the cover was not
+        // judged, so there is no quality verdict (and no usable feedback) to
+        // regenerate from — the sentinel row is the record that QC didn't run.
         if (
           coverForQc &&
           qcResult?.coverResult &&
           !qcResult.coverResult.passed &&
+          !isQcErrorFeedback(qcResult.coverResult.suggestedPromptAdditions) &&
           qcRound === 0 &&
           !titlePageRequeued
         ) {

@@ -1,15 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import type { PageQCResult } from '@storywink/shared/types';
+import type { PageQCResult, CoverQCResult } from '@storywink/shared/types';
 import {
   QC_BATCH_MAX_PAGES,
   QC_ERROR_PREFIX,
   isQcErrorFeedback,
   partitionQcPages,
   sentinelPageResult,
+  sentinelCoverResult,
   selectRequeuePageIds,
   runQcBatches,
+  buildQcRows,
   type QcBatchPageInfo,
-  type QcBatchOutcome,
+  type QcRenderMeta,
 } from './qc-batching.js';
 
 function realResult(overrides: Partial<PageQCResult> = {}): PageQCResult {
@@ -21,6 +23,19 @@ function realResult(overrides: Partial<PageQCResult> = {}): PageQCResult {
     characterConsistencyScore: 8,
     styleConsistencyScore: 8,
     overallScore: 8,
+    suggestedPromptAdditions: null,
+    ...overrides,
+  };
+}
+
+function realCoverResult(overrides: Partial<CoverQCResult> = {}): CoverQCResult {
+  return {
+    passed: true,
+    titleMatches: true,
+    characterConsistencyScore: 7,
+    styleConsistencyScore: 7,
+    overallScore: 7,
+    issues: [],
     suggestedPromptAdditions: null,
     ...overrides,
   };
@@ -85,7 +100,7 @@ describe('partitionQcPages', () => {
   });
 });
 
-describe('isQcErrorFeedback / sentinelPageResult', () => {
+describe('isQcErrorFeedback / sentinelPageResult / sentinelCoverResult', () => {
   it('recognizes the qc_error prefix', () => {
     expect(isQcErrorFeedback('qc_error: boom')).toBe(true);
     expect(isQcErrorFeedback(`${QC_ERROR_PREFIX} anything`)).toBe(true);
@@ -97,12 +112,20 @@ describe('isQcErrorFeedback / sentinelPageResult', () => {
     expect(isQcErrorFeedback('HAIR COLOR WRONG: must be black')).toBe(false);
   });
 
-  it('builds a sentinel with false pass, placeholder scores, and prefixed feedback', () => {
+  it('builds a page sentinel with false pass, placeholder scores, and prefixed feedback', () => {
     const s = sentinelPageResult({ pageNumber: 4, pageId: 'page-4' }, 'request timed out');
     expect(s.pageId).toBe('page-4');
     expect(s.pageNumber).toBe(4);
     expect(s.passed).toBe(false);
     expect(s.suggestedPromptAdditions).toBe('qc_error: request timed out');
+    expect(isQcErrorFeedback(s.suggestedPromptAdditions)).toBe(true);
+  });
+
+  it('builds a cover sentinel: unverified (not passed, title unconfirmed), prefixed feedback', () => {
+    const s = sentinelCoverResult('cover call exploded');
+    expect(s.passed).toBe(false);
+    expect(s.titleMatches).toBe(false);
+    expect(s.suggestedPromptAdditions).toBe('qc_error: cover call exploded');
     expect(isQcErrorFeedback(s.suggestedPromptAdditions)).toBe(true);
   });
 });
@@ -139,38 +162,22 @@ describe('selectRequeuePageIds', () => {
 });
 
 describe('runQcBatches', () => {
-  const okOutcome = (batch: QcBatchPageInfo[]): QcBatchOutcome => ({
+  const okOutcome = (batch: QcBatchPageInfo[]) => ({
     pageResults: batch.map((p) =>
       realResult({ pageId: p.pageId, pageNumber: p.pageNumber, passed: true }),
     ),
   });
 
-  it('one batch throws: sentinels for exactly that batch, real results for the others, cover preserved', async () => {
+  it('one batch throws: sentinels for exactly that batch, real results for the others', async () => {
     const batches = [
       [pageInfo(1), pageInfo(2), pageInfo(3)],
       [pageInfo(4), pageInfo(5), pageInfo(6)],
     ];
 
-    const { pageResults, coverResult, logs } = await runQcBatches(
-      batches,
-      async (batch, index, includeCover) => {
-        if (index === 1) throw new Error('rate limited');
-        return {
-          ...okOutcome(batch),
-          coverResult: includeCover
-            ? {
-                passed: true,
-                titleMatches: true,
-                characterConsistencyScore: 7,
-                styleConsistencyScore: 7,
-                overallScore: 7,
-                issues: [],
-                suggestedPromptAdditions: null,
-              }
-            : null,
-        };
-      },
-    );
+    const { pageResults, logs } = await runQcBatches(batches, async (batch, index) => {
+      if (index === 1) throw new Error('rate limited');
+      return okOutcome(batch);
+    });
 
     // Batch 0 pages are real, batch 1 pages are sentinels.
     const byId = new Map(pageResults.map((r) => [r.pageId, r]));
@@ -182,9 +189,6 @@ describe('runQcBatches', () => {
       expect(byId.get(id)!.suggestedPromptAdditions).toBe('qc_error: rate limited');
     }
 
-    // Cover verdict came from batch 0 and survived.
-    expect(coverResult?.passed).toBe(true);
-
     // The errored batch is NOT requeued; genuine fails would be — here none.
     expect(selectRequeuePageIds(pageResults)).toEqual([]);
 
@@ -195,14 +199,14 @@ describe('runQcBatches', () => {
     ]);
   });
 
-  it('all batches fail: every page gets a sentinel, no requeues, cover null', async () => {
+  it('all batches fail: every page gets a sentinel, no requeues', async () => {
     const batches = [
       [pageInfo(1), pageInfo(2)],
       [pageInfo(3), pageInfo(4)],
     ];
 
     const captured: string[] = [];
-    const { pageResults, coverResult } = await runQcBatches(
+    const { pageResults } = await runQcBatches(
       batches,
       async () => {
         throw new Error('QC outage');
@@ -214,7 +218,6 @@ describe('runQcBatches', () => {
     expect(pageResults.every((r) => r.passed === false)).toBe(true);
     expect(pageResults.every((r) => isQcErrorFeedback(r.suggestedPromptAdditions))).toBe(true);
     expect(selectRequeuePageIds(pageResults)).toEqual([]);
-    expect(coverResult).toBeNull();
     expect(captured).toEqual(['0:false', '1:false']);
   });
 
@@ -259,16 +262,172 @@ describe('runQcBatches', () => {
     // A back-filled omission still never requeues.
     expect(selectRequeuePageIds(pageResults)).toEqual([]);
   });
+});
 
-  it('offers the cover to batch 0 only', async () => {
-    const batches = [[pageInfo(1)], [pageInfo(2)], [pageInfo(3)]];
-    const coverOffered: boolean[] = [];
+describe('buildQcRows (the exact shape persisted to IllustrationQcResult)', () => {
+  const meta = (over: Partial<QcRenderMeta> = {}): QcRenderMeta => ({
+    provider: 'gemini',
+    model: 'gemini-3.1-flash-image-preview',
+    hadSheet: true,
+    ...over,
+  });
 
-    await runQcBatches(batches, async (batch, _index, includeCover) => {
-      coverOffered.push(includeCover);
-      return okOutcome(batch);
+  const base = {
+    bookId: 'book-1',
+    qcRound: 0,
+    coverResult: null,
+    coverMeta: meta(),
+  };
+
+  it('writes a qc_error page row with passed=false, ALL scores null, prefixed feedback', () => {
+    const rows = buildQcRows({
+      ...base,
+      pageResults: [sentinelPageResult({ pageNumber: 3, pageId: 'page-3' }, 'rate limited')],
+      renderMetaByPageId: new Map([['page-3', meta()]]),
     });
 
-    expect(coverOffered).toEqual([true, false, false]);
+    expect(rows).toEqual([
+      {
+        bookId: 'book-1',
+        pageId: 'page-3',
+        target: 'page',
+        qcRound: 0,
+        charScore: null,
+        styleScore: null,
+        overallScore: null,
+        passed: false,
+        provider: 'gemini',
+        model: 'gemini-3.1-flash-image-preview',
+        hadSheet: true,
+        feedback: 'qc_error: rate limited',
+      },
+    ]);
+  });
+
+  it('keeps real scores on a genuinely scored page row (pass and fail alike)', () => {
+    const rows = buildQcRows({
+      ...base,
+      pageResults: [
+        realResult({ pageId: 'page-1', pageNumber: 1 }),
+        realResult({
+          pageId: 'page-2',
+          pageNumber: 2,
+          passed: false,
+          characterConsistencyScore: 3,
+          styleConsistencyScore: 5,
+          overallScore: 4,
+          suggestedPromptAdditions: 'HAIR COLOR WRONG: must be black',
+        }),
+      ],
+      renderMetaByPageId: new Map([
+        ['page-1', meta()],
+        ['page-2', meta({ provider: 'openai', model: 'gpt-image-2', hadSheet: false })],
+      ]),
+    });
+
+    expect(rows[0]).toMatchObject({
+      pageId: 'page-1',
+      target: 'page',
+      charScore: 8,
+      styleScore: 8,
+      overallScore: 8,
+      passed: true,
+      feedback: null,
+    });
+    expect(rows[1]).toMatchObject({
+      pageId: 'page-2',
+      charScore: 3,
+      styleScore: 5,
+      overallScore: 4,
+      passed: false,
+      provider: 'openai',
+      model: 'gpt-image-2',
+      hadSheet: false,
+      feedback: 'HAIR COLOR WRONG: must be black',
+    });
+  });
+
+  it('defaults missing render meta to nulls / false rather than dropping the row', () => {
+    const rows = buildQcRows({
+      ...base,
+      pageResults: [realResult({ pageId: 'page-9', pageNumber: 9 })],
+      renderMetaByPageId: new Map(),
+    });
+
+    expect(rows[0]).toMatchObject({
+      pageId: 'page-9',
+      provider: null,
+      model: null,
+      hadSheet: false,
+    });
+  });
+
+  it('writes a cover SENTINEL row: pageId null, target cover, null scores, qc_error feedback', () => {
+    const rows = buildQcRows({
+      ...base,
+      pageResults: [],
+      renderMetaByPageId: new Map(),
+      coverResult: sentinelCoverResult('cover call exploded'),
+      coverMeta: meta({ provider: 'openai', model: 'gpt-image-2' }),
+    });
+
+    expect(rows).toEqual([
+      {
+        bookId: 'book-1',
+        pageId: null,
+        target: 'cover',
+        qcRound: 0,
+        charScore: null,
+        styleScore: null,
+        overallScore: null,
+        passed: false,
+        provider: 'openai',
+        model: 'gpt-image-2',
+        hadSheet: true,
+        feedback: 'qc_error: cover call exploded',
+      },
+    ]);
+  });
+
+  it('writes a real cover row with its scores intact', () => {
+    const rows = buildQcRows({
+      ...base,
+      pageResults: [],
+      renderMetaByPageId: new Map(),
+      coverResult: realCoverResult({
+        passed: false,
+        titleMatches: false,
+        suggestedPromptAdditions: 'TITLE GARBLED: reads "Corel", must read "Coral"',
+      }),
+    });
+
+    expect(rows).toEqual([
+      {
+        bookId: 'book-1',
+        pageId: null,
+        target: 'cover',
+        qcRound: 0,
+        charScore: 7,
+        styleScore: 7,
+        overallScore: 7,
+        passed: false,
+        provider: 'gemini',
+        model: 'gemini-3.1-flash-image-preview',
+        hadSheet: true,
+        feedback: 'TITLE GARBLED: reads "Corel", must read "Coral"',
+      },
+    ]);
+  });
+
+  it('writes no cover row when there was no cover in the QC run', () => {
+    const rows = buildQcRows({
+      ...base,
+      pageResults: [realResult({ pageId: 'page-1', pageNumber: 1 })],
+      renderMetaByPageId: new Map([['page-1', meta()]]),
+      coverResult: null,
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].target).toBe('page');
   });
 });
