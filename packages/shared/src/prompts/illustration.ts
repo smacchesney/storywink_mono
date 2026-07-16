@@ -295,7 +295,7 @@ function buildBridgeSceneSection(bridgeScene: BridgeScene | null | undefined): s
  * scene failed validation, the page text carries the moment instead.
  */
 function buildAvatarSceneSection(
-  scene: AvatarPageScene | BridgeScene | null | undefined,
+  scene: AvatarPageScene | null | undefined,
   pageText: string | null,
 ): string {
   // Empty scene cast = a deliberate establishing shot: the instruction must
@@ -308,10 +308,14 @@ function buildAvatarSceneSection(
   }`;
 
   if (!scene) {
+    // L2: the raw page text is a null-scene fallback ONLY (validation failed).
+    // Strip shouty/quoted sound tokens first — otherwise a stored refrain like
+    // 'SPLASH!' would ride into the render prompt as renderable lettering.
+    const safeText = sanitizeIllustrationNotes(pageText);
     return [
       header,
       `Compose the moment this page's story text describes (the moment to depict, not caption copy)${
-        pageText ? `: "${pageText}"` : '.'
+        safeText ? `: "${safeText}"` : '.'
       }`,
     ].join(' ');
   }
@@ -320,7 +324,13 @@ function buildAvatarSceneSection(
   return [
     header,
     `Compose this moment: ${scene.action}.`,
+    // L1: the composition-focus directive — who the picture is ABOUT. Any cast
+    // name here is neutralized by the caller's neutralize() wrap (this whole
+    // section is wrapped), so it never smuggles a display name past the diet.
+    scene.focus && scene.focus.trim() ? `Center the composition on ${scene.focus.trim()}.` : null,
     `Set the scene in ${scene.location}, at ${scene.timeOfDay}.`,
+    // L1: the mood directive — how the moment FEELS (lights, expressions, pose).
+    scene.mood && scene.mood.trim() ? `The mood of this moment: ${scene.mood.trim()}.` : null,
     props.length ? `The following objects should appear in the scene: ${props.join(', ')}.` : null,
   ]
     .filter(Boolean)
@@ -432,7 +442,10 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
   //      anchors the cover repaint
   const bridgeSection = neutralize(
     contentAnchor === 'sheet'
-      ? buildAvatarSceneSection(opts.bridgeScene, opts.pageText)
+      ? buildAvatarSceneSection(
+          opts.bridgeScene as AvatarPageScene | null | undefined,
+          opts.pageText,
+        )
       : contentAnchor === 'interior'
         ? buildInteriorAnchorSection()
         : buildBridgeSceneSection(opts.bridgeScene as BridgeScene | null | undefined),

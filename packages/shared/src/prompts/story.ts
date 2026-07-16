@@ -598,6 +598,19 @@ export interface AvatarPageScene {
   /** characterIds from the cast roster (avatar_1, avatar_2, ...). */
   charactersPresent: string[];
   props: string[];
+  /**
+   * X13 Track L: the page's emotional beat (1-3 words, seeded from the
+   * storyArc.emotionalPeak trajectory) — drives the renderer's mood directive
+   * and the QC moodMismatch telemetry. Optional/nullable: older persisted
+   * scenes and degraded parses carry no mood.
+   */
+  mood?: string | null;
+  /**
+   * X13 Track L: the single character+action the composition centers on
+   * ("Kai reaching for the lantern") — drives the renderer's focus directive.
+   * Optional/nullable for the same degrade-safety reason as `mood`.
+   */
+  focus?: string | null;
 }
 
 export interface AvatarStoryPageResponse extends StoryPageResponse {
@@ -630,8 +643,18 @@ const AVATAR_PAGE_SCENE_SCHEMA = {
       items: { type: 'string' },
       description: 'Concrete objects in the scene (keep recurring props consistent)',
     },
+    mood: {
+      type: ['string', 'null'],
+      description:
+        'The emotional beat of THIS page in 1-3 words ("gleeful", "hushed wonder"), drawn from the storyArc.emotionalPeak trajectory — how the moment FEELS, not what happens. Null only if genuinely neutral.',
+    },
+    focus: {
+      type: ['string', 'null'],
+      description:
+        'The single character + action the picture is ABOUT ("Kai reaching for the lantern") — who owns the composition on this page. Null only when the page is a pure establishing shot with no focal character.',
+    },
   },
-  required: ['location', 'timeOfDay', 'action', 'charactersPresent', 'props'],
+  required: ['location', 'timeOfDay', 'action', 'charactersPresent', 'props', 'mood', 'focus'],
   additionalProperties: false,
 } as const;
 
@@ -748,10 +771,12 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
   // ---------- SCENES ----------
   const sceneInstructions = [
     `# Scenes (REQUIRED for every page — the illustrator has NO photos):`,
-    `- For EACH page fill "scene": location, timeOfDay, action, charactersPresent, props.`,
+    `- For EACH page fill "scene": location, timeOfDay, action, charactersPresent, props, mood, focus.`,
     `- "charactersPresent" lists the characterIds (from The Cast above) actually visible on that page. The star should appear on most pages.`,
     `- "scene.action" must name WHO does WHAT, matching the focal beat of this page's text — and every character the page text names as present or acting on this page MUST appear in "charactersPresent" (the illustrator sees ONLY the scene, never the text — a name left out of charactersPresent vanishes from the picture).`,
     `- When the page text makes it unambiguous WHO holds a prop, phrase that prop with its holder inside the props string — e.g. "lantern held by Kai". When the holder is not clear, use a plain prop name.`,
+    `- "scene.mood" is the emotional beat of THIS page in 1-3 words ("gleeful", "hushed wonder", "brave"). Track the storyArc's emotionalPeak trajectory across the book — the mood should build toward the peak and settle after it, so the illustrator can light and pose the moment to FEEL right, not just look right.`,
+    `- "scene.focus" is the single character + action the picture is ABOUT ("Kai reaching for the lantern") — the one figure whose moment the composition centers on. It names who OWNS the page, drawn from charactersPresent; the rest support them.`,
     `- Keep the world CONTINUOUS: locations flow into each other (garden → gate → lane), time of day moves forward, recurring props stay consistent.`,
     `- Keep scenes concrete and drawable: one clear action per page, simple settings a toddler recognizes.`,
   ].join('\n');

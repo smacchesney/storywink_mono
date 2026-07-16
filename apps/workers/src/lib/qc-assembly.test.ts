@@ -111,7 +111,7 @@ describe('heldPropsForPage', () => {
 });
 
 describe('pageFeedFor', () => {
-  it('bundles text, cast, and held props — the exact judge feed the telemetry mirrors', () => {
+  it('bundles text, cast, held props, and scene meaning — the exact judge feed the telemetry mirrors', () => {
     const p = page(2, { bridgeScene: { props: ['lantern held by Kai'] } });
     expect(pageFeedFor(identity, p)).toEqual({
       text: 'Text of page 2.',
@@ -120,7 +120,19 @@ describe('pageFeedFor', () => {
         { name: 'Grypho', species: 'a green toy crocodile' },
       ],
       props: ['lantern held by Kai'],
+      // No mood/focus on this scene → the meaning channel degrades to null.
+      mood: null,
+      focus: null,
     });
+  });
+
+  it('surfaces the story-authored mood + focus when the avatar scene carries them (L1)', () => {
+    const p = page(2, {
+      bridgeScene: { props: [], mood: 'gleeful', focus: 'Kai splashing into the puddle' },
+    });
+    const feed = pageFeedFor(identity, p);
+    expect(feed.mood).toBe('gleeful');
+    expect(feed.focus).toBe('Kai splashing into the puddle');
   });
 
   it('nulls missing text', () => {

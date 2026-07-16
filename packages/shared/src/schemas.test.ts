@@ -3,6 +3,7 @@ import {
   createBookSchema,
   additionalCharacterSchema,
   bridgePageResponseSchema,
+  avatarPageSceneSchema,
 } from './schemas.js';
 
 describe('createBookSchema', () => {
@@ -113,5 +114,38 @@ describe('bridgePageResponseSchema (story response additions)', () => {
       false,
     );
     expect(bridgePageResponseSchema.safeParse({ ...valid, afterPhotoPage: 0 }).success).toBe(false);
+  });
+});
+
+describe('avatarPageSceneSchema (X13 Track L — mood + focus survive extraction)', () => {
+  const valid = {
+    location: 'the rainy garden',
+    timeOfDay: 'morning',
+    action: 'tiptoeing to the gate',
+    charactersPresent: ['avatar_1'],
+    props: ['red umbrella'],
+  };
+
+  it('keeps mood + focus when the model emits them (BLOCKER: zod must NOT strip them)', () => {
+    const parsed = avatarPageSceneSchema.parse({
+      ...valid,
+      mood: 'hushed wonder',
+      focus: 'Emma reaching for the gate latch',
+    });
+    expect(parsed.mood).toBe('hushed wonder');
+    expect(parsed.focus).toBe('Emma reaching for the gate latch');
+  });
+
+  it('degrades safely: absent mood/focus default to null, never a parse failure', () => {
+    expect(avatarPageSceneSchema.safeParse(valid).success).toBe(true);
+    const parsed = avatarPageSceneSchema.parse(valid);
+    expect(parsed.mood).toBe(null);
+    expect(parsed.focus).toBe(null);
+  });
+
+  it('accepts an explicit null for mood/focus', () => {
+    const parsed = avatarPageSceneSchema.parse({ ...valid, mood: null, focus: null });
+    expect(parsed.mood).toBe(null);
+    expect(parsed.focus).toBe(null);
   });
 });

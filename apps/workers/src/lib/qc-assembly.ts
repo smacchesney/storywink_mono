@@ -91,6 +91,24 @@ export function heldPropsForPage(page: { bridgeScene?: unknown }): string[] {
 }
 
 /**
+ * X13 Track L: the story-authored mood + composition focus for a page. Present
+ * only on avatar scenes (photo/bridge scenes never carry them), so this
+ * degrades to null/null and the moodMismatch class stays a no-op elsewhere.
+ */
+export function sceneMeaningForPage(page: { bridgeScene?: unknown }): {
+  mood: string | null;
+  focus: string | null;
+} {
+  const scene = page.bridgeScene;
+  if (!scene || typeof scene !== 'object') return { mood: null, focus: null };
+  const s = scene as { mood?: unknown; focus?: unknown };
+  return {
+    mood: typeof s.mood === 'string' && s.mood.trim() ? s.mood : null,
+    focus: typeof s.focus === 'string' && s.focus.trim() ? s.focus : null,
+  };
+}
+
+/**
  * One page's judge feed (text + expected cast + held props) — used for both
  * the per-page prompt context (with an ordinal, in `assembleQcBatchParts`) and
  * the `qc_class_flags` telemetry record, so the telemetry always describes
@@ -100,10 +118,13 @@ export function pageFeedFor(
   characterIdentity: CharacterIdentity | null,
   page: QcAssemblyPage,
 ): QcClassFlagFeed {
+  const { mood, focus } = sceneMeaningForPage(page);
   return {
     text: page.text ?? null,
     cast: expectedCastForPage(characterIdentity, page),
     props: heldPropsForPage(page),
+    mood,
+    focus,
   };
 }
 

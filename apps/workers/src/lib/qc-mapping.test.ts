@@ -141,6 +141,8 @@ describe('mapQcResultsToPages', () => {
       speciesMismatch: true,
       characterHybrid: false,
       propHolderMismatch: false,
+      // L1: a partial judge blob without moodMismatch normalizes to the null default.
+      moodMismatch: null,
       focalActionMismatch: null,
     });
   });

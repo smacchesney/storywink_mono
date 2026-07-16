@@ -120,6 +120,12 @@ export const avatarPageSceneSchema = z.object({
   action: z.string().min(1).max(500),
   charactersPresent: z.array(z.string().min(1).max(100)).max(8),
   props: z.array(z.string().max(200)).max(10),
+  // X13 Track L — meaning channel. The generation schema carries these as
+  // required-nullable; here they are nullable AND defaulted so an absent key
+  // (older stored scenes, a partial model reply) degrades to null instead of
+  // being silently STRIPPED (a plain z.object drops unknown keys — the BLOCKER).
+  mood: z.string().max(100).nullable().default(null),
+  focus: z.string().max(300).nullable().default(null),
 });
 
 // Type exports

@@ -78,8 +78,23 @@ describe('extractAvatarScene', () => {
     props: ['red umbrella'],
   };
 
-  it('accepts a valid scene verbatim', () => {
-    expect(extractAvatarScene(validScene, ['avatar_1', 'avatar_2'])).toEqual(validScene);
+  it('accepts a valid scene, defaulting the L1 meaning channel to null', () => {
+    // X13 Track L: mood/focus are absent here, so the zod layer defaults them to
+    // null (degrade-safe) rather than dropping the scene.
+    expect(extractAvatarScene(validScene, ['avatar_1', 'avatar_2'])).toEqual({
+      ...validScene,
+      mood: null,
+      focus: null,
+    });
+  });
+
+  it('carries mood + focus through extraction when the model authors them (BLOCKER fix)', () => {
+    const scene = extractAvatarScene(
+      { ...validScene, mood: 'hushed wonder', focus: 'Emma reaching for the latch' },
+      ['avatar_1', 'avatar_2'],
+    );
+    expect(scene?.mood).toBe('hushed wonder');
+    expect(scene?.focus).toBe('Emma reaching for the latch');
   });
 
   it('drops unknown characterIds but keeps the scene', () => {

@@ -319,6 +319,11 @@ export interface QcClassFlags {
    * `null` when the page has no story text to judge against.
    */
   focalActionMismatch: boolean | null;
+  /**
+   * Telemetry (X13 Track L): the art's emotional tone contradicts the page's
+   * stated scene.mood. `null` when no mood was fed for this page.
+   */
+  moodMismatch: boolean | null;
 }
 
 /**

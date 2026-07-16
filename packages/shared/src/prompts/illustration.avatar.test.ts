@@ -180,6 +180,39 @@ describe('createIllustrationPrompt — sheet anchor (avatar story pages)', () =>
     expect(prompt).not.toContain('DEPICT the moment');
   });
 
+  it('emits the mood + focus directives when the scene carries them (L1)', () => {
+    const prompt = createIllustrationPrompt({
+      ...baseOpts,
+      contentAnchor: 'sheet',
+      bridgeScene: { ...scene, mood: 'hushed wonder', focus: 'Emma reaching for the gate latch' },
+    });
+    expect(prompt).toContain('The mood of this moment: hushed wonder.');
+    expect(prompt).toContain('Center the composition on Emma reaching for the gate latch.');
+  });
+
+  it('degrades silently when mood/focus are null — no empty directive lines', () => {
+    const prompt = createIllustrationPrompt({
+      ...baseOpts,
+      contentAnchor: 'sheet',
+      bridgeScene: { ...scene, mood: null, focus: null },
+    });
+    expect(prompt).not.toContain('The mood of this moment:');
+    expect(prompt).not.toContain('Center the composition on');
+    // the rest of the scene section is unaffected
+    expect(prompt).toContain('Compose this moment: tiptoeing to the gate under one umbrella.');
+  });
+
+  it('L2: sanitizes shouty tokens in the null-scene page-text fallback (renderable-text leak)', () => {
+    const prompt = createIllustrationPrompt({
+      ...baseOpts,
+      pageText: 'Emma tiptoes. "SPLASH!" goes the puddle.',
+      contentAnchor: 'sheet',
+      bridgeScene: null,
+    });
+    expect(prompt).not.toContain('SPLASH');
+    expect(prompt).toContain('sound-effect energy');
+  });
+
   it('lists the exact cast so each character is drawn once and no strays are added', () => {
     const prompt = createIllustrationPrompt({
       ...baseOpts,

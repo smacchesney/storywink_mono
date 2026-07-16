@@ -140,6 +140,11 @@ describe('createQCPrompt per-page defect-class rubric (items 3-8)', () => {
     expect(prompt).toContain('Set null when no Held props line assigns a holder');
     expect(prompt).toContain('Set null when the page has no Story text');
   });
+
+  it('scores moodMismatch (telemetry) against the stated mood, null when none fed (L1)', () => {
+    expect(prompt).toContain('moodMismatch');
+    expect(prompt).toContain('Set null when this page has no Mood');
+  });
 });
 
 describe('createQCPrompt per-page context feed', () => {
@@ -152,6 +157,8 @@ describe('createQCPrompt per-page context feed', () => {
         { name: 'Grypho', species: 'a green toy crocodile' },
       ],
       props: ['lantern held by Kai'],
+      mood: 'gleeful',
+      focus: 'Kai splashing into the puddle',
     },
     { ordinal: 2, text: null, cast: [{ name: 'Kai', species: 'a young boy' }] },
   ];
@@ -170,6 +177,11 @@ describe('createQCPrompt per-page context feed', () => {
 
   it('feeds holder-annotated props when present', () => {
     expect(prompt).toContain('Held props: lantern held by Kai.');
+  });
+
+  it('feeds the stated mood + composition focus when present (L1)', () => {
+    expect(prompt).toContain('Mood: gleeful.');
+    expect(prompt).toContain('Focus: Kai splashing into the puddle.');
   });
 
   it('states the real-names-are-intentional rationale in the feed header', () => {
@@ -283,6 +295,8 @@ describe('QC class taxonomy + gating constants', () => {
       speciesMismatch: false,
       characterHybrid: false,
       propHolderMismatch: null,
+      // L1: moodMismatch is a nullable telemetry class — null = nothing judged.
+      moodMismatch: null,
       focalActionMismatch: null,
     });
   });

@@ -181,6 +181,10 @@ export interface QcClassFlagFeed {
   cast: Array<{ name: string; species: string }>;
   /** Holder-annotated props fed (empty = prop-holder was a no-op). */
   props: string[];
+  /** X13 Track L: stated mood fed (null/blank = moodMismatch was a no-op). */
+  mood?: string | null;
+  /** X13 Track L: composition focus fed (sharpens focalActionMismatch). */
+  focus?: string | null;
 }
 
 /** One searchable per-page telemetry record carrying every class flag. */
@@ -200,6 +204,8 @@ export interface QcClassFlagLog {
   fedText: boolean;
   /** Whether holder-annotated props were fed (prop-holder judged) on this page. */
   fedProps: boolean;
+  /** Whether a stated mood was fed (moodMismatch judged) on this page. */
+  fedMood: boolean;
   renderedText: boolean;
   intraImageDuplicate: boolean;
   missingExpectedCast: boolean;
@@ -207,6 +213,7 @@ export interface QcClassFlagLog {
   characterHybrid: boolean;
   propHolderMismatch: boolean | null;
   focalActionMismatch: boolean | null;
+  moodMismatch: boolean | null;
 }
 
 /**
@@ -238,6 +245,7 @@ export function buildQcClassFlagLog(params: {
     expectedCast: feed?.cast.map((c) => c.name) ?? [],
     fedText: Boolean(feed?.text && feed.text.trim()),
     fedProps: (feed?.props.length ?? 0) > 0,
+    fedMood: Boolean(feed?.mood && feed.mood.trim()),
     renderedText: f.renderedText,
     intraImageDuplicate: f.intraImageDuplicate,
     missingExpectedCast: f.missingExpectedCast,
@@ -245,6 +253,7 @@ export function buildQcClassFlagLog(params: {
     characterHybrid: f.characterHybrid,
     propHolderMismatch: f.propHolderMismatch,
     focalActionMismatch: f.focalActionMismatch,
+    moodMismatch: f.moodMismatch,
   };
 }
 

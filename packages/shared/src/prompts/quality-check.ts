@@ -24,6 +24,7 @@ export const QC_CLASSES = [
   'characterHybrid',
   'propHolderMismatch',
   'focalActionMismatch',
+  'moodMismatch',
 ] as const;
 export type QcClass = (typeof QC_CLASSES)[number];
 
@@ -61,6 +62,7 @@ export function emptyQcClassFlags(): QcClassFlags {
     characterHybrid: false,
     propHolderMismatch: null,
     focalActionMismatch: null,
+    moodMismatch: null,
   };
 }
 
@@ -78,6 +80,16 @@ export interface QcPageContext {
    * enriches props with holders.
    */
   props?: string[];
+  /**
+   * X13 Track L: the page's stated emotional beat (feeds the moodMismatch
+   * telemetry class). Present only for avatar scenes that authored one.
+   */
+  mood?: string | null;
+  /**
+   * X13 Track L: the single character+action the composition centers on
+   * (sharpens the focalActionMismatch judgment). Present only for avatar scenes.
+   */
+  focus?: string | null;
 }
 
 export interface QCPromptOptions {
@@ -182,8 +194,10 @@ ${pageContext
       ? p.cast.map((c) => `${c.name} (${c.species})`).join(', ')
       : '(none expected)';
     const props = p.props && p.props.length ? `\n  Held props: ${p.props.join('; ')}.` : '';
+    const mood = p.mood && p.mood.trim() ? `\n  Mood: ${p.mood.trim()}.` : '';
+    const focus = p.focus && p.focus.trim() ? `\n  Focus: ${p.focus.trim()}.` : '';
     const text = p.text && p.text.trim() ? `"${p.text.trim()}"` : '(no story text on this page)';
-    return `PAGE ${p.ordinal} — Expected cast: ${cast}.${props}\n  Story text: ${text}`;
+    return `PAGE ${p.ordinal} — Expected cast: ${cast}.${props}${mood}${focus}\n  Story text: ${text}`;
   })
   .join('\n')}\n`
       : '';
@@ -209,7 +223,7 @@ For each illustration, evaluate:
    - RENDERED TEXT: Interior page illustrations must contain NO lettering of ANY kind. Any rendered text — words, captions, labels, signage, watermark-like marks, garbled or half-formed letters, AND sound-effect / onomatopoeia words (${language === 'ja' ? 'e.g. ざぶーん, わーい, SPLASH' : 'e.g. SPLASH!, WHEE!, ざぶーん'}) — is a FAILURE. There is NO exception for sound words or onomatopoeia: the story's words live in a separate text overlay outside the art, so any lettering inside the illustration is a defect. Set classFlags.renderedText=true and cap OVERALL QUALITY at 4.
    - ANATOMY: Clearly visible anatomical errors — wrong number of fingers, extra or missing limbs, fused or melted facial features, impossible joints — cap OVERALL QUALITY at 5.
 
-PER-PAGE DEFECT CLASSES — for EACH interior page, set every field of "classFlags". Judge these against each page's expected cast, story text, and any held props (fed above when present)${sheetCount > 0 ? ', and the REFERENCE SHEETS' : ''}. Convention: true = the defect IS present in that page's art.
+PER-PAGE DEFECT CLASSES — for EACH interior page, set every field of "classFlags". Judge these against each page's expected cast, story text, stated mood, and any held props (fed above when present)${sheetCount > 0 ? ', and the REFERENCE SHEETS' : ''}. Convention: true = the defect IS present in that page's art.
 - renderedText (boolean): true if the page contains ANY rendered lettering, sound words included (same as the RENDERED TEXT cap above).
 - intraImageDuplicate (boolean): true if the SAME character is drawn more than once in the one image (e.g. two copies of the same child side by side).
 - missingExpectedCast (boolean): true if a character listed in this page's Expected cast is ABSENT from the art.
@@ -217,6 +231,7 @@ PER-PAGE DEFECT CLASSES — for EACH interior page, set every field of "classFla
 - characterHybrid (boolean): true if ONE figure fuses two cast members' bodies together, OR fuses a cast member with a non-cast creature into a single whole creature. This is the WHOLE-creature case — broader than the ANATOMY cap's fused facial features.
 - propHolderMismatch (boolean or null): only when this page's Held props line names WHO holds a prop, set true if that prop is drawn held by the WRONG character. Set null when no Held props line assigns a holder — there is nothing to judge.
 - focalActionMismatch (boolean or null): compare the art to this page's Story text — set true if the art does NOT depict the text's main who-does-what (the subject performing the described action). Set null when the page has no Story text.
+- moodMismatch (boolean or null): compare the emotional tone of the art — the characters' facial expressions and body language, plus the lighting — to this page's stated Mood. Set true only when the art's mood clearly CONTRADICTS it (e.g. Mood "gleeful" but the figures look frightened or blank). Set null when this page has no Mood fed.
 
 A page PASSES if overall score >= 6.
 A page FAILS if overall score < 6 OR character consistency < 5.
@@ -292,6 +307,7 @@ export const QC_RESPONSE_SCHEMA = {
               characterHybrid: { type: 'boolean' },
               propHolderMismatch: { type: ['boolean', 'null'] },
               focalActionMismatch: { type: ['boolean', 'null'] },
+              moodMismatch: { type: ['boolean', 'null'] },
             },
             required: [
               'renderedText',
@@ -301,6 +317,7 @@ export const QC_RESPONSE_SCHEMA = {
               'characterHybrid',
               'propHolderMismatch',
               'focalActionMismatch',
+              'moodMismatch',
             ],
             additionalProperties: false,
           },

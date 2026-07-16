@@ -67,6 +67,15 @@ describe('createAvatarStoryPrompt — structure', () => {
     expect(text).toContain('phrase that prop with its holder inside the props string');
     expect(text).toContain('"lantern held by Kai"');
   });
+
+  it('instructs the model to author scene.mood + scene.focus (L1 meaning fields)', () => {
+    const text = promptText(baseInput);
+    // mood is seeded from the emotionalPeak trajectory; focus is the single
+    // character+action the composition centers on.
+    expect(text).toContain('"scene.mood"');
+    expect(text).toContain('emotionalPeak');
+    expect(text).toContain('"scene.focus"');
+  });
 });
 
 describe('createAvatarStoryPrompt — cast rendering', () => {
@@ -178,16 +187,28 @@ describe('createAvatarStoryPrompt — shared machinery retained', () => {
 });
 
 describe('STORY_RESPONSE_SCHEMA_AVATAR', () => {
-  it('requires a scene on every page', () => {
+  it('requires a scene on every page (L1: mood + focus join the contract)', () => {
     const pageItems = STORY_RESPONSE_SCHEMA_AVATAR.properties.pages.items;
     expect(pageItems.required).toContain('scene');
+    // Deliberate re-baseline (X13 Track L): mood + focus are appended as
+    // required-nullable meaning fields — every property is in `required`
+    // (strict mode) with a nullable type carrying the degrade case.
     expect(pageItems.properties.scene.required).toEqual([
       'location',
       'timeOfDay',
       'action',
       'charactersPresent',
       'props',
+      'mood',
+      'focus',
     ]);
+  });
+
+  it('carries mood + focus as required-nullable meaning fields (strict mode)', () => {
+    const sceneProps =
+      STORY_RESPONSE_SCHEMA_AVATAR.properties.pages.items.properties.scene.properties;
+    expect(sceneProps.mood.type).toEqual(['string', 'null']);
+    expect(sceneProps.focus.type).toEqual(['string', 'null']);
   });
 
   it('has no outfitFrom (no adjacent photo exists) and no bridgePages', () => {

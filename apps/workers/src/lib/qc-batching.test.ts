@@ -304,12 +304,14 @@ describe('buildQcClassFlagLog', () => {
       expectedCast: [],
       fedText: false,
       fedProps: false,
+      fedMood: false,
       renderedText: true,
       intraImageDuplicate: false,
       missingExpectedCast: true,
       speciesMismatch: false,
       characterHybrid: false,
       propHolderMismatch: null,
+      moodMismatch: null,
       focalActionMismatch: null,
     });
   });
@@ -326,11 +328,14 @@ describe('buildQcClassFlagLog', () => {
           { name: 'Grypho', species: 'a green toy crocodile' },
         ],
         props: ['lantern held by Kai'],
+        mood: 'gleeful',
+        focus: 'Kai splashing into the puddle',
       },
     });
     expect(log.expectedCast).toEqual(['Kai', 'Grypho']);
     expect(log.fedText).toBe(true);
     expect(log.fedProps).toBe(true);
+    expect(log.fedMood).toBe(true);
   });
 
   it('reports fedText/fedProps false for empty text and holder-less props', () => {
@@ -338,11 +343,12 @@ describe('buildQcClassFlagLog', () => {
       bookId: 'b',
       qcRound: 0,
       result: realResult({ pageId: 'p' }),
-      feed: { text: '   ', cast: [], props: [] },
+      feed: { text: '   ', cast: [], props: [], mood: '  ', focus: null },
     });
     expect(log.expectedCast).toEqual([]);
     expect(log.fedText).toBe(false);
     expect(log.fedProps).toBe(false);
+    expect(log.fedMood).toBe(false);
   });
 
   it('marks a telemetry-only defect as NOT blocked', () => {

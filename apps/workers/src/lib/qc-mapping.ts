@@ -38,6 +38,7 @@ function normalizeClassFlags(raw: Partial<QcClassFlags> | null | undefined): QcC
     // Nullable no-op classes: honor an explicit null/boolean, else default null.
     propHolderMismatch: raw.propHolderMismatch ?? base.propHolderMismatch,
     focalActionMismatch: raw.focalActionMismatch ?? base.focalActionMismatch,
+    moodMismatch: raw.moodMismatch ?? base.moodMismatch,
   };
 }
 
