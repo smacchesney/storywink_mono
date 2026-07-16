@@ -6,7 +6,9 @@ import {
   orderCharacterSheets,
   selectSceneSheets,
   avatarStoryQcProblems,
+  reconcileSceneCastWithText,
 } from './avatar-story.js';
+import type { AvatarPageScene } from '@storywink/shared/prompts/story';
 
 describe('describeCastMember', () => {
   it('composes hair, feature, and clothing into one line', () => {
@@ -225,6 +227,104 @@ describe('selectSceneSheets — send only the scene cast, star floor, cap 4', ()
       starCharacterId: null,
     });
     expect(ids(out)).toEqual(['avatar_1']);
+  });
+});
+
+describe('reconcileSceneCastWithText — union-repair scene cast from page text', () => {
+  const roster = [
+    { characterId: 'kai', name: 'Kai' },
+    { characterId: 'grypho', name: 'Grypho' },
+    { characterId: 'kaito', name: 'Kaito' },
+  ];
+  const scene = (charactersPresent: string[]): AvatarPageScene => ({
+    location: 'the misty ridge',
+    timeOfDay: 'morning',
+    action: 'climbing toward the summit',
+    charactersPresent,
+    props: ['lantern'],
+  });
+
+  it('adds a text-named character the scene dropped (union), roster order appended', () => {
+    const out = reconcileSceneCastWithText(
+      scene(['kai']),
+      'Kai and Grypho scramble up the rocks.',
+      roster,
+    );
+    expect(out.scene.charactersPresent).toEqual(['kai', 'grypho']);
+    expect(out.repair).toEqual({ addedIds: ['grypho'], textNames: ['Grypho'] });
+  });
+
+  it('is a no-op when the text names nobody new (repair null, same scene reference)', () => {
+    const input = scene(['kai']);
+    const out = reconcileSceneCastWithText(input, 'Up the quiet mountain they go.', roster);
+    expect(out.repair).toBeNull();
+    expect(out.scene).toBe(input);
+  });
+
+  it('is a no-op when every text-named character is already present', () => {
+    const input = scene(['kai', 'grypho']);
+    const out = reconcileSceneCastWithText(input, 'Kai and Grypho rest.', roster);
+    expect(out.repair).toBeNull();
+    expect(out.scene).toBe(input);
+  });
+
+  it('whole-word only: "Kai" does NOT false-match inside "Kaito"', () => {
+    const out = reconcileSceneCastWithText(scene([]), 'Kaito waves hello.', roster);
+    expect(out.scene.charactersPresent).toEqual(['kaito']);
+    expect(out.repair).toEqual({ addedIds: ['kaito'], textNames: ['Kaito'] });
+  });
+
+  it('catches a possessive: "Kai’s lantern" names Kai', () => {
+    const out = reconcileSceneCastWithText(scene([]), "Kai's lantern glows.", roster);
+    expect(out.scene.charactersPresent).toEqual(['kai']);
+    expect(out.repair).toEqual({ addedIds: ['kai'], textNames: ['Kai'] });
+  });
+
+  it('turns an establishing shot into a cast page when the text names a character', () => {
+    const out = reconcileSceneCastWithText(scene([]), 'Grypho circles overhead.', roster);
+    expect(out.scene.charactersPresent).toEqual(['grypho']);
+    expect(out.repair).toEqual({ addedIds: ['grypho'], textNames: ['Grypho'] });
+  });
+
+  it('is case-insensitive', () => {
+    const out = reconcileSceneCastWithText(scene([]), 'high above, GRYPHO soars.', roster);
+    expect(out.scene.charactersPresent).toEqual(['grypho']);
+  });
+
+  it('preserves existing order, appends repairs in roster order', () => {
+    const out = reconcileSceneCastWithText(
+      scene(['grypho']),
+      'Kaito and Kai wave up at Grypho.',
+      roster,
+    );
+    // grypho already present (kept first); kai + kaito appended in roster order.
+    expect(out.scene.charactersPresent).toEqual(['grypho', 'kai', 'kaito']);
+    expect(out.repair).toEqual({ addedIds: ['kai', 'kaito'], textNames: ['Kai', 'Kaito'] });
+  });
+
+  it('union only — never removes an id the model kept that the text omits (establishing extras)', () => {
+    const out = reconcileSceneCastWithText(
+      scene(['kai', 'grypho']),
+      'Kai looks around the empty ridge.',
+      roster,
+    );
+    expect(out.scene.charactersPresent).toEqual(['kai', 'grypho']);
+    expect(out.repair).toBeNull();
+  });
+
+  it('is idempotent — a second pass over a repaired scene makes no further change', () => {
+    const once = reconcileSceneCastWithText(scene(['kai']), 'Kai and Grypho climb.', roster);
+    const twice = reconcileSceneCastWithText(once.scene, 'Kai and Grypho climb.', roster);
+    expect(twice.repair).toBeNull();
+    expect(twice.scene).toBe(once.scene);
+    expect(twice.scene.charactersPresent).toEqual(['kai', 'grypho']);
+  });
+
+  it('tolerates an empty roster (no names to match) as a no-op', () => {
+    const input = scene(['kai']);
+    const out = reconcileSceneCastWithText(input, 'Kai and Grypho climb.', []);
+    expect(out.repair).toBeNull();
+    expect(out.scene).toBe(input);
   });
 });
 

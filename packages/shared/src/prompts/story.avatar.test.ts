@@ -53,6 +53,20 @@ describe('createAvatarStoryPrompt — structure', () => {
     expect(text).toContain('For EACH page fill "scene"');
     expect(text).toContain('"charactersPresent" lists the characterIds');
   });
+
+  it("ties scene.action + charactersPresent to the page text's focal cast (B1)", () => {
+    const text = promptText(baseInput);
+    expect(text).toContain('"scene.action" must name WHO does WHAT');
+    expect(text).toContain(
+      'every character the page text names as present or acting on this page MUST appear in "charactersPresent"',
+    );
+  });
+
+  it('asks for prop-holder phrasing matching the QC "held by" convention (B3)', () => {
+    const text = promptText(baseInput);
+    expect(text).toContain('phrase that prop with its holder inside the props string');
+    expect(text).toContain('"lantern held by Kai"');
+  });
 });
 
 describe('createAvatarStoryPrompt — cast rendering', () => {

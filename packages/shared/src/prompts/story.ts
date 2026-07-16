@@ -735,6 +735,8 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
     `# Scenes (REQUIRED for every page — the illustrator has NO photos):`,
     `- For EACH page fill "scene": location, timeOfDay, action, charactersPresent, props.`,
     `- "charactersPresent" lists the characterIds (from The Cast above) actually visible on that page. The star should appear on most pages.`,
+    `- "scene.action" must name WHO does WHAT, matching the focal beat of this page's text — and every character the page text names as present or acting on this page MUST appear in "charactersPresent" (the illustrator sees ONLY the scene, never the text — a name left out of charactersPresent vanishes from the picture).`,
+    `- When the page text makes it unambiguous WHO holds a prop, phrase that prop with its holder inside the props string — e.g. "lantern held by Kai". When the holder is not clear, use a plain prop name.`,
     `- Keep the world CONTINUOUS: locations flow into each other (garden → gate → lane), time of day moves forward, recurring props stay consistent.`,
     `- Keep scenes concrete and drawable: one clear action per page, simple settings a toddler recognizes.`,
   ].join('\n');

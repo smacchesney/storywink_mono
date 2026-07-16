@@ -56,6 +56,7 @@ import {
 import {
   buildAvatarCastForPrompt,
   extractAvatarScene,
+  reconcileSceneCastWithText,
   avatarStoryQcProblems,
 } from '../lib/avatar-story.js';
 import { STORY_MODEL, ANALYSIS_MODEL } from '../config/models.js';
@@ -877,6 +878,12 @@ export async function processStoryGeneration(
     const rosterIdsForScenes = isAvatarStory
       ? (avatarInput!.cast.map((c) => c.characterId) ?? [])
       : [];
+    // The same roster paired with display names — the B2 cross-check matches
+    // these names against each page's text to catch cast the model wrote into
+    // the prose but dropped from scene.charactersPresent.
+    const rosterForScenes = isAvatarStory
+      ? avatarInput!.cast.map((c) => ({ characterId: c.characterId, name: c.name }))
+      : [];
 
     try {
       logger.info({ bookId, pageCount: storyResponse.pages?.length }, 'Parsing story response');
@@ -943,12 +950,34 @@ export async function processStoryGeneration(
         const rawScene = isAvatarStory
           ? (content as AvatarStoryResponse['pages'][number] | undefined)?.scene
           : undefined;
-        const scene = isAvatarStory ? extractAvatarScene(rawScene, rosterIdsForScenes) : undefined;
+        let scene = isAvatarStory ? extractAvatarScene(rawScene, rosterIdsForScenes) : undefined;
         if (isAvatarStory && rawScene && !scene) {
           logger.warn(
             { bookId, pageId: page.id, storyPosition },
             'Avatar page scene failed validation — page will render from text alone',
           );
+        }
+        // B2 cross-check: text and scene are independent model outputs, so a
+        // character the page TEXT names can be missing from charactersPresent —
+        // and the illustrator only ever sees the scene. Union-repair before
+        // persist so the named cast can never silently vanish from the art.
+        if (isAvatarStory && scene) {
+          const reconciled = reconcileSceneCastWithText(scene, finalText, rosterForScenes);
+          scene = reconciled.scene;
+          if (reconciled.repair) {
+            logger.info(
+              {
+                bookId,
+                pageId: page.id,
+                event: 'scene_cast_repaired',
+                pageNumber: page.pageNumber,
+                storyPosition,
+                addedIds: reconciled.repair.addedIds,
+                textNames: reconciled.repair.textNames,
+              },
+              'Scene cast auto-repaired from page text (union)',
+            );
+          }
         }
 
         return {

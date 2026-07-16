@@ -170,6 +170,73 @@ export function selectSceneSheets<T extends { characterId: string }>(
   return selected.slice(0, cap);
 }
 
+/** Roster entry the scene-cast cross-check matches page text against. */
+export interface SceneCastRosterMember {
+  characterId: string;
+  name: string;
+}
+
+/** What reconcileSceneCastWithText changed, for the repair telemetry. */
+export interface SceneCastRepair {
+  /** characterIds the text named that the scene had dropped (roster order). */
+  addedIds: string[];
+  /** The display names (roster spelling) that triggered each added id. */
+  textNames: string[];
+}
+
+const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Whole-word, case-insensitive test for a roster name inside page text. Mirrors
+ * the proven neutral-name substitution boundary (`illustration.ts`): alphanumeric
+ * lookarounds, so "Kai" never matches inside "Kaito", and a possessive ("Kai's")
+ * still matches — the apostrophe is a non-alphanumeric boundary.
+ */
+function textNamesCharacter(text: string, name: string): boolean {
+  if (!name.trim()) return false;
+  const body = `(?<![A-Za-z0-9])${escapeRegExp(name)}(?![A-Za-z0-9])`;
+  return new RegExp(body, 'i').test(text);
+}
+
+/**
+ * B2 cross-check: `text` and `scene` are two independent outputs of the story
+ * model, so a character NAMED in the page text can silently go missing from
+ * `charactersPresent` — and the illustrator only ever sees the scene (Track A's
+ * `selectSceneSheets` even decides WHICH reference sheets ship from this list).
+ * This deterministic pass re-unites them.
+ *
+ * For each roster character whose name the page text names (whole-word,
+ * case-insensitive), assert its id is in `charactersPresent`; AUTO-REPAIR BY
+ * UNION — append any missing id, existing entries first, appended repairs in
+ * roster order. UNION ONLY: ids the model included but the text does not name
+ * are kept (establishing shots and background presence are legitimate).
+ *
+ * Pure and idempotent: a no-op returns the SAME scene reference and a null
+ * repair, so the caller logs telemetry only when something actually moved.
+ */
+export function reconcileSceneCastWithText(
+  scene: AvatarPageScene,
+  text: string,
+  roster: SceneCastRosterMember[],
+): { scene: AvatarPageScene; repair: SceneCastRepair | null } {
+  const present = new Set(scene.charactersPresent);
+  const addedIds: string[] = [];
+  const textNames: string[] = [];
+  for (const member of roster) {
+    if (present.has(member.characterId)) continue;
+    if (textNamesCharacter(text, member.name)) {
+      addedIds.push(member.characterId);
+      textNames.push(member.name);
+      present.add(member.characterId); // guard against a duplicated roster entry
+    }
+  }
+  if (addedIds.length === 0) return { scene, repair: null };
+  return {
+    scene: { ...scene, charactersPresent: [...scene.charactersPresent, ...addedIds] },
+    repair: { addedIds, textNames },
+  };
+}
+
 /**
  * Validate-or-DEGRADE one model-emitted page scene. A malformed scene must
  * never fail the story job — the page simply renders from its text alone.
