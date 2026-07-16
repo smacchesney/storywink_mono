@@ -243,6 +243,13 @@ const illustrationWorker = new Worker(
 const finalizeWorker = new Worker(QUEUE_NAMES.BOOK_FINALIZE, processBookFinalize, {
   connection: redis,
   concurrency: FINALIZE_CONCURRENCY,
+  // 10 minutes, matching the illustration worker: finalize renders the cover
+  // QC regen INLINE (generateAndStoreCover), and an OpenAI cover render
+  // (96-266s measured, plus upscale/logo/upload) holds the job far past
+  // BullMQ's 30s default lock. maxStalledCount: 0 so a lost lock never
+  // double-processes a finalize (same hardening as illustration).
+  lockDuration: 600000,
+  maxStalledCount: 0,
 });
 
 const printFulfillmentWorker = new Worker(QUEUE_NAMES.PRINT_FULFILLMENT, processPrintFulfillment, {

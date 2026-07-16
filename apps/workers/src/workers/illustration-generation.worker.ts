@@ -26,7 +26,7 @@ import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/sh
 // Upscaling for print (the cover's logo overlay lives in lib/cover-generation)
 import { upscaleForPrint } from '../utils/image-processing.js';
 import { characterSheetsEnabled } from '../lib/character-sheets.js';
-import { capStyleRefs, styleRefsMax } from '../lib/style-refs.js';
+import { capStyleRefs, styleRefsCapForProvider } from '../lib/style-refs.js';
 import { generateAndStoreCover } from '../lib/cover-generation.js';
 import { fetchImageInput, resizeForReference } from '../lib/images.js';
 import type { IllustrationImageInput } from '../lib/illustrators/index.js';
@@ -447,8 +447,10 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
     // current behavior). 0 deliberately sends no style-ref images — the style
     // bible text carries the style. Applied AFTER the base trim; the
     // missing-URL diagnostic below checks the UNCAPPED list so genuinely
-    // broken style data is still caught in diet mode.
-    const styleRefsCap = styleRefsMax(process.env);
+    // broken style data is still caught in diet mode. Provider-gated: the diet
+    // is validated for OpenAI only, so a rollback to gemini ignores the env
+    // var — rollback stays a one-variable change.
+    const styleRefsCap = styleRefsCapForProvider(illustrator.name, process.env);
     const styleReferenceUrls: string[] = capStyleRefs(baseStyleReferenceUrls, styleRefsCap);
 
     // ============================================================================

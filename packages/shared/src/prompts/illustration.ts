@@ -162,10 +162,17 @@ const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
  * Whole-word name→token substitution: longest names first (so "Kai" never
- * chews "Kaito"), exact-case pass first, then a case-insensitive pass for
- * leftover variants. Boundaries are alphanumeric lookarounds, so possessives
+ * chews "Kaito"). Boundaries are alphanumeric lookarounds, so possessives
  * ("Kai's") and punctuation neighbors substitute cleanly while occurrences
  * inside longer words never match.
+ *
+ * Capitalization-preserving (X12-D review fix): a bare-lowercase occurrence is
+ * a common-noun homograph, not the character — a child named "Star" must not
+ * turn "the falling star" into "the falling Character 1" (same for Rose/rose,
+ * Summer/summer). Only occurrences whose first letter is uppercase ("Star",
+ * "STAR", sentence-case variants) substitute, plus the roster's exact spelling
+ * (covers characterId fallbacks like "avatar_2" that are legitimately
+ * lowercase).
  */
 export function substituteCharacterNames(text: string, map: NeutralNameEntry[]): string {
   if (!map.length) return text;
@@ -174,8 +181,9 @@ export function substituteCharacterNames(text: string, map: NeutralNameEntry[]):
   for (const { name, token } of byLength) {
     if (!name) continue;
     const body = `(?<![A-Za-z0-9])${escapeRegExp(name)}(?![A-Za-z0-9])`;
-    out = out.replace(new RegExp(body, 'g'), token);
-    out = out.replace(new RegExp(body, 'gi'), token);
+    out = out.replace(new RegExp(body, 'gi'), (match) =>
+      match === name || /^[A-Z]/.test(match) ? token : match,
+    );
   }
   return out;
 }
@@ -404,6 +412,9 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
         ? opts.sheetRoster.map((s) => ({
             ...s,
             name: substituteCharacterNames(s.name, neutralMap),
+            // Species phrases can quote a roster name ("Kai's older brother")
+            // — a leak there smuggles the name prior right back in.
+            species: substituteCharacterNames(s.species, neutralMap),
           }))
         : opts.sheetRoster,
   };

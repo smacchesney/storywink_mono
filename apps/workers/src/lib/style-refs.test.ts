@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { capStyleRefs, styleRefsMax } from './style-refs.js';
+import { capStyleRefs, styleRefsCapForProvider, styleRefsMax } from './style-refs.js';
 
 describe('styleRefsMax', () => {
   it('is null (current behavior) when the env var is unset or empty', () => {
@@ -35,5 +35,24 @@ describe('capStyleRefs', () => {
 
   it('a cap above the length is a no-op', () => {
     expect(capStyleRefs(urls, 5)).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('styleRefsCapForProvider (rollback one-variable guarantee)', () => {
+  const env = { ILLUSTRATION_STYLE_REFS_MAX: '0' };
+
+  it('applies the cap when the executing provider is OpenAI', () => {
+    expect(styleRefsCapForProvider('openai', env)).toBe(0);
+    expect(styleRefsCapForProvider('openai', { ILLUSTRATION_STYLE_REFS_MAX: '2' })).toBe(2);
+  });
+
+  it('never applies the cap for Gemini — the diet is unvalidated there', () => {
+    expect(styleRefsCapForProvider('gemini', env)).toBeNull();
+    expect(styleRefsCapForProvider('gemini', { ILLUSTRATION_STYLE_REFS_MAX: '2' })).toBeNull();
+  });
+
+  it('is null when the env var is unset, regardless of provider', () => {
+    expect(styleRefsCapForProvider('openai', {})).toBeNull();
+    expect(styleRefsCapForProvider('gemini', {})).toBeNull();
   });
 });

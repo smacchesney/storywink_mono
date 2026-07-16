@@ -137,9 +137,9 @@ describe('substituteCharacterNames', () => {
     );
   });
 
-  it('catches case variants in the insensitive second pass', () => {
+  it('substitutes ALL-CAPS variants but leaves bare lowercase (homograph safety)', () => {
     expect(substituteCharacterNames('kai waves; GRYPHO naps', map)).toBe(
-      'Character 1 waves; Character 3 naps',
+      'kai waves; Character 3 naps',
     );
   });
 
@@ -149,6 +149,53 @@ describe('substituteCharacterNames', () => {
 
   it('is a no-op with an empty map', () => {
     expect(substituteCharacterNames('Kai hugs Kaito', [])).toBe('Kai hugs Kaito');
+  });
+
+  it('still substitutes a lowercase roster name written exactly as the roster spells it', () => {
+    // buildNeutralNameMap falls back to characterId ("avatar_2") when a roster
+    // entry has no display name — the exact roster spelling must substitute
+    // even though its first letter is lowercase.
+    expect(
+      substituteCharacterNames('avatar_2 waves', [{ name: 'avatar_2', token: 'Character 1' }]),
+    ).toBe('Character 1 waves');
+  });
+});
+
+describe('substituteCharacterNames — homograph preservation (X12-D review fix)', () => {
+  const starMap = [{ name: 'Star', token: 'Character 1' }];
+
+  it('substitutes the capitalized name but leaves the lowercase common noun', () => {
+    expect(substituteCharacterNames('Star reaches for the falling star.', starMap)).toBe(
+      'Character 1 reaches for the falling star.',
+    );
+  });
+
+  it('leaves "the summer meadow" alone for a child named Summer', () => {
+    expect(
+      substituteCharacterNames('the summer meadow', [{ name: 'Summer', token: 'Character 1' }]),
+    ).toBe('the summer meadow');
+  });
+
+  it('leaves "a rose" alone for a child named Rose', () => {
+    expect(substituteCharacterNames('a rose', [{ name: 'Rose', token: 'Character 1' }])).toBe(
+      'a rose',
+    );
+  });
+
+  it('substitutes exact, possessive, ALL-CAPS, and ALL-CAPS-possessive occurrences', () => {
+    expect(substituteCharacterNames("Star's wand, STAR'S cape, STAR shouts", starMap)).toBe(
+      "Character 1's wand, Character 1'S cape, Character 1 shouts",
+    );
+  });
+
+  it('keeps whole-word boundaries and longest-first ordering', () => {
+    const map = [
+      { name: 'Star', token: 'Character 1' },
+      { name: 'Starla', token: 'Character 2' },
+    ];
+    expect(substituteCharacterNames('Starla hands Star a starfish', map)).toBe(
+      'Character 2 hands Character 1 a starfish',
+    );
   });
 });
 
@@ -209,6 +256,44 @@ describe('createIllustrationPrompt — neutralizeCharacterNames (avatar interior
     });
     expect(withNotes).toContain('Specific effect to add: Motion lines as Character 3 tumbles');
   });
+
+  it('tokenizes roster names inside sheetRoster species phrases', () => {
+    const withSpeciesLeak = createIllustrationPrompt({
+      ...baseOpts,
+      neutralizeCharacterNames: true,
+      sheetRoster: [
+        { name: 'Kai', species: 'a young boy' },
+        { name: 'Kaito', species: "Kai's older brother, a young boy" },
+        { name: 'Grypho', species: "Grypho, Kai's black-and-orange toy crocodile" },
+      ],
+    });
+    expect(withSpeciesLeak).toContain(
+      "image 2 = Character 2, Character 1's older brother, a young boy",
+    );
+    expect(withSpeciesLeak).toContain(
+      "image 3 = Character 3, Character 3, Character 1's black-and-orange toy crocodile",
+    );
+    expect(withSpeciesLeak).not.toContain('Grypho');
+    expect(withSpeciesLeak).not.toMatch(asWord('Kai'));
+  });
+
+  it('tokenizes roster names inside QC feedback (the QC-escalation requeue prompt)', () => {
+    const feedback = "Grypho gained a second tail and Kai's raincoat turned blue.";
+    const requeue = createIllustrationPrompt({
+      ...baseOpts,
+      neutralizeCharacterNames: true,
+      qcFeedback: feedback,
+    });
+    expect(requeue).toContain('CRITICAL CORRECTIONS');
+    expect(requeue).toContain(
+      "Character 3 gained a second tail and Character 1's raincoat turned blue.",
+    );
+    expect(requeue).not.toContain('Grypho');
+
+    // Verbatim when neutral mode is off.
+    const off = createIllustrationPrompt({ ...baseOpts, qcFeedback: feedback });
+    expect(off).toContain(feedback);
+  });
 });
 
 describe('createIllustrationPrompt — neutralizeCharacterNames (avatar cover)', () => {
@@ -244,6 +329,29 @@ describe('createIllustrationPrompt — neutral mode default-off is byte-identica
     // and names render exactly as today
     expect(absent).toContain('image 3 = Grypho, a black-and-orange toy crocodile');
     expect(absent).toContain('Compose this moment: Kai hugs Kaito while Grypho naps');
+  });
+
+  it('holds across the cover, qcFeedback, and null-scene fallback shapes', () => {
+    const shapes: IllustrationPromptOptions[] = [
+      // Avatar cover (isTitlePage + interior anchor)
+      {
+        ...baseOpts,
+        isTitlePage: true,
+        contentAnchor: 'interior',
+        characterSheetCount: 3,
+        bridgeScene: null,
+        sheetRoster: undefined,
+      },
+      // QC-escalation requeue (qcFeedback present)
+      { ...baseOpts, qcFeedback: "Grypho gained a second tail; fix Kai's raincoat." },
+      // Null-scene fallback (quoted pageText path)
+      { ...baseOpts, bridgeScene: null },
+    ];
+    for (const shape of shapes) {
+      expect(createIllustrationPrompt({ ...shape, neutralizeCharacterNames: false })).toBe(
+        createIllustrationPrompt(shape),
+      );
+    }
   });
 
   it('never touches the photo path even when the option is (incorrectly) set', () => {
