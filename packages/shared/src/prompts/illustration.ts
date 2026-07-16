@@ -182,7 +182,7 @@ export function substituteCharacterNames(text: string, map: NeutralNameEntry[]):
     if (!name) continue;
     const body = `(?<![A-Za-z0-9])${escapeRegExp(name)}(?![A-Za-z0-9])`;
     out = out.replace(new RegExp(body, 'gi'), (match) =>
-      match === name || /^[A-Z]/.test(match) ? token : match,
+      match === name || /^\p{Lu}/u.test(match) ? token : match,
     );
   }
   return out;

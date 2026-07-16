@@ -188,6 +188,13 @@ describe('substituteCharacterNames — homograph preservation (X12-D review fix)
     );
   });
 
+  it('substitutes accented uppercase variants (ÉMILE for Émile)', () => {
+    const map = [{ name: 'Émile', token: 'Character 1' }];
+    expect(substituteCharacterNames('ÉMILE jumps while Émile laughs', map)).toBe(
+      'Character 1 jumps while Character 1 laughs',
+    );
+  });
+
   it('keeps whole-word boundaries and longest-first ordering', () => {
     const map = [
       { name: 'Star', token: 'Character 1' },
