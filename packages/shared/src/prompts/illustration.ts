@@ -382,9 +382,15 @@ function buildExactCastSection(
  * page's cast. Mirrors buildCharacterIdentitySection's `relevantCharacters`
  * filter (bridge cast, else main-role / appears-on-page / appears-everywhere)
  * so the living-companion directive fires on exactly the toys the identity
- * section already lists — never on a toy absent from this page. Duplicating the
- * small filter (rather than refactoring the identity builder) keeps the
- * flag-off path byte-identical: this is only ever called when the flag is on.
+ * section already lists — never on a toy absent from this page. When authored
+ * scene ids are provided but NONE resolve against the roster (stale ids after a
+ * roster re-extraction), bridgeFiltered is empty and the helper widens to the
+ * page filter (main-role / appears-on-page / appears-everywhere) — the same
+ * fallback buildCharacterIdentitySection takes, so the directive can then name a
+ * toy the authored cast didn't list, but only ever one that section is already
+ * listing on this page. Duplicating the small filter (rather than refactoring
+ * the identity builder) keeps the flag-off path byte-identical: this is only
+ * ever called when the flag is on.
  */
 function toyCharactersInCast(
   characterIdentity: CharacterIdentity | null | undefined,

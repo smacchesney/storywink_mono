@@ -101,6 +101,21 @@ describe('createIllustrationPrompt — toys come alive (X13 Track T)', () => {
     expect(prompt).not.toMatch(/figurine/i);
   });
 
+  it('flag ON stays silent when the toy is in the roster but off this page cast', () => {
+    // The toy lives in the identity roster, but this page's scene cast is the
+    // child + pet only — the gate must filter the toy out in lockstep with the
+    // identity section, so the directive never names a toy off the page.
+    const prompt = createIllustrationPrompt({
+      ...baseOpts,
+      characterIdentity: identityWithToy,
+      bridgeScene: { ...sceneWithToy, charactersPresent: ['avatar_1', 'avatar_3'] },
+      toysComeAlive: true,
+    });
+    // pageText still says "Trapjaw", so scope the check to the directive itself.
+    expect(prompt).not.toContain('LIVING TOY COMPANION');
+    expect(prompt).not.toMatch(/figurine/i);
+  });
+
   it('flag ON stays silent on an establishing shot (empty scene cast)', () => {
     const prompt = createIllustrationPrompt({
       ...baseOpts,
