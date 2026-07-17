@@ -1,6 +1,7 @@
 import { StyleKey, getStyleDefinition, StylePromptContext } from './styles.js';
-import { CharacterIdentity } from '../types.js';
+import { CharacterIdentity, CharacterDescription } from '../types.js';
 import type { BridgeScene, AvatarPageScene } from './story.js';
+import { kindFromRole } from './character-identity.js';
 
 // ----------------------------------
 // TYPES
@@ -56,6 +57,19 @@ export interface IllustrationPromptOptions {
    * The photo path never neutralizes, even when the option is set.
    */
   neutralizeCharacterNames?: boolean;
+  /**
+   * X13 Track T (TOYS_COME_ALIVE_ENABLED, default absent/false = today's
+   * prompt byte-identical). On the sheet-anchored (avatar) path, when a
+   * toy-kind character (companion_object role) is actually in THIS page's
+   * cast, add ONE living-companion render directive: the toy is drawn as a
+   * living, expressive companion at child-companion scale — never a tabletop
+   * figurine or shelf toy — while every color, shape, material, and feature
+   * still comes from its numbered character sheet. Photo, bridge, and cover
+   * ('interior') paths never emit it; neither does an establishing shot with
+   * no cast. Toy kind is derived from the identity roles already threaded in
+   * (kindFromRole), so no new roster field is needed.
+   */
+  toysComeAlive?: boolean;
 }
 
 // ----------------------------------
@@ -364,6 +378,62 @@ function buildExactCastSection(
 }
 
 /**
+ * X13 Track T: the toy-kind (companion_object) characters actually in THIS
+ * page's cast. Mirrors buildCharacterIdentitySection's `relevantCharacters`
+ * filter (bridge cast, else main-role / appears-on-page / appears-everywhere)
+ * so the living-companion directive fires on exactly the toys the identity
+ * section already lists — never on a toy absent from this page. Duplicating the
+ * small filter (rather than refactoring the identity builder) keeps the
+ * flag-off path byte-identical: this is only ever called when the flag is on.
+ */
+function toyCharactersInCast(
+  characterIdentity: CharacterIdentity | null | undefined,
+  pageNumber: number | undefined,
+  bridgeCharacterIds: string[] | null | undefined,
+): CharacterDescription[] {
+  const chars = characterIdentity?.characters ?? [];
+  if (chars.length === 0) return [];
+
+  const bridgeFiltered = bridgeCharacterIds?.length
+    ? chars.filter((c) => bridgeCharacterIds.includes(c.characterId))
+    : [];
+
+  const relevant = bridgeFiltered.length
+    ? bridgeFiltered
+    : pageNumber
+      ? chars.filter(
+          (c) =>
+            isMainCharacterRole(c.role) ||
+            c.appearsOnPages.includes(pageNumber) ||
+            c.appearsOnPages.length === 0,
+        )
+      : chars;
+
+  return relevant.filter((c) => kindFromRole(c.role) === 'toy');
+}
+
+/**
+ * X13 Track T: the ONE bounded living-companion directive. Toy characters are
+ * beloved toys brought to life for this adventure — drawn as living, expressive
+ * companions at the child's own scale, never a tabletop figurine or a shelf
+ * toy — while every color, shape, material, and distinctive feature still comes
+ * from their numbered CHARACTER SHEET (the sheets stay the sole authority, so
+ * no regeneration is needed). Names here are neutralized by the caller's
+ * neutralize() wrap, so token mode carries no display name into the render.
+ */
+function buildLivingToySection(toyNames: string[]): string | null {
+  if (toyNames.length === 0) return null;
+  const one = toyNames.length === 1;
+  const who = toyNames.join(', ');
+  return (
+    `LIVING TOY COMPANION${one ? '' : 'S'} — ${who} ${one ? 'is a beloved toy' : 'are beloved toys'} brought to life for this adventure: ` +
+    `render ${one ? 'it' : 'them'} as ${one ? 'a living, expressive companion' : 'living, expressive companions'} at the child's own scale, adventuring side by side — ` +
+    `${one ? 'a lively, feeling face' : 'lively, feeling faces'} and ${one ? 'a dynamic, full-body pose' : 'dynamic, full-body poses'}, NEVER a tabletop figurine, a posed collectible, or a toy sitting still on a shelf. ` +
+    `Every color, shape, material, and distinctive feature still comes EXACTLY from ${one ? 'its' : 'their'} numbered CHARACTER SHEET — ${one ? 'it stays' : 'they stay'} unmistakably made of ${one ? 'its' : 'their'} own toy-stuff (plush, plastic, stitching, and paintwork all intact).`
+  );
+}
+
+/**
  * AVATAR_STORY covers: image 1 is the approved interior render of the cover
  * scene — the cover repaints that scene, with the sheets as identity truth.
  */
@@ -480,6 +550,24 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
       : null,
   );
 
+  // 4b. X13 Track T living-companion directive (TOYS_COME_ALIVE_ENABLED):
+  //     sheet-anchored path only, and only when a toy is actually in this
+  //     page's cast (an establishing shot names nobody → no toy → no
+  //     directive). Neutralized so token mode carries no display name. Flag
+  //     absent/off → null → the assembly is byte-identical.
+  const livingToySection =
+    opts.toysComeAlive === true && contentAnchor === 'sheet' && !emptySceneCast
+      ? neutralize(
+          buildLivingToySection(
+            toyCharactersInCast(
+              opts.characterIdentity,
+              opts.pageNumber,
+              opts.bridgeScene?.charactersPresent ?? null,
+            ).map((c) => c.name || c.characterId),
+          ),
+        )
+      : null;
+
   // 5. Cross-cutting: QC feedback (neutralized too — feedback text quoting a
   //    display name would smuggle the name prior right back in).
   const qcSection = neutralize(buildQCFeedbackSection(opts.qcFeedback));
@@ -493,6 +581,7 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
     bridgeSection,
     charSection,
     exactCastSection,
+    livingToySection,
     qcSection,
     noTextSection,
   ]

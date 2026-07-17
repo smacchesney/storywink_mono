@@ -9,6 +9,7 @@ import {
 import type { IllustrationInput, IllustrationProvider } from '../lib/illustrators/index.js';
 import { maybeGeminiFallback } from '../lib/illustrators/fallback.js';
 import { shouldNeutralizeNames } from '../lib/illustrators/neutralize.js';
+import { toysComeAliveEnabled } from '../lib/toys-come-alive.js';
 import type { EscalationJobFields } from '../lib/escalation.js';
 import { v2 as cloudinary } from 'cloudinary';
 import pino from 'pino';
@@ -645,6 +646,11 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       // rebuilds mid-flight); a neutral prompt is valid on Gemini — just not
       // required — so reuse is correct. No-op on the photo path / when off.
       neutralizeCharacterNames: shouldNeutralizeNames(illustrator.name),
+      // TOYS_COME_ALIVE_ENABLED (X13 Track T): on the sheet-anchored path, adds
+      // the living-companion render directive when a toy is in the page's cast.
+      // The directive itself is gated internally to contentAnchor 'sheet' and
+      // toy presence, so a flag-on non-toy page stays byte-identical.
+      toysComeAlive: toysComeAliveEnabled(),
     };
 
     logger.info(
