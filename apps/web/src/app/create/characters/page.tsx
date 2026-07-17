@@ -102,6 +102,14 @@ type Step = AvatarStoryStep;
 // path is byte-identically absent when it is false.
 const STORY_HELPER_FLAG = process.env.NEXT_PUBLIC_STORY_HELPER_ENABLED === 'true';
 
+// D6: how long the /api/story/propose prefetch may run before its abort
+// controller fires and the shape step fails open to the length step. Re-derived
+// from telemetry on 2026-07-17: prod p50 was 4302ms over a 4-call re-measure
+// (post latency fix), and an 8462ms tail call silently fail-opened under the
+// old 6s abort with a good storyline the user never saw. 12s ≈ 3x the median
+// for tail headroom; the fail-open behavior on a true timeout is unchanged.
+const PROPOSAL_ABORT_MS = 12_000;
+
 export default function AvatarStoryPage() {
   if (process.env.NEXT_PUBLIC_AVATARS_ENABLED !== 'true') notFound();
   return <AvatarStoryFlow />;
@@ -186,8 +194,8 @@ function AvatarStoryFlow() {
 
   // Story-helper async plumbing (D2/D6). The prefetch's abort controller, the
   // signature the cached proposal belongs to, whether story_helper_shown has
-  // fired for this proposal, and a step mirror so the 6s fail-open only advances
-  // when still on shape.
+  // fired for this proposal, and a step mirror so the PROPOSAL_ABORT_MS fail-open
+  // only advances when still on shape.
   const proposalAbortRef = useRef<AbortController | null>(null);
   const proposalTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const proposalSigRef = useRef<string | null>(null);
@@ -197,8 +205,8 @@ function AvatarStoryFlow() {
     stepRef.current = step;
   }, [step]);
 
-  // Unmount-only: tear down an in-flight proposal fetch and its 6s abort timer
-  // so neither outlives the wizard (leaving mid-shape must not leak a pending
+  // Unmount-only: tear down an in-flight proposal fetch and its PROPOSAL_ABORT_MS
+  // abort timer so neither outlives the wizard (leaving mid-shape must not leak a pending
   // fetch or a stray timeout). Separate from the repair-poll and arrival-poll
   // cleanups above — this one owns only the proposal plumbing.
   useEffect(() => {
@@ -450,14 +458,14 @@ function AvatarStoryFlow() {
   const helperEnabled = helperStepEnabled(writingOwn, STORY_HELPER_FLAG);
 
   // D2/D6: fire /api/story/propose ONCE per shape entry. Shows the twinkle and
-  // fails open to length on any non-2xx / 404 / 429 / 6s-abort. "More ideas"
+  // fails open to length on any non-2xx / 404 / 429 / PROPOSAL_ABORT_MS abort. "More ideas"
   // never re-calls; it cycles the alternates this one prefetch returned, so a
   // tap is always instant (the whole pool is in hand before the card appears).
   const runProposal = async () => {
     proposalAbortRef.current?.abort();
     const controller = new AbortController();
     proposalAbortRef.current = controller;
-    const timeout = setTimeout(() => controller.abort(), 6000);
+    const timeout = setTimeout(() => controller.abort(), PROPOSAL_ABORT_MS);
     proposalTimeoutRef.current = timeout;
     setProposalLoading(true);
     shownFiredRef.current = false;

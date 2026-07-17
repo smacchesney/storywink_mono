@@ -331,7 +331,7 @@ describe('finalPremiseFor (X11 accept→preset guard)', () => {
 
 describe('propose call latency knobs (X13 V)', () => {
   it('pins the reasoning effort to the lowest tier gpt-5-mini supports', () => {
-    // Default effort burned most of the ~21s p50 that overran the 6s client
+    // Default effort burned most of the ~21s p50 that overran the then-6s client
     // abort. If this ever changes, the latency budget changes with it.
     expect(STORY_PROPOSAL_REASONING_EFFORT).toBe('minimal');
   });

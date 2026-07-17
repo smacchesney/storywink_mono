@@ -110,7 +110,7 @@ export const STORYLINE_MAX = 280;
  * X13-V flip runbook (latency): reasoning effort for the propose call. The task is tiny —
  * a <=280-char storyline plus two alternates — so the model needs no deep chain
  * of thought. `minimal` is the lowest tier gpt-5-mini supports and cuts the
- * reasoning tokens that pushed prod p50 to ~21s (past the client's 6s abort).
+ * reasoning tokens that pushed prod p50 to ~21s (past the client's then-6s abort).
  * Typed as a literal so the route binds it to the OpenAI SDK's ReasoningEffort
  * at the call site — a bad value fails type-check there, not at runtime.
  */
