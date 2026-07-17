@@ -81,7 +81,8 @@ export async function POST(request: NextRequest) {
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     // Time the OpenAI call in isolation — the durationMs on the telemetry row is
-    // the number the latency runbook re-measures against the 6s client abort.
+    // the number the latency runbook re-measures against the client abort
+    // (PROPOSAL_ABORT_MS in create/characters/page.tsx).
     const startedAt = Date.now();
     const response = await openai.responses.create({
       model: ANALYSIS_MODEL,

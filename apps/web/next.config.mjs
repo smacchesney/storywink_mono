@@ -61,10 +61,6 @@ const nextConfig = {
   experimental: {
     optimizeCss: true,
     optimizePackageImports: ['lucide-react', '@radix-ui/react-*', 'framer-motion'],
-    // Increase body size limit for API routes
-    serverActions: {
-      bodySizeLimit: '50mb', // Increase from default 1mb to 50mb
-    },
   },
   
   // Environment variables
