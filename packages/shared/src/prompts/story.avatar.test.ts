@@ -104,6 +104,37 @@ describe('createAvatarStoryPrompt — cast rendering', () => {
     expect(text).toContain('it never walks, talks, or acts on its own');
   });
 
+  describe('toys come alive (X13 Track T)', () => {
+    const toyCast: AvatarStoryGenerationInput = {
+      ...baseInput,
+      cast: [
+        ...baseInput.cast,
+        { characterId: 'avatar_4', name: 'Mr. Hoppy', role: 'companion_object' },
+      ],
+    };
+
+    it('flag OFF keeps the grounded-object rule verbatim (byte-identical)', () => {
+      const off = promptText(toyCast);
+      const absent = promptText({ ...toyCast, toysComeAlive: undefined });
+      expect(off).toContain('it never walks, talks, or acts on its own');
+      expect(off).toBe(absent);
+    });
+
+    it('flag ON turns the toy into a living companion and drops the never-acts rule', () => {
+      const on = promptText({ ...toyCast, toysComeAlive: true });
+      expect(on).not.toContain('it never walks, talks, or acts on its own');
+      expect(on).toContain('brought to life');
+      expect(on).toMatch(/adventur/i);
+      // The cast line + billing are untouched.
+      expect(on).toContain('characterId "avatar_4" = Mr. Hoppy (companion object)');
+    });
+
+    it('flag ON leaves the REAL-pet realism flavor untouched', () => {
+      const on = promptText({ ...toyCast, toysComeAlive: true });
+      expect(on).toContain('never a talking character');
+    });
+  });
+
   it('includes appearance descriptions when provided', () => {
     const text = promptText({
       ...baseInput,

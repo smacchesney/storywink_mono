@@ -208,6 +208,14 @@ export interface StoryGenerationInput {
    * stays byte-identical.
    */
   bridgeCap?: number;
+  /**
+   * X13 Track T (TOYS_COME_ALIVE_ENABLED, default absent/false = today's
+   * prompt byte-identical): flips the companion-object register. Off, a
+   * beloved toy "never walks, talks, or acts on its own"; on, it is brought
+   * to life — it moves, reacts, has feelings, and adventures side by side,
+   * while staying recognizably itself. REAL PETS are untouched either way.
+   */
+  toysComeAlive?: boolean;
   storyPages: {
     pageId: string;
     pageNumber: number;
@@ -313,7 +321,9 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
           ? ` They are the family's animal companion — keep them a real animal (sounds, wags, nuzzles), never a talking character.`
           : '';
         const objectNote = isObject
-          ? ` It is the child's beloved object — it can be hugged, carried, dropped, lost and found, tucked in; it never walks, talks, or acts on its own. Let it anchor emotional beats (comfort at the quiet moment, joining the landing).`
+          ? input.toysComeAlive
+            ? ` It is the child's beloved toy, brought to life for this adventure — it moves, plays, reacts, and has feelings of its own, adventuring right beside ${input.childName || 'the child'}; it may even speak when the story wants it to. A true companion in the action, yet it stays recognizably itself — the same beloved toy, never turned into a person. Let it share the emotional beats: comfort at the quiet moment, cheer at the landing.`
+            : ` It is the child's beloved object — it can be hugged, carried, dropped, lost and found, tucked in; it never walks, talks, or acts on its own. Let it anchor emotional beats (comfort at the quiet moment, joining the landing).`
           : '';
         const supportingRole = isObject
           ? `Weave it in as a treasured companion`
@@ -718,6 +728,12 @@ export interface AvatarStoryGenerationInput {
   qcFeedback?: string;
   /** Parent-supplied words the child is learning (max 4). Woven 3-4x each. */
   learningWords?: string[];
+  /**
+   * X13 Track T (TOYS_COME_ALIVE_ENABLED, default absent/false = today's
+   * prompt byte-identical): see StoryGenerationInput.toysComeAlive. Flips a
+   * companion_object cast member from grounded-object to living-companion.
+   */
+  toysComeAlive?: boolean;
 }
 
 /**
@@ -745,7 +761,9 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
       : isPet
         ? ` — the family's animal companion. Keep them a real animal (sounds, wags, nuzzles), never a talking character.`
         : isObject
-          ? ` — the child's beloved object. It can be hugged, carried, dropped, lost and found, tucked in; it never walks, talks, or acts on its own. Let it anchor emotional beats.`
+          ? input.toysComeAlive
+            ? ` — the child's beloved toy, brought to life for this adventure: it moves, plays, reacts, and has feelings of its own, adventuring side by side; it may even speak when the story wants it to. A true companion in the action, yet it stays recognizably itself — the same beloved toy, never turned into a person. Let it share the emotional beats.`
+            : ` — the child's beloved object. It can be hugged, carried, dropped, lost and found, tucked in; it never walks, talks, or acts on its own. Let it anchor emotional beats.`
           : ` — give them a real supporting role: involve them in at least one emotional beat (a shared laugh, a steadying hand, a discovery together), and if they are present near the end, include them in the landing.`;
     const desc = c.description ? ` Appearance: ${c.description}.` : '';
     castLines.push(

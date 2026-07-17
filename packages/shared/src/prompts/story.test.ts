@@ -170,6 +170,46 @@ describe('createStoryGenerationPrompt — companion objects', () => {
   });
 });
 
+describe('createStoryGenerationPrompt — toys come alive (X13 Track T)', () => {
+  const toyInput: StoryGenerationInput = {
+    ...baseInput,
+    charactersInPhotos: [
+      { characterId: 'child_1', name: 'Emma', role: 'main_child', appearsOnPages: [1, 2] },
+      {
+        characterId: 'object_1',
+        name: 'Mr. Hoppy',
+        role: 'companion_object',
+        appearsOnPages: [1, 2],
+        namedVia: 'chip',
+      },
+      { characterId: 'pet_1', name: 'Biscuit', role: 'pet', appearsOnPages: [1, 2] },
+    ],
+  };
+
+  it('flag OFF keeps the grounded-object rule verbatim (byte-identical)', () => {
+    const off = promptText(toyInput);
+    const absent = promptText({ ...toyInput, toysComeAlive: undefined });
+    expect(off).toContain('never walks, talks, or acts on its own');
+    // off ≡ absent — the flip must be deliberate, not accidental.
+    expect(off).toBe(absent);
+  });
+
+  it('flag ON turns the toy into a living companion and drops the never-acts rule', () => {
+    const on = promptText({ ...toyInput, toysComeAlive: true });
+    expect(on).not.toContain('never walks, talks, or acts on its own');
+    expect(on).toContain('brought to life');
+    expect(on).toMatch(/adventur/i);
+    // The confirmed name still lands in the story text.
+    expect(on).toContain('call it "Mr. Hoppy" in the story text');
+  });
+
+  it('flag ON leaves the REAL-pet realism rule untouched', () => {
+    const on = promptText({ ...toyInput, toysComeAlive: true });
+    expect(on).toContain('never a talking character');
+    expect(on).toContain('keep them a real animal');
+  });
+});
+
 describe('createStoryGenerationPrompt — illustrationNotes stay wordless', () => {
   const text = promptText(baseInput);
 

@@ -45,6 +45,7 @@ import {
   planPageSequence,
   shouldPurgeStaleBridges,
 } from '../lib/bridge-pages.js';
+import { toysComeAliveEnabled } from '../lib/toys-come-alive.js';
 import {
   mergeCastNames,
   resolveCastEntries,
@@ -657,6 +658,11 @@ export async function processStoryGeneration(
         ? bridgeCapForPhotoCount(storyPages.length)
         : 0;
 
+    // TOYS_COME_ALIVE_ENABLED (X13 Track T): flips a companion_object cast
+    // member from grounded object to living companion. Read once, threaded into
+    // both the photo and avatar prompt inputs. Default OFF → prompt untouched.
+    const toysAlive = toysComeAliveEnabled();
+
     // Prepare story generation input using advanced prompt structure
     const storyInput: StoryGenerationInput = {
       bookTitle: book.title || 'My Special Story',
@@ -678,6 +684,7 @@ export async function processStoryGeneration(
       })(),
       charactersInPhotos: charactersInPhotos.length > 0 ? charactersInPhotos : undefined,
       bridgeCap: bridgeCap > 0 ? bridgeCap : undefined,
+      toysComeAlive: toysAlive,
       language: book.language || 'en',
       suggestTitle: job.data.titleWasGenerated === true,
       storyPages: storyPages.map((page, index) => {
@@ -719,6 +726,7 @@ export async function processStoryGeneration(
           suggestTitle: job.data.titleWasGenerated === true,
           qcFeedback: undefined,
           learningWords: storyInput.learningWords,
+          toysComeAlive: toysAlive,
         }
       : null;
 
