@@ -129,6 +129,26 @@ describe('createQCPrompt per-page defect-class rubric (items 3-8)', () => {
     expect(prompt).toContain('judge the KIND against the Expected cast species');
   });
 
+  describe('speciesMismatch — toys come alive (X13 Track T)', () => {
+    it('flag OFF keeps the speciesMismatch rubric byte-identical', () => {
+      const off = createQCPrompt(null, 8, 'en', {});
+      const explicitFalse = createQCPrompt(null, 8, 'en', { toysComeAlive: false });
+      expect(off).toBe(explicitFalse);
+      // No living-toy clarification in the default rubric.
+      expect(off).not.toMatch(/describes? (its )?material, not (its )?size/i);
+    });
+
+    it('flag ON teaches the judge that a lively, life-sized toy is CORRECT', () => {
+      const on = createQCPrompt(null, 8, 'en', { toysComeAlive: true });
+      expect(on).toContain('speciesMismatch');
+      // "toy" = material, not size or stillness — an alive/large toy is NOT a mismatch.
+      expect(on).toMatch(/material, not/i);
+      expect(on).toMatch(/size or stillness/i);
+      // Still keeps the real wrong-kind failure (croc drawn as a griffin).
+      expect(on).toContain('griffin');
+    });
+  });
+
   it('describes the whole-creature hybrid case as broader than the anatomy cap', () => {
     expect(prompt).toContain('characterHybrid');
     expect(prompt).toContain('WHOLE-creature case');

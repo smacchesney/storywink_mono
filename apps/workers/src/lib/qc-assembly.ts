@@ -163,8 +163,14 @@ export function assembleQcBatchParts(params: {
   characterIdentity: CharacterIdentity | null;
   language: string;
   sheetCount: number;
+  /**
+   * X13 Track T (TOYS_COME_ALIVE_ENABLED): when on, the speciesMismatch rubric
+   * treats a lively, life-sized toy as CORRECT. Default absent/false keeps the
+   * assembled prompt byte-identical (and the proof harness in lockstep).
+   */
+  toysComeAlive?: boolean;
 }): QcBatchAssembly {
-  const { batch, characterIdentity, language, sheetCount } = params;
+  const { batch, characterIdentity, language, sheetCount, toysComeAlive } = params;
 
   const contentParts: QcContentPart[] = [];
   const pageMapping: Array<{ pageNumber: number; pageId: string }> = [];
@@ -198,6 +204,8 @@ export function assembleQcBatchParts(params: {
     // prompt, so the flag-off default is untouched.
     ...(bridgePageOrdinals.length ? { bridgePageOrdinals } : {}),
     ...(pageContext.length ? { pageContext } : {}),
+    // TOYS_COME_ALIVE_ENABLED: omitted when off → rubric byte-identical.
+    ...(toysComeAlive ? { toysComeAlive } : {}),
   });
   contentParts.push({ type: 'input_text', text: promptText });
 

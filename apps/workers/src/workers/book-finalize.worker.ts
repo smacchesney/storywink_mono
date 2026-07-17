@@ -35,6 +35,7 @@ import {
   type QcBatchOutcome,
 } from '../lib/qc-batching.js';
 import { assembleQcBatchParts, pageFeedFor, type QcAssemblyPage } from '../lib/qc-assembly.js';
+import { toysComeAliveEnabled } from '../lib/toys-come-alive.js';
 import { characterSheetsEnabled, sheetRefsForStyle } from '../lib/character-sheets.js';
 import { mergeLinkedAvatarSheets } from '../lib/avatar-sheets.js';
 import {
@@ -239,6 +240,9 @@ async function runQualityCheck(
       characterIdentity,
       language,
       sheetCount: sheets.length,
+      // TOYS_COME_ALIVE_ENABLED (X13 Track T): a lively, life-sized toy is not
+      // a speciesMismatch. Off → rubric byte-identical.
+      toysComeAlive: toysComeAliveEnabled(),
     });
     const contentParts: typeof sheetParts = [...sheetParts, ...assembly.contentParts];
 

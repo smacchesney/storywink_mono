@@ -122,6 +122,15 @@ export interface QCPromptOptions {
    * cover-only call and on any book whose worker did not build the feed.
    */
   pageContext?: QcPageContext[];
+  /**
+   * X13 Track T (TOYS_COME_ALIVE_ENABLED, default absent/false = today's
+   * rubric byte-identical). When on, the speciesMismatch rubric wording
+   * treats a lively, LIFE-SIZED toy as CORRECT (kind = the creature, e.g.
+   * crocodile; "toy" describes material, not size or stillness), so the judge
+   * no longer flags a toy brought to life. QC_BLOCKING_CLASSES are untouched;
+   * speciesMismatch stays telemetry-only either way.
+   */
+  toysComeAlive?: boolean;
 }
 
 export function createQCPrompt(
@@ -202,6 +211,14 @@ ${pageContext
   .join('\n')}\n`
       : '';
 
+  // X13 Track T (TOYS_COME_ALIVE_ENABLED): when on, teach the judge that a toy
+  // brought to life is CORRECT — "toy" is a material, not a size or a pose — so
+  // a lively, life-sized toy of the right KIND never counts as a speciesMismatch.
+  // Absent/off → empty string → the speciesMismatch line is byte-identical.
+  const speciesMismatchLivingClause = options.toysComeAlive
+    ? ` A toy brought to life is NOT a speciesMismatch: "toy" describes its material, not its size or stillness — a toy crocodile rendered ALIVE and LIFE-SIZED (moving, expressive, adventuring side by side) is still a crocodile and CORRECT. Only a genuine change of KIND (that crocodile drawn as a griffin, dragon, or dog) fails.`
+    : '';
+
   // Cover-only calls carry pageCount 0 (only the COVER image). The interior
   // "these N illustrations … page 1 through page N" framing is nonsense there,
   // so give the cover its own opening and route the judge to coverResult.
@@ -227,7 +244,7 @@ PER-PAGE DEFECT CLASSES — for EACH interior page, set every field of "classFla
 - renderedText (boolean): true if the page contains ANY rendered lettering, sound words included (same as the RENDERED TEXT cap above).
 - intraImageDuplicate (boolean): true if the SAME character is drawn more than once in the one image (e.g. two copies of the same child side by side).
 - missingExpectedCast (boolean): true if a character listed in this page's Expected cast is ABSENT from the art.
-- speciesMismatch (boolean): true if a named character is rendered as the WRONG kind of creature — judge the KIND against the Expected cast species, never the name. Example: a character listed as "a green toy crocodile" drawn as a griffin, dragon, or dog is a speciesMismatch.
+- speciesMismatch (boolean): true if a named character is rendered as the WRONG kind of creature — judge the KIND against the Expected cast species, never the name. Example: a character listed as "a green toy crocodile" drawn as a griffin, dragon, or dog is a speciesMismatch.${speciesMismatchLivingClause}
 - characterHybrid (boolean): true if ONE figure fuses two cast members' bodies together, OR fuses a cast member with a non-cast creature into a single whole creature. This is the WHOLE-creature case — broader than the ANATOMY cap's fused facial features.
 - propHolderMismatch (boolean or null): only when this page's Held props line names WHO holds a prop, set true if that prop is drawn held by the WRONG character. Set null when no Held props line assigns a holder — there is nothing to judge.
 - focalActionMismatch (boolean or null): compare the art to this page's Story text — set true if the art does NOT depict the text's main who-does-what (the subject performing the described action). Set null when the page has no Story text.

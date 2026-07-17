@@ -206,6 +206,28 @@ describe('assembleQcBatchParts (the assembled level)', () => {
     expect(assembly.promptText).toContain('generated WITHOUT a source photo');
   });
 
+  it('threads TOYS_COME_ALIVE_ENABLED into the species rubric (off ≡ byte-identical)', () => {
+    const off = assembleQcBatchParts({
+      batch: batch2,
+      characterIdentity: identity,
+      language: 'en',
+      sheetCount: 1,
+    });
+    const on = assembleQcBatchParts({
+      batch: batch2,
+      characterIdentity: identity,
+      language: 'en',
+      sheetCount: 1,
+      toysComeAlive: true,
+    });
+    // Off omits the param → the assembled rubric is unchanged.
+    expect(off.promptText).toBe(assembly.promptText);
+    expect(off.promptText).not.toMatch(/material, not/i);
+    // On teaches the judge a lively, life-sized toy is correct.
+    expect(on.promptText).toMatch(/material, not/i);
+    expect(on.promptText).toMatch(/size or stillness/i);
+  });
+
   it('sends each page image vision-optimized', () => {
     const images = assembly.contentParts.filter(
       (p): p is { type: 'input_image'; image_url: string; detail: 'high' } =>
