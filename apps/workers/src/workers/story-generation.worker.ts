@@ -60,7 +60,7 @@ import {
   reconcileSceneCastWithText,
   avatarStoryQcProblems,
 } from '../lib/avatar-story.js';
-import { STORY_MODEL, ANALYSIS_MODEL } from '../config/models.js';
+import { STORY_MODEL, ANALYSIS_MODEL, STORY_OPENAI_TIMEOUT_MS } from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -444,6 +444,7 @@ export async function processStoryGeneration(
     // Initialize OpenAI client
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
+      timeout: STORY_OPENAI_TIMEOUT_MS,
     });
 
     // Safe access to job data

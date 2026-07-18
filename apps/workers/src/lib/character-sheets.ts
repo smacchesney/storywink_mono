@@ -40,7 +40,7 @@ import { optimizeCloudinaryUrlForVision } from '@storywink/shared/utils';
 import { getIllustrator } from './illustrators/index.js';
 import type { IllustrationImageInput } from './illustrators/index.js';
 import { fetchImageInput } from './images.js';
-import { ANALYSIS_MODEL } from '../config/models.js';
+import { ANALYSIS_MODEL, ANALYSIS_OPENAI_TIMEOUT_MS } from '../config/models.js';
 import {
   MAX_SHEET_GENERATIONS_PER_BOOK,
   SHEET_BUDGET_MS,
@@ -470,7 +470,10 @@ async function validateSheet(
     { type: 'input_text', text: promptText },
   ];
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    timeout: ANALYSIS_OPENAI_TIMEOUT_MS,
+  });
   const result = await openai.responses.create({
     model: ANALYSIS_MODEL,
     instructions: SHEET_VALIDATION_SYSTEM_PROMPT,

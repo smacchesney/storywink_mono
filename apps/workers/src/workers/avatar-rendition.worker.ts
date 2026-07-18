@@ -14,6 +14,7 @@
 import { Job } from 'bullmq';
 import OpenAI from 'openai';
 import pino from 'pino';
+import { ANALYSIS_OPENAI_TIMEOUT_MS } from '../config/models.js';
 import { PrismaClient } from '@prisma/client';
 import { optimizeCloudinaryUrlForVision } from '@storywink/shared/utils';
 import { extractCloudinaryPublicId } from '@storywink/shared';
@@ -31,7 +32,10 @@ import {
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 const prisma = new PrismaClient();
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  timeout: ANALYSIS_OPENAI_TIMEOUT_MS,
+});
 
 export interface AvatarRenditionJobData {
   avatarId: string;

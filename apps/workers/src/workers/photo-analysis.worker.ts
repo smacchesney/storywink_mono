@@ -11,7 +11,7 @@ import {
   scopeCaptureQuestions,
 } from '@storywink/shared/prompts/photo-analysis';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
-import { ANALYSIS_MODEL } from '../config/models.js';
+import { ANALYSIS_MODEL, ANALYSIS_OPENAI_TIMEOUT_MS } from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -128,7 +128,10 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
   if (contentParts.length === 0) throw new Error('No images available for analysis');
   contentParts.push({ type: 'input_text', text: createPhotoAnalysisPrompt(input) });
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    timeout: ANALYSIS_OPENAI_TIMEOUT_MS,
+  });
   const result = await openai.responses.create({
     model: ANALYSIS_MODEL,
     instructions: PHOTO_ANALYSIS_SYSTEM_PROMPT,

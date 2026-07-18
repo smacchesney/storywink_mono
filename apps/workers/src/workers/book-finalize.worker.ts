@@ -47,7 +47,7 @@ import { maybeSendReadyEmail } from '../lib/email.js';
 import { normalizeBookPalette, paletteNormalizeEnabled } from '../lib/palette.js';
 import { generateAndStoreCover } from '../lib/cover-generation.js';
 import { fetchImageInput, resizeForReference } from '../lib/images.js';
-import { ANALYSIS_MODEL } from '../config/models.js';
+import { ANALYSIS_MODEL, ANALYSIS_OPENAI_TIMEOUT_MS } from '../config/models.js';
 import pino from 'pino';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -126,7 +126,10 @@ async function runQualityCheck(
     });
   }
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    timeout: ANALYSIS_OPENAI_TIMEOUT_MS,
+  });
 
   // One JSON-schema'd judge call, shared by the page batches and the isolated
   // cover call. Throws on an empty response (an infra failure, not a pass) —

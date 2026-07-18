@@ -1,5 +1,6 @@
 import OpenAI, { toFile } from 'openai';
 import pino from 'pino';
+import { IMAGE_OPENAI_TIMEOUT_MS } from '../../config/models.js';
 import type { IllustrationInput, IllustrationOutput, IllustrationProvider } from './types.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -60,7 +61,10 @@ export class OpenAIProvider implements IllustrationProvider {
     if (!process.env.OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY is required when ILLUSTRATION_PROVIDER=openai');
     }
-    this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    this.client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      timeout: IMAGE_OPENAI_TIMEOUT_MS,
+    });
     this.quality = opts?.quality ?? readQuality();
     this.thinking = readThinking();
     this.modelId = opts?.modelId || process.env.OPENAI_IMAGE_MODEL || DEFAULT_OPENAI_IMAGE_MODEL;

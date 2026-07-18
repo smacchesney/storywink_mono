@@ -27,7 +27,7 @@ import {
 import { mergeCastNames, CaptureAnswerLike } from '../lib/resolveCast.js';
 import { mergeLinkedAvatarSheets } from '../lib/avatar-sheets.js';
 import { bridgePagesEnabled } from '../lib/bridge-pages.js';
-import { ANALYSIS_MODEL } from '../config/models.js';
+import { ANALYSIS_MODEL, ANALYSIS_OPENAI_TIMEOUT_MS } from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -284,7 +284,10 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
       contentParts.push({ type: 'input_text', text: promptText.text });
 
       // 6. Call OpenAI vision
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+        timeout: ANALYSIS_OPENAI_TIMEOUT_MS,
+      });
 
       const result = await openai.responses.create({
         model: ANALYSIS_MODEL,
@@ -453,7 +456,10 @@ async function refreshStyleTranslations(
       artStyle,
     );
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      timeout: ANALYSIS_OPENAI_TIMEOUT_MS,
+    });
     const result = await openai.responses.create({
       model: ANALYSIS_MODEL,
       instructions: STYLE_TRANSLATION_REFRESH_SYSTEM_PROMPT,
