@@ -237,6 +237,13 @@ const illustrationWorker = new Worker(
     // re-attempted, so the lock must outlast the worst-case single run.
     lockDuration: 600000,
     maxStalledCount: 0, // Disable auto-retry on stall (prevents duplicate processing)
+    // Rate brake decoupled from concurrency: a burst of books shares one
+    // org-wide OpenAI limit, and 429 storms burn BullMQ attempts. Far above
+    // one book's needs (12 jobs); tune against the logged rate-limit headroom.
+    limiter: {
+      max: parseInt(process.env.ILLUSTRATION_JOBS_PER_MINUTE || '30', 10),
+      duration: 60_000,
+    },
   },
 );
 
