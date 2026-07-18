@@ -767,6 +767,21 @@ export async function processStoryGeneration(
       const result = await openai.responses.create({
         model: STORY_MODEL,
         instructions: isAvatarStory ? AVATAR_STORY_SYSTEM_PROMPT : STORY_GENERATION_SYSTEM_PROMPT,
+        // X15 experiment knob, default ABSENT (model default effort). Adopt
+        // only after the quality gate: >=3 fresh generations at the candidate
+        // effort with no story-QC metric below the default-run floor, plus an
+        // owner read. Rollback = unset the env var.
+        ...(process.env.STORY_REASONING_EFFORT
+          ? {
+              reasoning: {
+                effort: process.env.STORY_REASONING_EFFORT as
+                  | 'minimal'
+                  | 'low'
+                  | 'medium'
+                  | 'high',
+              },
+            }
+          : {}),
         input: [{ role: 'user', content: contentParts }],
         text: {
           format: {
