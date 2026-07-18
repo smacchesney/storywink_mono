@@ -648,7 +648,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
           );
 
           console.log(
-            `[BookFinalize/QC] QC round ${nextRound} failed for book ${bookId} — re-queuing ${qcResult.failedPageIds.length} pages${coverRegenNeeded ? ' + cover regen' : ''}`,
+            `[BookFinalize/QC] QC round ${nextRound} requeue for book ${bookId} — re-rendering ${qcResult.failedPageIds.length} pages${coverRegenNeeded ? ' + cover regen' : ''}`,
           );
 
           // Build re-illustration jobs for failed pages

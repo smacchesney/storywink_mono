@@ -769,6 +769,7 @@ export async function processStoryGeneration(
         }
       }
 
+      const reasoningEffort = storyReasoningEffort();
       const result = await openai.responses.create({
         model: STORY_MODEL,
         instructions: isAvatarStory ? AVATAR_STORY_SYSTEM_PROMPT : STORY_GENERATION_SYSTEM_PROMPT,
@@ -777,7 +778,7 @@ export async function processStoryGeneration(
         // effort with no story-QC metric below the default-run floor, plus an
         // owner read. Rollback = unset the env var. Invalid values are
         // ignored (default behavior) rather than 400-looping the story job.
-        ...(storyReasoningEffort() ? { reasoning: { effort: storyReasoningEffort()! } } : {}),
+        ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
         input: [{ role: 'user', content: contentParts }],
         text: {
           format: {
