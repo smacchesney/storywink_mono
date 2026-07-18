@@ -307,46 +307,55 @@ export async function runQcBatches<T extends QcBatchPageInfo>(
   scoreBatch: (batch: T[], batchIndex: number) => Promise<QcBatchOutcome>,
   onBatchComplete?: (log: QcBatchLog) => void,
 ): Promise<RunQcBatchesResult> {
-  const pageResults: PageQCResult[] = [];
-  const logs: QcBatchLog[] = [];
+  // Batches score CONCURRENTLY (X15 — the judge calls are independent);
+  // per-batch isolation is inside each mapped promise, so one throwing batch
+  // still yields sentinels for exactly its own pages. Aggregation below runs
+  // in input batch order regardless of completion order. onBatchComplete
+  // fires as each batch settles (completion order — logging only).
+  const settled = await Promise.all(
+    batches.map(async (batch, i) => {
+      const batchStartedAt = Date.now();
+      let log: QcBatchLog;
+      const batchPageResults: PageQCResult[] = [];
 
-  for (let i = 0; i < batches.length; i++) {
-    const batch = batches[i];
-    const batchStartedAt = Date.now();
-    let log: QcBatchLog;
-
-    try {
-      const outcome = await scoreBatch(batch, i);
-      const byId = new Map(outcome.pageResults.map((r) => [r.pageId, r]));
-      for (const page of batch) {
-        const mapped = byId.get(page.pageId);
-        pageResults.push(mapped ?? sentinelPageResult(page, 'no QC result returned for page'));
+      try {
+        const outcome = await scoreBatch(batch, i);
+        const byId = new Map(outcome.pageResults.map((r) => [r.pageId, r]));
+        for (const page of batch) {
+          const mapped = byId.get(page.pageId);
+          batchPageResults.push(
+            mapped ?? sentinelPageResult(page, 'no QC result returned for page'),
+          );
+        }
+        log = {
+          event: 'qc_batch_result',
+          batchIndex: i,
+          pageCount: batch.length,
+          ok: true,
+          durationMs: Date.now() - batchStartedAt,
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        for (const page of batch) batchPageResults.push(sentinelPageResult(page, message));
+        log = {
+          event: 'qc_batch_result',
+          batchIndex: i,
+          pageCount: batch.length,
+          ok: false,
+          error: message,
+          durationMs: Date.now() - batchStartedAt,
+        };
       }
-      log = {
-        event: 'qc_batch_result',
-        batchIndex: i,
-        pageCount: batch.length,
-        ok: true,
-        durationMs: Date.now() - batchStartedAt,
-      };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      for (const page of batch) pageResults.push(sentinelPageResult(page, message));
-      log = {
-        event: 'qc_batch_result',
-        batchIndex: i,
-        pageCount: batch.length,
-        ok: false,
-        error: message,
-        durationMs: Date.now() - batchStartedAt,
-      };
-    }
 
-    logs.push(log);
-    onBatchComplete?.(log);
-  }
+      onBatchComplete?.(log);
+      return { pageResults: batchPageResults, log };
+    }),
+  );
 
-  return { pageResults, logs };
+  return {
+    pageResults: settled.flatMap((s) => s.pageResults),
+    logs: settled.map((s) => s.log),
+  };
 }
 
 /** Render-time attribution stamps for one rendered image. */

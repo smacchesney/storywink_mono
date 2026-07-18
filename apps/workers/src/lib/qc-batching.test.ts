@@ -402,6 +402,37 @@ describe('runQcBatches', () => {
     ),
   });
 
+  it('scores batches CONCURRENTLY while keeping page results in input batch order (X15)', async () => {
+    const batches = [
+      [pageInfo(1), pageInfo(2)],
+      [pageInfo(3), pageInfo(4)],
+      [pageInfo(5), pageInfo(6)],
+    ];
+
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const { pageResults, logs } = await runQcBatches(batches, async (batch, index) => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      // Reversed delays: batch 0 resolves LAST — order stability must come
+      // from aggregation, not from completion order.
+      await new Promise((resolve) => setTimeout(resolve, (batches.length - index) * 10));
+      inFlight--;
+      return okOutcome(batch);
+    });
+
+    expect(maxInFlight).toBeGreaterThan(1);
+    expect(pageResults.map((r) => r.pageId)).toEqual([
+      'page-1',
+      'page-2',
+      'page-3',
+      'page-4',
+      'page-5',
+      'page-6',
+    ]);
+    expect(logs.map((l) => l.batchIndex)).toEqual([0, 1, 2]);
+  });
+
   it('one batch throws: sentinels for exactly that batch, real results for the others', async () => {
     const batches = [
       [pageInfo(1), pageInfo(2), pageInfo(3)],

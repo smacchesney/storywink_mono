@@ -168,8 +168,12 @@ async function runQualityCheck(
   // and a cover failure can never taint the pages. Throw/empty/omitted →
   // cover sentinel, persisted like a page sentinel; the qc_error prefix keeps
   // it from ever buying a regen off garbage feedback.
-  let coverResult: CoverQCResult | null = null;
-  if (cover) {
+  // Started here, awaited AFTER the page batches launch (X15): the cover
+  // judge runs concurrently with them. Never rejects — every failure path
+  // resolves to a sentinel, exactly as the old sequential block did.
+  const coverJudgePromise: Promise<CoverQCResult | null> = (async () => {
+    if (!cover) return null;
+    let scored: CoverQCResult;
     try {
       const contentParts: typeof sheetParts = [...sheetParts];
       // Non-numeric label; scored via the coverResult schema field with its
@@ -191,38 +195,39 @@ async function runQualityCheck(
       });
 
       const parsed = await callQcJudge(contentParts);
-      coverResult = parsed.coverResult ?? sentinelCoverResult('no cover result returned');
+      scored = parsed.coverResult ?? sentinelCoverResult('no cover result returned');
     } catch (err) {
-      coverResult = sentinelCoverResult(err instanceof Error ? err.message : 'Unknown error');
+      scored = sentinelCoverResult(err instanceof Error ? err.message : 'Unknown error');
     }
 
-    const coverErrored = isQcErrorFeedback(coverResult.suggestedPromptAdditions);
+    const coverErrored = isQcErrorFeedback(scored.suggestedPromptAdditions);
     if (coverErrored) {
       logger.error(
         {
           bookId,
           event: 'qc_cover_result',
           ok: false,
-          error: coverResult.suggestedPromptAdditions,
+          error: scored.suggestedPromptAdditions,
         },
         'QC cover call failed — sentinel recorded',
       );
     } else {
       logger.info(
-        { bookId, event: 'qc_cover_result', ok: true, passed: coverResult.passed },
+        { bookId, event: 'qc_cover_result', ok: true, passed: scored.passed },
         'QC cover scored',
       );
     }
     console.log(
       `[BookFinalize/QC] cover: ${
         coverErrored
-          ? `error — ${coverResult.suggestedPromptAdditions}`
-          : coverResult.passed
+          ? `error — ${scored.suggestedPromptAdditions}`
+          : scored.passed
             ? 'passed'
             : 'failed'
       }`,
     );
-  }
+    return scored;
+  })();
 
   // Split the book into small batches so no single vision call carries the
   // whole book (the oversized-call failure mode that shipped a book with ZERO
@@ -280,6 +285,9 @@ async function runQualityCheck(
       }`,
     );
   });
+
+  // The cover judge has been running alongside the batches — join it here.
+  const coverResult = await coverJudgePromise;
 
   // Genuine quality failures only — qc_error sentinels are excluded so an
   // outage never re-illustrates a page.
