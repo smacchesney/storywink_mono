@@ -511,11 +511,16 @@ export function countLearningWordEchoes(
 // STORY QUALITY V2 — deterministic length + name checks
 // ----------------------------------
 
-/** Whitespace-token word count (en). Dash-joined tokens count once. */
+/**
+ * Word count (en): whitespace-delimited, with em/en-dashes counting as
+ * separators too — an em-dash joins CLAUSES ("Kai—the map curls"), and
+ * letting it merge words would let over-length prose slip under the hard
+ * cap. Hyphens still join ("merry-go-round" is one word).
+ */
 export function countWords(text: string): number {
   const trimmed = text.trim();
   if (!trimmed) return 0;
-  return trimmed.split(/\s+/).length;
+  return trimmed.split(/[\s—–]+/).filter(Boolean).length;
 }
 
 // Unlike normalize(), keeps the long-vowel mark ー — it is part of the word
@@ -527,14 +532,18 @@ export function countJaChars(text: string): number {
   return text.replace(JA_STRIP_RE, '').length;
 }
 
+// Honorifics whose trailing period is not a sentence break ("Mr. Fox").
+const ABBREVIATION_RE = /\b(Mr|Mrs|Ms|Dr|St)\./g;
+
 /**
  * Sentence count via terminator groups ("What?!" is one sentence).
  * Non-empty text without a terminator still reads as one sentence; a
  * terminator wrapped in closing quotes/brackets ("brave Emma!”") still
- * counts as the ending, not as an extra unterminated sentence.
+ * counts as the ending, not as an extra unterminated sentence; honorific
+ * periods (Mr./Mrs./Dr.) do not count as breaks.
  */
 export function countSentences(text: string, language: string = 'en'): number {
-  const trimmed = text.trim();
+  const trimmed = text.trim().replace(ABBREVIATION_RE, '$1');
   if (!trimmed) return 0;
   const terminators = language === 'ja' ? /[。！？…!?.]+/g : /[.!?…]+/g;
   const groups = trimmed.match(terminators)?.length ?? 0;

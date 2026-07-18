@@ -1088,25 +1088,44 @@ export async function processStoryGeneration(
       const sorted = [...storyResponse.pages].sort((a, b) => a.pageNumber - b.pageNumber);
       const byNumber = new Map(sorted.map((p) => [p.pageNumber, p]));
       const beats = new Map((storyResponse.beatSheet ?? []).map((b) => [b.pageNumber, b]));
+      // One rewrite per page: a page with BOTH a budget and a garble finding
+      // gets a single call carrying every issue, never two competing rewrites.
+      const violationsByPage = new Map<number, string[]>();
       for (const violation of verdict.pageLocal) {
-        const page = byNumber.get(violation.pageNumber);
+        const issues = violationsByPage.get(violation.pageNumber) ?? [];
+        issues.push(violation.issue);
+        violationsByPage.set(violation.pageNumber, issues);
+      }
+      for (const [pageNumber, issues] of violationsByPage) {
+        const page = byNumber.get(pageNumber);
         if (!page) continue;
         try {
-          const newText = await rewriteSinglePageText(openai, {
-            bookTitle: book.title || 'My Special Story',
-            language: bookLanguage,
-            refrain: storyResponse.storyArc?.refrain || '',
-            isAvatarStory,
-            pageNumber: violation.pageNumber,
-            currentText: page.text,
-            violation: violation.issue,
-            beat: beats.get(violation.pageNumber),
-            prevText: byNumber.get(violation.pageNumber - 1)?.text,
-            nextText: byNumber.get(violation.pageNumber + 1)?.text,
-            sceneAction: isAvatarStory
-              ? ((page as AvatarStoryResponse['pages'][number]).scene?.action ?? null)
-              : null,
-          });
+          const newText = (
+            await rewriteSinglePageText(openai, {
+              bookTitle: book.title || 'My Special Story',
+              language: bookLanguage,
+              refrain: storyResponse.storyArc?.refrain || '',
+              isAvatarStory,
+              pageNumber,
+              currentText: page.text,
+              violation: issues.join(' '),
+              beat: beats.get(pageNumber),
+              prevText: byNumber.get(pageNumber - 1)?.text,
+              nextText: byNumber.get(pageNumber + 1)?.text,
+              sceneAction: isAvatarStory
+                ? ((page as AvatarStoryResponse['pages'][number]).scene?.action ?? null)
+                : null,
+            })
+          ).trim();
+          if (!newText) {
+            // An empty rewrite would sail through the deterministic recheck
+            // (0 words = no violation) and brick illustration downstream.
+            logger.warn(
+              { bookId, pageNumber },
+              'Targeted rewrite returned empty text — keeping original page',
+            );
+            continue;
+          }
           page.text = newText;
           targetedRewrites++;
           if (storyInput.learningWords?.length) {
@@ -1115,14 +1134,14 @@ export async function processStoryGeneration(
             );
           }
           logger.info(
-            { bookId, pageNumber: violation.pageNumber, event: 'story_page_targeted_rewrite' },
+            { bookId, pageNumber, event: 'story_page_targeted_rewrite' },
             'Targeted single-page rewrite applied',
           );
         } catch (rewriteError) {
           logger.warn(
             {
               bookId,
-              pageNumber: violation.pageNumber,
+              pageNumber,
               error: rewriteError instanceof Error ? rewriteError.message : 'Unknown error',
             },
             'Targeted single-page rewrite failed — leaving page as-is',
@@ -1130,17 +1149,29 @@ export async function processStoryGeneration(
         }
       }
       // Deterministic re-check only: the model-scored dimensions already
-      // passed, and only the rewritten pages changed.
+      // passed, and only the rewritten pages changed. The refrain floor IS
+      // re-counted — a rewrite can delete the one echo a page carried.
+      const recheckPages = [...storyResponse.pages].sort((a, b) => a.pageNumber - b.pageNumber);
       const recheck = deterministicStoryChecks(
-        [...storyResponse.pages]
-          .sort((a, b) => a.pageNumber - b.pageNumber)
-          .map((p) => ({ pageNumber: p.pageNumber, text: p.text || '' })),
+        recheckPages.map((p) => ({ pageNumber: p.pageNumber, text: p.text || '' })),
         rewriteRosterNames,
         bookLanguage,
       );
+      const recheckProblems = [...recheck.problems];
+      const refrain = storyResponse.storyArc?.refrain || '';
+      const echoesAfter = countRefrainEchoes(
+        refrain,
+        recheckPages.map((p) => p.text || ''),
+        bookLanguage,
+      );
+      if (echoesAfter < STORY_QC_THRESHOLDS.minRefrainEchoes) {
+        recheckProblems.push(
+          `The refrain "${refrain}" is only recognizable on ${echoesAfter} page(s) after the rewrite. It must echo (with variation) on at least ${STORY_QC_THRESHOLDS.minRefrainEchoes} pages.`,
+        );
+      }
       return {
-        passed: recheck.problems.length === 0,
-        feedback: recheck.problems.map((p, i) => `${i + 1}. ${p}`).join('\n'),
+        passed: recheckProblems.length === 0,
+        feedback: recheckProblems.map((p, i) => `${i + 1}. ${p}`).join('\n'),
         pageLocal: [],
         pageLocalOnly: false,
       };
@@ -1944,6 +1975,9 @@ async function processSinglePageTextGeneration(
       text: parsed.text,
       illustrationNotes: parsed.illustrationNotes,
       textConfirmed: false,
+      // The old mood cue described the PREVIOUS text's moment — clear it so
+      // a stale tone can never color the new render (this path emits none).
+      illustrationMood: null,
     },
   });
 

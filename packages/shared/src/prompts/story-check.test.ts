@@ -288,8 +288,10 @@ describe('countWords (en)', () => {
     expect(countWords('Up, up, up!')).toBe(3);
   });
 
-  it('counts dash-joined tokens as one word', () => {
-    expect(countWords('one—two three')).toBe(2);
+  it('counts em/en-dash-joined clauses as separate words (hyphens still join)', () => {
+    expect(countWords('one—two three')).toBe(3);
+    expect(countWords('a merry-go-round ride')).toBe(3);
+    expect(countWords('brave step, Kai—the map curls')).toBe(6);
   });
 
   it('returns 0 for empty or whitespace text', () => {
@@ -324,6 +326,11 @@ describe('countSentences', () => {
   it('does not count a phantom sentence after a quote-wrapped terminator', () => {
     expect(countSentences('“Reach up, brave Emma!”')).toBe(1);
     expect(countSentences('She caught it. “You did it, Emma.”')).toBe(2);
+  });
+
+  it('does not count honorific abbreviations as sentence breaks', () => {
+    expect(countSentences('Mr. Fox tiptoed close. Kai froze still.')).toBe(2);
+    expect(countSentences('Dr. Lee waved. Mrs. Hen clucked. St. Ives shone.')).toBe(3);
   });
 
   it('counts unterminated non-empty text as one sentence', () => {
