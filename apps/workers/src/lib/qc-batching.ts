@@ -268,6 +268,34 @@ export function coverJudgeEligible(qcRound: number): boolean {
   return qcRound === 0;
 }
 
+/**
+ * Whether a round-0 cover QC failure buys the single cover regen (X15: as a
+ * requeue-flow child, no longer inline in finalize). Mirrors the old inline
+ * condition exactly:
+ * - a genuine failed verdict only — a qc_error sentinel was never judged, so
+ *   there is no feedback to regenerate from;
+ * - round 0 only, so a book run can never re-buy the cover twice;
+ * - skipped when the title page itself is being requeued — its successful
+ *   re-render regenerates the cover anyway, and this regen would be
+ *   overwritten uncorrected (one wasted render).
+ */
+export function coverRegenEligible(params: {
+  coverJudged: boolean;
+  coverResult: CoverQCResult | null | undefined;
+  qcRound: number;
+  titlePageRequeued: boolean;
+}): boolean {
+  const { coverJudged, coverResult, qcRound, titlePageRequeued } = params;
+  return Boolean(
+    coverJudged &&
+      coverResult &&
+      !coverResult.passed &&
+      !isQcErrorFeedback(coverResult.suggestedPromptAdditions) &&
+      qcRound === 0 &&
+      !titlePageRequeued,
+  );
+}
+
 /** What one batch's scoring call resolves to. */
 export interface QcBatchOutcome {
   /** Mapped, real page results the judge returned for this batch. */

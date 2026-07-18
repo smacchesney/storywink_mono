@@ -29,6 +29,7 @@ import { upscaleForPrint } from '../utils/image-processing.js';
 import { characterSheetsEnabled } from '../lib/character-sheets.js';
 import { capStyleRefs, styleRefsCapForProvider } from '../lib/style-refs.js';
 import { generateAndStoreCover } from '../lib/cover-generation.js';
+import { regenerateCoverFromQc, loadBookForCoverRegen } from '../lib/cover-regen.js';
 import { fetchImageInput, resizeForReference } from '../lib/images.js';
 import type { IllustrationImageInput } from '../lib/illustrators/index.js';
 
@@ -144,6 +145,29 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
   );
   console.log(`  - QC Round: ${qcRound || 0}`);
   if (qcFeedback) console.log(`  - QC Feedback: ${qcFeedback.substring(0, 200)}...`);
+
+  // X15: a cover-regen flow child re-renders ONLY the QC-failed cover (was
+  // inline in finalize). No page render, no page DB writes; non-fatal like
+  // the inline path — any failure keeps the existing cover and the flow's
+  // finalize parent still runs.
+  if (job.data.coverRegen) {
+    if (!job.data.coverQcResult) {
+      logger.warn({ jobId: job.id, bookId }, 'Cover regen job missing coverQcResult — skipping');
+      return { success: true, coverRegen: true, skipped: true };
+    }
+    const regenBook = await loadBookForCoverRegen(bookId);
+    if (!regenBook) {
+      logger.warn({ jobId: job.id, bookId }, 'Cover regen job: book not found — skipping');
+      return { success: true, coverRegen: true, skipped: true };
+    }
+    await regenerateCoverFromQc(
+      regenBook,
+      job.data.characterSheets ?? [],
+      job.data.coverQcResult,
+      logger,
+    );
+    return { success: true, coverRegen: true };
+  }
 
   try {
     // Validate prerequisites

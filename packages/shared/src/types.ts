@@ -193,6 +193,14 @@ export interface IllustrationGenerationJobV2 extends IllustrationGenerationJob {
    * CHARACTER_SHEETS_ENABLED produced (or reused) sheets for this run.
    */
   characterSheets?: CharacterSheetRef[];
+  /**
+   * X15: when true this child re-renders ONLY the QC-failed cover as part of
+   * a requeue flow (no page render, no page DB writes). pageId/pageNumber
+   * carry the title page so diagnostics stay meaningful. Carries the cover
+   * verdict whose suggestedPromptAdditions become the regen feedback.
+   */
+  coverRegen?: boolean;
+  coverQcResult?: CoverQCResult | null;
 }
 
 /**

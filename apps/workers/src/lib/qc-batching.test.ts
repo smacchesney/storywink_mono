@@ -13,6 +13,7 @@ import {
   requeueFeedbackFor,
   buildQcClassFlagLog,
   coverJudgeEligible,
+  coverRegenEligible,
   runQcBatches,
   buildQcRows,
   type QcBatchPageInfo,
@@ -392,6 +393,47 @@ describe('coverJudgeEligible', () => {
   it('skips it on round 1+ (regen is round-0-gated, so the verdict is unactionable)', () => {
     expect(coverJudgeEligible(1)).toBe(false);
     expect(coverJudgeEligible(2)).toBe(false);
+  });
+});
+
+describe('coverRegenEligible (X15: regen rides the requeue flow)', () => {
+  const failedCover = (): CoverQCResult =>
+    realCoverResult({
+      passed: false,
+      titleMatches: false,
+      issues: ['title corrupted'],
+      suggestedPromptAdditions: 'Fix the title lettering',
+    });
+
+  const base = {
+    coverJudged: true,
+    coverResult: failedCover(),
+    qcRound: 0,
+    titlePageRequeued: false,
+  };
+
+  it('buys the regen on a genuine round-0 cover failure', () => {
+    expect(coverRegenEligible(base)).toBe(true);
+  });
+
+  it('never regens from a qc_error sentinel (cover was not judged)', () => {
+    expect(coverRegenEligible({ ...base, coverResult: sentinelCoverResult('boom') })).toBe(false);
+  });
+
+  it('never regens on round 1+ (exactly-once rule)', () => {
+    expect(coverRegenEligible({ ...base, qcRound: 1 })).toBe(false);
+  });
+
+  it('skips when the title page itself is requeued (its re-render rebuys the cover)', () => {
+    expect(coverRegenEligible({ ...base, titlePageRequeued: true })).toBe(false);
+  });
+
+  it('skips a passed cover and a missing/unjudged cover', () => {
+    expect(
+      coverRegenEligible({ ...base, coverResult: { ...failedCover(), passed: true } }),
+    ).toBe(false);
+    expect(coverRegenEligible({ ...base, coverResult: null })).toBe(false);
+    expect(coverRegenEligible({ ...base, coverJudged: false })).toBe(false);
   });
 });
 
