@@ -49,6 +49,59 @@ async function setGenerationPhase(bookId: string, phase: string | null): Promise
 export async function processCharacterExtraction(job: Job<CharacterExtractionJob>) {
   const { bookId, userId, artStyle, pageIds, recovery } = job.data;
 
+  // X15 sheet pre-warm: enqueued alongside the story job so sheet generation
+  // (up to SHEET_BUDGET_MS of image-gen) overlaps the ~2min story call
+  // instead of running after it. Writes ONLY Book.characterReferences (keyed
+  // characterId+artStyle — the real extraction pass then reuses the sheets);
+  // deliberately never touches book status, generationPhase, or
+  // Book.characterIdentity (the story worker is writing that concurrently).
+  // Every failure path is a silent no-op — the real pass regenerates.
+  if (job.data.prepareOnly) {
+    if (!characterSheetsEnabled()) return { prepared: false, reason: 'sheets_disabled' };
+    try {
+      const book = await prisma.book.findUnique({
+        where: { id: bookId },
+        select: {
+          bookType: true,
+          characterIdentity: true,
+          characterReferences: true,
+          pages: {
+            orderBy: { index: 'asc' },
+            select: {
+              assetId: true,
+              asset: { select: { url: true, thumbnailUrl: true } },
+            },
+          },
+        },
+      });
+      // Avatar books render on avatar sheets, not book sheets — nothing to warm.
+      if (!book || book.bookType === 'AVATAR_STORY') {
+        return { prepared: false, reason: !book ? 'book_not_found' : 'avatar_story' };
+      }
+      const identity = book.characterIdentity as CharacterIdentity | null;
+      if (!identity?.characters?.length) {
+        return { prepared: false, reason: 'no_identity' };
+      }
+      const sheets = await ensureCharacterSheets({
+        bookId,
+        userId,
+        artStyle,
+        identity,
+        pages: book.pages,
+        existingReferences: book.characterReferences,
+        logger,
+      });
+      logger.info({ bookId, artStyle, sheetCount: sheets.length }, 'Sheet pre-warm complete');
+      return { prepared: true, sheetCount: sheets.length };
+    } catch (prepError) {
+      logger.warn(
+        { bookId, error: prepError instanceof Error ? prepError.message : 'Unknown error' },
+        'Sheet pre-warm failed (non-fatal) — the extraction pass will generate sheets',
+      );
+      return { prepared: false, reason: 'error' };
+    }
+  }
+
   logger.info({ bookId, userId, artStyle }, 'Starting character identity extraction');
 
   await setGenerationPhase(bookId, 'characters');

@@ -201,12 +201,14 @@ const PRINT_FULFILLMENT_CONCURRENCY = parseInt(
   process.env.PRINT_FULFILLMENT_CONCURRENCY || '1',
   10,
 );
-// Default 2 (was 1): character sheet generation (CHARACTER_SHEETS_ENABLED)
+// Default 3 (was 2, was 1): character sheet generation (CHARACTER_SHEETS_ENABLED)
 // can put up to ~60s of image-gen work into this stage, and a single lane
 // would head-of-line block book B's whole illustration pipeline behind
-// book A's sheets. Env-overridable like ILLUSTRATION_CONCURRENCY.
+// book A's sheets. X15 adds prepareOnly sheet pre-warm jobs on this queue,
+// so one more lane keeps them from ever delaying a real extraction.
+// Env-overridable like ILLUSTRATION_CONCURRENCY.
 const CHARACTER_EXTRACTION_CONCURRENCY = parseInt(
-  process.env.CHARACTER_EXTRACTION_CONCURRENCY || '2',
+  process.env.CHARACTER_EXTRACTION_CONCURRENCY || '3',
   10,
 );
 
