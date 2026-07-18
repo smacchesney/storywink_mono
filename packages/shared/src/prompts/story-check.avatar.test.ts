@@ -90,12 +90,7 @@ describe('AVATAR_STORY_QC_RESPONSE_SCHEMA', () => {
     expect('truthToEvent' in AVATAR_STORY_QC_RESPONSE_SCHEMA.properties).toBe(false);
     const pageItems = AVATAR_STORY_QC_RESPONSE_SCHEMA.properties.pages.items;
     expect('captionRisk' in pageItems.properties).toBe(false);
-    expect(pageItems.required).toEqual([
-      'pageNumber',
-      'deliversBeat',
-      'sceneMatchesText',
-      'issue',
-    ]);
+    expect(pageItems.required).toEqual(['pageNumber', 'deliversBeat', 'sceneMatchesText', 'issue']);
   });
 
   it('adds soundOverload (required-nullable) and agency (required number) — S2/S3', () => {

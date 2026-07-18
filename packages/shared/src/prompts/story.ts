@@ -69,7 +69,12 @@ const PAGE_ITEM_PROPERTIES = {
   },
 } as const;
 
-const PAGE_ITEM_REQUIRED = ['pageNumber', 'text', 'illustrationNotes', 'learningWordsUsed'] as const;
+const PAGE_ITEM_REQUIRED = [
+  'pageNumber',
+  'text',
+  'illustrationNotes',
+  'learningWordsUsed',
+] as const;
 
 // JSON Schema for OpenAI structured output (strict mode)
 // Array-based format: { pages: [{ pageNumber, text, illustrationNotes }, ...] }
@@ -641,13 +646,7 @@ export interface StoryArc {
 
 /** STORY QUALITY V2: one structural beat per page, planned before prose. */
 export type BeatRole =
-  | 'setup'
-  | 'complication'
-  | 'try'
-  | 'breath'
-  | 'turn'
-  | 'climax'
-  | 'resolution';
+  'setup' | 'complication' | 'try' | 'breath' | 'turn' | 'climax' | 'resolution';
 
 export interface BeatSheetEntry {
   pageNumber: number;

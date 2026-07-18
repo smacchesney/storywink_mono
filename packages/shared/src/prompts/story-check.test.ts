@@ -416,7 +416,11 @@ describe('findNameGarbles', () => {
 
   it('skips ja books (no reliable word boundaries)', () => {
     expect(
-      findNameGarbles([{ pageNumber: 1, text: 'えま の トレックス' }], ['えま', 'トレックス'], 'ja'),
+      findNameGarbles(
+        [{ pageNumber: 1, text: 'えま の トレックス' }],
+        ['えま', 'トレックス'],
+        'ja',
+      ),
     ).toEqual([]);
   });
 });

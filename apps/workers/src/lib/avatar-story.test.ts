@@ -427,3 +427,51 @@ describe('avatarStoryQcProblems', () => {
     ).toEqual([]);
   });
 });
+
+describe('avatarStoryQcProblems — STORY_QUALITY_V2 enforcement', () => {
+  const passing = { arcCoherence: 9, readAloudRhythm: 8, lastPageLanding: true, feedback: null };
+  const v2Pages = [
+    { pageNumber: 1, deliversBeat: true, sceneMatchesText: true, issue: null },
+    { pageNumber: 2, deliversBeat: false, sceneMatchesText: true, issue: 'Stalls the quest.' },
+    { pageNumber: 3, deliversBeat: true, sceneMatchesText: false, issue: null },
+  ];
+  const beatSheet = [
+    { pageNumber: 2, role: 'try' as const, goal: 'first try fails', handoff: 'a bigger idea' },
+  ];
+
+  it('stays inert when v2 is absent or not enforcing (flag-off byte-identical)', () => {
+    const qc = { ...passing, agency: 0, pages: v2Pages };
+    expect(avatarStoryQcProblems(qc, 'drip drop off we go', 5)).toEqual([]);
+    expect(avatarStoryQcProblems(qc, 'drip drop off we go', 5, { enforce: false })).toEqual([]);
+  });
+
+  it('enforces agency, deliversBeat, and sceneMatchesText when enforcing', () => {
+    const qc = { ...passing, agency: 3, pages: v2Pages };
+    const problems = avatarStoryQcProblems(qc, 'drip drop off we go', 5, {
+      enforce: true,
+      beatSheet,
+    });
+    expect(problems.some((p) => p.includes('DOER'))).toBe(true);
+    expect(problems.some((p) => p.includes('Page 2') && p.includes('try — first try fails'))).toBe(
+      true,
+    );
+    expect(problems.some((p) => p.includes('Page 3') && p.includes('scene'))).toBe(true);
+  });
+
+  it('carries deterministic problems through when enforcing', () => {
+    const detProblem = 'Page 4 runs 33 words (cap 30) — rewrite to 1-2 sentences, 15-30 words.';
+    const problems = avatarStoryQcProblems(passing, 'drip drop off we go', 5, {
+      enforce: true,
+      deterministicProblems: [detProblem],
+    });
+    expect(problems).toEqual([detProblem]);
+  });
+
+  it('never lets deterministic problems block when not enforcing', () => {
+    const problems = avatarStoryQcProblems(passing, 'drip drop off we go', 5, {
+      enforce: false,
+      deterministicProblems: ['Page 4 runs 33 words'],
+    });
+    expect(problems).toEqual([]);
+  });
+});
