@@ -181,9 +181,12 @@ export const STORY_QC_THRESHOLDS = {
   minRefrainEchoes: 3,
   // Age-4 length budget (STORY_QUALITY_V2). Target band is 15-30 words /
   // 1-2 sentences (en) and 20-45 chars (ja); the caps below are the hard
-  // enforcement line. No floor — short punchy pages are a feature.
+  // enforcement line. No floor — short punchy pages are a feature. The
+  // sentence cap is 4, not 3: the house style (prose + refrain quote +
+  // dialogic question) legitimately lands 4 terminator groups inside the
+  // word budget; the 30-word cap is the load-bearing limit.
   maxWordsEn: 30,
-  maxSentences: 3,
+  maxSentences: 4,
   maxCharsJa: 48,
   // Log-only today: truthToEvent is scored and logged but never triggers a
   // regen. Flip to enforcing only after Railway data validates the
@@ -526,14 +529,18 @@ export function countJaChars(text: string): number {
 
 /**
  * Sentence count via terminator groups ("What?!" is one sentence).
- * Non-empty text without a terminator still reads as one sentence.
+ * Non-empty text without a terminator still reads as one sentence; a
+ * terminator wrapped in closing quotes/brackets ("brave Emma!”") still
+ * counts as the ending, not as an extra unterminated sentence.
  */
 export function countSentences(text: string, language: string = 'en'): number {
   const trimmed = text.trim();
   if (!trimmed) return 0;
   const terminators = language === 'ja' ? /[。！？…!?.]+/g : /[.!?…]+/g;
   const groups = trimmed.match(terminators)?.length ?? 0;
-  const endsTerminated = (language === 'ja' ? /[。！？…!?.]\s*$/ : /[.!?…]\s*$/).test(trimmed);
+  const endsTerminated = (
+    language === 'ja' ? /[。！？…!?.]["”'’)\]」』]*\s*$/ : /[.!?…]["”'’)\]]*\s*$/
+  ).test(trimmed);
   return groups + (endsTerminated ? 0 : 1);
 }
 

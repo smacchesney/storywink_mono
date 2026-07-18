@@ -321,6 +321,11 @@ describe('countSentences', () => {
     expect(countSentences('What?!')).toBe(1);
   });
 
+  it('does not count a phantom sentence after a quote-wrapped terminator', () => {
+    expect(countSentences('“Reach up, brave Emma!”')).toBe(1);
+    expect(countSentences('She caught it. “You did it, Emma.”')).toBe(2);
+  });
+
   it('counts unterminated non-empty text as one sentence', () => {
     expect(countSentences('goodnight little one')).toBe(1);
     expect(countSentences('')).toBe(0);
@@ -348,11 +353,17 @@ describe('wordBudgetProblems', () => {
     expect(problems[0].issue).toContain('31 words');
   });
 
-  it('flags en pages over the 3-sentence cap', () => {
-    const problems = wordBudgetProblems([{ pageNumber: 4, text: choppy }], 'en');
+  it('flags en pages over the 4-sentence cap', () => {
+    const problems = wordBudgetProblems([{ pageNumber: 4, text: `${choppy} Kai snores.` }], 'en');
     expect(problems).toHaveLength(1);
     expect(problems[0].pageNumber).toBe(4);
-    expect(problems[0].issue).toContain('4 sentences');
+    expect(problems[0].issue).toContain('5 sentences');
+  });
+
+  it('allows the house style: prose + refrain quote + dialogic question (4 groups)', () => {
+    const houseStyle =
+      'Emma stretched on tiptoes, then bounded. Still too high! “Reach higher, brave Emma!” Could one bigger jump catch the golden leaf?';
+    expect(wordBudgetProblems([{ pageNumber: 2, text: houseStyle }], 'en')).toEqual([]);
   });
 
   it('passes pages at exactly the caps', () => {
@@ -449,7 +460,7 @@ describe('rollCallProblems (log-only)', () => {
 describe('STORY_QC_THRESHOLDS — word budget caps', () => {
   it('carries the age-4 length caps', () => {
     expect(STORY_QC_THRESHOLDS.maxWordsEn).toBe(30);
-    expect(STORY_QC_THRESHOLDS.maxSentences).toBe(3);
+    expect(STORY_QC_THRESHOLDS.maxSentences).toBe(4);
     expect(STORY_QC_THRESHOLDS.maxCharsJa).toBe(48);
   });
 });
