@@ -5,7 +5,7 @@ Background job processors for AI operations.
 ## Stack
 
 - BullMQ workers with TypeScript
-- `gpt-5.5` (OpenAI Responses API, override via `STORY_MODEL`) for story generation
+- `gpt-5.6` (OpenAI Responses API, override via `STORY_MODEL`) for story generation
 - `gpt-5-mini` for character extraction and QC (illustration QC + story QC)
 - Gemini 3.1 Flash Image or OpenAI gpt-image-2 for illustrations (selected via `ILLUSTRATION_PROVIDER` env)
 - Redis via `createBullMQConnection()` from `@storywink/shared/redis`

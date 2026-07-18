@@ -1,6 +1,6 @@
 # Storywink.ai
 
-AI-powered platform transforming photos into personalized children's picture books. Story generation runs on the OpenAI Responses API (`gpt-5.5`, override via `STORY_MODEL`); character extraction and QC use `gpt-5-mini`. Illustrations use Gemini 3.1 Flash Image or OpenAI gpt-image-2, selectable via the `ILLUSTRATION_PROVIDER` env var on the workers service.
+AI-powered platform transforming photos into personalized children's picture books. Story generation runs on the OpenAI Responses API (`gpt-5.6`, override via `STORY_MODEL`); character extraction and QC use `gpt-5-mini`. Illustrations use Gemini 3.1 Flash Image or OpenAI gpt-image-2, selectable via the `ILLUSTRATION_PROVIDER` env var on the workers service.
 
 ## Commands
 
