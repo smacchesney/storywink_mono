@@ -25,9 +25,14 @@ import {
   remapCharacterPages,
 } from '@storywink/shared/utils';
 import { mergeCastNames, CaptureAnswerLike } from '../lib/resolveCast.js';
+import { prepareIdentityForSheetPrewarm } from '../lib/sheet-prewarm.js';
 import { mergeLinkedAvatarSheets } from '../lib/avatar-sheets.js';
 import { bridgePagesEnabled } from '../lib/bridge-pages.js';
-import { ANALYSIS_MODEL, ANALYSIS_OPENAI_TIMEOUT_MS } from '../config/models.js';
+import {
+  ANALYSIS_MODEL,
+  ANALYSIS_OPENAI_TIMEOUT_MS,
+  VISION_OPENAI_TIMEOUT_MS,
+} from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -63,6 +68,8 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         where: { id: bookId },
         select: {
           bookType: true,
+          childName: true,
+          captureQuestions: true,
           characterIdentity: true,
           characterReferences: true,
           pages: {
@@ -78,9 +85,21 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
       if (!book || book.bookType === 'AVATAR_STORY') {
         return { prepared: false, reason: !book ? 'book_not_found' : 'avatar_story' };
       }
-      const identity = book.characterIdentity as CharacterIdentity | null;
-      if (!identity?.characters?.length) {
-        return { prepared: false, reason: 'no_identity' };
+      // Mirror the real pass's identity preparation IN MEMORY (cast-name
+      // merge + style-translation refresh) so the pre-warmed sheet is built
+      // from the same prompt inputs the shipped path would use — a stale
+      // vignette styleTranslation baked into a kawaii sheet would otherwise
+      // be cache-hit by the real pass (final-review Critical). A failed
+      // refresh skips the warm entirely; nothing is ever persisted here.
+      const identity = await prepareIdentityForSheetPrewarm({
+        identity: book.characterIdentity as CharacterIdentity | null,
+        artStyle,
+        captureQuestions: (book.captureQuestions as CaptureAnswerLike[] | null) ?? [],
+        childName: book.childName,
+        refresh: (i) => refreshStyleTranslations(i, artStyle, bookId),
+      });
+      if (!identity) {
+        return { prepared: false, reason: 'no_usable_identity' };
       }
       const sheets = await ensureCharacterSheets({
         bookId,
@@ -336,10 +355,10 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
       // Add the text prompt after all images
       contentParts.push({ type: 'input_text', text: promptText.text });
 
-      // 6. Call OpenAI vision
+      // 6. Call OpenAI vision (fat multi-image call — vision-tier timeout)
       const openai = new OpenAI({
         apiKey: process.env.OPENAI_API_KEY,
-        timeout: ANALYSIS_OPENAI_TIMEOUT_MS,
+        timeout: VISION_OPENAI_TIMEOUT_MS,
       });
 
       const result = await openai.responses.create({

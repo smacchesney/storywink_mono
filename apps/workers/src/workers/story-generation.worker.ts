@@ -60,7 +60,12 @@ import {
   reconcileSceneCastWithText,
   avatarStoryQcProblems,
 } from '../lib/avatar-story.js';
-import { STORY_MODEL, ANALYSIS_MODEL, STORY_OPENAI_TIMEOUT_MS } from '../config/models.js';
+import {
+  STORY_MODEL,
+  ANALYSIS_MODEL,
+  STORY_OPENAI_TIMEOUT_MS,
+  storyReasoningEffort,
+} from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -770,18 +775,9 @@ export async function processStoryGeneration(
         // X15 experiment knob, default ABSENT (model default effort). Adopt
         // only after the quality gate: >=3 fresh generations at the candidate
         // effort with no story-QC metric below the default-run floor, plus an
-        // owner read. Rollback = unset the env var.
-        ...(process.env.STORY_REASONING_EFFORT
-          ? {
-              reasoning: {
-                effort: process.env.STORY_REASONING_EFFORT as
-                  | 'minimal'
-                  | 'low'
-                  | 'medium'
-                  | 'high',
-              },
-            }
-          : {}),
+        // owner read. Rollback = unset the env var. Invalid values are
+        // ignored (default behavior) rather than 400-looping the story job.
+        ...(storyReasoningEffort() ? { reasoning: { effort: storyReasoningEffort()! } } : {}),
         input: [{ role: 'user', content: contentParts }],
         text: {
           format: {

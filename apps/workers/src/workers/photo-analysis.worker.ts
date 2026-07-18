@@ -11,7 +11,7 @@ import {
   scopeCaptureQuestions,
 } from '@storywink/shared/prompts/photo-analysis';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
-import { ANALYSIS_MODEL, ANALYSIS_OPENAI_TIMEOUT_MS } from '../config/models.js';
+import { ANALYSIS_MODEL, VISION_OPENAI_TIMEOUT_MS } from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -130,7 +130,8 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
 
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
-    timeout: ANALYSIS_OPENAI_TIMEOUT_MS,
+    // Fat multi-image perception batch — vision-tier timeout, not analysis.
+    timeout: VISION_OPENAI_TIMEOUT_MS,
   });
   const result = await openai.responses.create({
     model: ANALYSIS_MODEL,

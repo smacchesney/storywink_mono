@@ -644,7 +644,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
               coverRegen: coverRegenNeeded,
               ...(escalationModelId ? { escalationModel: escalationModelId } : {}),
             },
-            'QC failed — re-queuing failed pages for re-illustration',
+            'QC requeue — re-rendering failed pages and/or the cover',
           );
 
           console.log(

@@ -25,3 +25,20 @@ function timeoutFromEnv(name: string, fallbackMs: number): number {
 export const STORY_OPENAI_TIMEOUT_MS = timeoutFromEnv('STORY_OPENAI_TIMEOUT_MS', 240_000);
 export const IMAGE_OPENAI_TIMEOUT_MS = timeoutFromEnv('IMAGE_OPENAI_TIMEOUT_MS', 360_000);
 export const ANALYSIS_OPENAI_TIMEOUT_MS = timeoutFromEnv('ANALYSIS_OPENAI_TIMEOUT_MS', 120_000);
+// The two FAT vision calls (photo-analysis perception batch, extraction's
+// fresh vision pass) carry up to ~16 detail-high images in one request —
+// 120s would fail them systematically on max-photo books, not just at the
+// tail. Still below their workers' 300s locks.
+export const VISION_OPENAI_TIMEOUT_MS = timeoutFromEnv('VISION_OPENAI_TIMEOUT_MS', 240_000);
+
+const STORY_REASONING_EFFORTS = ['minimal', 'low', 'medium', 'high'] as const;
+type StoryReasoningEffort = (typeof STORY_REASONING_EFFORTS)[number];
+
+/** X15 experiment knob: validated STORY_REASONING_EFFORT, or null for the
+ * model-default request (also on a typo — never 400-loop the story job). */
+export function storyReasoningEffort(): StoryReasoningEffort | null {
+  const raw = process.env.STORY_REASONING_EFFORT;
+  return (STORY_REASONING_EFFORTS as readonly string[]).includes(raw ?? '')
+    ? (raw as StoryReasoningEffort)
+    : null;
+}
