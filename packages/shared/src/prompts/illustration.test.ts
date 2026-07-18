@@ -365,3 +365,50 @@ describe('createIllustrationPrompt — photo-path interior no-text rule', () => 
     expect(prompt.endsWith('This is a wordless illustration.')).toBe(true);
   });
 });
+
+describe('createIllustrationPrompt — photo-path mood cue (STORY_ILLUS_MOOD_ENABLED)', () => {
+  const base = {
+    style: 'vignette' as const,
+    pageText: 'Aria spun in the sunshine.',
+    bookTitle: "Aria's Big Day",
+    isTitlePage: false,
+    referenceImageCount: 1,
+    characterIdentity,
+    pageNumber: 3,
+  };
+
+  it('renders the bounded emotional-tone section when a mood is threaded', () => {
+    const prompt = createIllustrationPrompt({ ...base, illustrationMood: 'hushed wonder' });
+    expect(prompt).toContain('EMOTIONAL TONE');
+    expect(prompt).toContain('hushed wonder');
+    expect(prompt).toContain('never changes pose, clothing, or scene composition');
+  });
+
+  it('is byte-identical when the option is absent or empty (flag-off path)', () => {
+    const off = createIllustrationPrompt(base);
+    expect(createIllustrationPrompt({ ...base, illustrationMood: null })).toBe(off);
+    expect(createIllustrationPrompt({ ...base, illustrationMood: '  ' })).toBe(off);
+    expect(off).not.toContain('EMOTIONAL TONE');
+  });
+
+  it('never renders on covers or off the photo path', () => {
+    const cover = createIllustrationPrompt({
+      ...base,
+      isTitlePage: true,
+      illustrationMood: 'hushed wonder',
+    });
+    expect(cover).not.toContain('EMOTIONAL TONE');
+    const avatar = createIllustrationPrompt({
+      ...base,
+      contentAnchor: 'sheet',
+      illustrationMood: 'hushed wonder',
+    });
+    expect(avatar).not.toContain('EMOTIONAL TONE');
+  });
+
+  it('sanitizes shouty mood text and keeps the no-text rule last', () => {
+    const prompt = createIllustrationPrompt({ ...base, illustrationMood: '"POOF!" excitement' });
+    expect(prompt).not.toContain('POOF');
+    expect(prompt.endsWith('This is a wordless illustration.')).toBe(true);
+  });
+});

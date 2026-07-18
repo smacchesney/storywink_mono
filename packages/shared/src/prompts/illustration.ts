@@ -70,6 +70,16 @@ export interface IllustrationPromptOptions {
    * (kindFromRole), so no new roster field is needed.
    */
   toysComeAlive?: boolean;
+  /**
+   * STORY QUALITY V2 (STORY_ILLUS_MOOD_ENABLED, default absent = today's
+   * prompt byte-identical): the story model's per-page mood cue
+   * (Page.illustrationMood, 1-3 words like "hushed wonder"), rendered as a
+   * bounded EMOTIONAL TONE directive on the PHOTO path's interior pages only.
+   * Strictly subordinate to the photo — it tunes lighting, atmosphere, and
+   * expression emphasis, never pose, clothing, or composition. The worker
+   * threads it only when the flag is on.
+   */
+  illustrationMood?: string | null;
 }
 
 // ----------------------------------
@@ -466,6 +476,17 @@ function buildQCFeedbackSection(qcFeedback: string | null | undefined): string |
  * Creates a prompt for illustration generation by delegating to the style's
  * prompt builder and appending cross-cutting concerns (character identity, QC feedback).
  */
+/**
+ * STORY QUALITY V2: bounded per-page emotional tone for the photo path.
+ * The photo remains the composition truth; this only tunes how the moment
+ * FEELS — light, air, and expression emphasis.
+ */
+function buildMoodCueSection(moodCue: string | null): string | null {
+  const cue = moodCue?.trim().slice(0, 80);
+  if (!cue) return null;
+  return `EMOTIONAL TONE (subordinate to the photo — it never changes pose, clothing, or scene composition): let this moment feel ${cue}; express it ONLY through lighting, atmosphere, and the characters' expressions.`;
+}
+
 export function createIllustrationPrompt(opts: IllustrationPromptOptions): string {
   const style = getStyleDefinition(opts.style);
   const contentAnchor = opts.contentAnchor ?? 'photo';
@@ -574,6 +595,15 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
         )
       : null;
 
+  // 4c. STORY QUALITY V2 mood cue (STORY_ILLUS_MOOD_ENABLED): photo-path
+  //     interiors only — the photo stays the composition truth; the cue may
+  //     tune light, air, and expression. Sanitized like illustrationNotes so
+  //     a shouty cue can never smuggle lettering into the render.
+  const moodSection =
+    contentAnchor === 'photo' && !opts.isTitlePage
+      ? buildMoodCueSection(sanitizeIllustrationNotes(opts.illustrationMood ?? null))
+      : null;
+
   // 5. Cross-cutting: QC feedback (neutralized too — feedback text quoting a
   //    display name would smuggle the name prior right back in).
   const qcSection = neutralize(buildQCFeedbackSection(opts.qcFeedback));
@@ -588,6 +618,7 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
     charSection,
     exactCastSection,
     livingToySection,
+    moodSection,
     qcSection,
     noTextSection,
   ]

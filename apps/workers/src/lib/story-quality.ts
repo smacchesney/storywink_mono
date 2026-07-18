@@ -25,6 +25,18 @@ export function storyQualityV2Enabled(
   return value === 'true' || value === '1';
 }
 
+/**
+ * STORY_ILLUS_MOOD_ENABLED: whether the photo path's per-page mood cue
+ * (Page.illustrationMood) is threaded into the interior illustration prompt.
+ * Persistence is unconditional; this flag only gates rendering.
+ */
+export function storyIllusMoodEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  const value = (env.STORY_ILLUS_MOOD_ENABLED || '').trim().toLowerCase();
+  return value === 'true' || value === '1';
+}
+
 export interface DeterministicStoryChecks {
   budget: WordBudgetProblem[];
   garbles: NameGarble[];

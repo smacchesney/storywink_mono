@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { storyQualityV2Enabled, deterministicStoryChecks } from './story-quality.js';
+import {
+  storyQualityV2Enabled,
+  storyIllusMoodEnabled,
+  deterministicStoryChecks,
+} from './story-quality.js';
 
 describe('storyQualityV2Enabled', () => {
   it('reads the STORY_QUALITY_V2 env flag', () => {
@@ -8,6 +12,14 @@ describe('storyQualityV2Enabled', () => {
     expect(storyQualityV2Enabled({ STORY_QUALITY_V2: 'false' })).toBe(false);
     expect(storyQualityV2Enabled({ STORY_QUALITY_V2: '' })).toBe(false);
     expect(storyQualityV2Enabled({})).toBe(false);
+  });
+});
+
+describe('storyIllusMoodEnabled', () => {
+  it('reads the STORY_ILLUS_MOOD_ENABLED env flag', () => {
+    expect(storyIllusMoodEnabled({ STORY_ILLUS_MOOD_ENABLED: 'true' })).toBe(true);
+    expect(storyIllusMoodEnabled({ STORY_ILLUS_MOOD_ENABLED: 'false' })).toBe(false);
+    expect(storyIllusMoodEnabled({})).toBe(false);
   });
 });
 

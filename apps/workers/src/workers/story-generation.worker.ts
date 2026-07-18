@@ -1220,6 +1220,8 @@ export async function processStoryGeneration(
       learningWordsUsed: string[];
       /** AVATAR_STORY only: validated model scene → Page.bridgeScene. */
       bridgeScene?: AvatarPageScene | null;
+      /** Photo books only (STORY QUALITY V2): per-page mood cue → Page.illustrationMood. */
+      illustrationMood?: string | null;
     }
     let pageUpdates: PageUpdateData[] = [];
 
@@ -1336,7 +1338,11 @@ export async function processStoryGeneration(
           illustrationNotes: notes,
           textConfirmed: trimmedText.length > 0,
           learningWordsUsed: content?.learningWordsUsed ?? [],
-          ...(isAvatarStory ? { bridgeScene: scene } : {}),
+          ...(isAvatarStory
+            ? { bridgeScene: scene }
+            : // Persisted unconditionally (avatar pages carry scene.mood
+              // instead); STORY_ILLUS_MOOD_ENABLED gates rendering.
+              { illustrationMood: content?.moodCue?.trim() || null }),
         };
       });
     } catch (mappingError) {
@@ -1379,6 +1385,10 @@ export async function processStoryGeneration(
               ...(update.bridgeScene !== undefined
                 ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   { bridgeScene: (update.bridgeScene ?? null) as any } // Prisma Json column
+                : {}),
+              // Photo books: per-page mood cue (or clear a stale one).
+              ...(update.illustrationMood !== undefined
+                ? { illustrationMood: update.illustrationMood }
                 : {}),
             },
           });
