@@ -13,10 +13,73 @@ export interface ImagePlaceholder {
 }
 export type StoryPromptPart = TextPart | ImagePlaceholder;
 
+// STORY QUALITY V2: the beat sheet is generated BEFORE the pages array
+// (strict-mode output follows schema property order), so the model commits
+// the full structural plan before writing a word of prose — the same page
+// order the photos arrive in; beats are assigned, never reordered.
+const BEAT_SHEET_SCHEMA = {
+  type: 'array',
+  description:
+    'One beat per page, planned BEFORE writing any page text — the structural spine the pages must deliver',
+  items: {
+    type: 'object',
+    properties: {
+      pageNumber: { type: 'number', description: 'The 1-based page number this beat belongs to' },
+      role: {
+        type: 'string',
+        enum: ['setup', 'complication', 'try', 'breath', 'turn', 'climax', 'resolution'],
+        description: "This page's single structural job in the story",
+      },
+      goal: {
+        type: 'string',
+        description:
+          'The one thing this page does for the throughline (one line, e.g. "first try fails — the branch is too short")',
+      },
+      handoff: {
+        type: ['string', 'null'],
+        description:
+          'What this page ends on that leans into the next page. Null ONLY on the final page.',
+      },
+    },
+    required: ['pageNumber', 'role', 'goal', 'handoff'],
+    additionalProperties: false,
+  },
+} as const;
+
+// Page-item fields shared by the photo and avatar response schemas. The
+// avatar variant adds `scene`; the photo variant adds `moodCue`.
+const PAGE_ITEM_PROPERTIES = {
+  pageNumber: {
+    type: 'number',
+    description: 'The 1-based page number',
+  },
+  text: {
+    type: 'string',
+    description: 'The story text for this page (1-2 sentences, 15-30 words)',
+  },
+  illustrationNotes: {
+    type: ['string', 'null'],
+    description: 'Visual effects suggestion for the illustration, or null if none',
+  },
+  learningWordsUsed: {
+    type: 'array',
+    items: { type: 'string' },
+    description:
+      "Which of the LEARNING WORDS (verbatim) appear in this page's text. Empty array when none or when no learning words were given.",
+  },
+} as const;
+
+const PAGE_ITEM_REQUIRED = [
+  'pageNumber',
+  'text',
+  'illustrationNotes',
+  'learningWordsUsed',
+] as const;
+
 // JSON Schema for OpenAI structured output (strict mode)
 // Array-based format: { pages: [{ pageNumber, text, illustrationNotes }, ...] }
-// NOTE: this legacy shape stays byte-identical — bridge pages are requested
-// via STORY_RESPONSE_SCHEMA_WITH_BRIDGES only when BRIDGE_PAGES_ENABLED.
+// NOTE: bridge pages are requested via STORY_RESPONSE_SCHEMA_WITH_BRIDGES
+// only when BRIDGE_PAGES_ENABLED.
 export const STORY_RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
@@ -32,6 +95,11 @@ export const STORY_RESPONSE_SCHEMA = {
           type: 'string',
           description:
             'The one thing in the way of the desire — a problem to solve, a fear to face, something lost, a goal that resists. This is what makes it a story, not a tour. (1 sentence)',
+        },
+        throughline: {
+          type: 'string',
+          description:
+            'The ONE connective spine of the book: the single problem/goal plus the recurring object or question that is planted in the SITUATION pages and paid off in the RESOLUTION. (1 sentence)',
         },
         tryAndOvercome: {
           type: ['string', 'null'],
@@ -54,9 +122,18 @@ export const STORY_RESPONSE_SCHEMA = {
             "How does the story land — the payoff the child feels? The goal reached and the wish granted for an adventure, or a warm bedtime hush for a sweet or sleepy story (match the story's own energy). (1 sentence)",
         },
       },
-      required: ['desire', 'obstacle', 'tryAndOvercome', 'refrain', 'emotionalPeak', 'resolution'],
+      required: [
+        'desire',
+        'obstacle',
+        'throughline',
+        'tryAndOvercome',
+        'refrain',
+        'emotionalPeak',
+        'resolution',
+      ],
       additionalProperties: false,
     },
+    beatSheet: BEAT_SHEET_SCHEMA,
     suggestedTitle: {
       type: 'string',
       description:
@@ -68,31 +145,19 @@ export const STORY_RESPONSE_SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          pageNumber: {
-            type: 'number',
-            description: 'The 1-based page number',
-          },
-          text: {
-            type: 'string',
-            description: 'The story text for this page (2-4 sentences, max 50 words)',
-          },
-          illustrationNotes: {
+          ...PAGE_ITEM_PROPERTIES,
+          moodCue: {
             type: ['string', 'null'],
-            description: 'Visual effects suggestion for the illustration, or null if none',
-          },
-          learningWordsUsed: {
-            type: 'array',
-            items: { type: 'string' },
             description:
-              "Which of the LEARNING WORDS (verbatim) appear in this page's text. Empty array when none or when no learning words were given.",
+              'How this page\'s moment should FEEL in the picture, in 1-3 words ("hushed wonder", "giddy triumph") — steers lighting, atmosphere, and expression emphasis ONLY, never pose or composition. Null when genuinely neutral.',
           },
         },
-        required: ['pageNumber', 'text', 'illustrationNotes', 'learningWordsUsed'],
+        required: [...PAGE_ITEM_REQUIRED, 'moodCue'],
         additionalProperties: false,
       },
     },
   },
-  required: ['storyArc', 'suggestedTitle', 'pages'],
+  required: ['storyArc', 'beatSheet', 'suggestedTitle', 'pages'],
   additionalProperties: false,
 } as const;
 
@@ -355,6 +420,7 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
     `  - NEVER invent a proper name for anyone. Use ONLY the names given above.`,
     `  - For unnamed people, use the warm relationship word a toddler would say — "Grandma", "Grandpa", "Daddy", "Mummy", "Auntie", "the little sister" — based on their listed role. If the relationship is unclear, use a neutral warm term like "a friend".`,
     `  - For unnamed pets, use simple animal words ("the dog", "the cat"). For unnamed beloved objects, use simple object words ("her bunny", "the blanket"). Never name a pet or object the parent didn't name. A pet or object the parent DID name is a character too — use that name.`,
+    `  - At most TWO named characters ACT in any page's text. Others may appear in the picture — but never roll-call the cast ("A does X, B does Y, and C does Z" is the pattern to avoid).`,
   ].join('\n');
 
   // BRIDGE PAGES (BRIDGE_PAGES_ENABLED): rendered only when the worker set a
@@ -389,18 +455,26 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
     `- GOOD: "The waves whisper a secret — come closer, come closer! Kai wiggles his toes in the sand." (this is a story)`,
     `- Each page must contain at least one element that goes BEYOND the photo: an internal feeling, a question, a sensory detail, or an imaginative leap.`,
     ``,
-    `## Narrative Architecture (OPENING → BUILDING → LANDING):`,
+    `## Narrative Architecture — ONE problem, escalating tries, an earned payoff:`,
     `- **The child is the DOER**: give them one clear goal, one thing in the way, and let them TRY, wobble, and try again before it works. The child acts ON the world — not just moving through it. That trying is what makes a story fun instead of a tour.`,
-    `- **OPENING** (first ~20% of pages): Establish the child's world AND a small desire or question. What do they want, wonder about, or set out to do? Hook the listener.`,
-    `- **BUILDING** (middle ~60%): The desire meets the obstacle. Each page should ESCALATE — the child tries, it wobbles, they try again; new discoveries, mounting excitement or tenderness. This is where the refrain repeats and evolves.`,
-    `- **LANDING** (final ~20%): The goal is reached and the feeling pays off. Land on the WIN with a warm exhale — the last page a parent lingers on. Only sweet or sleepy stories drift into a bedtime hush; an adventure earns a satisfied, wide-awake glow. Read the story's own energy to choose which — never ask the parent.`,
+    `- **SITUATION** (first ~20% of pages): establish the child's world AND the one desire or problem this book is about. Plant the throughline here — the recurring object, question, or quest the whole story hangs on (name it in "storyArc.throughline"). If the title names a thing, it appears in this stretch, never sprung near the end.`,
+    `- **COMPLICATION & TRIES** (the middle): the SAME problem pushes back, and each try ESCALATES — bigger, closer, braver. NEVER stage a new, unrelated set-piece on each page; obstacle after unconnected obstacle is a tour, not a story. This is where the refrain repeats and evolves.`,
+    `- **TURN** (about 3/4 through): the hardest moment — the try that almost fails. Let it wobble hardest here.`,
+    `- **RESOLUTION** (final 1-2 pages): the child's OWN action pays off the throughline, and the feeling lands with a warm exhale — the last page a parent lingers on. Only sweet or sleepy stories drift into a bedtime hush; an adventure earns a satisfied, wide-awake glow. Read the story's own energy to choose which — never ask the parent.`,
     `- NEVER end with "What a wonderful day" or similar summary statements. Let the accumulated feeling speak for itself.`,
     `- Where pages carry an ARC ROLE note, use it: "opening" pages plant the desire, "rising" pages escalate, a "peak" page carries the emotional high point, "quiet" pages are a breath of tenderness, "closing" pages land the story. The roles are suggestions from the photos — honor their shape even while you interpret freely.`,
+    ``,
+    `## BEAT SHEET (required — plan it BEFORE any page text, in "beatSheet"):`,
+    `- Assign every page exactly ONE beat: "setup", "complication", "try", "breath", "turn", "climax", or "resolution".`,
+    `- The photos are in fixed order — NEVER reorder them. Map the throughline ONTO the given sequence; the ARC ROLE notes are your beat hints (opening→setup, rising→try, peak→turn or climax, quiet→breath, closing→resolution).`,
+    `- "goal": the single job that page does for the throughline (one line). "handoff": what leans into the next page (null ONLY on the final page).`,
+    `- Every "try" beat escalates the SAME problem. If a beat's goal could belong to a different book, it is wrong.`,
+    `- Then write each page to DELIVER its beat — a page that ignores its declared beat fails editorial review.`,
     ``,
     `## PAGE-TO-PAGE FLOW (critical — photos alone rarely tell a story):`,
     `- **Connective device**: If the photos read as a montage of separate moments rather than one continuous event, choose ONE thread and pull every page through it: a wondering question the child carries ("will the waves say hello back?"), a tiny quest, something the child is collecting or counting, or the refrain itself acting as a heartbeat. Never let pages sit side by side unconnected.`,
     `- **Hand-off rule**: Every page except the last must END with something that leans into the next page — a shadow slipping across the floor, a glance toward something new, a question, an "and then...?" energy (a sound getting closer can work too, but don't lean on it). The listener should NEED the page turn.`,
-    `- **Callbacks**: In the LANDING, echo one concrete detail from the OPENING (an object, a gesture, the refrain in its softest form). This is what makes a story feel whole instead of a list of moments.`,
+    `- **Callbacks**: In the RESOLUTION, echo one concrete detail from the SITUATION pages (an object, a gesture, the refrain in its softest form). This is what makes a story feel whole instead of a list of moments.`,
     ...(bridgeSection ? [bridgeSection] : []),
     ``,
     `## Recurring Refrain (REQUIRED):`,
@@ -486,9 +560,10 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
           ]
         : []),
     `## Length:`,
-    `- **2-4 sentences per page, maximum 50 words** (for the ${input.storyPages.length} pages provided).`,
-    `  - This 50 word limit is STRICT — text is displayed on its own page but must stay concise for toddler attention spans.`,
-    `  - Vary length across pages for rhythm: some pages deserve a single punchy line, others need a beat more.`,
+    `- **1-2 sentences per page, 15-30 words** (for the ${input.storyPages.length} pages provided).`,
+    `  - The 30-word cap is HARD — a page over 30 words fails editorial review and comes back for a rewrite. The pictures carry the rest.`,
+    `  - A short run of tiny fragments ("Up, up, up!") counts as one breath — use one now and then for rhythm.`,
+    `  - Vary length across pages: a big moment often lands hardest as a single short line.`,
   ].join('\n');
 
   // Language-specific instructions (appended when not English)
@@ -502,7 +577,7 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
           `- Japanese sound words are one spice among many — at most one per page, never the page's main event (e.g. ざぶーん).`,
           `- Character names should remain as provided (do not transliterate to katakana unless they are clearly non-Japanese names).`,
           `- For unnamed people, use the warm hiragana relationship word a toddler would say (おばあちゃん、おじいちゃん、おかあさん、おとうさん、おねえちゃん、おにいちゃん、いもうと、おとうと) — NEVER invent a name. For unnamed pets use わんちゃん / ねこちゃん style words.`,
-          `- **Length constraint (replaces the English rule above):** 2-4 sentences per page, **maximum 80 characters** per page.`,
+          `- **Length constraint (replaces the English rule above):** 1-2 sentences per page, **20-45 characters** (hard cap 48).`,
           `- The "illustrationNotes" field must remain in **English** (the illustration AI only understands English).`,
         ].join('\n')
       : '';
@@ -523,10 +598,11 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
     `  - **Specifically for illustrationNotes ONLY:** Use visual language (e.g., 'the boy in red', 'the girl with pigtails') instead of character names. The illustration AI doesn't know names.`,
     `  - If no dynamic effect fits, set "illustrationNotes" to null or empty.`,
     `\n- Effects must feel playful but natural, blending into the scene without overwhelming it.`,
+    `\n- For **each** page, also set "moodCue" — 1-3 words for how this page's moment should FEEL in the picture ("hushed wonder", "giddy triumph", "cozy hush"). It steers lighting, atmosphere, and expression emphasis ONLY; it never changes pose, composition, or what the photo shows. Use null when the moment is genuinely neutral.`,
     `\n- Final Output:`,
-    `\nReturn ONLY a valid JSON object with a "storyArc" object, a "suggestedTitle" string, AND a "pages" array${bridgeSection ? ', AND a "bridgePages" array (empty when no bridges are needed — the usual case)' : ''}. Plan the storyArc FIRST (desire, obstacle, tryAndOvercome, refrain, emotionalPeak, resolution), then write pages that follow that arc.`,
-    `Each page element must have "pageNumber" (number), "text" (string), and "illustrationNotes" (string or null).`,
-    `Example format: {"storyArc":{"desire":"...","obstacle":"...","tryAndOvercome":"...","refrain":"...","emotionalPeak":"...","resolution":"..."},"suggestedTitle":"...","pages":[{"pageNumber":1,"text":"Sample text...","illustrationNotes":"Suggestion..."}]}`,
+    `\nReturn ONLY a valid JSON object with a "storyArc" object, a "beatSheet" array, a "suggestedTitle" string, AND a "pages" array${bridgeSection ? ', AND a "bridgePages" array (empty when no bridges are needed — the usual case)' : ''}. Plan the storyArc FIRST (desire, obstacle, throughline, tryAndOvercome, refrain, emotionalPeak, resolution), then the beatSheet (one beat per page), then write pages that DELIVER their beats.`,
+    `Each page element must have "pageNumber" (number), "text" (string), "illustrationNotes" (string or null), and "moodCue" (string or null).`,
+    `Example format: {"storyArc":{"desire":"...","obstacle":"...","throughline":"...","tryAndOvercome":"...","refrain":"...","emotionalPeak":"...","resolution":"..."},"beatSheet":[{"pageNumber":1,"role":"setup","goal":"...","handoff":"..."}],"suggestedTitle":"...","pages":[{"pageNumber":1,"text":"Sample text...","illustrationNotes":"Suggestion...","moodCue":"hushed wonder"}]}`,
   ].join('');
 
   parts.push({
@@ -543,17 +619,42 @@ export interface StoryPageResponse {
   illustrationNotes?: string | null;
   /** Which parent-supplied learning words this page's text contains. */
   learningWordsUsed?: string[];
+  /**
+   * STORY QUALITY V2 (photo path): how this page's moment should FEEL in the
+   * picture (1-3 words) — lighting/atmosphere/expression only, never
+   * composition. Consumed by the illustration mood channel
+   * (STORY_ILLUS_MOOD_ENABLED); absent on avatar pages (scene.mood instead).
+   */
+  moodCue?: string | null;
 }
 
 export interface StoryArc {
   desire: string;
   /** The one thing in the way of the desire — the problem that makes it a story. */
   obstacle: string;
+  /**
+   * STORY QUALITY V2: the single connective spine — problem/goal plus the
+   * recurring object or question planted in setup and paid off at the end.
+   */
+  throughline: string;
   /** How the child tries, wobbles, and tries again. Null when there is no obstacle to overcome. */
   tryAndOvercome: string | null;
   refrain: string;
   emotionalPeak: string;
   resolution: string;
+}
+
+/** STORY QUALITY V2: one structural beat per page, planned before prose. */
+export type BeatRole =
+  'setup' | 'complication' | 'try' | 'breath' | 'turn' | 'climax' | 'resolution';
+
+export interface BeatSheetEntry {
+  pageNumber: number;
+  role: BeatRole;
+  /** The one thing this page does for the throughline (one line). */
+  goal: string;
+  /** What leans into the next page. Null only on the final page. */
+  handoff: string | null;
 }
 
 /**
@@ -583,6 +684,8 @@ export interface StoryBridgePageResponse {
 
 export interface StoryResponse {
   storyArc: StoryArc;
+  /** STORY QUALITY V2: the per-page structural plan, generated before pages. */
+  beatSheet: BeatSheetEntry[];
   suggestedTitle: string;
   pages: StoryPageResponse[];
   /** Present only when STORY_RESPONSE_SCHEMA_WITH_BRIDGES was requested. */
@@ -629,6 +732,8 @@ export interface AvatarStoryPageResponse extends StoryPageResponse {
 
 export interface AvatarStoryResponse {
   storyArc: StoryArc;
+  /** STORY QUALITY V2: the per-page structural plan, generated before pages. */
+  beatSheet: BeatSheetEntry[];
   suggestedTitle: string;
   pages: AvatarStoryPageResponse[];
 }
@@ -677,6 +782,7 @@ export const STORY_RESPONSE_SCHEMA_AVATAR = {
   type: 'object',
   properties: {
     storyArc: STORY_RESPONSE_SCHEMA.properties.storyArc,
+    beatSheet: STORY_RESPONSE_SCHEMA.properties.beatSheet,
     suggestedTitle: STORY_RESPONSE_SCHEMA.properties.suggestedTitle,
     pages: {
       type: 'array',
@@ -684,15 +790,16 @@ export const STORY_RESPONSE_SCHEMA_AVATAR = {
       items: {
         type: 'object',
         properties: {
-          ...STORY_RESPONSE_SCHEMA.properties.pages.items.properties,
+          // No moodCue here — avatar pages carry the richer scene.mood instead.
+          ...PAGE_ITEM_PROPERTIES,
           scene: AVATAR_PAGE_SCENE_SCHEMA,
         },
-        required: [...STORY_RESPONSE_SCHEMA.properties.pages.items.required, 'scene'],
+        required: [...PAGE_ITEM_REQUIRED, 'scene'],
         additionalProperties: false,
       },
     },
   },
-  required: ['storyArc', 'suggestedTitle', 'pages'],
+  required: ['storyArc', 'beatSheet', 'suggestedTitle', 'pages'],
   additionalProperties: false,
 } as const;
 
@@ -774,6 +881,7 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
     `- Not everyone needs to be on every page — but everyone the parent picked should MATTER to the story.`,
     `- NEVER invent a new person, pet, or named place. Use ONLY the names given above; the parent chose them.`,
     `- For relationships, use the warm word a toddler would say ("Grandma", "Daddy", "Auntie") only if it matches the listed role — never invent a proper name.`,
+    `- At most TWO named characters ACT in any page's text. Others may appear in the scene — but never roll-call the cast ("A does X, B does Y, and C does Z" is the pattern to avoid).`,
   );
   parts.push({ text: castLines.join('\n') });
 
@@ -806,17 +914,25 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
     ``,
     sceneInstructions,
     ``,
-    `## Narrative Architecture (OPENING → BUILDING → LANDING):`,
+    `## Narrative Architecture — ONE problem, escalating tries, an earned payoff:`,
     `- **The child is the DOER**: give them one clear goal, one thing in the way, and let them TRY, wobble, and try again before it works. The child acts ON the world — not just moving through it. That trying is what makes a story fun instead of a tour.`,
-    `- **OPENING** (first ~20% of pages): Establish the child's world AND a small desire or question. What do they want, wonder about, or set out to do? Hook the listener.`,
-    `- **BUILDING** (middle ~60%): The desire meets the obstacle. Each page should ESCALATE — the child tries, it wobbles, they try again; new discoveries, mounting excitement or tenderness. This is where the refrain repeats and evolves.`,
-    `- **LANDING** (final ~20%): The goal is reached and the feeling pays off. Land on the WIN with a warm exhale — the last page a parent lingers on. Only sweet or sleepy stories drift into a bedtime hush; an adventure earns a satisfied, wide-awake glow. Read the story's own energy to choose which — never ask the parent.`,
+    `- **SITUATION** (first ~20% of pages): establish the child's world AND the one desire or problem this book is about. Plant the throughline here — the recurring object, question, or quest the whole story hangs on (name it in "storyArc.throughline"). If the title names a thing, it appears in this stretch, never sprung near the end.`,
+    `- **COMPLICATION & TRIES** (the middle): the SAME problem pushes back, and each try ESCALATES — bigger, closer, braver. NEVER stage a new, unrelated set-piece on each page; obstacle after unconnected obstacle is a tour, not a story. This is where the refrain repeats and evolves.`,
+    `- **TURN** (about 3/4 through): the hardest moment — the try that almost fails. Let it wobble hardest here.`,
+    `- **RESOLUTION** (final 1-2 pages): the child's OWN action pays off the throughline, and the feeling lands with a warm exhale — the last page a parent lingers on. Only sweet or sleepy stories drift into a bedtime hush; an adventure earns a satisfied, wide-awake glow. Read the story's own energy to choose which — never ask the parent.`,
     `- NEVER end with "What a wonderful day" or similar summary statements. Let the accumulated feeling speak for itself.`,
+    ``,
+    `## BEAT SHEET (required — plan it BEFORE any page text, in "beatSheet"):`,
+    `- Assign every page exactly ONE beat: "setup", "complication", "try", "breath", "turn", "climax", or "resolution".`,
+    `- You invent the page sequence: setup in the first ~20% of pages, escalating tries through the middle, the turn about 3/4 through, resolution in the final 1-2 pages.`,
+    `- "goal": the single job that page does for the throughline (one line). "handoff": what leans into the next page (null ONLY on the final page).`,
+    `- Every "try" beat escalates the SAME problem. If a beat's goal could belong to a different book, it is wrong.`,
+    `- Then write each page's text AND scene to DELIVER its beat — a page that ignores its declared beat fails editorial review.`,
     ``,
     `## PAGE-TO-PAGE FLOW (critical):`,
     `- **Connective device**: choose ONE thread and pull every page through it: a wondering question the child carries, a tiny quest, something the child is collecting or counting, or the refrain itself acting as a heartbeat. Never let pages sit side by side unconnected.`,
     `- **Hand-off rule**: Every page except the last must END with something that leans into the next page — a shadow slipping across the floor, a glance toward something new, a question, an "and then...?" energy (a sound getting closer can work too, but don't lean on it). The listener should NEED the page turn.`,
-    `- **Callbacks**: In the LANDING, echo one concrete detail from the OPENING (an object, a gesture, the refrain in its softest form). This is what makes a story feel whole instead of a list of moments.`,
+    `- **Callbacks**: In the RESOLUTION, echo one concrete detail from the SITUATION pages (an object, a gesture, the refrain in its softest form). This is what makes a story feel whole instead of a list of moments.`,
     ``,
     `## Recurring Refrain (REQUIRED):`,
     `- Create a short phrase (4-8 words) that echoes through the story at least 3 times.`,
@@ -878,9 +994,10 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
         ]
       : []),
     `## Length:`,
-    `- **2-4 sentences per page, maximum 50 words** (for the ${input.pageCount} pages).`,
-    `  - This 50 word limit is STRICT — text is displayed on its own page but must stay concise for toddler attention spans.`,
-    `  - Vary length across pages for rhythm: some pages deserve a single punchy line, others need a beat more.`,
+    `- **1-2 sentences per page, 15-30 words** (for the ${input.pageCount} pages).`,
+    `  - The 30-word cap is HARD — a page over 30 words fails editorial review and comes back for a rewrite. The pictures carry the rest.`,
+    `  - A short run of tiny fragments ("Up, up, up!") counts as one breath — use one now and then for rhythm.`,
+    `  - Vary length across pages: a big moment often lands hardest as a single short line.`,
   ].join('\n');
 
   const languageInstruction =
@@ -893,7 +1010,7 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
           `- Japanese sound words are one spice among many — at most one per page, never the page's main event (e.g. ざぶーん).`,
           `- Character names should remain as provided (do not transliterate to katakana unless they are clearly non-Japanese names).`,
           `- For unnamed people, use the warm hiragana relationship word a toddler would say (おばあちゃん、おじいちゃん、おかあさん、おとうさん、おねえちゃん、おにいちゃん、いもうと、おとうと) — NEVER invent a name. For unnamed pets use わんちゃん / ねこちゃん style words.`,
-          `- **Length constraint (replaces the English rule above):** 2-4 sentences per page, **maximum 80 characters** per page.`,
+          `- **Length constraint (replaces the English rule above):** 1-2 sentences per page, **20-45 characters** (hard cap 48).`,
           `- The "illustrationNotes" and "scene" fields must remain in **English** (the illustration AI only understands English).`,
         ].join('\n')
       : '';
@@ -914,7 +1031,7 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
     `  - If no dynamic effect fits, set "illustrationNotes" to null or empty.`,
     `\n- Effects must feel playful but natural, blending into the scene without overwhelming it.`,
     `\n- Final Output:`,
-    `\nReturn ONLY a valid JSON object with a "storyArc" object, a "suggestedTitle" string, AND a "pages" array. Plan the storyArc FIRST (desire, obstacle, tryAndOvercome, refrain, emotionalPeak, resolution), then write pages that follow that arc.`,
+    `\nReturn ONLY a valid JSON object with a "storyArc" object, a "beatSheet" array, a "suggestedTitle" string, AND a "pages" array. Plan the storyArc FIRST (desire, obstacle, throughline, tryAndOvercome, refrain, emotionalPeak, resolution), then the beatSheet (one beat per page), then write pages that DELIVER their beats.`,
     `Each page element must have "pageNumber" (number), "text" (string), "illustrationNotes" (string or null), "learningWordsUsed" (array), and "scene" (object).`,
   ].join('');
 

@@ -92,6 +92,8 @@ export async function POST(
         text: null,
         textConfirmed: false,
         illustrationNotes: null,
+        // The mood cue belonged to the OLD photo's story moment.
+        illustrationMood: null,
       },
       select: {
         id: true,

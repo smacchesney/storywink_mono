@@ -5,15 +5,24 @@ import {
   countChildNameEchoes,
   createStoryQCPrompt,
   countLearningWordEchoes,
+  countWords,
+  countJaChars,
+  countSentences,
+  wordBudgetProblems,
+  findNameGarbles,
+  rollCallProblems,
   STORY_QC_RESPONSE_SCHEMA,
   STORY_QC_SYSTEM_PROMPT,
   STORY_QC_THRESHOLDS,
+  createAvatarStoryQCPrompt,
+  AVATAR_STORY_QC_RESPONSE_SCHEMA,
 } from './story-check.js';
-import type { StoryArc } from './story.js';
+import type { StoryArc, BeatSheetEntry } from './story.js';
 
 const arc: StoryArc = {
   desire: 'To rescue the soggy teddy',
   obstacle: 'The teddy is stuck under the shed in the rain',
+  throughline: 'Get teddy back before the rain stops — the umbrella keeps almost helping',
   tryAndOvercome: 'Emma tries a stick, then a broom, then asks Grandma for a boost',
   refrain: 'Splish, splash!',
   emotionalPeak: 'The biggest puddle of all',
@@ -162,6 +171,7 @@ describe('createStoryQCPrompt context block', () => {
   const storyArc: StoryArc = {
     desire: 'To splash in every puddle',
     obstacle: 'The biggest puddle is guarded by a grumpy goose',
+    throughline: 'Win the big puddle from the goose — crumb by crumb',
     tryAndOvercome: 'She tiptoes, she waits, then she offers the goose a crumb',
     refrain: 'Splish, splash!',
     emotionalPeak: 'The biggest puddle of all',
@@ -228,10 +238,10 @@ describe('createStoryQCPrompt — S2/S3 retargeted rubric (photo)', () => {
     expect(failLine).toContain('soundOverload true');
   });
 
-  it('scores agency but keeps it out of the fail conditions (log-only)', () => {
+  it('scores agency and enforces it in the fail conditions (V2)', () => {
     expect(prompt).toContain('agency (0-10)');
     const failLine = prompt.split('\n').find((l) => l.startsWith('If ANY of these fail'));
-    expect(failLine).not.toContain('agency');
+    expect(failLine).toContain('agency < 6');
   });
 
   it('renders the obstacle + try in the declared-arc block', () => {
@@ -269,5 +279,294 @@ describe('story QC — judge shares the 3-5 adventure frame (S4 alignment)', () 
     });
     expect(prompt).toContain('picture-book manuscript for children ages 3-5');
     expect(prompt).not.toContain('toddler picture-book manuscript');
+  });
+});
+
+describe('countWords (en)', () => {
+  it('counts whitespace-delimited words', () => {
+    expect(countWords('Kai stands at the jungle gate.')).toBe(6);
+    expect(countWords('Up, up, up!')).toBe(3);
+  });
+
+  it('counts em/en-dash-joined clauses as separate words (hyphens still join)', () => {
+    expect(countWords('one—two three')).toBe(3);
+    expect(countWords('a merry-go-round ride')).toBe(3);
+    expect(countWords('brave step, Kai—the map curls')).toBe(6);
+  });
+
+  it('returns 0 for empty or whitespace text', () => {
+    expect(countWords('')).toBe(0);
+    expect(countWords('   ')).toBe(0);
+  });
+});
+
+describe('countJaChars', () => {
+  it('counts characters excluding whitespace and punctuation', () => {
+    expect(countJaChars('ざぶーん！もういっかい。')).toBe(10);
+    expect(countJaChars('みずが ざぶん')).toBe(6);
+  });
+
+  it('returns 0 for empty text', () => {
+    expect(countJaChars('')).toBe(0);
+    expect(countJaChars(' 。！ ')).toBe(0);
+  });
+});
+
+describe('countSentences', () => {
+  it('counts sentence-final marks (en)', () => {
+    expect(countSentences('Kai pushes. Titan rolls. Trapjaw giggles.')).toBe(3);
+    expect(countSentences('Up, up, up!')).toBe(1);
+    expect(countSentences('Wait… what is that?')).toBe(2);
+  });
+
+  it('treats consecutive marks as one terminator', () => {
+    expect(countSentences('What?!')).toBe(1);
+  });
+
+  it('does not count a phantom sentence after a quote-wrapped terminator', () => {
+    expect(countSentences('“Reach up, brave Emma!”')).toBe(1);
+    expect(countSentences('She caught it. “You did it, Emma.”')).toBe(2);
+  });
+
+  it('does not count honorific abbreviations as sentence breaks', () => {
+    expect(countSentences('Mr. Fox tiptoed close. Kai froze still.')).toBe(2);
+    expect(countSentences('Dr. Lee waved. Mrs. Hen clucked. St. Ives shone.')).toBe(3);
+  });
+
+  it('counts unterminated non-empty text as one sentence', () => {
+    expect(countSentences('goodnight little one')).toBe(1);
+    expect(countSentences('')).toBe(0);
+  });
+
+  it('counts ja terminators', () => {
+    expect(countSentences('ざぶーん！もういっかい。', 'ja')).toBe(2);
+  });
+});
+
+describe('wordBudgetProblems', () => {
+  const longText = Array(31).fill('word').join(' ');
+  const choppy = 'Kai runs. Kai jumps. Kai spins. Kai naps.';
+
+  it('flags en pages over the 30-word cap with counts in the issue', () => {
+    const problems = wordBudgetProblems(
+      [
+        { pageNumber: 1, text: longText },
+        { pageNumber: 2, text: 'Kai tiptoes over the bendy bridge.' },
+      ],
+      'en',
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0].pageNumber).toBe(1);
+    expect(problems[0].issue).toContain('31 words');
+  });
+
+  it('flags en pages over the 4-sentence cap', () => {
+    const problems = wordBudgetProblems([{ pageNumber: 4, text: `${choppy} Kai snores.` }], 'en');
+    expect(problems).toHaveLength(1);
+    expect(problems[0].pageNumber).toBe(4);
+    expect(problems[0].issue).toContain('5 sentences');
+  });
+
+  it('allows the house style: prose + refrain quote + dialogic question (4 groups)', () => {
+    const houseStyle =
+      'Emma stretched on tiptoes, then bounded. Still too high! “Reach higher, brave Emma!” Could one bigger jump catch the golden leaf?';
+    expect(wordBudgetProblems([{ pageNumber: 2, text: houseStyle }], 'en')).toEqual([]);
+  });
+
+  it('passes pages at exactly the caps', () => {
+    const atCap = `${Array(27).fill('word').join(' ')}. Second one. Third!`;
+    expect(countWords(atCap)).toBe(30);
+    expect(wordBudgetProblems([{ pageNumber: 1, text: atCap }], 'en')).toEqual([]);
+  });
+
+  it('flags ja pages over the 48-char cap', () => {
+    const longJa = 'あ'.repeat(49);
+    const problems = wordBudgetProblems([{ pageNumber: 2, text: longJa }], 'ja');
+    expect(problems).toHaveLength(1);
+    expect(problems[0].issue).toContain('49 characters');
+  });
+
+  it('passes short ja pages', () => {
+    expect(wordBudgetProblems([{ pageNumber: 1, text: 'ざぶーん！もういっかい。' }], 'ja')).toEqual(
+      [],
+    );
+  });
+});
+
+describe('findNameGarbles', () => {
+  const roster = ['Kai', 'Trapjaw', 'Titan', 'Trex', 'Dada'];
+
+  it('flags two roster names joined by "the" (the shipped Trex-the-Kai bug)', () => {
+    const garbles = findNameGarbles(
+      [{ pageNumber: 6, text: 'Trex the Kai bursts out, yellow eye bright.' }],
+      roster,
+    );
+    expect(garbles).toHaveLength(1);
+    expect(garbles[0].pageNumber).toBe(6);
+    expect(garbles[0].snippet).toBe('Trex the Kai');
+  });
+
+  it('flags directly adjacent distinct roster names', () => {
+    const garbles = findNameGarbles([{ pageNumber: 2, text: 'Titan Kai runs fast.' }], roster);
+    expect(garbles).toHaveLength(1);
+    expect(garbles[0].snippet).toBe('Titan Kai');
+  });
+
+  it('matches case-insensitively', () => {
+    const garbles = findNameGarbles([{ pageNumber: 1, text: 'and then trex the kai ran' }], roster);
+    expect(garbles).toHaveLength(1);
+  });
+
+  it('ignores legit joins: and / comma lists / possessives / sentence breaks', () => {
+    const pages = [
+      { pageNumber: 1, text: 'Kai and Trapjaw run.' },
+      { pageNumber: 2, text: 'He chases Kai, Trapjaw, and Titan toward the mountain.' },
+      { pageNumber: 3, text: "Kai's Titan wiggles happily." },
+      { pageNumber: 4, text: 'They cheer for Kai. Trapjaw claps loudly.' },
+      { pageNumber: 5, text: 'Kai with Titan naps in the shade.' },
+    ];
+    expect(findNameGarbles(pages, roster)).toEqual([]);
+  });
+
+  it('never flags the same name repeated ("Kai the Kai" needs distinct names)', () => {
+    expect(findNameGarbles([{ pageNumber: 1, text: 'Kai the Kai' }], roster)).toEqual([]);
+  });
+
+  it('skips ja books (no reliable word boundaries)', () => {
+    expect(
+      findNameGarbles(
+        [{ pageNumber: 1, text: 'えま の トレックス' }],
+        ['えま', 'トレックス'],
+        'ja',
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe('rollCallProblems (log-only)', () => {
+  const roster = ['Kai', 'Trapjaw', 'Titan', 'Trex', 'Dada'];
+
+  it('flags pages where more than 3 roster names appear', () => {
+    const text = 'Trapjaw shines his arm, Titan wiggles, Dada holds the vines, and Kai steps.';
+    const problems = rollCallProblems([{ pageNumber: 1, text }], roster);
+    expect(problems).toHaveLength(1);
+    expect(problems[0].namesFound).toHaveLength(4);
+  });
+
+  it('passes pages with 3 or fewer roster names', () => {
+    const text = 'Trapjaw points ahead, and Titan sniffs the path while Kai watches.';
+    expect(rollCallProblems([{ pageNumber: 1, text }], roster)).toEqual([]);
+  });
+
+  it('does not match names inside longer words', () => {
+    const text = 'The titanic Kaiser dadaist trexcavator trapjawline.';
+    expect(rollCallProblems([{ pageNumber: 1, text }], roster)).toEqual([]);
+  });
+});
+
+describe('STORY_QC_THRESHOLDS — word budget caps', () => {
+  it('carries the age-4 length caps', () => {
+    expect(STORY_QC_THRESHOLDS.maxWordsEn).toBe(30);
+    expect(STORY_QC_THRESHOLDS.maxSentences).toBe(4);
+    expect(STORY_QC_THRESHOLDS.maxCharsJa).toBe(48);
+  });
+});
+
+describe('QC v2 — beat-aware photo judge', () => {
+  const beatSheet: BeatSheetEntry[] = [
+    {
+      pageNumber: 1,
+      role: 'setup',
+      goal: 'Plant the umbrella and the want',
+      handoff: 'Rain starts',
+    },
+    {
+      pageNumber: 2,
+      role: 'resolution',
+      goal: 'Teddy rescued with the umbrella',
+      handoff: null,
+    },
+  ];
+  const prompt = createStoryQCPrompt({
+    storyArc: arc,
+    pages: [
+      { pageNumber: 1, text: 'Splish!' },
+      { pageNumber: 2, text: 'Home.' },
+    ],
+    beatSheet,
+  });
+
+  it('renders the throughline in the declared-arc block', () => {
+    expect(prompt).toContain('Throughline: Get teddy back');
+  });
+
+  it('annotates each page with its declared beat', () => {
+    expect(prompt).toContain('--- Page 1 (beat: setup — Plant the umbrella and the want) ---');
+    expect(prompt).toContain('--- Page 2 (beat: resolution — Teddy rescued with the umbrella) ---');
+  });
+
+  it('scores deliversBeat per page and enforces it in the fail line', () => {
+    expect(prompt).toContain('deliversBeat');
+    const failLine = prompt.split('\n').find((l) => l.startsWith('If ANY of these fail'));
+    expect(failLine).toContain('deliversBeat');
+    expect(STORY_QC_RESPONSE_SCHEMA.properties.pages.items.required).toContain('deliversBeat');
+  });
+
+  it('omits beat annotations when no beat sheet is provided', () => {
+    const bare = createStoryQCPrompt({
+      storyArc: arc,
+      pages: [{ pageNumber: 1, text: 'Splish!' }],
+    });
+    expect(bare).toContain('--- Page 1 ---');
+    expect(bare).not.toContain('(beat:');
+  });
+});
+
+describe('QC v2 — avatar judge sees scenes and beats', () => {
+  const prompt = createAvatarStoryQCPrompt({
+    storyArc: arc,
+    premise: 'A jungle map adventure',
+    pages: [
+      {
+        pageNumber: 1,
+        text: 'Kai finds a map.',
+        sceneAction: 'Kai unfolds a crayon map at the jungle gate',
+        sceneFocus: 'Kai holding the map',
+      },
+    ],
+    beatSheet: [
+      {
+        pageNumber: 1,
+        role: 'setup',
+        goal: 'Plant the map',
+        handoff: 'The map curls toward the trees',
+      },
+    ],
+  });
+
+  it('annotates pages with beat + scene action/focus', () => {
+    expect(prompt).toContain('(beat: setup — Plant the map)');
+    expect(prompt).toContain(
+      '[scene action: Kai unfolds a crayon map at the jungle gate; focus: Kai holding the map]',
+    );
+  });
+
+  it('scores sceneMatchesText and deliversBeat per page in the schema', () => {
+    expect(prompt).toContain('sceneMatchesText');
+    expect(prompt).toContain('deliversBeat');
+    const req = AVATAR_STORY_QC_RESPONSE_SCHEMA.properties.pages.items.required;
+    expect(req).toContain('sceneMatchesText');
+    expect(req).toContain('deliversBeat');
+  });
+
+  it('enforces agency, deliversBeat, and sceneMatchesText in the fail line', () => {
+    const failLine = prompt.split('\n').find((l) => l.startsWith('If ANY of these fail'));
+    expect(failLine).toContain('agency < 6');
+    expect(failLine).toContain('deliversBeat');
+    expect(failLine).toContain('sceneMatchesText');
+  });
+
+  it('renders the throughline for the avatar judge too', () => {
+    expect(prompt).toContain('Throughline: Get teddy back');
   });
 });

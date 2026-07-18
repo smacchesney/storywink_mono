@@ -223,7 +223,13 @@ console.log(`  - Character Extraction: ${CHARACTER_EXTRACTION_CONCURRENCY}`);
 const storyWorker = new Worker(QUEUE_NAMES.STORY_GENERATION, processStoryGeneration, {
   connection: redis,
   concurrency: STORY_CONCURRENCY,
-  lockDuration: 300000, // 5 minutes for multi-image vision API calls
+  // 10 minutes: STORY QUALITY V2's QC loop budgets up to 360s
+  // (STORY_QC_TIME_BUDGET_MS) of generation + regens on top of setup and DB
+  // writes, so the old 300s lock could expire mid-job and hand the book to a
+  // second worker. maxStalledCount: 0 means a lost lock is NOT re-attempted
+  // (same duplicate-processing guard as the illustration worker).
+  lockDuration: 600000,
+  maxStalledCount: 0,
 });
 
 const illustrationWorker = new Worker(

@@ -8,7 +8,7 @@
  *
  * Env overrides allow rollback or experiments without a code deploy.
  */
-export const STORY_MODEL = process.env.STORY_MODEL || 'gpt-5.5';
+export const STORY_MODEL = process.env.STORY_MODEL || 'gpt-5.6';
 export const ANALYSIS_MODEL = process.env.ANALYSIS_MODEL || 'gpt-5-mini';
 
 /**

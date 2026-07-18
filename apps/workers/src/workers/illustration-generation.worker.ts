@@ -10,6 +10,7 @@ import type { IllustrationInput, IllustrationProvider } from '../lib/illustrator
 import { maybeGeminiFallback } from '../lib/illustrators/fallback.js';
 import { shouldNeutralizeNames } from '../lib/illustrators/neutralize.js';
 import { toysComeAliveEnabled } from '../lib/toys-come-alive.js';
+import { storyIllusMoodEnabled } from '../lib/story-quality.js';
 import type { EscalationJobFields } from '../lib/escalation.js';
 import { v2 as cloudinary } from 'cloudinary';
 import pino from 'pino';
@@ -693,6 +694,13 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       // The directive itself is gated internally to contentAnchor 'sheet' and
       // toy presence, so a flag-on non-toy page stays byte-identical.
       toysComeAlive: toysComeAliveEnabled(),
+      // STORY_ILLUS_MOOD_ENABLED (STORY QUALITY V2): photo-path interiors get
+      // the story model's per-page mood cue as a bounded lighting/expression
+      // directive. Read from the DB row (always fresh); flag-off → absent →
+      // prompt byte-identical.
+      ...(storyIllusMoodEnabled() && !isBridgePage && !isAvatarBook && page.illustrationMood
+        ? { illustrationMood: page.illustrationMood }
+        : {}),
     };
 
     logger.info(

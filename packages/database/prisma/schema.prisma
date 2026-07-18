@@ -132,6 +132,7 @@ model Page {
   text              String?
   textConfirmed     Boolean? @default(false)
   illustrationNotes String?
+  illustrationMood  String?  // STORY QUALITY V2 (photo path): the story model's per-page mood cue ("hushed wonder") — rendered into the interior prompt only when STORY_ILLUS_MOOD_ENABLED
   learningWordsUsed String[]  @default([])
   analysis          Json?    // Photo perception: {assetId, setting, action, emotion, eventSignals[], narrativeRole} — assetId marks freshness (stale when the photo was swapped)
 

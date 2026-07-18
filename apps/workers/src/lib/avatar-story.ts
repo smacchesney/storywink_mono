@@ -11,7 +11,11 @@
  * extract-pure-helper testing convention.
  */
 import { avatarPageSceneSchema } from '@storywink/shared/schemas';
-import type { AvatarPageScene, AvatarStoryCastMember } from '@storywink/shared/prompts/story';
+import type {
+  AvatarPageScene,
+  AvatarStoryCastMember,
+  BeatSheetEntry,
+} from '@storywink/shared/prompts/story';
 import { STORY_QC_THRESHOLDS, AvatarStoryQCResponse } from '@storywink/shared/prompts/story-check';
 
 /** The loose shape of one Book.characterIdentity roster entry (Json). */
@@ -63,21 +67,38 @@ export function buildAvatarCastForPrompt(
 }
 
 /**
+ * STORY_QUALITY_V2 options for avatarStoryQcProblems. When `enforce` is
+ * false (or the options are absent) the verdict is byte-identical to the
+ * pre-V2 behavior — the flag-off path.
+ */
+export interface AvatarQcV2Options {
+  /** The STORY_QUALITY_V2 flag: whether the V2 checks may block the draft. */
+  enforce: boolean;
+  /** Pre-stringified deterministic findings (word caps, name garbles). */
+  deterministicProblems?: string[];
+  /** The draft's beat sheet, for naming the failed beat in feedback. */
+  beatSheet?: BeatSheetEntry[];
+}
+
+/**
  * The avatar-story QC verdict (pure, pinned by tests): which scores block the
- * draft and force the single regeneration. premiseTruth is deliberately
- * ABSENT — it ships LOG-ONLY, same telemetry-first philosophy as every other
- * new check (an enforcing check is a silent extra generation during the
- * parent's wait). X13 Track S adds two more log-only-on-avatar scores kept
- * out of this Pick by the same principle: soundOverload (the PHOTO judge
- * enforces it; avatar only logs) and agency (log-only on both at launch).
+ * draft and force regeneration. premiseTruth is deliberately ABSENT — it
+ * ships LOG-ONLY (an enforcing check is a silent extra generation during the
+ * parent's wait); soundOverload likewise stays photo-judge-only.
+ *
+ * STORY_QUALITY_V2 (flag-gated via `v2.enforce`): agency, per-page
+ * deliversBeat, per-page sceneMatchesText, and the deterministic word-cap /
+ * name-garble findings join the enforced set.
  */
 export function avatarStoryQcProblems(
   qc: Pick<
     AvatarStoryQCResponse,
     'arcCoherence' | 'readAloudRhythm' | 'lastPageLanding' | 'feedback'
-  >,
+  > &
+    Partial<Pick<AvatarStoryQCResponse, 'agency' | 'pages'>>,
   refrain: string,
   refrainEchoes: number,
+  v2?: AvatarQcV2Options,
 ): string[] {
   const problems: string[] = [];
   if (refrainEchoes < STORY_QC_THRESHOLDS.minRefrainEchoes) {
@@ -97,6 +118,32 @@ export function avatarStoryQcProblems(
   }
   if (!qc.lastPageLanding) {
     problems.push('The final page must land as a soft, warm exhale — no summary statements.');
+  }
+  if (v2?.enforce) {
+    problems.push(...(v2.deterministicProblems ?? []));
+    if (qc.agency !== undefined && qc.agency < STORY_QC_THRESHOLDS.minAgency) {
+      problems.push(
+        `Agency scored ${qc.agency}/10 — the child must be the DOER: one clear goal, a real obstacle, and a try-wobble-try before the payoff.`,
+      );
+    }
+    const beats = new Map((v2.beatSheet ?? []).map((b) => [b.pageNumber, b]));
+    for (const page of qc.pages ?? []) {
+      if (page.deliversBeat === false) {
+        const beat = beats.get(page.pageNumber);
+        problems.push(
+          `Page ${page.pageNumber} does not deliver its declared beat${
+            beat ? ` (${beat.role} — ${beat.goal})` : ''
+          } — rewrite the page to do that job.${page.issue ? ` ${page.issue}` : ''}`,
+        );
+      }
+      if (page.sceneMatchesText === false) {
+        problems.push(
+          `Page ${page.pageNumber}: the scene the illustrator will draw does not depict the moment the text narrates — rewrite scene.action/focus to match the text exactly.${
+            page.issue ? ` ${page.issue}` : ''
+          }`,
+        );
+      }
+    }
   }
   if (problems.length > 0 && qc.feedback) {
     problems.push(qc.feedback);
