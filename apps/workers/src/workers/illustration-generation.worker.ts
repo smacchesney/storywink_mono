@@ -415,21 +415,37 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
               starCharacterId: starId,
             });
       }
-      for (const sheet of sheetSources) {
-        try {
-          sheetRefs.push(await fetchImageInput(optimizeCloudinaryUrlForVision(sheet.url)));
-          fetchedSheetMeta.push({ characterId: sheet.characterId, name: sheet.name });
-        } catch (sheetFetchError: any) {
-          logger.warn(
-            {
-              jobId: job.id,
-              pageNumber,
-              characterId: sheet.characterId,
-              error: sheetFetchError.message,
-            },
-            'Failed to fetch character sheet — continuing without it',
-          );
-        }
+      // Concurrent fetches; outcomes are collected in source order so the
+      // sheet-1-is-the-star position contract survives, and a failed fetch
+      // still just drops that sheet.
+      const sheetOutcomes = await Promise.all(
+        sheetSources.map(async (sheet) => {
+          try {
+            return {
+              sheet,
+              input: await fetchImageInput(optimizeCloudinaryUrlForVision(sheet.url)),
+            };
+          } catch (sheetFetchError: any) {
+            logger.warn(
+              {
+                jobId: job.id,
+                pageNumber,
+                characterId: sheet.characterId,
+                error: sheetFetchError.message,
+              },
+              'Failed to fetch character sheet — continuing without it',
+            );
+            return null;
+          }
+        }),
+      );
+      for (const outcome of sheetOutcomes) {
+        if (!outcome) continue;
+        sheetRefs.push(outcome.input);
+        fetchedSheetMeta.push({
+          characterId: outcome.sheet.characterId,
+          name: outcome.sheet.name,
+        });
       }
       console.log(
         `[IllustrationWorker] Fetched ${sheetRefs.length} character sheet(s) for page ${pageNumber}`,
@@ -521,42 +537,44 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       );
     }
 
-    // Fetch all style reference images
-    const styleReferenceBuffers: Array<{ buffer: Buffer; mimeType: string }> = [];
-
-    for (const styleRefUrl of styleReferenceUrls) {
-      try {
-        logger.info(
-          { jobId: job.id, pageNumber },
-          `Fetching style reference image from ${styleRefUrl}`,
-        );
-        const styleResponse = await fetch(styleRefUrl);
-        if (!styleResponse.ok) {
-          throw new Error(
-            `Failed to fetch style image: ${styleResponse.status} ${styleResponse.statusText}`,
+    // Fetch all style reference images concurrently, preserving list order.
+    // Any single failure still fails the page (same throw semantics as the
+    // old sequential loop).
+    const styleReferenceBuffers: Array<{ buffer: Buffer; mimeType: string }> = await Promise.all(
+      styleReferenceUrls.map(async (styleRefUrl) => {
+        try {
+          logger.info(
+            { jobId: job.id, pageNumber },
+            `Fetching style reference image from ${styleRefUrl}`,
           );
-        }
-        const styleContentTypeHeader = styleResponse.headers.get('content-type');
-        const mimeType = styleContentTypeHeader?.startsWith('image/')
-          ? styleContentTypeHeader
-          : styleRefUrl.endsWith('.png')
-            ? 'image/png'
-            : 'image/jpeg';
+          const styleResponse = await fetch(styleRefUrl);
+          if (!styleResponse.ok) {
+            throw new Error(
+              `Failed to fetch style image: ${styleResponse.status} ${styleResponse.statusText}`,
+            );
+          }
+          const styleContentTypeHeader = styleResponse.headers.get('content-type');
+          const mimeType = styleContentTypeHeader?.startsWith('image/')
+            ? styleContentTypeHeader
+            : styleRefUrl.endsWith('.png')
+              ? 'image/png'
+              : 'image/jpeg';
 
-        const styleArrayBuffer = await styleResponse.arrayBuffer();
-        styleReferenceBuffers.push({
-          buffer: Buffer.from(styleArrayBuffer),
-          mimeType,
-        });
-        logger.info({ jobId: job.id, pageNumber }, `Fetched style reference image (${mimeType}).`);
-      } catch (fetchError: any) {
-        logger.error(
-          { jobId: job.id, pageId, pageNumber, styleKey, error: fetchError.message },
-          'Failed to fetch style reference image.',
-        );
-        throw fetchError;
-      }
-    }
+          const styleArrayBuffer = await styleResponse.arrayBuffer();
+          logger.info(
+            { jobId: job.id, pageNumber },
+            `Fetched style reference image (${mimeType}).`,
+          );
+          return { buffer: Buffer.from(styleArrayBuffer), mimeType };
+        } catch (fetchError: any) {
+          logger.error(
+            { jobId: job.id, pageId, pageNumber, styleKey, error: fetchError.message },
+            'Failed to fetch style reference image.',
+          );
+          throw fetchError;
+        }
+      }),
+    );
 
     // Zero fetched buffers is only an error when the diet didn't deliberately
     // zero the list (ILLUSTRATION_STYLE_REFS_MAX=0 sends none by design).
