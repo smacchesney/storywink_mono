@@ -321,7 +321,7 @@ describe('createStoryGenerationPrompt — S3 agency arc + S4 payoff/age frame', 
   });
 
   it('lands on the win with an inferred tone (never asks the parent)', () => {
-    expect(text).toContain('Land on the WIN');
+    expect(text).toContain("the child's OWN action pays off the throughline");
     expect(text).toContain('Only sweet or sleepy stories');
     expect(text).toContain('never ask the parent');
   });
@@ -361,5 +361,63 @@ describe('STORY_RESPONSE_SCHEMA — storyArc agency + payoff fields (S3/S4)', ()
   it('retargets the resolution field to a tone-neutral payoff', () => {
     expect(arc.properties.resolution.description).toContain('payoff');
     expect(arc.properties.resolution.description).not.toContain('carry into sleep');
+  });
+});
+
+describe('STORY QUALITY V2 — beat sheet, throughline, length, moodCue', () => {
+  const text = promptText(baseInput);
+
+  it('requires throughline on the storyArc', () => {
+    const arc = STORY_RESPONSE_SCHEMA.properties.storyArc;
+    expect(arc.required).toContain('throughline');
+    expect(arc.properties.throughline.type).toBe('string');
+  });
+
+  it('generates the beatSheet BEFORE pages (schema property order)', () => {
+    const keys = Object.keys(STORY_RESPONSE_SCHEMA.properties);
+    expect(STORY_RESPONSE_SCHEMA.required).toContain('beatSheet');
+    expect(keys.indexOf('beatSheet')).toBeGreaterThan(keys.indexOf('storyArc'));
+    expect(keys.indexOf('beatSheet')).toBeLessThan(keys.indexOf('pages'));
+  });
+
+  it('constrains beat roles to the fixed vocabulary', () => {
+    const role = STORY_RESPONSE_SCHEMA.properties.beatSheet.items.properties.role;
+    expect(role.enum).toEqual([
+      'setup',
+      'complication',
+      'try',
+      'breath',
+      'turn',
+      'climax',
+      'resolution',
+    ]);
+  });
+
+  it('instructs the beat sheet against the fixed photo order with ARC ROLE hints', () => {
+    expect(text).toContain('BEAT SHEET (required');
+    expect(text).toContain('NEVER reorder them');
+    expect(text).toContain('opening→setup');
+  });
+
+  it('replaces the 50-word spec with the hard 15-30 word band', () => {
+    expect(text).toContain('1-2 sentences per page, 15-30 words');
+    expect(text).toContain('The 30-word cap is HARD');
+    expect(text).not.toContain('maximum 50 words');
+  });
+
+  it('replaces the ja 80-char spec with the 20-45 band', () => {
+    const jaText = promptText({ ...baseInput, language: 'ja' });
+    expect(jaText).toContain('20-45 characters');
+    expect(jaText).not.toContain('maximum 80 characters');
+  });
+
+  it('adds the moodCue channel guarded against composition changes', () => {
+    expect(text).toContain('"moodCue"');
+    expect(text).toContain('It steers lighting, atmosphere, and expression emphasis ONLY');
+    expect(STORY_RESPONSE_SCHEMA.properties.pages.items.required).toContain('moodCue');
+  });
+
+  it('caps named actors at two per page (anti roll-call)', () => {
+    expect(text).toContain('At most TWO named characters ACT');
   });
 });

@@ -11,6 +11,7 @@ const baseInput: AvatarStoryQCInput = {
   storyArc: {
     desire: 'Emma wants to rescue the soggy teddy',
     obstacle: 'Teddy floated down the stream and out of reach',
+    throughline: 'Bring Teddy home dry — the stream keeps carrying him further',
     tryAndOvercome: 'Emma reaches, then builds a leaf-boat, then Grandma lifts her closer',
     refrain: 'Drip, drop, off we go!',
     emotionalPeak: 'The teddy is found under the big leaf',
@@ -56,13 +57,13 @@ describe('createAvatarStoryQCPrompt', () => {
     expect(failLine).toContain('lastPageLanding false');
   });
 
-  it('scores soundOverload and agency but keeps BOTH log-only on avatar (S2/S3)', () => {
+  it('scores soundOverload log-only but enforces agency on avatar (V2)', () => {
     const prompt = createAvatarStoryQCPrompt(baseInput);
     expect(prompt).toContain('soundOverload (boolean)');
     expect(prompt).toContain('agency (0-10)');
     const failLine = prompt.split('\n').find((l) => l.startsWith('If ANY of these fail'));
     expect(failLine).not.toContain('soundOverload');
-    expect(failLine).not.toContain('agency');
+    expect(failLine).toContain('agency < 6');
   });
 
   it('stops praising sound words in the rhythm rubric', () => {
@@ -89,7 +90,12 @@ describe('AVATAR_STORY_QC_RESPONSE_SCHEMA', () => {
     expect('truthToEvent' in AVATAR_STORY_QC_RESPONSE_SCHEMA.properties).toBe(false);
     const pageItems = AVATAR_STORY_QC_RESPONSE_SCHEMA.properties.pages.items;
     expect('captionRisk' in pageItems.properties).toBe(false);
-    expect(pageItems.required).toEqual(['pageNumber', 'issue']);
+    expect(pageItems.required).toEqual([
+      'pageNumber',
+      'deliversBeat',
+      'sceneMatchesText',
+      'issue',
+    ]);
   });
 
   it('adds soundOverload (required-nullable) and agency (required number) — S2/S3', () => {

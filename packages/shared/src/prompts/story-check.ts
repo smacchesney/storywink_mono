@@ -10,7 +10,7 @@
  * computed in code — the model only scores the subjective dimensions.
  */
 
-import type { StoryArc, StoryPageResponse } from './story.js';
+import type { BeatSheetEntry, StoryArc, StoryPageResponse } from './story.js';
 
 export const STORY_QC_SYSTEM_PROMPT =
   "You are a ruthless children's-book editor reviewing a picture-book manuscript for children ages 3-5 — every book should be a real little adventure with a beginning, a problem, and a satisfying end. You evaluate narrative arc, read-aloud rhythm, and whether pages tell a story or merely caption photos. You never rewrite the story yourself — you score it and give precise, actionable corrections.";
@@ -22,10 +22,28 @@ export interface StoryQCInput {
   theme?: string; // Parent's story context, if provided
   eventSummary?: string; // Parent-confirmed "what actually happened". Supersedes theme, same as generation.
   confirmedFacts?: string[]; // Parent's tapped answers ("Who is the woman...? → Grandma")
+  /** STORY QUALITY V2: the per-page structural plan the pages promised to deliver. */
+  beatSheet?: BeatSheetEntry[];
+}
+
+/** "--- Page N (beat: try — first try fails) ---" when a beat exists. */
+function pageHeader(pageNumber: number, beats?: Map<number, BeatSheetEntry>): string {
+  const beat = beats?.get(pageNumber);
+  return beat
+    ? `--- Page ${pageNumber} (beat: ${beat.role} — ${beat.goal}) ---`
+    : `--- Page ${pageNumber} ---`;
+}
+
+function beatMap(beatSheet?: BeatSheetEntry[]): Map<number, BeatSheetEntry> | undefined {
+  if (!beatSheet?.length) return undefined;
+  return new Map(beatSheet.map((b) => [b.pageNumber, b]));
 }
 
 export function createStoryQCPrompt(input: StoryQCInput): string {
-  const pagesBlock = input.pages.map((p) => `--- Page ${p.pageNumber} ---\n${p.text}`).join('\n');
+  const beats = beatMap(input.beatSheet);
+  const pagesBlock = input.pages
+    .map((p) => `${pageHeader(p.pageNumber, beats)}\n${p.text}`)
+    .join('\n');
 
   // Mirror generation: exactly ONE experience-context block, with the
   // confirmed eventSummary superseding the legacy free-text theme, and
@@ -45,6 +63,7 @@ export function createStoryQCPrompt(input: StoryQCInput): string {
 # Declared story arc
 - Desire: ${input.storyArc.desire}
 - Obstacle: ${input.storyArc.obstacle}
+- Throughline: ${input.storyArc.throughline}
 - Try: ${input.storyArc.tryAndOvercome ?? '(none declared)'}
 - Refrain: ${input.storyArc.refrain}
 - Emotional peak: ${input.storyArc.emotionalPeak}
@@ -67,8 +86,9 @@ Score the manuscript:
   }
 6. soundOverload (boolean): true if the manuscript leans on sound words — any page that stacks 2+ sound words, or makes a sound word the page's main event. A story that reaches for a sound word where a vivid verb or image would do is overloaded. When true, name the offending pages in "feedback".
 7. agency (0-10): Is the child the DOER — one clear goal, a real obstacle, and a try-wobble-try before the payoff? A child who only moves THROUGH a tour of moments (witnessing, not acting) scores below 5.
-${input.language === 'ja' ? '\n8. The text must be Japanese in hiragana/katakana with NO kanji. Flag any kanji as a page issue.\n' : ''}
-If ANY of these fail (arcCoherence < 6, readAloudRhythm < 6, lastPageLanding false, soundOverload true, or any page captionRisk >= 7), write "feedback": a numbered list of specific corrections. Reference page numbers. Say exactly what is wrong and what a fix looks like — do not write replacement text yourself.
+8. Per page, deliversBeat (boolean): each page header declares its beat (role — goal). true only if the page's text actually does that job for the throughline. A lovely page doing a DIFFERENT job is false. If a page shows no beat, set true.
+${input.language === 'ja' ? '\n9. The text must be Japanese in hiragana/katakana with NO kanji. Flag any kanji as a page issue.\n' : ''}
+If ANY of these fail (arcCoherence < 6, readAloudRhythm < 6, lastPageLanding false, soundOverload true, agency < 6, any page captionRisk >= 7, or any page deliversBeat false), write "feedback": a numbered list of specific corrections. Reference page numbers. Say exactly what is wrong and what a fix looks like — do not write replacement text yourself.
 
 BAD feedback:  "Page 3 is too caption-like"
 GOOD feedback: "Page 3 only describes the visible scene (girl on swing). Rewrite from her inner experience — what does the swoop feel like in her tummy? Add one sensory or imaginative element beyond the photo."
@@ -89,12 +109,17 @@ export const STORY_QC_RESPONSE_SCHEMA = {
         properties: {
           pageNumber: { type: 'number' },
           captionRisk: { type: 'number', description: '0-10' },
+          deliversBeat: {
+            type: 'boolean',
+            description:
+              "Does this page's text do its declared beat's job? true when no beat was declared.",
+          },
           issue: {
             type: ['string', 'null'],
             description: 'Specific problem on this page, or null',
           },
         },
-        required: ['pageNumber', 'captionRisk', 'issue'],
+        required: ['pageNumber', 'captionRisk', 'deliversBeat', 'issue'],
         additionalProperties: false,
       },
     },
@@ -133,7 +158,13 @@ export interface StoryQCResponse {
   arcCoherence: number;
   readAloudRhythm: number;
   lastPageLanding: boolean;
-  pages: { pageNumber: number; captionRisk: number; issue: string | null }[];
+  pages: {
+    pageNumber: number;
+    captionRisk: number;
+    /** V2: does this page deliver its declared beat? true when no beat declared. */
+    deliversBeat: boolean;
+    issue: string | null;
+  }[];
   truthToEvent: number | null;
   /** Photo judge enforces this; true = the story over-uses sound words. */
   soundOverload: boolean | null;
@@ -148,6 +179,12 @@ export const STORY_QC_THRESHOLDS = {
   minReadAloudRhythm: 6,
   maxCaptionRisk: 6, // a page fails at >= 7
   minRefrainEchoes: 3,
+  // Age-4 length budget (STORY_QUALITY_V2). Target band is 15-30 words /
+  // 1-2 sentences (en) and 20-45 chars (ja); the caps below are the hard
+  // enforcement line. No floor — short punchy pages are a feature.
+  maxWordsEn: 30,
+  maxSentences: 3,
+  maxCharsJa: 48,
   // Log-only today: truthToEvent is scored and logged but never triggers a
   // regen. Flip to enforcing only after Railway data validates the
   // distribution (every new failure trigger is a silent extra generation
@@ -179,16 +216,33 @@ export const AVATAR_STORY_QC_SYSTEM_PROMPT =
 
 export interface AvatarStoryQCInput {
   storyArc: StoryArc;
-  pages: Pick<StoryPageResponse, 'pageNumber' | 'text'>[];
+  pages: {
+    pageNumber: number;
+    text: string;
+    /** V2: the scene the illustrator will draw for this page (scene.action). */
+    sceneAction?: string | null;
+    /** V2: the scene's focal character+action (scene.focus). */
+    sceneFocus?: string | null;
+  }[];
   language?: string; // "en" | "ja"
   /** The parent-picked spark the story promised to deliver. */
   premise: string;
   /** Cast names+roles, so the editor can spot missing or invented characters. */
   cast?: { name: string; role: string }[];
+  /** STORY QUALITY V2: the per-page structural plan the pages promised to deliver. */
+  beatSheet?: BeatSheetEntry[];
 }
 
 export function createAvatarStoryQCPrompt(input: AvatarStoryQCInput): string {
-  const pagesBlock = input.pages.map((p) => `--- Page ${p.pageNumber} ---\n${p.text}`).join('\n');
+  const beats = beatMap(input.beatSheet);
+  const pagesBlock = input.pages
+    .map((p) => {
+      const sceneLine = p.sceneAction
+        ? `\n[scene action: ${p.sceneAction}${p.sceneFocus ? `; focus: ${p.sceneFocus}` : ''}]`
+        : '';
+      return `${pageHeader(p.pageNumber, beats)}\n${p.text}${sceneLine}`;
+    })
+    .join('\n');
 
   const castBlock = input.cast?.length
     ? `\n# The cast the parent picked\n${input.cast
@@ -203,6 +257,7 @@ export function createAvatarStoryQCPrompt(input: AvatarStoryQCInput): string {
 # Declared story arc
 - Desire: ${input.storyArc.desire}
 - Obstacle: ${input.storyArc.obstacle}
+- Throughline: ${input.storyArc.throughline}
 - Try: ${input.storyArc.tryAndOvercome ?? '(none declared)'}
 - Refrain: ${input.storyArc.refrain}
 - Emotional peak: ${input.storyArc.emotionalPeak}
@@ -224,8 +279,10 @@ Score the manuscript:
 5. soundOverload (boolean): true if the manuscript leans on sound words — any page that stacks 2+ sound words, or makes a sound word the page's main event. A story that reaches for a sound word where a vivid verb or image would do is overloaded.
 6. agency (0-10): Is the child the DOER — one clear goal, a real obstacle, and a try-wobble-try before the payoff? A child who only moves THROUGH a tour of moments (witnessing, not acting) scores below 5.
 7. Per page, note a specific "issue" (or null): an invented character, a broken hand-off, a page that stalls the story.
-${input.language === 'ja' ? '\n8. The text must be Japanese in hiragana/katakana with NO kanji. Flag any kanji as a page issue.\n' : ''}
-If ANY of these fail (arcCoherence < 6, readAloudRhythm < 6, or lastPageLanding false), write "feedback": a numbered list of specific corrections. Reference page numbers. Say exactly what is wrong and what a fix looks like — do not write replacement text yourself.
+8. Per page, deliversBeat (boolean): each page header declares its beat (role — goal). true only if the page's text actually does that job for the throughline. A lovely page doing a DIFFERENT job is false. If a page shows no beat, set true.
+9. Per page, sceneMatchesText (boolean): the [scene action/focus] under a page is what the illustrator will draw. true only if it depicts the SAME moment the text narrates — same action, same focal character. Cast membership is checked elsewhere; judge the ACTION. If a page shows no scene line, set true.
+${input.language === 'ja' ? '\n10. The text must be Japanese in hiragana/katakana with NO kanji. Flag any kanji as a page issue.\n' : ''}
+If ANY of these fail (arcCoherence < 6, readAloudRhythm < 6, lastPageLanding false, agency < 6, any page deliversBeat false, or any page sceneMatchesText false), write "feedback": a numbered list of specific corrections. Reference page numbers. Say exactly what is wrong and what a fix looks like — do not write replacement text yourself.
 
 BAD feedback:  "Page 3 is weak"
 GOOD feedback: "Page 3 stalls — nothing leans into page 4. End it with a glance toward the next thing or a question, so the listener needs the page turn."
@@ -245,12 +302,22 @@ export const AVATAR_STORY_QC_RESPONSE_SCHEMA = {
         type: 'object',
         properties: {
           pageNumber: { type: 'number' },
+          deliversBeat: {
+            type: 'boolean',
+            description:
+              "Does this page's text do its declared beat's job? true when no beat was declared.",
+          },
+          sceneMatchesText: {
+            type: 'boolean',
+            description:
+              "Does the page's scene depict the same moment its text narrates? true when no scene was shown.",
+          },
           issue: {
             type: ['string', 'null'],
             description: 'Specific problem on this page, or null',
           },
         },
-        required: ['pageNumber', 'issue'],
+        required: ['pageNumber', 'deliversBeat', 'sceneMatchesText', 'issue'],
         additionalProperties: false,
       },
     },
@@ -289,7 +356,14 @@ export interface AvatarStoryQCResponse {
   arcCoherence: number;
   readAloudRhythm: number;
   lastPageLanding: boolean;
-  pages: { pageNumber: number; issue: string | null }[];
+  pages: {
+    pageNumber: number;
+    /** V2: does this page deliver its declared beat? true when no beat declared. */
+    deliversBeat: boolean;
+    /** V2: does scene.action/focus depict the text's moment? true when no scene shown. */
+    sceneMatchesText: boolean;
+    issue: string | null;
+  }[];
   premiseTruth: number;
   /** Log-only on avatar (photo enforces); true = the story over-uses sound words. */
   soundOverload: boolean | null;
@@ -428,4 +502,201 @@ export function countLearningWordEchoes(
       ? ` ${page} `.includes(` ${clean} `)
       : page.replace(/ /g, '').includes(clean.replace(/ /g, ''));
   }).length;
+}
+
+// ----------------------------------
+// STORY QUALITY V2 — deterministic length + name checks
+// ----------------------------------
+
+/** Whitespace-token word count (en). Dash-joined tokens count once. */
+export function countWords(text: string): number {
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+  return trimmed.split(/\s+/).length;
+}
+
+// Unlike normalize(), keeps the long-vowel mark ー — it is part of the word
+// and must count toward the ja length budget.
+const JA_STRIP_RE = /[\s.,!?;:'"“”‘’«»„…—–\-()[\]{}、。！？「」『』・〜]/g;
+
+/** Character count excluding whitespace and punctuation (ja length budget). */
+export function countJaChars(text: string): number {
+  return text.replace(JA_STRIP_RE, '').length;
+}
+
+/**
+ * Sentence count via terminator groups ("What?!" is one sentence).
+ * Non-empty text without a terminator still reads as one sentence.
+ */
+export function countSentences(text: string, language: string = 'en'): number {
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+  const terminators = language === 'ja' ? /[。！？…!?.]+/g : /[.!?…]+/g;
+  const groups = trimmed.match(terminators)?.length ?? 0;
+  const endsTerminated = (language === 'ja' ? /[。！？…!?.]\s*$/ : /[.!?…]\s*$/).test(trimmed);
+  return groups + (endsTerminated ? 0 : 1);
+}
+
+export interface WordBudgetProblem {
+  pageNumber: number;
+  issue: string;
+}
+
+/**
+ * Hard length caps per page (en words / ja characters, plus a shared
+ * sentence cap). Deterministic — runs before the QC model call so regen
+ * feedback carries exact counts. One problem per page (worst first).
+ */
+export function wordBudgetProblems(
+  pages: { pageNumber: number; text: string }[],
+  language: string = 'en',
+): WordBudgetProblem[] {
+  const problems: WordBudgetProblem[] = [];
+  for (const page of pages) {
+    if (language === 'ja') {
+      const chars = countJaChars(page.text);
+      if (chars > STORY_QC_THRESHOLDS.maxCharsJa) {
+        problems.push({
+          pageNumber: page.pageNumber,
+          issue: `Page ${page.pageNumber} runs ${chars} characters (cap ${STORY_QC_THRESHOLDS.maxCharsJa}) — rewrite to the 20-45 character band.`,
+        });
+        continue;
+      }
+    } else {
+      const words = countWords(page.text);
+      if (words > STORY_QC_THRESHOLDS.maxWordsEn) {
+        problems.push({
+          pageNumber: page.pageNumber,
+          issue: `Page ${page.pageNumber} runs ${words} words (cap ${STORY_QC_THRESHOLDS.maxWordsEn}) — rewrite to 1-2 sentences, 15-30 words.`,
+        });
+        continue;
+      }
+    }
+    const sentences = countSentences(page.text, language);
+    if (sentences > STORY_QC_THRESHOLDS.maxSentences) {
+      problems.push({
+        pageNumber: page.pageNumber,
+        issue: `Page ${page.pageNumber} has ${sentences} sentences (cap ${STORY_QC_THRESHOLDS.maxSentences}) — merge into 1-2 sentences.`,
+      });
+    }
+  }
+  return problems;
+}
+
+export interface NameGarble {
+  pageNumber: number;
+  snippet: string;
+}
+
+// Connectors that turn two adjacent cast names into a garble ("Trex the
+// Kai"). Legit joins (and, with, commas, sentence breaks, possessives)
+// never flag.
+const GARBLE_CONNECTORS = new Set(['the', 'a', 'an', 'of']);
+
+interface GarbleToken {
+  /** Token with surrounding punctuation stripped (keeps internal apostrophes). */
+  core: string;
+  /** Lowercased core without a possessive 's. */
+  word: string;
+  possessive: boolean;
+  /** Trailing punctuation (comma, period, dash…) breaks adjacency. */
+  breaksAfter: boolean;
+}
+
+/**
+ * Detect two DISTINCT roster names mashed together — directly adjacent or
+ * joined only by the/a/an/of — the exact class of the shipped
+ * "Trex the Kai" bug. High precision by design: any punctuation between
+ * tokens, a possessive first name, or a legit connector word clears it.
+ * ja books are skipped (no reliable word boundaries).
+ */
+export function findNameGarbles(
+  pages: { pageNumber: number; text: string }[],
+  rosterNames: string[],
+  language: string = 'en',
+): NameGarble[] {
+  if (language === 'ja') return [];
+  const names = new Set<string>();
+  for (const name of rosterNames) {
+    const clean = name.trim().toLowerCase();
+    // Only single-token names can garble by adjacency.
+    if (clean && !clean.includes(' ')) names.add(clean);
+  }
+  if (names.size === 0) return [];
+
+  const garbles: NameGarble[] = [];
+  for (const page of pages) {
+    const tokens: GarbleToken[] = page.text
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((raw) => {
+        const lead = raw.replace(/^[^\p{L}\p{N}'’]+/u, '');
+        const core = lead.replace(/[^\p{L}\p{N}'’]+$/u, '');
+        const possessive = /['’]s$/i.test(core);
+        return {
+          core,
+          word: core.replace(/['’]s$/i, '').toLowerCase(),
+          possessive,
+          breaksAfter: core !== lead,
+        };
+      });
+
+    for (let i = 0; i < tokens.length; i++) {
+      const first = tokens[i];
+      if (!names.has(first.word) || first.possessive || first.breaksAfter) continue;
+      const next = tokens[i + 1];
+      if (!next) continue;
+      if (names.has(next.word) && next.word !== first.word) {
+        garbles.push({ pageNumber: page.pageNumber, snippet: `${first.core} ${next.core}` });
+        continue;
+      }
+      const after = tokens[i + 2];
+      if (
+        after &&
+        GARBLE_CONNECTORS.has(next.word) &&
+        !next.possessive &&
+        !next.breaksAfter &&
+        names.has(after.word) &&
+        after.word !== first.word
+      ) {
+        garbles.push({
+          pageNumber: page.pageNumber,
+          snippet: `${first.core} ${next.core} ${after.core}`,
+        });
+      }
+    }
+  }
+  return garbles;
+}
+
+export interface RollCallProblem {
+  pageNumber: number;
+  namesFound: string[];
+}
+
+/**
+ * LOG-ONLY: pages where more than maxNames roster names appear — the
+ * "roll-call prose" smell (every character doing something every page).
+ */
+export function rollCallProblems(
+  pages: { pageNumber: number; text: string }[],
+  rosterNames: string[],
+  maxNames: number = 3,
+): RollCallProblem[] {
+  const problems: RollCallProblem[] = [];
+  for (const page of pages) {
+    const pageText = ` ${normalize(page.text)} `;
+    const compactPage = pageText.replace(/ /g, '');
+    const found = rosterNames.filter((name) => {
+      const clean = normalize(name);
+      if (!clean) return false;
+      return LATIN_RE.test(clean)
+        ? pageText.includes(` ${clean} `)
+        : compactPage.includes(clean.replace(/ /g, ''));
+    });
+    if (found.length > maxNames) {
+      problems.push({ pageNumber: page.pageNumber, namesFound: found });
+    }
+  }
+  return problems;
 }

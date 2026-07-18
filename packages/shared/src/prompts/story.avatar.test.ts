@@ -152,11 +152,13 @@ describe('createAvatarStoryPrompt — cast rendering', () => {
 });
 
 describe('createAvatarStoryPrompt — shared machinery retained', () => {
-  it('keeps the 20/60/20 arc, refrain, hand-off, and dialogic machinery', () => {
+  it('keeps the beat-driven arc, refrain, hand-off, and dialogic machinery', () => {
     const text = promptText(baseInput);
-    expect(text).toContain('OPENING** (first ~20% of pages)');
-    expect(text).toContain('BUILDING** (middle ~60%)');
-    expect(text).toContain('LANDING** (final ~20%)');
+    expect(text).toContain('SITUATION** (first ~20% of pages)');
+    expect(text).toContain('COMPLICATION & TRIES** (the middle)');
+    expect(text).toContain('TURN** (about 3/4 through)');
+    expect(text).toContain('RESOLUTION** (final 1-2 pages)');
+    expect(text).toContain('BEAT SHEET (required');
     expect(text).toContain('Recurring Refrain (REQUIRED)');
     expect(text).toContain('Hand-off rule');
     expect(text).toContain('Dialogic Moments');
@@ -249,11 +251,15 @@ describe('STORY_RESPONSE_SCHEMA_AVATAR', () => {
     expect('bridgePages' in STORY_RESPONSE_SCHEMA_AVATAR.properties).toBe(false);
   });
 
-  it('keeps the photo response contract fields on pages', () => {
+  it('keeps the shared page contract fields, plus scene, minus photo-only moodCue', () => {
     const pageItems = STORY_RESPONSE_SCHEMA_AVATAR.properties.pages.items;
-    for (const field of STORY_RESPONSE_SCHEMA.properties.pages.items.required) {
+    for (const field of ['pageNumber', 'text', 'illustrationNotes', 'learningWordsUsed']) {
       expect(pageItems.required).toContain(field);
     }
+    expect(pageItems.required).toContain('scene');
+    // moodCue is the photo path's channel; avatar pages carry scene.mood.
+    expect('moodCue' in pageItems.properties).toBe(false);
+    expect(STORY_RESPONSE_SCHEMA.properties.pages.items.required).toContain('moodCue');
   });
 });
 
@@ -316,7 +322,7 @@ describe('createAvatarStoryPrompt — S3 agency arc', () => {
   });
 
   it('lands on the win with an inferred tone (never asks the parent)', () => {
-    expect(text).toContain('Land on the WIN');
+    expect(text).toContain("the child's OWN action pays off the throughline");
     expect(text).toContain('never ask the parent');
   });
 
