@@ -487,6 +487,7 @@ async function regenerateCoverFromQc(
 export async function processBookFinalize(job: Job<BookFinalizeJob>) {
   const { bookId, userId } = job.data;
   const qcRound = job.data.qcRound || 0;
+  let qcMs: number | null = null;
 
   logger.info({ bookId, userId, jobId: job.id, qcRound }, 'Starting book finalization');
   console.log(
@@ -649,6 +650,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
         // The endgame is real work — say so instead of sitting on a full bar.
         await setGenerationPhase(bookId, 'finishing');
 
+        const qcStartedAt = Date.now();
         const qcResult = await runQualityCheck(
           bookId,
           qcPages,
@@ -657,6 +659,8 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
           sheetsForJudge,
           coverForQc,
         );
+        qcMs = Date.now() - qcStartedAt;
+        logger.info({ bookId, qcRound, qcMs }, 'Quality check complete');
 
         // C4 TELEMETRY: one searchable qc_class_flags record per page — the
         // dataset the promotion criterion reads to decide when a telemetry-only
@@ -1051,6 +1055,14 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
               p.moderationStatus === 'FAILED' ||
               p.moderationStatus === 'FLAGGED',
           ).length,
+          ...(qcMs !== null ? { qcMs } : {}),
+          ...(pagesWithIllustrations.length > 1
+            ? {
+                artSpanMs:
+                  Math.max(...pagesWithIllustrations.map((p: any) => p.updatedAt.getTime())) -
+                  Math.min(...pagesWithIllustrations.map((p: any) => p.updatedAt.getTime())),
+              }
+            : {}),
         },
       },
       logger,

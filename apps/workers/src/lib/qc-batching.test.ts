@@ -426,10 +426,23 @@ describe('runQcBatches', () => {
     // The errored batch is NOT requeued; genuine fails would be — here none.
     expect(selectRequeuePageIds(pageResults)).toEqual([]);
 
-    // Telemetry: one row per batch, marking ok/error.
+    // Telemetry: one row per batch, marking ok/error (+ per-batch duration).
     expect(logs).toEqual([
-      { event: 'qc_batch_result', batchIndex: 0, pageCount: 3, ok: true },
-      { event: 'qc_batch_result', batchIndex: 1, pageCount: 3, ok: false, error: 'rate limited' },
+      {
+        event: 'qc_batch_result',
+        batchIndex: 0,
+        pageCount: 3,
+        ok: true,
+        durationMs: expect.any(Number),
+      },
+      {
+        event: 'qc_batch_result',
+        batchIndex: 1,
+        pageCount: 3,
+        ok: false,
+        error: 'rate limited',
+        durationMs: expect.any(Number),
+      },
     ]);
   });
 

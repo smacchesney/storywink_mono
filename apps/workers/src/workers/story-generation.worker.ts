@@ -819,7 +819,10 @@ export async function processStoryGeneration(
       }
     };
 
+    const storyStartedAt = Date.now();
     let storyResponse = await generateStory();
+    const storyMs = Date.now() - storyStartedAt;
+    logger.info({ bookId, storyMs }, 'Story model call complete');
 
     // Validate-or-DROP the model's proposed bridges (cap, one-per-gap,
     // roster-only characters). A bad bridge never fails the story — the book
@@ -850,10 +853,14 @@ export async function processStoryGeneration(
     await setGenerationPhase(bookId, 'story_check');
     let qcPassed = true;
     let regenerated = false;
+    let storyQcMs = 0;
     try {
+      const qcStartedAt = Date.now();
       const verdict = isAvatarStory
         ? await evaluateAvatarStoryQuality(openai, storyResponse, avatarInput!, bookId)
         : await evaluateStoryQuality(openai, storyResponse, storyInput, bookId, acceptedBridges);
+      storyQcMs = Date.now() - qcStartedAt;
+      logger.info({ bookId, storyQcMs, qcPassed: verdict.passed }, 'Story QC call complete');
       if (!verdict.passed) {
         qcPassed = false;
         if (Date.now() - jobStartedAt < STORY_QC_TIME_BUDGET_MS) {
@@ -865,7 +872,12 @@ export async function processStoryGeneration(
           // Back to 'story' so the story stage emits a mid-flight signal —
           // this write is also what keeps the UI's stall clock honest.
           await setGenerationPhase(bookId, 'story');
+          const regenStartedAt = Date.now();
           storyResponse = await generateStory(verdict.feedback);
+          logger.info(
+            { bookId, storyRegenMs: Date.now() - regenStartedAt },
+            'Story regen call complete',
+          );
           acceptedBridges = validateBridges(storyResponse);
         } else {
           logger.warn(
@@ -1229,6 +1241,8 @@ export async function processStoryGeneration(
           qcPassed,
           bridgePages: acceptedBridges.length,
           bookType: book.bookType,
+          storyMs,
+          qcMs: storyQcMs,
         },
       },
       logger,

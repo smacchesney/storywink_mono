@@ -93,17 +93,34 @@ export class OpenAIProvider implements IllustrationProvider {
     const { quality, thinking } = this;
 
     try {
-      const response = await this.client.images.edit({
-        model: this.modelId,
-        image: imageFiles,
-        prompt: input.prompt,
-        size: '2048x2048',
-        quality,
-        // NOTE: as of gpt-image-2 launch (2026-04-21), the "thinking" mode parameter
-        // name is still settling in the SDK. Pass via generic `reasoning` field if
-        // set; fall back to omitting it (standard mode) if SDK rejects.
-        ...(thinking ? { reasoning: { effort: 'medium' } } : {}),
-      } as any);
+      const { data: response, response: raw } = await this.client.images
+        .edit({
+          model: this.modelId,
+          image: imageFiles,
+          prompt: input.prompt,
+          size: '2048x2048',
+          quality,
+          // NOTE: as of gpt-image-2 launch (2026-04-21), the "thinking" mode parameter
+          // name is still settling in the SDK. Pass via generic `reasoning` field if
+          // set; fall back to omitting it (standard mode) if SDK rejects.
+          ...(thinking ? { reasoning: { effort: 'medium' } } : {}),
+        } as any)
+        .withResponse();
+
+      // Rate-limit headroom (headers may be absent) — the observability input
+      // for raising ILLUSTRATION_CONCURRENCY safely.
+      const remainingImages = raw.headers.get('x-ratelimit-remaining-images');
+      const remainingTokens = raw.headers.get('x-ratelimit-remaining-tokens');
+      if (remainingImages !== null || remainingTokens !== null) {
+        logger.info(
+          {
+            provider: 'openai',
+            ...(remainingImages !== null ? { remainingImages } : {}),
+            ...(remainingTokens !== null ? { remainingTokens } : {}),
+          },
+          'OpenAI images rate-limit headroom',
+        );
+      }
 
       const imageBase64 = response.data?.[0]?.b64_json;
       if (imageBase64) {

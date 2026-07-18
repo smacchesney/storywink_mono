@@ -729,10 +729,18 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
           prompt: textPrompt,
         };
 
+        const renderStartedAt = Date.now();
         const result = await illustrator.generate(illustrationInput);
 
         logger.info(
-          { jobId: job.id, pageId, pageNumber, provider: illustrator.name },
+          {
+            jobId: job.id,
+            pageId,
+            pageNumber,
+            provider: illustrator.name,
+            attempt: contentPolicyAttempt + 1,
+            renderMs: Date.now() - renderStartedAt,
+          },
           'Received response from illustration provider.',
         );
         console.log(

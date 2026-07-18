@@ -281,6 +281,7 @@ export interface QcBatchLog {
   pageCount: number;
   ok: boolean;
   error?: string;
+  durationMs?: number;
 }
 
 export interface RunQcBatchesResult {
@@ -311,6 +312,7 @@ export async function runQcBatches<T extends QcBatchPageInfo>(
 
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
+    const batchStartedAt = Date.now();
     let log: QcBatchLog;
 
     try {
@@ -320,7 +322,13 @@ export async function runQcBatches<T extends QcBatchPageInfo>(
         const mapped = byId.get(page.pageId);
         pageResults.push(mapped ?? sentinelPageResult(page, 'no QC result returned for page'));
       }
-      log = { event: 'qc_batch_result', batchIndex: i, pageCount: batch.length, ok: true };
+      log = {
+        event: 'qc_batch_result',
+        batchIndex: i,
+        pageCount: batch.length,
+        ok: true,
+        durationMs: Date.now() - batchStartedAt,
+      };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       for (const page of batch) pageResults.push(sentinelPageResult(page, message));
@@ -330,6 +338,7 @@ export async function runQcBatches<T extends QcBatchPageInfo>(
         pageCount: batch.length,
         ok: false,
         error: message,
+        durationMs: Date.now() - batchStartedAt,
       };
     }
 
