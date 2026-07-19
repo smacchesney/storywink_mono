@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@storywink/database';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from '@/lib/db';
 import { z } from 'zod'; // Import Zod
@@ -264,6 +265,14 @@ export async function PATCH(
           );
         }
       }
+    }
+
+    // castMemberIds is a Json? column: Prisma rejects a literal JS null for JSON
+    // fields (it wants Prisma.DbNull/JsonNull). Map an explicit null clear to
+    // Prisma.DbNull (SQL NULL), mirroring avatar/[avatarId]/photo/route.ts. Only
+    // reached with the flag on — the strip above drops the field when off.
+    if (dataForPrisma.castMemberIds === null) {
+      dataForPrisma.castMemberIds = Prisma.DbNull;
     }
 
     // Use updateMany to ensure user owns the book AND the book exists

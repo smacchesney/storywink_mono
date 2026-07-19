@@ -26,9 +26,9 @@ export function formatCastNames(names: string[], language: string): string | nul
 
 /**
  * The dedication/ending display name for a book. Ensemble books list their
- * NAMED members in castMemberIds order (unnamed members are excluded; zero
- * named members falls back to childName). Star/legacy books return childName
- * untouched — the frozen Lulu snapshot rides this byte-identical path.
+ * NAMED members in castMemberIds order (unnamed members are excluded; fewer
+ * than two named members falls back to childName). Star/legacy books return
+ * childName untouched — the frozen Lulu snapshot rides this byte-identical path.
  * Data-driven off Book.castMode, deliberately not the env flag: an ensemble
  * book stays an ensemble book in print even after a flag rollback.
  */
@@ -48,5 +48,11 @@ export function castDisplayName(
   const names = memberIds
     .map((id) => identity?.characters?.find((c) => c.characterId === id)?.name?.trim())
     .filter((n): n is string => !!n);
+  // A lone named member is a star, not an ensemble: mirror the workers'
+  // MIN_ENSEMBLE_MEMBERS=2 convention (apps/workers/src/lib/ensemble.ts) but gate
+  // on RESOLVED names — that is what actually prints. Fewer than 2 named members
+  // (one member id, or two ids where only one resolves) falls back to childName,
+  // so a single-member 'ensemble' can never print the wrong lone name.
+  if (names.length < 2) return bookData.childName;
   return formatCastNames(names, bookData.language || 'en') ?? bookData.childName;
 }

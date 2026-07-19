@@ -45,6 +45,21 @@ describe('castDisplayName (X17 A2)', () => {
     const book = { ...ensembleBook, castMemberIds: ['pet_1'] } as unknown as BookWithPages;
     expect(castDisplayName(book)).toBe('Leo');
   });
+  it('ensemble with a single named member falls back to childName (min 2 to print)', () => {
+    // One resolvable member (Maya) but childName is Leo — a lone member is a
+    // star, not an ensemble, so the print must be childName, never the member.
+    const book = { ...ensembleBook, castMemberIds: ['child_2'] } as unknown as BookWithPages;
+    expect(castDisplayName(book)).toBe('Leo');
+  });
+  it('ensemble with two ids but only one resolving to a name falls back to childName', () => {
+    // Two member ids, but pet_1 is unnamed — only Maya resolves. The gate counts
+    // RESOLVED names (what prints), so one name < 2 → childName.
+    const book = {
+      ...ensembleBook,
+      castMemberIds: ['child_2', 'pet_1'],
+    } as unknown as BookWithPages;
+    expect(castDisplayName(book)).toBe('Leo');
+  });
   it('star/legacy books return childName untouched (byte-identical path)', () => {
     expect(
       castDisplayName({ castMode: 'star', childName: 'Kai' } as unknown as BookWithPages),
