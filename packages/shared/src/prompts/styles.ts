@@ -161,7 +161,7 @@ export const PEOPLE_SOURCE_HIERARCHY = `PEOPLE - SOURCE HIERARCHY (non-negotiabl
 Every person in the illustration must be immediately recognizable to their own family.
 Two sources describe the people in this scene. Apply them in this exact order:
 1. IDENTITY — face shape, hair color/style/length, skin tone, and distinguishing features (glasses, freckles, dimples): follow the CHARACTER IDENTITY reference when one is provided below. It is the canonical source; when the photo is ambiguous or disagrees on these features (lighting, angle, shadow, hat), the CHARACTER IDENTITY reference wins.
-2. THIS PAGE'S PHOTO — pose, body position, expression, clothing, other people present, and scene composition: follow the photo exactly. Never copy clothing, poses, or people from any style reference image.
+2. THIS PAGE'S PHOTO — pose, body position, clothing, other people present, and scene composition: follow the photo exactly. Expression: start from the photo's expression and, when an EMOTIONAL TONE is provided for the page, amplify it one notch in the photo's own direction — a neutral face may warm into a small smile, joy may brighten, wonder may widen — never changed in kind and never inverted. Never copy clothing, poses, or people from any style reference image.
 If no CHARACTER IDENTITY reference is provided, match every feature to the photo. If a feature is hidden in the photo (hat, angle, shadow) and no reference describes it, keep it hidden — never invent.`;
 
 // ----------------------------------
@@ -370,7 +370,7 @@ const KAWAII_STYLE_BIBLE = [
 - Nose: tiny dot or absent
 - Mouth: small open happy smile or closed gentle curved line
 - Blush: ALWAYS soft pink/rosy circular blush marks on both cheeks of EVERY character
-- Expression: universally warm, gentle, happy`,
+- Expression: default warm and gentle; when the page provides an EMOTIONAL TONE, follow it — determined, awed, sleepy, or triumphant faces are welcome, rendered softly`,
 
   `HAIR:
 - Solid color shape with a few interior lines suggesting strands

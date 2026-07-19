@@ -413,7 +413,7 @@ describe('createIllustrationPrompt — photo-path mood cue (STORY_ILLUS_MOOD_ENA
     const off = createIllustrationPrompt(base);
     expect(createIllustrationPrompt({ ...base, illustrationMood: null })).toBe(off);
     expect(createIllustrationPrompt({ ...base, illustrationMood: '  ' })).toBe(off);
-    expect(off).not.toContain('EMOTIONAL TONE');
+    expect(off).not.toContain('EMOTIONAL TONE (subordinate to the photo');
   });
 
   it('never renders on covers or off the photo path', () => {
@@ -422,13 +422,13 @@ describe('createIllustrationPrompt — photo-path mood cue (STORY_ILLUS_MOOD_ENA
       isTitlePage: true,
       illustrationMood: 'hushed wonder',
     });
-    expect(cover).not.toContain('EMOTIONAL TONE');
+    expect(cover).not.toContain('EMOTIONAL TONE (subordinate to the photo');
     const avatar = createIllustrationPrompt({
       ...base,
       contentAnchor: 'sheet',
       illustrationMood: 'hushed wonder',
     });
-    expect(avatar).not.toContain('EMOTIONAL TONE');
+    expect(avatar).not.toContain('EMOTIONAL TONE (subordinate to the photo');
   });
 
   it('sanitizes shouty mood text and keeps the no-text rule last', () => {
