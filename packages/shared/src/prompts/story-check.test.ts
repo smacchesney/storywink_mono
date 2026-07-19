@@ -570,3 +570,25 @@ describe('QC v2 — avatar judge sees scenes and beats', () => {
     expect(prompt).toContain('Throughline: Get teddy back');
   });
 });
+
+describe('story QC v3 fields (X16 W1)', () => {
+  it('prompt instructs the three new dimensions', () => {
+    const prompt = createStoryQCPrompt({
+      storyArc: arc,
+      pages: [{ pageNumber: 1, text: 'Up we go!' }],
+      language: 'en',
+    });
+    expect(prompt).toContain('endsLeaningForward');
+    expect(prompt).toContain('orphanedLanding');
+    expect(prompt).toContain('refrainAsNarrator');
+  });
+
+  it('schema requires the new fields', () => {
+    const pageProps = (STORY_QC_RESPONSE_SCHEMA.properties.pages.items as any).properties;
+    expect(pageProps.endsLeaningForward).toBeDefined();
+    expect((STORY_QC_RESPONSE_SCHEMA.properties as any).orphanedLanding).toBeDefined();
+    expect((STORY_QC_RESPONSE_SCHEMA.properties as any).refrainAsNarrator).toBeDefined();
+    expect(STORY_QC_RESPONSE_SCHEMA.required).toContain('orphanedLanding');
+    expect(STORY_QC_RESPONSE_SCHEMA.required).toContain('refrainAsNarrator');
+  });
+});

@@ -313,6 +313,9 @@ async function evaluateStoryQuality(
     nameGarbles: detChecks.garbles,
     rollCallPages: detChecks.rollCall.map((r) => r.pageNumber),
     deliversBeatFalse: qc.pages.filter((p) => p.deliversBeat === false).map((p) => p.pageNumber),
+    orphanedLanding: qc.orphanedLanding,
+    refrainAsNarrator: qc.refrainAsNarrator,
+    endsFlatPages: qc.pages.filter((p) => p.endsLeaningForward === false).map((p) => p.pageNumber),
   };
   logger.info(telemetry, 'Story QC scores');
 
@@ -372,6 +375,16 @@ async function evaluateStoryQuality(
           } — rewrite the page to do that job.${page.issue ? ` ${page.issue}` : ''}`,
         );
       }
+    }
+    if (qc.orphanedLanding === true) {
+      problems.push(
+        'A person from the opening pages has vanished by the landing — bring them back (or echo them) on the final page.',
+      );
+    }
+    if (qc.refrainAsNarrator === false) {
+      problems.push(
+        'The refrain must appear at least twice as its own standalone narrator line, OUTSIDE quotation marks — at most one echo may live inside dialogue.',
+      );
     }
   }
   // Everything above needs a whole-book regen; the deterministic findings are
