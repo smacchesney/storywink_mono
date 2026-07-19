@@ -62,6 +62,7 @@ import {
   avatarStoryQcProblems,
 } from '../lib/avatar-story.js';
 import { storyQualityV2Enabled, deterministicStoryChecks } from '../lib/story-quality.js';
+import { persistStoryQc } from '../lib/story-qc-persist.js';
 import { STORY_MODEL, ANALYSIS_MODEL } from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -129,6 +130,8 @@ interface StoryQcVerdict {
   pageLocal: { pageNumber: number; issue: string }[];
   /** True when pageLocal is ALL that is failing — eligible for surgical rewrites. */
   pageLocalOnly: boolean;
+  /** Full score payload for StoryQcResult persistence (same object the log line carries). */
+  telemetry: Record<string, unknown>;
 }
 
 let characterExtractionQueue: Queue | null = null;
@@ -283,37 +286,35 @@ async function evaluateStoryQuality(
     ? checkCastNameCoverage(cast, pageTexts, input.language || 'en')
     : null;
 
-  logger.info(
-    {
-      bookId,
-      refrainEchoes: echoes,
-      arcCoherence: qc.arcCoherence,
-      readAloudRhythm: qc.readAloudRhythm,
-      lastPageLanding: qc.lastPageLanding,
-      maxCaptionRisk: Math.max(0, ...qc.pages.map((p) => p.captionRisk)),
-      childNameCheck,
-      childNameEchoes,
-      childNameInLanding,
-      castNamesChecked: castCoverage?.checked ?? 0,
-      castNamesCovered: castCoverage?.covered ?? 0,
-      castNamesMissing: castCoverage?.missing ?? [],
-      castNamesSkippedScript: castCoverage?.skippedScript ?? 0,
-      truthToEvent: qc.truthToEvent,
-      // ENFORCED on photo (S2): a sound-overloaded draft is regenerated.
-      soundOverload: qc.soundOverload,
-      // ENFORCED under STORY_QUALITY_V2 (log-only when the flag is off).
-      agency: qc.agency,
-      hadEventSummary: !!input.eventSummary,
-      confirmedFactCount: input.confirmedFacts?.length ?? 0,
-      // STORY QUALITY V2 telemetry (always computed; enforced only when flagged).
-      v2Enforced,
-      wordBudgetViolations: detChecks.budget,
-      nameGarbles: detChecks.garbles,
-      rollCallPages: detChecks.rollCall.map((r) => r.pageNumber),
-      deliversBeatFalse: qc.pages.filter((p) => p.deliversBeat === false).map((p) => p.pageNumber),
-    },
-    'Story QC scores',
-  );
+  const telemetry = {
+    bookId,
+    refrainEchoes: echoes,
+    arcCoherence: qc.arcCoherence,
+    readAloudRhythm: qc.readAloudRhythm,
+    lastPageLanding: qc.lastPageLanding,
+    maxCaptionRisk: Math.max(0, ...qc.pages.map((p) => p.captionRisk)),
+    childNameCheck,
+    childNameEchoes,
+    childNameInLanding,
+    castNamesChecked: castCoverage?.checked ?? 0,
+    castNamesCovered: castCoverage?.covered ?? 0,
+    castNamesMissing: castCoverage?.missing ?? [],
+    castNamesSkippedScript: castCoverage?.skippedScript ?? 0,
+    truthToEvent: qc.truthToEvent,
+    // ENFORCED on photo (S2): a sound-overloaded draft is regenerated.
+    soundOverload: qc.soundOverload,
+    // ENFORCED under STORY_QUALITY_V2 (log-only when the flag is off).
+    agency: qc.agency,
+    hadEventSummary: !!input.eventSummary,
+    confirmedFactCount: input.confirmedFacts?.length ?? 0,
+    // STORY QUALITY V2 telemetry (always computed; enforced only when flagged).
+    v2Enforced,
+    wordBudgetViolations: detChecks.budget,
+    nameGarbles: detChecks.garbles,
+    rollCallPages: detChecks.rollCall.map((r) => r.pageNumber),
+    deliversBeatFalse: qc.pages.filter((p) => p.deliversBeat === false).map((p) => p.pageNumber),
+  };
+  logger.info(telemetry, 'Story QC scores');
 
   if (qc.arcCoherence < STORY_QC_THRESHOLDS.minArcCoherence) {
     problems.push(
@@ -396,6 +397,7 @@ async function evaluateStoryQuality(
       globalProblemCount === 0 &&
       pageLocal.length > 0 &&
       pageLocal.length === detChecks.problems.length,
+    telemetry,
   };
 }
 
@@ -499,39 +501,37 @@ async function evaluateAvatarStoryQuality(
     }
   }
 
-  logger.info(
-    {
-      bookId,
-      bookType: 'AVATAR_STORY',
-      refrainEchoes: echoes,
-      arcCoherence: qc.arcCoherence,
-      readAloudRhythm: qc.readAloudRhythm,
-      lastPageLanding: qc.lastPageLanding,
-      // LOG-ONLY dimension: premiseTruth never pushes into `problems` at
-      // launch (flip to enforcing only after Railway data validates the
-      // distribution — every new trigger is a silent extra generation).
-      premiseTruth: qc.premiseTruth,
-      // soundOverload enforces on PHOTO books only; agency enforces under
-      // STORY_QUALITY_V2 (log-only when the flag is off).
-      soundOverload: qc.soundOverload,
-      agency: qc.agency,
-      pageIssues: qc.pages.filter((p) => p.issue).length,
-      childNameCheck,
-      childNameEchoes,
-      childNameInLanding,
-      castSize: input.cast.length,
-      // STORY QUALITY V2 telemetry (always computed; enforced only when flagged).
-      v2Enforced,
-      wordBudgetViolations: detChecks.budget,
-      nameGarbles: detChecks.garbles,
-      rollCallPages: detChecks.rollCall.map((r) => r.pageNumber),
-      deliversBeatFalse: qc.pages.filter((p) => p.deliversBeat === false).map((p) => p.pageNumber),
-      sceneMismatchPages: qc.pages
-        .filter((p) => p.sceneMatchesText === false)
-        .map((p) => p.pageNumber),
-    },
-    'Story QC scores',
-  );
+  const telemetry = {
+    bookId,
+    bookType: 'AVATAR_STORY',
+    refrainEchoes: echoes,
+    arcCoherence: qc.arcCoherence,
+    readAloudRhythm: qc.readAloudRhythm,
+    lastPageLanding: qc.lastPageLanding,
+    // LOG-ONLY dimension: premiseTruth never pushes into `problems` at
+    // launch (flip to enforcing only after Railway data validates the
+    // distribution — every new trigger is a silent extra generation).
+    premiseTruth: qc.premiseTruth,
+    // soundOverload enforces on PHOTO books only; agency enforces under
+    // STORY_QUALITY_V2 (log-only when the flag is off).
+    soundOverload: qc.soundOverload,
+    agency: qc.agency,
+    pageIssues: qc.pages.filter((p) => p.issue).length,
+    childNameCheck,
+    childNameEchoes,
+    childNameInLanding,
+    castSize: input.cast.length,
+    // STORY QUALITY V2 telemetry (always computed; enforced only when flagged).
+    v2Enforced,
+    wordBudgetViolations: detChecks.budget,
+    nameGarbles: detChecks.garbles,
+    rollCallPages: detChecks.rollCall.map((r) => r.pageNumber),
+    deliversBeatFalse: qc.pages.filter((p) => p.deliversBeat === false).map((p) => p.pageNumber),
+    sceneMismatchPages: qc.pages
+      .filter((p) => p.sceneMatchesText === false)
+      .map((p) => p.pageNumber),
+  };
+  logger.info(telemetry, 'Story QC scores');
 
   // The enforced-dimension verdict is pure and pinned by tests — premiseTruth
   // stays LOG-ONLY by construction. The no-deterministic variant tells the
@@ -561,6 +561,7 @@ async function evaluateAvatarStoryQuality(
     feedback: problems.map((p, i) => `${i + 1}. ${p}`).join('\n'),
     pageLocal,
     pageLocalOnly: v2Enforced && globalProblems.length === 0 && pageLocal.length > 0,
+    telemetry,
   };
 }
 
@@ -1174,6 +1175,7 @@ export async function processStoryGeneration(
         feedback: recheckProblems.map((p, i) => `${i + 1}. ${p}`).join('\n'),
         pageLocal: [],
         pageLocalOnly: false,
+        telemetry: verdict.telemetry,
       };
     };
 
@@ -1183,8 +1185,21 @@ export async function processStoryGeneration(
           ? evaluateAvatarStoryQuality(openai, storyResponse, avatarInput!, bookId)
           : evaluateStoryQuality(openai, storyResponse, storyInput, bookId, acceptedBridges);
 
+      const persistVerdict = (v: StoryQcVerdict, round: number) =>
+        persistStoryQc(prisma, {
+          bookId,
+          bookType: book.bookType,
+          language: bookLanguage,
+          round,
+          passed: v.passed,
+          scores: v.telemetry as Record<string, unknown>,
+          feedback: v.feedback || null,
+          targetedRewrites,
+        });
+
       let verdict = await evaluate();
       verdict = await applyTargetedRewrites(verdict);
+      await persistVerdict(verdict, 0);
       while (
         !verdict.passed &&
         regenCount < MAX_STORY_REGENS &&
@@ -1204,6 +1219,7 @@ export async function processStoryGeneration(
         await setGenerationPhase(bookId, 'story_check');
         verdict = await evaluate();
         verdict = await applyTargetedRewrites(verdict);
+        await persistVerdict(verdict, regenCount);
       }
       qcPassed = verdict.passed;
       if (!verdict.passed) {

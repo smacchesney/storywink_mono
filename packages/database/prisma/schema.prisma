@@ -112,6 +112,7 @@ model Book {
   cartItems         CartItem[]
   printOrders       PrintOrder[]
   illustrationQcResults IllustrationQcResult[]
+  storyQcResults StoryQcResult[]
   bookAvatars BookAvatar[]
 
   @@index([userId])
@@ -302,6 +303,27 @@ model IllustrationQcResult {
   hadSheet     Boolean  @default(false)
   feedback     String?
   createdAt    DateTime @default(now())
+
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([bookId])
+  @@index([createdAt])
+}
+
+// Story QC telemetry: one row per QC evaluation round (round 0 = first
+// draft). Scores persist even when enforcement is off — flip decisions
+// (STORY_QUALITY_V2, truthToEvent, agency) become SQL, not log scraping.
+model StoryQcResult {
+  id               String   @id @default(cuid())
+  bookId           String
+  bookType         String
+  language         String
+  round            Int
+  passed           Boolean
+  scores           Json
+  feedback         String?
+  targetedRewrites Int      @default(0)
+  createdAt        DateTime @default(now())
 
   book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
 
