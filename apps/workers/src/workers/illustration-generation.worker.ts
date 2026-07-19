@@ -1075,9 +1075,9 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         `[IllustrationWorker] Generating separate cover illustration for title page ${pageNumber}...`,
       );
       try {
-        // Cover binding (CHARACTER_SHEETS_ENABLED): the cover call receives
-        // the character sheet(s) plus the approved interior title-page render
-        // as references, so the two renders of the same photo stop diverging.
+        // Cover binding: the cover call receives the character sheet(s) plus
+        // the approved interior title-page render as references, so the two
+        // renders of the same photo stop diverging.
         // X16 W1: the interior render exists unconditionally on the title-page
         // job — cover coherence must not ride the sheets flag.
         const interiorRenderRef = interiorRenderBuffer

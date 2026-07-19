@@ -313,7 +313,8 @@ async function main() {
 
   // Accumulate every evaluation round so the artifact keeps the pre-regen
   // draft + its problems, not just the final surviving draft. This is the
-  // proof that the regen loop fired and what it fired on.
+  // proof that the regen loop fired and what it fired on. Round labels match
+  // StoryQcResult.round semantics: 0 = first draft, 1 = first regen.
   const rounds: {
     round: number;
     problems: string[];
@@ -322,19 +323,19 @@ async function main() {
 
   let round = await judge(story);
   rounds.push({
-    round: 1,
+    round: 0,
     problems: round.problems,
     pages: round.sorted.map((p) => ({ pageNumber: p.pageNumber, text: p.text })),
   });
   if (round.problems.length > 0) {
     console.log(
-      `[proof-photo] round 1 failed (${round.problems.length} problems) — regenerating once with corrections (mirrors the worker loop)…`,
+      `[proof-photo] round 0 failed (${round.problems.length} problems) — regenerating once with corrections (mirrors the worker loop)…`,
     );
     regenerated = true;
     story = await generate(round.problems.map((p, i) => `${i + 1}. ${p}`).join('\n'));
     round = await judge(story);
     rounds.push({
-      round: 2,
+      round: 1,
       problems: round.problems,
       pages: round.sorted.map((p) => ({ pageNumber: p.pageNumber, text: p.text })),
     });
