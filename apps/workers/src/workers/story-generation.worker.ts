@@ -1929,6 +1929,7 @@ async function processSinglePageTextGeneration(
       : '## This is near the end of the story.',
     '',
     `Also provide brief illustrationNotes describing any visual effects or mood for the illustrator, or null if the photo speaks for itself.`,
+    `Also set "moodCue" — 1-3 words for how this moment should FEEL in the picture ("hushed wonder"); null when neutral.`,
   ].join('\n');
 
   const imageUrl = photoUrl ? optimizeCloudinaryUrlForVision(convertHeicToJpeg(photoUrl)) : null;
@@ -1941,8 +1942,13 @@ async function processSinglePageTextGeneration(
         type: ['string', 'null'],
         description: 'Visual notes for illustrator, or null',
       },
+      moodCue: {
+        type: ['string', 'null'],
+        description:
+          "1-3 words for how this page's moment should FEEL in the picture; null when neutral",
+      },
     },
-    required: ['text', 'illustrationNotes'],
+    required: ['text', 'illustrationNotes', 'moodCue'],
     additionalProperties: false,
   } as const;
 
@@ -1973,7 +1979,11 @@ async function processSinglePageTextGeneration(
   const responseText = result.output_text;
   if (!responseText) throw new Error('OpenAI returned empty response for single page');
 
-  let parsed = JSON.parse(responseText) as { text: string; illustrationNotes: string | null };
+  let parsed = JSON.parse(responseText) as {
+    text: string;
+    illustrationNotes: string | null;
+    moodCue?: string | null;
+  };
 
   // STORY QUALITY V2: this path used to ship with no QC at all. Run the
   // deterministic caps + garble scan; one retry with the violation named,
@@ -2023,6 +2033,7 @@ async function processSinglePageTextGeneration(
         parsed = JSON.parse(retry.output_text) as {
           text: string;
           illustrationNotes: string | null;
+          moodCue?: string | null;
         };
         const recheck = deterministicStoryChecks(
           [{ pageNumber: targetPage.pageNumber, text: parsed.text }],
@@ -2045,9 +2056,9 @@ async function processSinglePageTextGeneration(
       text: parsed.text,
       illustrationNotes: parsed.illustrationNotes,
       textConfirmed: false,
-      // The old mood cue described the PREVIOUS text's moment — clear it so
-      // a stale tone can never color the new render (this path emits none).
-      illustrationMood: null,
+      // X16 W1: the rewrite emits a fresh mood for its new text (previously
+      // this path nulled the mood forever).
+      illustrationMood: parsed.moodCue?.trim() || null,
     },
   });
 

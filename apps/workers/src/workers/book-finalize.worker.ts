@@ -596,6 +596,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
           source: p.source,
           text: p.text,
           bridgeScene: p.bridgeScene,
+          illustrationMood: p.illustrationMood,
         }));
 
         // CHARACTER_SHEETS_ENABLED: validated sheets become QC's ground

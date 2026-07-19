@@ -32,6 +32,8 @@ export interface QcAssemblyPage {
   text?: string | null;
   /** Page.bridgeScene JSON — source of the scene cast + holder-annotated props. */
   bridgeScene?: unknown;
+  /** Page.illustrationMood — photo-path mood source for the moodMismatch class (X16 W1). */
+  illustrationMood?: string | null;
 }
 
 /** Prop strings whose text names WHO holds the prop can be judged for holder match. */
@@ -91,21 +93,29 @@ export function heldPropsForPage(page: { bridgeScene?: unknown }): string[] {
 }
 
 /**
- * X13 Track L: the story-authored mood + composition focus for a page. Present
- * only on avatar scenes (photo/bridge scenes never carry them), so this
- * degrades to null/null and the moodMismatch class stays a no-op elsewhere.
+ * X13 Track L: the story-authored mood + composition focus for a page. Avatar
+ * scenes carry both in `bridgeScene` (mood + composition focus win when set).
+ * X16 W1: photo pages have no scene, so the mood falls back to the page's own
+ * `illustrationMood` (focus stays null — a photo has no story-authored framing).
+ * With neither, this degrades to null/null and the moodMismatch class stays a
+ * no-op.
  */
-export function sceneMeaningForPage(page: { bridgeScene?: unknown }): {
-  mood: string | null;
-  focus: string | null;
-} {
+export function sceneMeaningForPage(page: {
+  bridgeScene?: unknown;
+  illustrationMood?: string | null;
+}): { mood: string | null; focus: string | null } {
   const scene = page.bridgeScene;
-  if (!scene || typeof scene !== 'object') return { mood: null, focus: null };
-  const s = scene as { mood?: unknown; focus?: unknown };
-  return {
-    mood: typeof s.mood === 'string' && s.mood.trim() ? s.mood : null,
-    focus: typeof s.focus === 'string' && s.focus.trim() ? s.focus : null,
-  };
+  if (scene && typeof scene === 'object') {
+    const s = scene as { mood?: unknown; focus?: unknown };
+    const mood = typeof s.mood === 'string' && s.mood.trim() ? s.mood : null;
+    const focus = typeof s.focus === 'string' && s.focus.trim() ? s.focus : null;
+    if (mood || focus) return { mood, focus };
+  }
+  const mood =
+    typeof page.illustrationMood === 'string' && page.illustrationMood.trim()
+      ? page.illustrationMood
+      : null;
+  return { mood, focus: null };
 }
 
 /**
