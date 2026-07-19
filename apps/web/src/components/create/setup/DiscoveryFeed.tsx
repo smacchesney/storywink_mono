@@ -8,23 +8,27 @@ import type { DiscoveryChip } from '@/components/create/setup/discovery-feed';
 export const CHIP_STAGGER_MS = 350;
 
 /**
- * Reserved feed height while perception is still reading — mirrors the
- * CaptureChips reserve (SetupSheet's `minHeight: 96`). Sized to one header
- * line plus two chip rows, so the child-name field below never shifts when
- * chips land: they animate INTO this box instead of pushing it open.
+ * Reserved feed floor, held whenever the feed renders — mirrors the
+ * CaptureChips reserve (SetupSheet's `minHeight: 96`). The feed sits below the
+ * child-name field, so this floor never moves the name field; it only keeps
+ * content below the feed from shifting until chip content exceeds 96px, which
+ * matches the accepted CaptureChips-region behavior below a focused field.
  */
 export const FEED_RESERVE_MIN_HEIGHT = 96;
 
 /**
  * X17 B1 — the perception pass's real findings, cascading in as quiet data
- * chips under the librarian strip. Chips are Geist (they are data); the
- * header line is Excalifont narration. Non-interactive by design: the
- * ramble is the correction channel, so a wrong guess reads as charm.
+ * chips below the child-name field, directly above the capture-chips region.
+ * Chips are Geist (they are data); the header line is Excalifont narration.
+ * Non-interactive by design: the ramble is the correction channel, so a wrong
+ * guess reads as charm.
  *
- * `reserve` (true while the strip is still reading) holds a stable min-height
- * box with a live region already mounted, so chips arrive without a layout
- * shift and screen readers announce the mutation. Once reading settles with
- * no chips the box collapses (nothing more will arrive).
+ * `reserve` (true while the strip is still reading) arms a live region with a
+ * stable min-height floor already mounted, so chips arrive without a shift
+ * above them and screen readers announce the mutation. The floor is HELD once
+ * chips land (it does not drop to undefined), so the only thing that can move
+ * is content below the feed, and only when chips exceed the floor. Once
+ * reading settles with no chips the box collapses (nothing more will arrive).
  */
 export function DiscoveryFeed({ chips, reserve }: { chips: DiscoveryChip[]; reserve?: boolean }) {
   const t = useTranslations('setup');
@@ -32,8 +36,8 @@ export function DiscoveryFeed({ chips, reserve }: { chips: DiscoveryChip[]; rese
   const reducedMotion = useReducedMotion() ?? false;
 
   const hasChips = chips.length > 0;
-  // Reserve empty space only while reading and no chips yet; once chips land
-  // they define the height (mirrors the CaptureChips reserve idiom).
+  // Reserve empty space only while reading and no chips yet; the aria-live
+  // region still mounts here so the later mutation is announced.
   const reserveSpace = !!reserve && !hasChips;
   // Collapse entirely when nothing is reserved and no chips are present —
   // flag-off never reaches here (the whole block is gated in SetupSheet).
@@ -42,7 +46,10 @@ export function DiscoveryFeed({ chips, reserve }: { chips: DiscoveryChip[]; rese
   return (
     <div
       className="flex flex-col gap-1.5"
-      style={{ minHeight: reserveSpace ? FEED_RESERVE_MIN_HEIGHT : undefined }}
+      // Hold the floor whenever the feed renders (reserve OR chips present) so
+      // it never drops when chips land; the feed lives below the name field,
+      // so this can only shift content beneath it, never the name field.
+      style={{ minHeight: FEED_RESERVE_MIN_HEIGHT }}
       aria-live="polite"
     >
       {hasChips && (

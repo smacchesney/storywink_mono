@@ -145,15 +145,6 @@ export function SetupSheet({
         <LibrarianStrip phase={stripPhase} questionCount={form.captureQuestions.length} />
       )}
 
-      {/* X17 B1 — real perception findings cascade in as Geist data chips.
-          A stable min-height box is reserved while the strip is still reading
-          (reserve), so chips animate INTO it and the child-name field below
-          never shifts; the box collapses once reading settles with no chips.
-          Whole block is flag-gated, so flag-off output stays byte-identical. */}
-      {CREATE_DISCOVERY_FLAG && (
-        <DiscoveryFeed chips={discoveryChips ?? []} reserve={stripPhase === 'reading'} />
-      )}
-
       {/* Child name — the one required field */}
       <section className="flex flex-col gap-1.5">
         <label htmlFor="childName" className="text-sm font-medium text-gray-600">
@@ -212,6 +203,17 @@ export function SetupSheet({
         onSummaryChange={(v) => onChange('eventSummary', v)}
         onLearningWordsChange={(v) => onChange('learningWords', v)}
       />
+
+      {/* X17 B1 — real perception findings cascade in as Geist data chips,
+          placed directly ABOVE the capture-chips region (below the name field)
+          so the child-name field's position never depends on feed height:
+          nothing above it changes size when chips arrive. A min-height floor
+          holds whenever the feed renders, so only content below the feed can
+          shift — and only past 96px — matching the reserved CaptureChips box.
+          Whole block is flag-gated, so flag-off output stays byte-identical. */}
+      {CREATE_DISCOVERY_FLAG && (
+        <DiscoveryFeed chips={discoveryChips ?? []} reserve={stripPhase === 'reading'} />
+      )}
 
       {/* Capture chips — space is reserved while the librarian reads, and the
           rows rise into that same box on arrival (no layout shift below).
