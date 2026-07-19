@@ -90,3 +90,27 @@ describe('generateCoverHtml', () => {
     expect(html).toContain('Cover image not available');
   });
 });
+
+describe('composed covers (X17 A1/A5)', () => {
+  const page = (assetId: string, render: string) =>
+    ({ assetId, generatedImageUrl: render }) as never;
+
+  it('null coverAssetId + coverImageUrl resolves to the generated cover, hasTitlePage false', () => {
+    const { coverImageUrl, hasTitlePage } = resolveCoverImageUrl({
+      coverAssetId: null,
+      coverImageUrl: 'https://res.cloudinary.com/x/image/upload/v1/cover.png',
+      pages: [page('a1', 'https://res.cloudinary.com/x/image/upload/v1/p1.png')],
+    } as never);
+    expect(coverImageUrl).toBe('https://res.cloudinary.com/x/image/upload/v1/cover.png');
+    expect(hasTitlePage).toBe(false);
+  });
+
+  it('null coverAssetId + no generated cover falls back to the first page render', () => {
+    const { coverImageUrl } = resolveCoverImageUrl({
+      coverAssetId: null,
+      coverImageUrl: null,
+      pages: [page('a1', 'https://res.cloudinary.com/x/image/upload/v1/p1.png')],
+    } as never);
+    expect(coverImageUrl).toBe('https://res.cloudinary.com/x/image/upload/v1/p1.png');
+  });
+});

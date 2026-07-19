@@ -29,8 +29,11 @@ export async function generateLuluCover(
 
   try {
     const { coverImageUrl, hasTitlePage } = resolveCoverImageUrl(bookData);
-    if (!hasTitlePage) {
-      log.warn({ bookId: bookData.id }, 'No title page found, using first page as cover');
+    if (!hasTitlePage && !bookData.coverImageUrl) {
+      log.warn(
+        { bookId: bookData.id },
+        'No title page and no generated cover — using first page as cover',
+      );
     }
 
     const fontFace = buildCoverFontFace(options.fonts);
