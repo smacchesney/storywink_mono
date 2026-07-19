@@ -480,3 +480,28 @@ describe('scene anchor (X16 W1)', () => {
     expect(sheet).not.toContain("THIS PHOTO'S MOMENT");
   });
 });
+
+describe('come-alive directive (X16 W1)', () => {
+  const photoBase = {
+    style: 'vignette' as const,
+    pageText: 'Aria spun in the sunshine.',
+    bookTitle: "Aria's Big Day",
+    isTitlePage: false,
+    referenceImageCount: 1,
+    characterIdentity,
+    pageNumber: 3,
+  };
+
+  it('renders on photo pages when enabled', () => {
+    const prompt = createIllustrationPrompt({ ...photoBase, photoComeAlive: true });
+    expect(prompt).toContain('BRING THE MOMENT ALIVE');
+    expect(prompt).toContain('never a posed catalog shot');
+  });
+
+  it('absent when off / on non-photo anchors (byte-identical legacy)', () => {
+    expect(createIllustrationPrompt(photoBase)).not.toContain('BRING THE MOMENT ALIVE');
+    expect(
+      createIllustrationPrompt({ ...photoBase, contentAnchor: 'sheet', photoComeAlive: true }),
+    ).not.toContain('BRING THE MOMENT ALIVE');
+  });
+});

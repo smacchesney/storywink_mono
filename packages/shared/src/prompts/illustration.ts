@@ -82,6 +82,17 @@ export interface IllustrationPromptOptions {
   illustrationMood?: string | null;
   /** X16 W1: perception's {setting, action} for this page (fresh rows only) — photo-path scene anchor. */
   sceneAnchor?: { setting: string; action: string } | null;
+  /**
+   * PHOTO_COME_ALIVE_ENABLED (X16 W1, default absent/false = today's prompt
+   * byte-identical): on the photo path's interior pages, add ONE bounded
+   * directive licensing storybook liveliness INSIDE the photo's truth — pose,
+   * composition, people, clothing, and setting stay exactly as the photo shows
+   * them, but gestures, gazes, secondary motion, and expression emphasis are
+   * amplified one notch in the photo's own direction. Bridge pages (story-model
+   * scene) and avatar books (photo-less) never emit it. The worker threads it
+   * only when the flag is on.
+   */
+  photoComeAlive?: boolean;
 }
 
 // ----------------------------------
@@ -512,6 +523,16 @@ function buildSceneAnchorSection(
   return `THIS PHOTO'S MOMENT (keep it recognizable): ${moment}. The place and the action above must survive stylization — simplify them into the art style, never erase or replace them.`;
 }
 
+/** X16 W1: "photo pins, amplify within" — bounded liveliness license for photo pages. */
+function buildComeAliveSection(enabled: boolean | undefined): string | null {
+  if (!enabled) return null;
+  return (
+    `BRING THE MOMENT ALIVE (within the photo's truth): keep pose, composition, people, clothing, and setting exactly as the photo shows them — then let the scene breathe: ` +
+    `readable gestures, gazes directed at the moment's focus, secondary motion in hair, clothing, water, and leaves, and expressions amplified one notch in the photo's own direction. ` +
+    `The result is a caught-mid-story storybook moment — never a posed catalog shot, never a re-composed scene.`
+  );
+}
+
 export function createIllustrationPrompt(opts: IllustrationPromptOptions): string {
   const style = getStyleDefinition(opts.style);
   const contentAnchor = opts.contentAnchor ?? 'photo';
@@ -640,6 +661,15 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
       ? buildSceneAnchorSection(opts.sceneAnchor)
       : null;
 
+  // 4e. PHOTO_COME_ALIVE_ENABLED (X16 W1): one bounded liveliness license on
+  //     the photo path's interior pages — "photo pins, amplify within". Same
+  //     guard shape as the scene anchor (photo path, never bridge). Flag
+  //     absent/off → photoComeAlive absent → null → assembly byte-identical.
+  const comeAliveSection =
+    contentAnchor === 'photo' && !opts.bridgeScene
+      ? buildComeAliveSection(opts.photoComeAlive)
+      : null;
+
   // 5. Cross-cutting: QC feedback (neutralized too — feedback text quoting a
   //    display name would smuggle the name prior right back in).
   const qcSection = neutralize(buildQCFeedbackSection(opts.qcFeedback));
@@ -656,6 +686,7 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
     livingToySection,
     moodSection,
     sceneAnchorSection,
+    comeAliveSection,
     qcSection,
     noTextSection,
   ]

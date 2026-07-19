@@ -37,6 +37,18 @@ export function storyIllusMoodEnabled(
   return value === 'true' || value === '1';
 }
 
+/**
+ * PHOTO_COME_ALIVE_ENABLED (X16 W1): photo-path interiors get one bounded
+ * directive licensing storybook energy INSIDE the photo's truth. Prompt-only;
+ * default OFF; rollback is unset.
+ */
+export function photoComeAliveEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  const value = (env.PHOTO_COME_ALIVE_ENABLED || '').trim().toLowerCase();
+  return value === 'true' || value === '1';
+}
+
 export interface DeterministicStoryChecks {
   budget: WordBudgetProblem[];
   garbles: NameGarble[];

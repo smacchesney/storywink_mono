@@ -10,7 +10,7 @@ import type { IllustrationInput, IllustrationProvider } from '../lib/illustrator
 import { maybeGeminiFallback } from '../lib/illustrators/fallback.js';
 import { shouldNeutralizeNames } from '../lib/illustrators/neutralize.js';
 import { toysComeAliveEnabled } from '../lib/toys-come-alive.js';
-import { storyIllusMoodEnabled } from '../lib/story-quality.js';
+import { storyIllusMoodEnabled, photoComeAliveEnabled } from '../lib/story-quality.js';
 import type { EscalationJobFields } from '../lib/escalation.js';
 import { v2 as cloudinary } from 'cloudinary';
 import pino from 'pino';
@@ -707,6 +707,8 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
             },
           }
         : {}),
+      // PHOTO_COME_ALIVE_ENABLED (X16 W1): bounded liveliness on photo pages.
+      photoComeAlive: photoComeAliveEnabled() && !isBridgePage && !isAvatarBook,
     };
 
     logger.info(
