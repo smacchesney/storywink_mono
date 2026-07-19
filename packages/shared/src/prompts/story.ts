@@ -286,6 +286,16 @@ export interface StoryGenerationInput {
     namedVia?: 'chip' | 'childName' | 'fallback'; // provenance of `name`; chip/childName = parent-confirmed, must appear verbatim
   }[]; // From the perception pass — who actually appears where
   /**
+   * X17 A2 (ENSEMBLE_BOOKS_ENABLED): 'ensemble' replaces the single-star
+   * character instruction with one crew block — every confirmed member woven
+   * in equally, rotating spotlight, shared refrain. Absent/'star' keeps
+   * today's prompt byte-identical. PHOTO builder only — never the avatar
+   * builder (its cast rides buildAvatarCastForPrompt). NOTE: do not write the
+   * literal crew-header string in this comment — the Step 4 grep asserts it
+   * appears exactly once in this file, inside the prompt builder.
+   */
+  castMode?: 'star' | 'ensemble';
+  /**
    * BRIDGE_PAGES_ENABLED: maximum bridge pages the model may propose
    * (code-enforced again in the worker). 0/undefined = no bridge section in
    * the prompt and no bridgePages in the response schema — the legacy prompt
@@ -375,65 +385,106 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
   parts.push({ text: '--- End Storyboard ---' });
 
   // ---------- INSTRUCTIONS ----------
-  // Build character instruction dynamically based on provided names
-  let characterInstruction: string;
-  if (input.childName) {
-    characterInstruction = `  - The main character is named "${input.childName}". Use this name directly in the story text.`;
-    if (input.additionalCharacters && input.additionalCharacters.length > 0) {
-      const charList = input.additionalCharacters
-        .map((c) => `"${c.name}" (${c.relationship})`)
-        .join(', ');
-      characterInstruction += `\n  - Other characters who may appear: ${charList}. Identify which characters appear in each photo and use their names appropriately.`;
-    }
-  } else {
-    // Fallback to generic terms if no child name provided
-    characterInstruction = `  - Use descriptive terms like "the child", "the little one", etc.`;
-  }
+  // X17 A2: ensemble books star EVERYONE — one CREW block instead of a star
+  // line plus supporting cast. Star books (castMode absent/'star') keep the
+  // pre-X17 build byte-identically.
+  const ensembleCrew =
+    input.castMode === 'ensemble' && input.charactersInPhotos?.length
+      ? input.charactersInPhotos
+      : null;
 
-  // Supporting-cast weaving: the perception pass knows who appears on which
-  // pages, so recurring family members get real roles instead of cameos.
-  // Characters with an empty appearsOnPages survived a photo change but their
-  // exact pages are unknown — they get the page-less variant instead of
-  // asserted (possibly wrong) page numbers.
-  if (input.charactersInPhotos?.length) {
-    const supporting = input.charactersInPhotos.filter((c) => c.role !== 'main_child');
-    if (supporting.length > 0) {
-      characterInstruction += `\n  - SUPPORTING CAST (from the actual photos — weave them in, don't just mention them):`;
-      for (const c of supporting) {
-        const isPet = c.role === 'pet';
-        const isObject = c.role === 'companion_object';
-        const confirmedName =
-          c.namedVia === 'chip' || c.namedVia === 'childName'
-            ? ` The parent confirmed this ${isObject ? "object's" : isPet ? "pet's" : "person's"} name: call ${isObject ? 'it' : 'them'} "${c.name}" in the story text.`
-            : '';
-        const petNote = isPet
-          ? ` They are the family's animal companion — keep them a real animal (sounds, wags, nuzzles), never a talking character.`
+  let characterInstruction: string;
+  if (ensembleCrew) {
+    characterInstruction = `  - THE CREW (an ensemble book — it stars ALL of them equally, not one child with a supporting cast):`;
+    for (const c of ensembleCrew) {
+      const isPet = c.role === 'pet';
+      const isObject = c.role === 'companion_object';
+      const confirmedName =
+        c.namedVia === 'chip' || c.namedVia === 'childName'
+          ? ` The parent confirmed this ${isObject ? "object's" : isPet ? "pet's" : "person's"} name: call ${isObject ? 'it' : 'them'} "${c.name}" in the story text.`
           : '';
-        const objectNote = isObject
-          ? input.toysComeAlive
-            ? ` It is the child's beloved toy, brought to life for this adventure — it moves, plays, reacts, and has feelings of its own, adventuring right beside ${input.childName || 'the child'}; it may even speak when the story wants it to. A true companion in the action, yet it stays recognizably itself — the same beloved toy, never turned into a person. Let it share the emotional beats: comfort at the quiet moment, cheer at the landing.`
-            : ` It is the child's beloved object — it can be hugged, carried, dropped, lost and found, tucked in; it never walks, talks, or acts on its own. Let it anchor emotional beats (comfort at the quiet moment, joining the landing).`
-          : '';
-        const supportingRole = isObject
-          ? `Weave it in as a treasured companion`
-          : `Give them a real supporting role`;
-        if (c.appearsOnPages.length > 0) {
-          characterInstruction += `\n    - ${c.name} (${c.role.replace(/_/g, ' ')}) appears on page(s) ${c.appearsOnPages.join(', ')}. ${supportingRole}${
-            isObject
-              ? ` where it appears.`
-              : ` in the story: introduce them naturally when they first appear, involve them in at least one emotional beat (a shared laugh, a steadying hand, a discovery together), and if they are present near the end, include them in the landing.`
-          }${confirmedName}${petNote}${objectNote}`;
-        } else {
-          characterInstruction += `\n    - ${c.name} (${c.role.replace(/_/g, ' ')}) appears in several of the photos (exact pages unknown). ${supportingRole}${
-            isObject
-              ? ` wherever you can SEE it in the storyboard images.`
-              : ` wherever you can SEE them in the storyboard images: introduce them naturally where they first appear, and involve them in at least one emotional beat.`
-          }${confirmedName}${petNote}${objectNote}`;
-        }
+      const petNote = isPet
+        ? ` They are the family's animal companion — keep them a real animal (sounds, wags, nuzzles), never a talking character.`
+        : '';
+      const objectNote = isObject
+        ? input.toysComeAlive
+          ? ` It is the crew's beloved toy, brought to life for this adventure — it moves, plays, reacts, and has feelings of its own; it stays recognizably itself, never turned into a person.`
+          : ` It is the crew's beloved object — it can be hugged, carried, dropped, lost and found, tucked in; it never walks, talks, or acts on its own.`
+        : '';
+      const where =
+        c.appearsOnPages.length > 0
+          ? `appears on page(s) ${c.appearsOnPages.join(', ')}`
+          : `appears in several of the photos (exact pages unknown — include them only where you can SEE them in the storyboard images)`;
+      characterInstruction += `\n    - ${c.name} (${c.role.replace(/_/g, ' ')}) ${where}.${confirmedName}${petNote}${objectNote}`;
+    }
+    characterInstruction += [
+      ``,
+      `    - Rotate the spotlight: EVERY named crew member drives at least one page's beat — an action, a discovery, a decision that moves the story forward (not a wave from the background).`,
+      `    - No member disappears: where a member's photos allow it, never leave a named member out of the text for a long stretch — bring them back within a page or two of their photo appearances.`,
+      `    - The refrain belongs to the whole crew: let different members carry or answer it across the book.`,
+      `    - Never invent appearances: a character speaks or acts on a page ONLY if they are actually on that page (or plausibly just off-frame on an adjacent one).`,
+    ].join('\n');
+  } else {
+    // ---- pre-X17 star branch, UNCHANGED ----
+    // Build character instruction dynamically based on provided names
+    if (input.childName) {
+      characterInstruction = `  - The main character is named "${input.childName}". Use this name directly in the story text.`;
+      if (input.additionalCharacters && input.additionalCharacters.length > 0) {
+        const charList = input.additionalCharacters
+          .map((c) => `"${c.name}" (${c.relationship})`)
+          .join(', ');
+        characterInstruction += `\n  - Other characters who may appear: ${charList}. Identify which characters appear in each photo and use their names appropriately.`;
       }
-      characterInstruction += `\n    - Never invent appearances: a character speaks or acts on a page ONLY if they are actually on that page (or plausibly just off-frame on an adjacent one).`;
-      if (supporting.some((c) => c.appearsOnPages.length === 0)) {
-        characterInstruction += ` For characters whose exact pages are unknown, include them only on pages where you can actually see them in the storyboard images.`;
+    } else {
+      // Fallback to generic terms if no child name provided
+      characterInstruction = `  - Use descriptive terms like "the child", "the little one", etc.`;
+    }
+
+    // Supporting-cast weaving: the perception pass knows who appears on which
+    // pages, so recurring family members get real roles instead of cameos.
+    // Characters with an empty appearsOnPages survived a photo change but their
+    // exact pages are unknown — they get the page-less variant instead of
+    // asserted (possibly wrong) page numbers.
+    if (input.charactersInPhotos?.length) {
+      const supporting = input.charactersInPhotos.filter((c) => c.role !== 'main_child');
+      if (supporting.length > 0) {
+        characterInstruction += `\n  - SUPPORTING CAST (from the actual photos — weave them in, don't just mention them):`;
+        for (const c of supporting) {
+          const isPet = c.role === 'pet';
+          const isObject = c.role === 'companion_object';
+          const confirmedName =
+            c.namedVia === 'chip' || c.namedVia === 'childName'
+              ? ` The parent confirmed this ${isObject ? "object's" : isPet ? "pet's" : "person's"} name: call ${isObject ? 'it' : 'them'} "${c.name}" in the story text.`
+              : '';
+          const petNote = isPet
+            ? ` They are the family's animal companion — keep them a real animal (sounds, wags, nuzzles), never a talking character.`
+            : '';
+          const objectNote = isObject
+            ? input.toysComeAlive
+              ? ` It is the child's beloved toy, brought to life for this adventure — it moves, plays, reacts, and has feelings of its own, adventuring right beside ${input.childName || 'the child'}; it may even speak when the story wants it to. A true companion in the action, yet it stays recognizably itself — the same beloved toy, never turned into a person. Let it share the emotional beats: comfort at the quiet moment, cheer at the landing.`
+              : ` It is the child's beloved object — it can be hugged, carried, dropped, lost and found, tucked in; it never walks, talks, or acts on its own. Let it anchor emotional beats (comfort at the quiet moment, joining the landing).`
+            : '';
+          const supportingRole = isObject
+            ? `Weave it in as a treasured companion`
+            : `Give them a real supporting role`;
+          if (c.appearsOnPages.length > 0) {
+            characterInstruction += `\n    - ${c.name} (${c.role.replace(/_/g, ' ')}) appears on page(s) ${c.appearsOnPages.join(', ')}. ${supportingRole}${
+              isObject
+                ? ` where it appears.`
+                : ` in the story: introduce them naturally when they first appear, involve them in at least one emotional beat (a shared laugh, a steadying hand, a discovery together), and if they are present near the end, include them in the landing.`
+            }${confirmedName}${petNote}${objectNote}`;
+          } else {
+            characterInstruction += `\n    - ${c.name} (${c.role.replace(/_/g, ' ')}) appears in several of the photos (exact pages unknown). ${supportingRole}${
+              isObject
+                ? ` wherever you can SEE it in the storyboard images.`
+                : ` wherever you can SEE them in the storyboard images: introduce them naturally where they first appear, and involve them in at least one emotional beat.`
+            }${confirmedName}${petNote}${objectNote}`;
+          }
+        }
+        characterInstruction += `\n    - Never invent appearances: a character speaks or acts on a page ONLY if they are actually on that page (or plausibly just off-frame on an adjacent one).`;
+        if (supporting.some((c) => c.appearsOnPages.length === 0)) {
+          characterInstruction += ` For characters whose exact pages are unknown, include them only on pages where you can actually see them in the storyboard images.`;
+        }
       }
     }
   }

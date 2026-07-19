@@ -533,3 +533,58 @@ describe('ARC ROLE staleness suppression in the prompt (X16 W1)', () => {
     expect(prompt).toContain('ARC ROLE: closing.');
   });
 });
+
+describe('ensemble crew block (X17 A2)', () => {
+  const crewInput = () => {
+    const input = structuredClone(baseInput);
+    input.castMode = 'ensemble';
+    input.childName = 'Maya';
+    input.charactersInPhotos = [
+      {
+        characterId: 'child_2',
+        name: 'Maya',
+        role: 'sibling',
+        appearsOnPages: [1, 2],
+        namedVia: 'childName',
+      },
+      {
+        characterId: 'child_1',
+        name: 'Leo',
+        role: 'main_child',
+        appearsOnPages: [1],
+        namedVia: 'chip',
+      },
+      { characterId: 'pet_1', name: 'the dog', role: 'pet', appearsOnPages: [2] },
+    ];
+    return input;
+  };
+
+  it('replaces the star line + SUPPORTING CAST with THE CREW', () => {
+    const prompt = promptText(crewInput());
+    expect(prompt).toContain('THE CREW');
+    expect(prompt).toContain('Rotate the spotlight');
+    expect(prompt).toContain('The refrain belongs to the whole crew');
+    expect(prompt).toContain('Maya (sibling) appears on page(s) 1, 2');
+    expect(prompt).not.toContain('SUPPORTING CAST');
+    expect(prompt).not.toContain('The main character is named');
+  });
+
+  it('keeps pet grounding and the two-actors-per-page rule', () => {
+    const prompt = promptText(crewInput());
+    expect(prompt).toContain('never a talking character');
+    expect(prompt).toContain('At most TWO named characters ACT');
+  });
+
+  it('empty roster degrades to the star branch even in ensemble mode', () => {
+    const input = crewInput();
+    input.charactersInPhotos = undefined;
+    expect(promptText(input)).toContain('The main character is named "Maya"');
+  });
+
+  it("castMode 'star'/absent stays byte-identical", () => {
+    const star = structuredClone(baseInput);
+    const explicit = structuredClone(baseInput);
+    explicit.castMode = 'star';
+    expect(promptText(explicit)).toBe(promptText(star));
+  });
+});
