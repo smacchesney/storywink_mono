@@ -20,6 +20,7 @@ import AvatarMatchChip from '@/components/create/setup/AvatarMatchChip';
 import CaptureChips, { CaptureQuestion } from '@/components/create/setup/CaptureChips';
 import type { DiscoveryChip, RosterCharacterLike } from '@/components/create/setup/discovery-feed';
 import DiscoveryFeed from '@/components/create/setup/DiscoveryFeed';
+import ThemeCard from '@/components/create/setup/ThemeCard';
 import { CREATE_DISCOVERY_FLAG } from '@/lib/discovery-client';
 
 export interface SetupFormState {
@@ -213,6 +214,13 @@ export function SetupSheet({
           Whole block is flag-gated, so flag-off output stays byte-identical. */}
       {CREATE_DISCOVERY_FLAG && (
         <DiscoveryFeed chips={discoveryChips ?? []} reserve={stripPhase === 'reading'} />
+      )}
+
+      {/* X17 B2 — the feed's finale: the perception theme as a tap-to-edit
+          Excalifont card. Renders with the feed (flag-gated) so flag-off output
+          stays byte-identical; hidden entirely when perception found no theme. */}
+      {CREATE_DISCOVERY_FLAG && (
+        <ThemeCard themeLine={form.themeLine} onChange={(v) => onChange('themeLine', v)} />
       )}
 
       {/* Capture chips — space is reserved while the librarian reads, and the
