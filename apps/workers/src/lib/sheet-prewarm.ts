@@ -18,9 +18,10 @@ export async function prepareIdentityForSheetPrewarm(params: {
   artStyle: string;
   captureQuestions: CaptureAnswerLike[];
   childName: string | null;
+  starCharacterId: string | null;
   refresh: (identity: CharacterIdentity) => Promise<CharacterIdentity | null>;
 }): Promise<CharacterIdentity | null> {
-  const { artStyle, captureQuestions, childName, refresh } = params;
+  const { artStyle, captureQuestions, childName, starCharacterId, refresh } = params;
   let identity = params.identity;
 
   if (!identity?.characters?.length) return null;
@@ -29,6 +30,7 @@ export async function prepareIdentityForSheetPrewarm(params: {
     characters: identity.characters,
     captureQuestions,
     childName,
+    starCharacterId,
   });
   if (merge.changed) {
     identity = { ...identity, characters: merge.characters };

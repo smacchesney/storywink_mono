@@ -34,6 +34,7 @@ describe('prepareIdentityForSheetPrewarm (X15 fix layer)', () => {
         artStyle: 'vignette',
         captureQuestions: [],
         childName: null,
+        starCharacterId: null,
         refresh: refreshNever,
       }),
     ).toBeNull();
@@ -43,6 +44,7 @@ describe('prepareIdentityForSheetPrewarm (X15 fix layer)', () => {
         artStyle: 'vignette',
         captureQuestions: [],
         childName: null,
+        starCharacterId: null,
         refresh: refreshNever,
       }),
     ).toBeNull();
@@ -57,6 +59,7 @@ describe('prepareIdentityForSheetPrewarm (X15 fix layer)', () => {
       artStyle: 'vignette',
       captureQuestions: [{ id: 'q1', characterId: 'char_2', answer: 'Milo' }],
       childName: 'Kai',
+      starCharacterId: null,
       refresh,
     });
     expect(prepared?.characters[0]?.name).toBe('Milo');
@@ -74,6 +77,7 @@ describe('prepareIdentityForSheetPrewarm (X15 fix layer)', () => {
       artStyle: 'kawaii',
       captureQuestions: [],
       childName: null,
+      starCharacterId: null,
       refresh,
     });
     expect(refresh).toHaveBeenCalledTimes(1);
@@ -90,6 +94,7 @@ describe('prepareIdentityForSheetPrewarm (X15 fix layer)', () => {
       artStyle: 'vignette',
       captureQuestions: [],
       childName: null,
+      starCharacterId: null,
       refresh,
     });
     expect(refresh).toHaveBeenCalledTimes(1);
@@ -101,6 +106,7 @@ describe('prepareIdentityForSheetPrewarm (X15 fix layer)', () => {
       artStyle: 'kawaii',
       captureQuestions: [],
       childName: null,
+      starCharacterId: null,
       refresh: vi.fn(async () => null),
     });
     expect(prepared).toBeNull();
@@ -116,6 +122,7 @@ describe('prepareIdentityForSheetPrewarm (X15 fix layer)', () => {
       artStyle: 'kawaii',
       captureQuestions: [{ id: 'q1', characterId: 'char_2', answer: 'Milo' }],
       childName: null,
+      starCharacterId: null,
       refresh,
     });
     const passed = refresh.mock.calls[0][0] as CharacterIdentity;

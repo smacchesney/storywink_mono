@@ -69,6 +69,9 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         select: {
           bookType: true,
           childName: true,
+          starCharacterId: true,
+          castMode: true,
+          castMemberIds: true,
           captureQuestions: true,
           characterIdentity: true,
           characterReferences: true,
@@ -96,6 +99,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         artStyle,
         captureQuestions: (book.captureQuestions as CaptureAnswerLike[] | null) ?? [],
         childName: book.childName,
+        starCharacterId: book.starCharacterId,
         refresh: (i) => refreshStyleTranslations(i, artStyle, bookId),
       });
       if (!identity) {
@@ -205,6 +209,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         characters: existingIdentity.characters,
         captureQuestions: (book.captureQuestions as CaptureAnswerLike[] | null) ?? [],
         childName: book.childName,
+        starCharacterId: book.starCharacterId,
       });
       if (merge.changed) {
         existingIdentity = { ...existingIdentity, characters: merge.characters };
@@ -416,6 +421,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
           characters: characterIdentity!.characters,
           captureQuestions: (book.captureQuestions as CaptureAnswerLike[] | null) ?? [],
           childName: book.childName,
+          starCharacterId: book.starCharacterId,
         });
         if (freshMerge.changed) {
           characterIdentity = { ...characterIdentity!, characters: freshMerge.characters };

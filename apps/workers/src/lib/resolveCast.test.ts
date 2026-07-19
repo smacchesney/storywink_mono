@@ -281,3 +281,66 @@ describe('mergeCastNames — companion objects', () => {
     expect(obj.namedVia).toBe('chip');
   });
 });
+
+describe('star binding (X17 A2)', () => {
+  const roster = () => [
+    { characterId: 'child_1', role: 'main_child', name: null },
+    { characterId: 'child_2', role: 'sibling', name: null },
+  ];
+
+  it('binds childName to starCharacterId when present', () => {
+    const { characters, changed } = mergeCastNames({
+      characters: roster(),
+      captureQuestions: [],
+      childName: 'Maya',
+      starCharacterId: 'child_2',
+    });
+    expect(changed).toBe(true);
+    expect(characters.find((c) => c.characterId === 'child_2')).toMatchObject({
+      name: 'Maya',
+      namedVia: 'childName',
+    });
+    expect(characters.find((c) => c.characterId === 'child_1')?.name).toBeNull();
+  });
+
+  it('falls back to main_child when starCharacterId is stale or absent', () => {
+    const stale = mergeCastNames({
+      characters: roster(),
+      captureQuestions: [],
+      childName: 'Maya',
+      starCharacterId: 'ghost_9',
+    });
+    expect(stale.characters.find((c) => c.role === 'main_child')?.name).toBe('Maya');
+    const absent = mergeCastNames({
+      characters: roster(),
+      captureQuestions: [],
+      childName: 'Maya',
+    });
+    expect(absent.characters.find((c) => c.role === 'main_child')?.name).toBe('Maya');
+  });
+
+  it('a naming chip may now name the demoted main_child', () => {
+    const { characters, consumedQuestionIds } = mergeCastNames({
+      characters: roster(),
+      captureQuestions: [{ id: 'q1', answer: 'Leo', characterId: 'child_1' }],
+      childName: 'Maya',
+      starCharacterId: 'child_2',
+    });
+    expect(characters.find((c) => c.characterId === 'child_1')).toMatchObject({
+      name: 'Leo',
+      namedVia: 'chip',
+    });
+    expect(consumedQuestionIds).toEqual(['q1']);
+  });
+
+  it('chip answers aimed at the star stay unconsumed (the sheet name wins)', () => {
+    const { characters, consumedQuestionIds } = mergeCastNames({
+      characters: roster(),
+      captureQuestions: [{ id: 'q1', answer: 'Bobby', characterId: 'child_2' }],
+      childName: 'Maya',
+      starCharacterId: 'child_2',
+    });
+    expect(characters.find((c) => c.characterId === 'child_2')?.name).toBe('Maya');
+    expect(consumedQuestionIds).toEqual([]);
+  });
+});

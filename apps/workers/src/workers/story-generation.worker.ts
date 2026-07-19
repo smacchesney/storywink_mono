@@ -851,6 +851,7 @@ export async function processStoryGeneration(
         characters: mergedCharacters,
         captureQuestions,
         childName: book.childName,
+        starCharacterId: book.starCharacterId,
       });
       mergedCharacters = merge.characters;
       consumedQuestionIds = new Set(merge.consumedQuestionIds);
@@ -1870,6 +1871,7 @@ async function processSinglePageTextGeneration(
       characters: rawIdentity.characters,
       captureQuestions,
       childName: book.childName,
+      starCharacterId: book.starCharacterId,
     });
     consumedQuestionIds = new Set(merge.consumedQuestionIds);
     cast = resolveCastEntries(

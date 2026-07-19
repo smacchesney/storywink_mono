@@ -100,8 +100,8 @@ export function isGenericCategoryAnswer(answer: string): boolean {
 /**
  * Merge chip answers + childName into the roster.
  *
- * - main_child gets `childName` (namedVia 'childName') — applied LAST so the
- *   setup sheet always wins for the star.
+ * - The STAR (starCharacterId when set, else the main_child role) gets childName
+ *   (namedVia 'childName') — applied LAST so the setup sheet always wins for the star.
  * - Each answered naming question joins on characterId. A generic-category
  *   answer ("Family friend") refines the ROLE and never sets a name; a
  *   child-vocabulary answer ("Grandma", "Our dog", free-typed names) becomes
@@ -118,10 +118,22 @@ export function mergeCastNames<T extends MergeableCharacter>(input: {
   characters: T[];
   captureQuestions: CaptureAnswerLike[] | null | undefined;
   childName: string | null | undefined;
+  /**
+   * X17 A2: perception characterId the parent picked as the star. When set
+   * (and still in the roster), childName binds to THIS character instead of
+   * the main_child role guess — the wrong-sibling fix. Stale/absent ids fall
+   * back to main_child, so pre-X17 callers are byte-identical.
+   */
+  starCharacterId?: string | null;
 }): MergeCastResult<T> {
   const characters = input.characters.map((c) => ({ ...c }));
   const consumedQuestionIds: string[] = [];
   let changed = false;
+
+  const starTarget =
+    (input.starCharacterId
+      ? characters.find((c) => c.characterId === input.starCharacterId)
+      : undefined) ?? characters.find((c) => c.role === 'main_child');
 
   const applyAnswer = (target: T, rawAnswer: string): void => {
     const answer = rawAnswer.trim();
@@ -150,20 +162,19 @@ export function mergeCastNames<T extends MergeableCharacter>(input: {
 
   for (const q of answered) {
     const target = characters.find((c) => c.characterId === q.characterId);
-    // A failed join, and a naming answer pointing at main_child (the star's
-    // name comes from the setup sheet), are both left unconsumed.
-    if (target && target.role !== 'main_child') {
+    // A failed join, and a naming answer pointing at the STAR (whose name
+    // comes from the setup sheet), are both left unconsumed.
+    if (target && target !== starTarget) {
       applyAnswer(target, q.answer!);
       consumedQuestionIds.push(q.id);
     }
   }
 
   const childName = input.childName?.trim();
-  if (childName) {
-    const main = characters.find((c) => c.role === 'main_child');
-    if (main && (main.name !== childName || main.namedVia !== 'childName')) {
-      main.name = childName;
-      main.namedVia = 'childName';
+  if (childName && starTarget) {
+    if (starTarget.name !== childName || starTarget.namedVia !== 'childName') {
+      starTarget.name = childName;
+      starTarget.namedVia = 'childName';
       changed = true;
     }
   }
