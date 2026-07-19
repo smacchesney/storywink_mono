@@ -103,10 +103,16 @@ export async function reconcileAvatarClothing(params: {
         },
         { timeout: ANALYSIS_OPENAI_TIMEOUT_MS },
       );
-      const parsed = JSON.parse(result.output_text ?? '{}') as { styleTranslation?: string };
+      const parsed = JSON.parse(result.output_text || '{}') as { styleTranslation?: string };
       rewrittenStyle = parsed.styleTranslation?.trim() || null;
       const original = character.styleTranslation;
-      if (!rewrittenStyle || rewrittenStyle.length > original.length * 2 + 200) {
+      // Bound both directions: a ballooned rewrite AND a degenerate stub
+      // ("Orange tee.") that dropped the art-technique prose are rejected.
+      if (
+        !rewrittenStyle ||
+        rewrittenStyle.length > original.length * 2 + 200 ||
+        rewrittenStyle.length < original.length / 3
+      ) {
         logger.warn(
           { avatarId, rewrittenLength: rewrittenStyle?.length ?? 0 },
           'Clothing reconcile skipped: styleTranslation rewrite empty or out of bounds',
