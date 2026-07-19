@@ -612,15 +612,18 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
         );
         const coverRegenNeeded = Boolean(
           qcResult &&
-            coverRegenEligible({
-              coverJudged: Boolean(coverForQc),
-              coverResult: qcResult.coverResult,
-              qcRound,
-              titlePageRequeued,
-            }),
+          coverRegenEligible({
+            coverJudged: Boolean(coverForQc),
+            coverResult: qcResult.coverResult,
+            qcRound,
+            titlePageRequeued,
+          }),
         );
 
-        if (qcResult && ((!qcResult.passed && qcResult.failedPageIds.length > 0) || coverRegenNeeded)) {
+        if (
+          qcResult &&
+          ((!qcResult.passed && qcResult.failedPageIds.length > 0) || coverRegenNeeded)
+        ) {
           const nextRound = qcRound + 1;
           qcResult.qcRound = nextRound;
 

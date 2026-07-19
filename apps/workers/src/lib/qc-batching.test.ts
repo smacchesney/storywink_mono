@@ -429,9 +429,9 @@ describe('coverRegenEligible (X15: regen rides the requeue flow)', () => {
   });
 
   it('skips a passed cover and a missing/unjudged cover', () => {
-    expect(
-      coverRegenEligible({ ...base, coverResult: { ...failedCover(), passed: true } }),
-    ).toBe(false);
+    expect(coverRegenEligible({ ...base, coverResult: { ...failedCover(), passed: true } })).toBe(
+      false,
+    );
     expect(coverRegenEligible({ ...base, coverResult: null })).toBe(false);
     expect(coverRegenEligible({ ...base, coverJudged: false })).toBe(false);
   });

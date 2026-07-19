@@ -288,11 +288,11 @@ export function coverRegenEligible(params: {
   const { coverJudged, coverResult, qcRound, titlePageRequeued } = params;
   return Boolean(
     coverJudged &&
-      coverResult &&
-      !coverResult.passed &&
-      !isQcErrorFeedback(coverResult.suggestedPromptAdditions) &&
-      qcRound === 0 &&
-      !titlePageRequeued,
+    coverResult &&
+    !coverResult.passed &&
+    !isQcErrorFeedback(coverResult.suggestedPromptAdditions) &&
+    qcRound === 0 &&
+    !titlePageRequeued,
   );
 }
 
