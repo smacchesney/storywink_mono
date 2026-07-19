@@ -25,7 +25,10 @@ import {
   mergeCaptureQuestions,
 } from '@/components/create/setup/star-ask';
 import { shouldExtract } from '@/components/create/setup/ramble';
-import { mergeExtractionFacts } from '@/components/create/setup/extraction-merge';
+import {
+  mergeExtractionFacts,
+  applyExtractionToQuestions,
+} from '@/components/create/setup/extraction-merge';
 import type { RambleExtraction } from '@/lib/ramble-extract';
 import {
   allPagesAnalyzed,
@@ -456,29 +459,36 @@ export default function SetupPage() {
       clearTimeout(timeout);
       if (!res.ok || !isMountedRef.current) return;
       const facts = (await res.json()) as RambleExtraction;
-      const { changed } = mergeExtractionFacts(
-        form,
-        facts,
-        roster,
-        {
-          location: t('factLocationQ'),
-          highlight: t('factHighlightQ'),
-          mishap: t('factMishapQ'),
-          childSaid: t('factChildSaidQ'),
-          nameQuestionFor: (descriptor) => t('memberNameQuestion', { descriptor }),
-        },
-        {
-          childName: touched.current.childName,
-          themeLine: touched.current.themeLine,
-          castMode: touched.current.castMode,
-        },
-      );
+      const labels = {
+        location: t('factLocationQ'),
+        highlight: t('factHighlightQ'),
+        mishap: t('factMishapQ'),
+        childSaid: t('factChildSaidQ'),
+        nameQuestionFor: (descriptor: string) => t('memberNameQuestion', { descriptor }),
+      };
+      const { changed } = mergeExtractionFacts(form, facts, roster, labels, {
+        childName: touched.current.childName,
+        themeLine: touched.current.themeLine,
+        castMode: touched.current.castMode,
+      });
       if (Object.keys(changed).length === 0) return;
-      // Spread ONLY the changed fields onto the freshest state — the call
-      // took seconds, and a mood tap (or any other edit) made mid-flight
-      // must survive the merge landing.
-      setForm((prev) => ({ ...prev, ...changed }) as SetupFormState);
-      patcherRef.current?.queue(changed);
+      // Scalars carry their own touched guards, so spreading them onto the
+      // freshest state is safe. captureQuestions is different: the merge above
+      // was computed against a `form` snapshot that is now seconds stale, and a
+      // parent may have answered a naming chip mid-flight. Re-run the pure row
+      // logic INSIDE the updater against `prev.captureQuestions` so the parent's
+      // answer wins. `nextCq` is assigned deterministically from `prev`, so a
+      // StrictMode double-invoke assigns the same value (no queue call here).
+      const changedScalars: Record<string, unknown> = { ...changed };
+      delete changedScalars.captureQuestions;
+      let nextCq: CaptureQuestion[] | undefined;
+      setForm((prev) => {
+        const applied = applyExtractionToQuestions(prev.captureQuestions, facts, roster, labels);
+        nextCq = applied === prev.captureQuestions ? undefined : applied;
+        return { ...prev, ...changedScalars, captureQuestions: applied } as SetupFormState;
+      });
+      const patchBody = { ...changedScalars, ...(nextCq ? { captureQuestions: nextCq } : {}) };
+      if (Object.keys(patchBody).length > 0) patcherRef.current?.queue(patchBody);
     } catch {
       // Extraction is optional — silence on failure/timeout.
     }

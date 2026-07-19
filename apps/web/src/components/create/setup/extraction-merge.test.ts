@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { mergeExtractionFacts, type FactQuestionLabels } from './extraction-merge';
+import {
+  mergeExtractionFacts,
+  applyExtractionToQuestions,
+  type FactQuestionLabels,
+} from './extraction-merge';
 import type { SetupFormState } from './SetupSheet';
+import type { CaptureQuestion } from '@/components/create/setup/CaptureChips';
 import type { RosterCharacterLike } from './discovery-feed';
 import type { RambleExtraction } from '@/lib/ramble-extract';
 
@@ -112,5 +117,70 @@ describe('mergeExtractionFacts', () => {
       themeLine: null,
     };
     expect(mergeExtractionFacts(form, empty, roster, labels, untouched).changed).toEqual({});
+  });
+});
+
+describe('applyExtractionToQuestions', () => {
+  it('parent answered during extraction round-trip → answer preserved', () => {
+    // The extraction started against a blank naming row, but by the time the
+    // facts land the parent has typed their own answer. Applying against the
+    // FRESH rows must not clobber it — parent input always wins.
+    const freshRows: CaptureQuestion[] = [
+      {
+        id: 'q1',
+        question: 'Who is the woman?',
+        options: ['Grandma'],
+        characterId: 'adult_1',
+        kind: 'naming',
+        answer: 'Auntie Bea', // parent answered mid-flight
+      },
+    ];
+    const applied = applyExtractionToQuestions(freshRows, facts, roster, labels);
+    // Extraction wanted 'Nana Ray' for adult_1, but the parent's answer stays.
+    expect(applied.find((q) => q.characterId === 'adult_1')?.answer).toBe('Auntie Bea');
+    // The new person (child_1) with no fresh row still gets appended.
+    expect(applied.find((q) => q.characterId === 'child_1')?.answer).toBe('Leo');
+  });
+
+  it('dedupe by id: a ramble_* row already present is updated in place, not duplicated', () => {
+    const existing: CaptureQuestion[] = [
+      {
+        id: 'ramble_name_child_1',
+        question: 'What should we call the child?',
+        options: [],
+        characterId: 'child_1',
+        kind: 'naming',
+        answer: null, // still blank → fillable
+      },
+      {
+        id: 'ramble_location',
+        question: labels.location,
+        options: [],
+        characterId: null,
+        kind: 'other',
+        answer: 'Old Beach',
+      },
+    ];
+    const applied = applyExtractionToQuestions(existing, facts, roster, labels);
+    // Naming row matched by characterId → filled in place, no second child_1 row.
+    expect(applied.filter((q) => q.characterId === 'child_1')).toHaveLength(1);
+    expect(applied.find((q) => q.characterId === 'child_1')?.answer).toBe('Leo');
+    // Fact row matched by id → updated in place, no duplicate ramble_location.
+    expect(applied.filter((q) => q.id === 'ramble_location')).toHaveLength(1);
+    expect(applied.find((q) => q.id === 'ramble_location')?.answer).toBe('Camber Sands');
+  });
+
+  it('returns the same reference when nothing lands', () => {
+    const empty: RambleExtraction = {
+      starName: null,
+      people: [],
+      location: null,
+      highlight: null,
+      mishap: null,
+      childSaid: null,
+      themeLine: null,
+    };
+    const rows = form.captureQuestions;
+    expect(applyExtractionToQuestions(rows, empty, roster, labels)).toBe(rows);
   });
 });
