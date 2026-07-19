@@ -34,6 +34,18 @@ describe('createPatchDebouncer', () => {
     await expect(vi.advanceTimersByTimeAsync(BOOK_PATCH_DEBOUNCE_MS)).resolves.not.toThrow();
   });
 
+  it('flush sends a pending clear ({field: null}) before the timer fires', async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const d = createPatchDebouncer(send);
+    d.queue({ themeLine: null });
+    await d.flush();
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith({ themeLine: null });
+    // Pending is empty: no further send when the debounce window elapses.
+    await vi.advanceTimersByTimeAsync(BOOK_PATCH_DEBOUNCE_MS * 2);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
   it('dispose drops pending fields', async () => {
     const send = vi.fn().mockResolvedValue(undefined);
     const d = createPatchDebouncer(send);

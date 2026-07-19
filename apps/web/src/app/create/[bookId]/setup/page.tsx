@@ -437,9 +437,12 @@ export default function SetupPage() {
     }
     setIsSubmitting(true);
     try {
-      // The submit PATCH is the full-form source of truth; drop any pending
-      // debounce so a racing partial PATCH can't land after it.
-      patcherRef.current?.dispose();
+      // Flush any pending debounce first (awaited, so it lands before the
+      // submit PATCH — no race). This matters for clears: buildSubmitPatchBody
+      // omits empty fields, so a field cleared within the debounce window would
+      // otherwise keep its stale DB value. flush() early-returns when nothing
+      // is pending, so the common path adds no request.
+      await patcherRef.current?.flush();
       const patchBody = buildSubmitPatchBody(form);
 
       const patchRes = await fetch(`/api/book/${bookId}`, {
