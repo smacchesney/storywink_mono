@@ -74,6 +74,10 @@ export interface PhotoAnalysisResponse {
   sceneContext: string;
   eventSummary: string;
   suggestedTitle: string;
+  /** X17 A4: distilled theme phrase, <= 8 words ("a splashy beach day with Grandma"). Optional-on-read for pre-X17 stored payloads. */
+  suggestedTheme?: string;
+  /** X17 A4: 1-3 photo numbers (1-N, best first) that would anchor the COVER. */
+  coverHeroPages?: number[];
   captureQuestions: CaptureQuestion[];
 }
 
@@ -118,8 +122,12 @@ Be ruthlessly specific — an illustrator will use this as the canonical referen
 ## 3. The story brief ("eventSummary")
 ONE warm sentence a parent would recognize as their day: "Emma's first trip to the beach with Grandma — nervous about the waves at first, then couldn't stop splashing." Ground it ONLY in what you can actually see or reasonably infer. ${lang === 'ja' ? 'Write eventSummary in natural Japanese.' : ''}
 
+## 3b. The theme line ("suggestedTheme") and cover heroes ("coverHeroPages")
+- suggestedTheme: distill the day into ONE short phrase of 8 words or fewer — concrete and warm, like "a splashy beach day with Grandma". A phrase, not a sentence. ${lang === 'ja' ? 'Write suggestedTheme in natural Japanese.' : ''}
+- coverHeroPages: pick 1-3 photo numbers (1-${input.storyPages.length}) that would anchor a great COVER — the star child's face clear and well-lit, an iconic moment of the day. Best first.
+
 ## 4. A suggested title ("suggestedTitle")
-Short (2-6 words), warm, specific to these photos. ${lang === 'ja' ? 'In Japanese, hiragana/katakana only, no kanji.' : ''} Avoid generic titles like "A Special Day".
+Short (2-6 words), warm, specific to these photos, and aligned with the theme you distilled in suggestedTheme. ${lang === 'ja' ? 'In Japanese, hiragana/katakana only, no kanji.' : ''} Avoid generic titles like "A Special Day".
 
 ## 5. Micro-questions for the parent ("captureQuestions", 3 maximum)
 Ask ONLY what the photos cannot tell you and what would most change the story. The parent answers with one tap, so each question needs 2-4 SHORT tappable options (the UI adds "skip" automatically, and on naming questions it also adds a "Someone else…" free-text option — do not include either). ${lang === 'ja' ? 'Write questions and options in natural Japanese.' : ''}
@@ -227,6 +235,15 @@ export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
     sceneContext: { type: 'string' },
     eventSummary: { type: 'string' },
     suggestedTitle: { type: 'string' },
+    suggestedTheme: {
+      type: 'string',
+      description: 'Distilled theme phrase, <= 8 words ("a splashy beach day with Grandma")',
+    },
+    coverHeroPages: {
+      type: 'array',
+      items: { type: 'number' },
+      description: '1-3 photo numbers (best first) that would anchor the cover',
+    },
     captureQuestions: {
       type: 'array',
       items: {
@@ -249,10 +266,29 @@ export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
     'sceneContext',
     'eventSummary',
     'suggestedTitle',
+    'suggestedTheme',
+    'coverHeroPages',
     'captureQuestions',
   ],
   additionalProperties: false,
 } as const;
+
+/**
+ * X17 A4: map perception's positional coverHeroPages onto assetIds (asset-
+ * stable, like the appearsOnAssetIds stamps — survives reorders). Unknown or
+ * photo-less positions drop; order preserved (best first); deduped; cap 3.
+ */
+export function heroAssetIds(
+  coverHeroPages: number[] | undefined,
+  assetIdByPosition: Map<number, string | null>,
+): string[] {
+  const out: string[] = [];
+  for (const n of coverHeroPages ?? []) {
+    const assetId = assetIdByPosition.get(n);
+    if (assetId && !out.includes(assetId)) out.push(assetId);
+  }
+  return out.slice(0, 3);
+}
 
 // ---------------------------------------------------------------------------
 // Subject detection (X7 batch studio) — roster-only perception variant
