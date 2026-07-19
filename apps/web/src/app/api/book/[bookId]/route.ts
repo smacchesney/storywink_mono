@@ -66,7 +66,9 @@ const updateBookSchema = z
     tone: z.enum(STORY_MOODS).nullable().optional(),
     theme: z.string().max(100).nullable().optional(),
     // The experience-capture fields the setup surface fills before generation.
-    eventSummary: z.string().max(500).nullable().optional(),
+    // 1500 matches the ramble cap (X17 B4) — the field doubles as the
+    // parent's full account of the day, not just a one-line brief.
+    eventSummary: z.string().max(1500).nullable().optional(),
     learningWords: z
       .array(z.object({ word: z.string().min(1).max(30) }))
       .max(4)
