@@ -120,6 +120,20 @@ function imageCountText(
       `${range} ${sheetCount === 1 ? 'is a CHARACTER SHEET' : 'are CHARACTER SHEETS'} (2x2 turnaround grid${sheetCount === 1 ? '' : 's'} of the main character${sheetCount === 1 ? '' : 's'} — the canonical reference for face, hair, skin tone, and proportions)`,
     );
     next += sheetCount;
+    // A4 (X16 W1): bind each sheet to its named character on the photo path
+    // too — the misbinding failure is identical to the avatar case. Only when
+    // the roster matches the sheets sent; a mismatch would misbind. Placed
+    // AFTER the advance so `next - sheetCount` recovers image 1's first sheet
+    // (image 2 here); inserting before it would compute image 0.
+    if (sheetRoster && sheetRoster.length === sheetCount) {
+      const firstSheetImage = next - sheetCount;
+      const bindings = sheetRoster
+        .map((s, i) => `image ${firstSheetImage + i} = ${s.name}, ${s.species}`)
+        .join('; ');
+      roles.push(
+        `each sheet is one specific named character — ${bindings} — so draw each character to match their OWN named sheet and never swap identities between sheets`,
+      );
+    }
   }
   if (interiorRenderCount > 0) {
     roles.push(

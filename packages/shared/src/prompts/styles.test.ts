@@ -126,3 +126,63 @@ describe('style bibles are frozen byte-for-byte', () => {
     });
   }
 });
+
+// A4 name↔sheet binding on the PHOTO path (X16 W1): photo-path pages that ship
+// character sheets now bind each sheet to its named character, exactly like the
+// avatar (sheet-anchored) branch. image 1 is the photo, so the sheets map to
+// images 2..N+1. Without a roster (or on a count mismatch) the wording must
+// stay byte-identical to the generic pre-binding line.
+describe('photo-path name↔sheet binding (X16 W1)', () => {
+  const photoSheetCtx = {
+    bookTitle: 'T',
+    pageText: 'p',
+    illustrationNotes: null,
+    referenceImageCount: 0,
+    language: 'en',
+    characterSheetCount: 2,
+    interiorRenderCount: 0,
+    contentAnchor: 'photo' as const,
+  };
+
+  // The exact generic ordering line the photo branch emits with NO roster —
+  // the byte-for-byte regression pin. A roster only APPENDS a binding clause
+  // before the style line; this generic line must survive verbatim and stand
+  // alone whenever no (matching) roster is supplied.
+  const GENERIC_PHOTO_SHEET_LINE =
+    "using the 3 images provided, in this order: image 1 shows the scene/subjects (this page's photo); images 2-3 are CHARACTER SHEETS (2x2 turnaround grids of the main characters — the canonical reference for face, hair, skin tone, and proportions); the final 0 images show the artistic style to apply.";
+
+  it('binds sheets to names when a roster is provided', () => {
+    const prompt = STYLE_LIBRARY.vignette.buildInteriorPrompt({
+      ...photoSheetCtx,
+      sheetRoster: [
+        { name: 'Emma', species: 'a young girl' },
+        { name: 'Grandma', species: 'a grown woman' },
+      ],
+    });
+    expect(prompt).toContain('image 2 = Emma, a young girl');
+    expect(prompt).toContain('image 3 = Grandma, a grown woman');
+    expect(prompt).toContain('never swap identities between sheets');
+    // The generic sheet role line is still present verbatim; the binding is an
+    // ADDED clause, so image 1 stays the photo and the sheets are images 2-3.
+    expect(prompt).toContain(
+      'images 2-3 are CHARACTER SHEETS (2x2 turnaround grids of the main characters',
+    );
+  });
+
+  it('leaves the photo branch byte-identical when NO roster is supplied', () => {
+    const prompt = STYLE_LIBRARY.vignette.buildInteriorPrompt(photoSheetCtx);
+    expect(prompt).toContain(GENERIC_PHOTO_SHEET_LINE);
+    expect(prompt).not.toContain('image 2 =');
+    expect(prompt).not.toContain('never swap identities between sheets');
+  });
+
+  it('omits the binding (stays byte-identical) when the roster count mismatches', () => {
+    const prompt = STYLE_LIBRARY.vignette.buildInteriorPrompt({
+      ...photoSheetCtx,
+      sheetRoster: [{ name: 'Emma', species: 'a young girl' }], // 1 ≠ 2 sheets
+    });
+    expect(prompt).toContain(GENERIC_PHOTO_SHEET_LINE);
+    expect(prompt).not.toContain('image 2 =');
+    expect(prompt).not.toContain('never swap identities between sheets');
+  });
+});

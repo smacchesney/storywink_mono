@@ -603,21 +603,23 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
 
     // A4 name↔sheet map: bind each sheet ACTUALLY SENT (anchor first, then the
     // remaining refs) to its named character + a compact species phrase, so
-    // the model never guesses which unnamed grid is whom. Sheet-anchored
-    // (avatar) renders only — image 1 is a photo on every other path.
-    // fetchedSheetMeta is still in full sent order (the shift() above popped
-    // sheetRefs, not this list), so its order matches image 1..N.
-    const sheetRoster = sheetAnchored
-      ? fetchedSheetMeta.map((meta) => {
-          const rosterChar = characterIdentity?.characters?.find(
-            (c) => c.characterId === meta.characterId,
-          );
-          return {
-            name: meta.name || rosterChar?.name || meta.characterId,
-            species: speciesLineFor(rosterChar, kindFromRole(rosterChar?.role)),
-          };
-        })
-      : undefined;
+    // the model never guesses which unnamed grid is whom. On sheet-anchored
+    // (avatar) renders image 1 IS the anchor sheet; fetchedSheetMeta is still
+    // in full sent order (the shift() above popped sheetRefs, not this list),
+    // so its order matches image 1..N.
+    // X16 W1: photo pages bind too — fetchedSheetMeta aligns with images 2..N there.
+    const sheetRoster =
+      sheetAnchored || sheetRefs.length > 0
+        ? fetchedSheetMeta.map((meta) => {
+            const rosterChar = characterIdentity?.characters?.find(
+              (c) => c.characterId === meta.characterId,
+            );
+            return {
+              name: meta.name || rosterChar?.name || meta.characterId,
+              species: speciesLineFor(rosterChar, kindFromRole(rosterChar?.role)),
+            };
+          })
+        : undefined;
 
     // For the primary illustration, always use story-style prompt (isTitlePage: false).
     // Cover pages get a separate cover-style illustration generated afterwards.
