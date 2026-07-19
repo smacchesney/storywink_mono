@@ -1078,10 +1078,11 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         // Cover binding (CHARACTER_SHEETS_ENABLED): the cover call receives
         // the character sheet(s) plus the approved interior title-page render
         // as references, so the two renders of the same photo stop diverging.
-        const interiorRenderRef =
-          (characterSheetsEnabled() || isAvatarBook) && interiorRenderBuffer
-            ? await resizeForReference(interiorRenderBuffer)
-            : null;
+        // X16 W1: the interior render exists unconditionally on the title-page
+        // job — cover coherence must not ride the sheets flag.
+        const interiorRenderRef = interiorRenderBuffer
+          ? await resizeForReference(interiorRenderBuffer)
+          : null;
 
         // AVATAR_STORY covers: there is no title photo — the approved
         // interior render of page 1 anchors the cover repaint, and ALL cast
