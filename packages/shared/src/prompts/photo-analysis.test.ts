@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { scopeCaptureQuestions, CaptureQuestion, ScopeCharacterLike } from './photo-analysis.js';
+import {
+  scopeCaptureQuestions,
+  createPhotoAnalysisPrompt,
+  PHOTO_ANALYSIS_RESPONSE_SCHEMA,
+  CaptureQuestion,
+  ScopeCharacterLike,
+  PhotoAnalysisInput,
+} from './photo-analysis.js';
 
 const q = (overrides: Partial<CaptureQuestion>): CaptureQuestion => ({
   id: 'q1',
@@ -129,6 +136,33 @@ describe('scopeCaptureQuestions', () => {
       [character({})],
     );
     expect(result.map((x) => x.id)).toEqual(['other']);
+  });
+});
+
+describe('perception species + foreground (X16 W1)', () => {
+  // photo-analysis.test.ts has no prompt-builder fixture (it covers
+  // scopeCaptureQuestions only) — build a minimal PhotoAnalysisInput inline,
+  // satisfying exactly the required fields of the interface.
+  const minimalInput = (): PhotoAnalysisInput => ({
+    childName: null,
+    additionalCharacters: null,
+    artStyle: 'vignette',
+    language: 'en',
+    storyPages: [{ pageNumber: 1, assetId: 'a1', imageUrl: 'http://x/1.jpg' }],
+  });
+
+  it('prompt asks for species and isForeground', () => {
+    const prompt = createPhotoAnalysisPrompt(minimalInput());
+    expect(prompt).toContain('species');
+    expect(prompt).toContain('isForeground');
+  });
+
+  it('schema requires them on character entries', () => {
+    const charItems = PHOTO_ANALYSIS_RESPONSE_SCHEMA.properties.characters.items;
+    expect(charItems.properties.species).toBeDefined();
+    expect(charItems.properties.isForeground).toBeDefined();
+    expect(charItems.required as readonly string[]).toContain('species');
+    expect(charItems.required as readonly string[]).toContain('isForeground');
   });
 });
 
