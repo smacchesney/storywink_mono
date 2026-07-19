@@ -43,7 +43,9 @@ import { fetchImageInput } from './images.js';
 import { ANALYSIS_MODEL, ANALYSIS_OPENAI_TIMEOUT_MS } from '../config/models.js';
 import {
   MAX_SHEET_GENERATIONS_PER_BOOK,
+  MAX_SHEET_GENERATIONS_PER_BOOK_ENSEMBLE,
   SHEET_BUDGET_MS,
+  SHEET_BUDGET_MS_ENSEMBLE,
   STYLE_EXEMPLARS_FOR_SHEET,
   characterSheetsEnabled,
   parseCharacterReferences,
@@ -65,6 +67,8 @@ export interface EnsureCharacterSheetsParams {
   pages: PageWithAsset[];
   /** Raw Book.characterReferences Json value. */
   existingReferences: unknown;
+  /** X17 A3: confirmed ensemble member ids (null = solo/star path). */
+  ensembleMemberIds?: string[] | null;
   logger: Logger;
 }
 
@@ -83,9 +87,26 @@ interface SheetGenerationOutcome {
 export async function ensureCharacterSheets(
   params: EnsureCharacterSheetsParams,
 ): Promise<CharacterSheetRef[]> {
-  const { bookId, userId, artStyle, identity, pages, existingReferences, logger } = params;
+  const {
+    bookId,
+    userId,
+    artStyle,
+    identity,
+    pages,
+    existingReferences,
+    ensembleMemberIds,
+    logger,
+  } = params;
 
   if (!characterSheetsEnabled()) return [];
+
+  // X17 A3: ensemble books carry more sheets, so they get a larger wall-clock
+  // budget and generation cap; solo/star books keep the pre-X17 numbers.
+  const memberIds = ensembleMemberIds ?? null;
+  const budgetMs = memberIds ? SHEET_BUDGET_MS_ENSEMBLE : SHEET_BUDGET_MS;
+  const generationCap = memberIds
+    ? MAX_SHEET_GENERATIONS_PER_BOOK_ENSEMBLE
+    : MAX_SHEET_GENERATIONS_PER_BOOK;
 
   try {
     if (!identity?.characters?.length) {
@@ -107,7 +128,7 @@ export async function ensureCharacterSheets(
     }
 
     const entries = parseCharacterReferences(existingReferences);
-    const selected = selectSheetCharacters(identity.characters);
+    const selected = selectSheetCharacters(identity.characters, memberIds);
 
     if (selected.length === 0) {
       await trackEvent(
@@ -150,7 +171,7 @@ export async function ensureCharacterSheets(
       api_secret: process.env.CLOUDINARY_API_SECRET,
     });
 
-    const deadline = Date.now() + SHEET_BUDGET_MS;
+    const deadline = Date.now() + budgetMs;
     // Shared across characters; incremented synchronously before each await,
     // so the parallel tasks respect the book-wide hard cap.
     const attemptBudget = { used: 0 };
@@ -175,6 +196,7 @@ export async function ensureCharacterSheets(
           styleExemplarUrls: [...styleExemplarUrls],
           deadline,
           attemptBudget,
+          generationCap,
           logger,
         }),
       ),
@@ -210,7 +232,7 @@ export async function ensureCharacterSheets(
     // run (or a re-illustrate) reuses them for free.
     let budgetTimer: ReturnType<typeof setTimeout> | undefined;
     const budget = new Promise<'BUDGET_EXCEEDED'>((resolve) => {
-      budgetTimer = setTimeout(() => resolve('BUDGET_EXCEEDED'), SHEET_BUDGET_MS);
+      budgetTimer = setTimeout(() => resolve('BUDGET_EXCEEDED'), budgetMs);
     });
 
     const raced = await Promise.race([generationRun, budget]).finally(() => {
@@ -219,7 +241,7 @@ export async function ensureCharacterSheets(
 
     if (raced === 'BUDGET_EXCEEDED') {
       logger.warn(
-        { bookId, artStyle, budgetMs: SHEET_BUDGET_MS },
+        { bookId, artStyle, budgetMs },
         'Character sheet budget exceeded — proceeding sheetless (late results persist for reuse)',
       );
       generationRun.catch((error) =>
@@ -267,6 +289,8 @@ interface GenerateSheetParams {
   styleExemplarUrls: string[];
   deadline: number;
   attemptBudget: { used: number };
+  /** Book-wide generation cap (mode-scaled: solo vs ensemble). */
+  generationCap: number;
   logger: Logger;
 }
 
@@ -287,6 +311,7 @@ async function generateAndValidateSheet(
     styleExemplarUrls,
     deadline,
     attemptBudget,
+    generationCap,
     logger,
   } = params;
 
@@ -315,7 +340,7 @@ async function generateAndValidateSheet(
         );
         return { entry: null, attempts };
       }
-      if (attemptBudget.used >= MAX_SHEET_GENERATIONS_PER_BOOK) {
+      if (attemptBudget.used >= generationCap) {
         logger.warn(
           { bookId, characterId: character.characterId },
           'Book-wide sheet generation cap reached',

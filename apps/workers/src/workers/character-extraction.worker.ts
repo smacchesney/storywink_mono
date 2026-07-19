@@ -24,6 +24,7 @@ import {
   convertHeicToJpeg,
   remapCharacterPages,
 } from '@storywink/shared/utils';
+import { ensembleMemberIds } from '../lib/ensemble.js';
 import { mergeCastNames, CaptureAnswerLike } from '../lib/resolveCast.js';
 import { prepareIdentityForSheetPrewarm } from '../lib/sheet-prewarm.js';
 import { mergeLinkedAvatarSheets } from '../lib/avatar-sheets.js';
@@ -112,6 +113,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         identity,
         pages: book.pages,
         existingReferences: book.characterReferences,
+        ensembleMemberIds: ensembleMemberIds(book),
         logger,
       });
       logger.info({ bookId, artStyle, sheetCount: sheets.length }, 'Sheet pre-warm complete');
@@ -301,6 +303,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         identity: characterIdentity,
         pages: storyPages,
         existingReferences: book.characterReferences,
+        ensembleMemberIds: ensembleMemberIds(book),
         logger,
       });
 
@@ -463,6 +466,8 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
           where: { id: bookId },
           select: {
             characterReferences: true,
+            castMode: true,
+            castMemberIds: true,
             pages: {
               orderBy: { index: 'asc' },
               select: {
@@ -481,6 +486,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         identity: characterIdentity,
         pages: bookForSheets.pages,
         existingReferences: bookForSheets.characterReferences,
+        ensembleMemberIds: ensembleMemberIds(bookForSheets),
         logger,
       });
     }

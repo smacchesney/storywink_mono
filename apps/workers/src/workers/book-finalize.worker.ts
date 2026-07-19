@@ -36,7 +36,8 @@ import {
 } from '../lib/qc-batching.js';
 import { assembleQcBatchParts, pageFeedFor, type QcAssemblyPage } from '../lib/qc-assembly.js';
 import { toysComeAliveEnabled } from '../lib/toys-come-alive.js';
-import { characterSheetsEnabled, sheetRefsForStyle } from '../lib/character-sheets.js';
+import { characterSheetsEnabled, sheetCapFor, sheetRefsForStyle } from '../lib/character-sheets.js';
+import { ensembleMemberIds } from '../lib/ensemble.js';
 import { mergeLinkedAvatarSheets } from '../lib/avatar-sheets.js';
 import {
   escalationModel,
@@ -480,7 +481,12 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
             artStyle: book.artStyle,
             bookType: book.bookType,
             base: sheetsEnabled
-              ? sheetRefsForStyle(book.characterReferences, book.artStyle, characterIdentity)
+              ? sheetRefsForStyle(
+                  book.characterReferences,
+                  book.artStyle,
+                  characterIdentity,
+                  sheetCapFor(ensembleMemberIds(book)),
+                )
               : [],
             logger,
           })) ??
