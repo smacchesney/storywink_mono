@@ -291,8 +291,13 @@ export async function generateAvatarSheet(
         provider: provider.name,
         model: provider.modelId,
         validated: true,
+        // "none" is the validator's no-clothing sentinel, not an outfit —
+        // never reconcile typicalClothing to it (telemetry still sees the
+        // mismatch via the verdict log).
         clothingMismatch:
-          verdict.clothingMatchesDescription === false && verdict.observedClothing
+          verdict.clothingMatchesDescription === false &&
+          verdict.observedClothing &&
+          verdict.observedClothing.toLowerCase() !== 'none'
             ? { observedClothing: verdict.observedClothing }
             : null,
       };

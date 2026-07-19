@@ -517,7 +517,9 @@ async function validateSheet(params: ValidateSheetParams): Promise<{
     passed: Boolean(parsed.passed),
     notes: parsed.notes ?? '',
     clothingMismatch:
-      parsed.clothingMatchesDescription === false && parsed.observedClothing?.trim()
+      parsed.clothingMatchesDescription === false &&
+      parsed.observedClothing?.trim() &&
+      parsed.observedClothing.trim().toLowerCase() !== 'none'
         ? { observedClothing: parsed.observedClothing.trim() }
         : null,
   };

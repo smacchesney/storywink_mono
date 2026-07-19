@@ -245,16 +245,20 @@ export function createSheetValidationPrompt(input: {
       `then 1 candidate 2x2 character model sheet, ` +
       `then ${styleRefCount} art style exemplar image(s) for the "${artStyle}" style.`,
     sheetCharacterBlock(character),
-    character.typicalClothing && character.typicalClothing !== 'none'
-      ? `EXPECTED CLOTHING (from the stored identity): ${character.typicalClothing}`
-      : null,
     `Evaluate the candidate sheet:`,
     `1. sameCharacter: Is the character on the sheet recognizably the SAME child as in the photos (hair color/style, skin tone, distinguishing features)? Judge against the photos and the description above.`,
     `2. allPanelsConsistent: Do all four panels depict the same character with identical features, proportions, and outfit?`,
     `3. styleMatches: Does the sheet's rendering match the art style exemplars (line work, palette, construction method)?`,
     `4. noTextArtifacts: Is the sheet free of any text, labels, captions, watermarks, and obvious anatomical errors (wrong finger count, fused features)?`,
     `Set passed=true only if ALL four checks pass. Describe any failure precisely in notes.`,
-    `Separately — a REPORT, never part of passed: set clothingMatchesDescription to whether the sheet's clothing matches the EXPECTED CLOTHING above (garment types and colors; true when no expected clothing was given), and set observedClothing to a one-line plain description of the clothing actually shown on the sheet ("none" if the character wears none).`,
+    // Placed BELOW the pass rubric on purpose: no pass/fail check may read
+    // the expected clothing as part of "the description above" — a clothing
+    // disagreement must never brick sheet generation.
+    `Separately — a REPORT that is never part of passed: ${
+      character.typicalClothing && character.typicalClothing !== 'none'
+        ? `the character's stored clothing description is "${character.typicalClothing}". Set clothingMatchesDescription to whether the sheet's clothing matches it (garment types and colors).`
+        : `no stored clothing description was given — set clothingMatchesDescription to true.`
+    } Set observedClothing to a one-line plain description of the clothing actually shown on the sheet ("none" if the character wears none).`,
   ]
     .filter(Boolean)
     .join('\n\n');

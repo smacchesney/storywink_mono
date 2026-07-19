@@ -61,6 +61,13 @@ export function buildStyleTranslationRewritePrompt(
  * itself in prompts). Never throws — a failed reconcile only logs; the
  * rendition stays READY.
  */
+const STYLE_TRANSLATION_REWRITE_SCHEMA = {
+  type: 'object',
+  properties: { styleTranslation: { type: 'string' } },
+  required: ['styleTranslation'],
+  additionalProperties: false,
+} as const;
+
 export async function reconcileAvatarClothing(params: {
   openai: OpenAI;
   avatarId: string;
@@ -72,34 +79,57 @@ export async function reconcileAvatarClothing(params: {
   try {
     const avatar = await prisma.avatar.findUnique({ where: { id: avatarId } });
     const identity = avatar?.identity as StoredIdentity | null;
-    if (!identity) return;
+    if (!avatar || !identity) return;
     const character = ('character' in identity ? identity.character : identity) as ClothingCharacter;
     if (!character) return;
 
     let rewrittenStyle: string | null = null;
     if (typeof character.styleTranslation === 'string' && character.styleTranslation.trim()) {
+      // Strict schema output: a preamble-wrapped or refusal reply must never
+      // be persisted as the styleTranslation (it would corrupt every future
+      // sheet/cutout/book prompt for this avatar).
       const result = await openai.responses.create(
         {
           model: ANALYSIS_MODEL,
           input: buildStyleTranslationRewritePrompt(character.styleTranslation, observedClothing),
+          text: {
+            format: {
+              type: 'json_schema',
+              name: 'style_translation_rewrite',
+              strict: true,
+              schema: STYLE_TRANSLATION_REWRITE_SCHEMA as unknown as Record<string, unknown>,
+            },
+          },
         },
         { timeout: ANALYSIS_OPENAI_TIMEOUT_MS },
       );
-      rewrittenStyle = result.output_text?.trim() || null;
-      if (!rewrittenStyle) {
+      const parsed = JSON.parse(result.output_text ?? '{}') as { styleTranslation?: string };
+      rewrittenStyle = parsed.styleTranslation?.trim() || null;
+      const original = character.styleTranslation;
+      if (!rewrittenStyle || rewrittenStyle.length > original.length * 2 + 200) {
         logger.warn(
-          { avatarId },
-          'Clothing reconcile skipped: styleTranslation rewrite returned empty',
+          { avatarId, rewrittenLength: rewrittenStyle?.length ?? 0 },
+          'Clothing reconcile skipped: styleTranslation rewrite empty or out of bounds',
         );
         return;
       }
     }
 
     const patched = applyClothingToIdentity(identity, observedClothing, rewrittenStyle);
-    await prisma.avatar.update({
-      where: { id: avatarId },
+    // Compare-and-set on updatedAt: the read→LLM→write window spans seconds,
+    // and a concurrent identity writer (relearn DbNull, a parallel style's
+    // fresh extraction) must win over this reconcile, not be clobbered by it.
+    const updated = await prisma.avatar.updateMany({
+      where: { id: avatarId, updatedAt: avatar.updatedAt },
       data: { identity: patched as unknown as object },
     });
+    if (updated.count === 0) {
+      logger.warn(
+        { avatarId },
+        'Clothing reconcile skipped: avatar changed concurrently (stale read)',
+      );
+      return;
+    }
     await trackEvent(
       prisma,
       {
