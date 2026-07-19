@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { BookStatus, Page, Book } from '@prisma/client';
 import { Storydust } from '@/components/ui/storydust';
 import { MASCOT_CAT_FLOATING } from '@/lib/mascots';
+import { CREATE_DISCOVERY_FLAG } from '@/lib/discovery-client';
 
 // Import the new components
 import PageTracker from '@/components/create/review/PageTracker';
@@ -67,7 +68,7 @@ function ReviewPageContent() {
 
   // Get bookId from URL query parameter
   const bookIdFromUrl = searchParams.get('bookId');
-  const peekMode = searchParams.get('peek') === '1';
+  const peekMode = CREATE_DISCOVERY_FLAG && searchParams.get('peek') === '1';
   const playful = useLocale() === 'ja' ? 'font-japanese' : 'font-playful';
 
   // State hooks
@@ -480,6 +481,11 @@ function ReviewPageContent() {
     setIsStartingIllustration(true);
 
     try {
+      // A 409 from paint-now (NOT_WAITING/ALREADY_PAINTING) means the book
+      // flipped ILLUSTRATING in the tap gap — success, not an error. Remember
+      // it: the legacy start below will then 409 too, and that pair reads as
+      // "already painting", not a red toast.
+      let peekRaced = false;
       if (peekMode) {
         const peekRes = await fetch(`/api/book/${bookIdToUse}/peek`, {
           method: 'POST',
@@ -490,6 +496,7 @@ function ReviewPageContent() {
           router.push(`/create/${bookIdToUse}/setup`);
           return;
         }
+        if (peekRes.status === 409) peekRaced = true;
         // 409/500: fall through to the legacy start below — never strand.
       }
       const response = await fetch('/api/generate/illustrations', {
@@ -498,6 +505,13 @@ function ReviewPageContent() {
         body: JSON.stringify({ bookId: bookIdToUse }),
       });
       if (!response.ok && response.status !== 202) {
+        // Raced peek + a 409 here: painting already started. Surface it as
+        // info and let the peek poll route the parent — no error toast. Any
+        // other failure shape (a genuine PARTIAL/FAILED retry) still errors.
+        if (peekRaced && response.status === 409) {
+          toast.message(t('peekStarting'));
+          return;
+        }
         const errorData = await response
           .json()
           .catch(() => ({ message: 'Unknown error occurred' }));
