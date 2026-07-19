@@ -19,6 +19,7 @@ import type { StripPhase } from '@/components/create/setup/strip-phase';
 import AvatarMatchChip from '@/components/create/setup/AvatarMatchChip';
 import CaptureChips, { CaptureQuestion } from '@/components/create/setup/CaptureChips';
 import type { DiscoveryChip, RosterCharacterLike } from '@/components/create/setup/discovery-feed';
+import { CREATE_DISCOVERY_FLAG } from '@/lib/discovery-client';
 
 export interface SetupFormState {
   childName: string;
@@ -132,6 +133,7 @@ export function SetupSheet({
           onReorder={onReorder}
           bookId={bookId}
           onPhotosChanged={onPhotosChanged}
+          reading={CREATE_DISCOVERY_FLAG && stripPhase === 'reading'}
         />
       </section>
 
