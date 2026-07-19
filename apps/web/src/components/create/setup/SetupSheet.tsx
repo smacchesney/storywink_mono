@@ -19,6 +19,7 @@ import type { StripPhase } from '@/components/create/setup/strip-phase';
 import AvatarMatchChip from '@/components/create/setup/AvatarMatchChip';
 import CaptureChips, { CaptureQuestion } from '@/components/create/setup/CaptureChips';
 import type { DiscoveryChip, RosterCharacterLike } from '@/components/create/setup/discovery-feed';
+import DiscoveryFeed from '@/components/create/setup/DiscoveryFeed';
 import { CREATE_DISCOVERY_FLAG } from '@/lib/discovery-client';
 
 export interface SetupFormState {
@@ -90,6 +91,7 @@ export function SetupSheet({
   showNameError,
   bookId,
   mainCharacterId,
+  discoveryChips,
   onReorder,
   onPhotosChanged,
   onChange,
@@ -142,6 +144,11 @@ export function SetupSheet({
       {stripPhase !== 'hidden' && (
         <LibrarianStrip phase={stripPhase} questionCount={form.captureQuestions.length} />
       )}
+
+      {/* X17 B1 — real perception findings cascade in as Geist data chips.
+          Renders in normal flow (no blocking overlay); [] until analysis lands
+          keeps this null, so flag-off output stays byte-identical. */}
+      {CREATE_DISCOVERY_FLAG && <DiscoveryFeed chips={discoveryChips ?? []} />}
 
       {/* Child name — the one required field */}
       <section className="flex flex-col gap-1.5">
