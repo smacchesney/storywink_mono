@@ -110,6 +110,37 @@ describe('mergeCaptureQuestions', () => {
     const out = mergeCaptureQuestions([], local);
     expect(out.map((r) => r.id)).toEqual(['name_child_1', 'name_child_2']);
   });
+
+  it('preserves local ramble_* rows the server has not echoed yet (B4)', () => {
+    const server = [q('perc_1')];
+    const local: CaptureQuestion[] = [
+      q('perc_1'),
+      { id: 'ramble_location', question: 'Where', options: [], answer: 'Camber Sands' },
+      {
+        id: 'ramble_name_adult_1',
+        question: 'Who',
+        options: [],
+        characterId: 'adult_1',
+        answer: 'Nana',
+      },
+    ];
+    const out = mergeCaptureQuestions(server, local);
+    expect(out.map((r) => r.id)).toEqual(['perc_1', 'ramble_location', 'ramble_name_adult_1']);
+  });
+
+  it('dedupes once the server echoes a ramble_* id, server version wins', () => {
+    const server = [
+      q('perc_1'),
+      { id: 'ramble_location', question: 'Where', options: [], answer: 'Camber Sands' },
+    ];
+    const local = [
+      q('perc_1'),
+      { id: 'ramble_location', question: 'Where', options: [], answer: 'the beach' },
+    ];
+    const out = mergeCaptureQuestions(server, local);
+    expect(out.map((r) => r.id)).toEqual(['perc_1', 'ramble_location']);
+    expect(out.find((r) => r.id === 'ramble_location')?.answer).toBe('Camber Sands');
+  });
 });
 
 describe('orderQuestions caps', () => {

@@ -24,6 +24,9 @@ import {
   ensureMemberNamingQuestions,
   mergeCaptureQuestions,
 } from '@/components/create/setup/star-ask';
+import { shouldExtract } from '@/components/create/setup/ramble';
+import { mergeExtractionFacts } from '@/components/create/setup/extraction-merge';
+import type { RambleExtraction } from '@/lib/ramble-extract';
 import {
   allPagesAnalyzed,
   arrivalStripPhase,
@@ -433,6 +436,54 @@ export default function SetupPage() {
     });
   }, [roster, form.captureQuestions, t]);
 
+  // X17 B4: ramble blur → extraction → fact merge. Optional garnish — every
+  // failure path is silent, and the 20/hr propose rate limit bounds cost.
+  const lastExtractRef = useRef<string | null>(null);
+  const handleRambleBlur = useCallback(async () => {
+    if (!CREATE_DISCOVERY_FLAG) return;
+    const text = form.eventSummary;
+    if (!shouldExtract(text, lastExtractRef.current)) return;
+    lastExtractRef.current = text.trim();
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12_000);
+      const res = await fetch('/api/story/propose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'extract', bookId, ramble: text.trim() }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (!res.ok || !isMountedRef.current) return;
+      const facts = (await res.json()) as RambleExtraction;
+      const { changed } = mergeExtractionFacts(
+        form,
+        facts,
+        roster,
+        {
+          location: t('factLocationQ'),
+          highlight: t('factHighlightQ'),
+          mishap: t('factMishapQ'),
+          childSaid: t('factChildSaidQ'),
+          nameQuestionFor: (descriptor) => t('memberNameQuestion', { descriptor }),
+        },
+        {
+          childName: touched.current.childName,
+          themeLine: touched.current.themeLine,
+          castMode: touched.current.castMode,
+        },
+      );
+      if (Object.keys(changed).length === 0) return;
+      // Spread ONLY the changed fields onto the freshest state — the call
+      // took seconds, and a mood tap (or any other edit) made mid-flight
+      // must survive the merge landing.
+      setForm((prev) => ({ ...prev, ...changed }) as SetupFormState);
+      patcherRef.current?.queue(changed);
+    } catch {
+      // Extraction is optional — silence on failure/timeout.
+    }
+  }, [bookId, form, roster, t]);
+
   // Refetch the book after photos are added/removed inline in the strip. Reuses
   // mergeBook, which respects parent edits (touched fields) and re-derives the
   // photo strip from the fresh page set.
@@ -567,6 +618,7 @@ export default function SetupPage() {
       onChange={handleChange}
       onPickStar={handlePickStar}
       onPickEveryone={handlePickEveryone}
+      onRambleBlur={handleRambleBlur}
       onSubmit={handleSubmit}
     />
   );

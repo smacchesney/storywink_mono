@@ -32,19 +32,29 @@ export function ensureMemberNamingQuestions(
   return [...questions, ...additions].slice(0, 10);
 }
 
+/** Local-only synthetic rows the poll must not drop before the PATCH echoes
+ * back: `name_` naming chips from "Everyone!" (X17 B3) and the `ramble_*`
+ * fact/naming rows from extraction (X17 B4). Both are injected without marking
+ * captureQuestions touched, so the merge — not the touched guard — protects them. */
+const SYNTHETIC_ID_PREFIXES = ['name_', 'ramble_'] as const;
+
+const isLocalSynthetic = (id: string): boolean =>
+  SYNTHETIC_ID_PREFIXES.some((prefix) => id.startsWith(prefix));
+
 /**
  * X17 B3 review fix — id-preserving merge for the perception poll.
  *
- * `handlePickEveryone` injects synthetic `name_<characterId>` naming rows into
- * local `captureQuestions` WITHOUT marking `touched.current.captureQuestions`
+ * `handlePickEveryone` injects synthetic `name_<characterId>` naming rows, and
+ * `handleRambleBlur` (B4) injects `ramble_*` fact/naming rows, into local
+ * `captureQuestions` WITHOUT marking `touched.current.captureQuestions`
  * (deliberate — so perception's own late-arriving questions can still merge).
  * The gap: while the poll is still live, a tick landing before the debounced
  * PATCH round-trips would otherwise replace the local list wholesale and
- * silently drop those naming chips.
+ * silently drop those synthetic rows.
  *
  * This keeps the server list as the base (server order, server wins on any id
- * collision) and re-appends only the local `name_` rows the server has not yet
- * echoed, in their local relative order. When no local `name_` rows exist the
+ * collision) and re-appends only the local synthetic rows the server has not
+ * yet echoed, in their local relative order. When no local synthetics exist the
  * server list is returned by reference — byte-identical to the legacy wholesale
  * replacement, so every pre-X17 book is unaffected.
  */
@@ -53,7 +63,7 @@ export function mergeCaptureQuestions(
   localQuestions: CaptureQuestion[],
 ): CaptureQuestion[] {
   const serverIds = new Set(serverQuestions.map((q) => q.id));
-  const survivors = localQuestions.filter((q) => q.id.startsWith('name_') && !serverIds.has(q.id));
+  const survivors = localQuestions.filter((q) => isLocalSynthetic(q.id) && !serverIds.has(q.id));
   if (survivors.length === 0) return serverQuestions;
   return [...serverQuestions, ...survivors];
 }
