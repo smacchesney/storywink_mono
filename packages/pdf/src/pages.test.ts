@@ -184,3 +184,25 @@ describe('assembleInteriorPages — count authority parity with calculatePrinted
     });
   }
 });
+
+describe('ensemble dedication + ending (X17 A2)', () => {
+  it('dedication and ending carry the crew name list', () => {
+    const book = makeBook(3);
+    Object.assign(book, {
+      castMode: 'ensemble',
+      castMemberIds: ['c1', 'c2', 'c3'],
+      characterIdentity: {
+        characters: [
+          { characterId: 'c1', name: 'Leo' },
+          { characterId: 'c2', name: 'Maya' },
+          { characterId: 'c3', name: 'Sam' },
+        ],
+      },
+    });
+    const pages = assembleInteriorPages(book);
+    const dedication = pages.find((p) => p.kind === 'dedication')!.html;
+    const ending = pages.find((p) => p.kind === 'ending')!.html;
+    expect(dedication).toContain('Leo, Maya &amp; Sam');
+    expect(ending).toContain('Leo, Maya &amp; Sam');
+  });
+});
