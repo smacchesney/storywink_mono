@@ -146,9 +146,13 @@ export function SetupSheet({
       )}
 
       {/* X17 B1 — real perception findings cascade in as Geist data chips.
-          Renders in normal flow (no blocking overlay); [] until analysis lands
-          keeps this null, so flag-off output stays byte-identical. */}
-      {CREATE_DISCOVERY_FLAG && <DiscoveryFeed chips={discoveryChips ?? []} />}
+          A stable min-height box is reserved while the strip is still reading
+          (reserve), so chips animate INTO it and the child-name field below
+          never shifts; the box collapses once reading settles with no chips.
+          Whole block is flag-gated, so flag-off output stays byte-identical. */}
+      {CREATE_DISCOVERY_FLAG && (
+        <DiscoveryFeed chips={discoveryChips ?? []} reserve={stripPhase === 'reading'} />
+      )}
 
       {/* Child name — the one required field */}
       <section className="flex flex-col gap-1.5">
