@@ -1,6 +1,9 @@
 import type { CaptureQuestion } from './CaptureChips';
 import { describeCharacter, type RosterCharacterLike } from './discovery-feed';
 
+// Matches the ensemble sheet/dedication cap of 4; keeps merged rows within the PATCH bound (≤3 server perception rows + 4 synthetics ≤ 10).
+export const MAX_MEMBER_NAMING_QUESTIONS = 4;
+
 /**
  * X17 B3 — when "Everyone!" is tapped, every unnamed member gets a naming
  * chip through the existing characterId-linked question flow. Questions the
@@ -13,8 +16,11 @@ export function ensureMemberNamingQuestions(
   questionFor: (descriptor: string) => string,
 ): CaptureQuestion[] {
   const covered = new Set(questions.filter((q) => q.characterId).map((q) => q.characterId));
+  const existingNaming = questions.filter((q) => q.id.startsWith('name_')).length;
+  const slots = Math.max(0, MAX_MEMBER_NAMING_QUESTIONS - existingNaming);
   const additions: CaptureQuestion[] = members
     .filter((m) => !m.name?.trim() && !covered.has(m.characterId))
+    .slice(0, slots)
     .map((m) => ({
       id: `name_${m.characterId}`,
       question: questionFor(describeCharacter(m)),

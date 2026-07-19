@@ -51,6 +51,25 @@ describe('ensureMemberNamingQuestions', () => {
     );
     expect(out).toHaveLength(10);
   });
+
+  it('caps synthetic naming rows at 4 for big-party ensembles', () => {
+    const members = Array.from({ length: 8 }, (_, i) => member(`child_${i}`, null));
+    const out = ensureMemberNamingQuestions([], members, (d) => d);
+    expect(out).toHaveLength(4);
+    expect(out.every((q) => q.id.startsWith('name_'))).toBe(true);
+  });
+
+  it('counts pre-existing name_ rows toward the 4-row cap', () => {
+    const existing: CaptureQuestion[] = [
+      { id: 'name_a', question: 'x', options: [], characterId: 'a', kind: 'naming', answer: null },
+      { id: 'name_b', question: 'x', options: [], characterId: 'b', kind: 'naming', answer: null },
+    ];
+    const members = Array.from({ length: 8 }, (_, i) => member(`child_${i}`, null));
+    const out = ensureMemberNamingQuestions(existing, members, (d) => d);
+    // 2 existing name_ rows leave only 2 synthetic slots → 4 naming rows total.
+    expect(out).toHaveLength(4);
+    expect(out.filter((q) => q.id.startsWith('name_child_'))).toHaveLength(2);
+  });
 });
 
 describe('mergeCaptureQuestions', () => {
