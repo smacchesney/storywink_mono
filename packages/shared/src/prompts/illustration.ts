@@ -306,6 +306,13 @@ function buildBridgeSceneSection(bridgeScene: BridgeScene | null | undefined): s
     `Location: ${bridgeScene.location}. Time of day: ${bridgeScene.timeOfDay}.`,
     props.length ? `Include these objects from the surrounding photos: ${props.join(', ')}.` : null,
     `Outfits: exactly as worn in the photo (image 1). The people must be instantly recognizable as the same people from the photo.`,
+    // X16 W1: mood + focus — the bridge has no photo, so these are its only
+    // emotional/compositional steer. Null-safe: pre-X16 stored scenes lack the
+    // keys, so the access is falsy and the line is dropped.
+    bridgeScene.focus ? `Focus: ${bridgeScene.focus} — this owns the composition.` : null,
+    bridgeScene.mood
+      ? `Mood: let this moment feel ${bridgeScene.mood} — expressed through lighting, atmosphere, and expression, never by changing the scene.`
+      : null,
   ]
     .filter(Boolean)
     .join(' ');

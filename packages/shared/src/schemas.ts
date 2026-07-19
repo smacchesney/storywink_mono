@@ -94,6 +94,14 @@ export const bridgeSceneSchema = z.object({
   charactersPresent: z.array(z.string().min(1).max(100)).min(1).max(8),
   outfitFrom: z.enum(['previous', 'next']),
   props: z.array(z.string().max(200)).max(10),
+  // X16 W1 — meaning channel (mirrors avatarPageSceneSchema). The generation
+  // schema carries these as required-nullable; here they are nullable AND
+  // defaulted so an absent key (older stored scenes, a partial model reply)
+  // degrades to null instead of being silently STRIPPED (a plain z.object
+  // drops unknown keys — the BLOCKER that would keep mood/focus from ever
+  // reaching Page.bridgeScene and the renderer).
+  mood: z.string().max(100).nullable().default(null),
+  focus: z.string().max(300).nullable().default(null),
 });
 
 export const bridgePageResponseSchema = z.object({

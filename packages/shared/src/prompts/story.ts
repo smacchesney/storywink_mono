@@ -219,8 +219,27 @@ const BRIDGE_PAGES_SCHEMA = {
             items: { type: 'string' },
             description: 'Concrete objects carried over from the adjacent photos',
           },
+          mood: {
+            type: ['string', 'null'],
+            description:
+              "1-3 words for how this moment should FEEL in the picture ('hushed wonder'); null when neutral",
+          },
+          focus: {
+            type: ['string', 'null'],
+            description:
+              'Who + what owns this composition ("Emma reaching for the branch"); null when no single focus',
+          },
         },
-        required: ['location', 'timeOfDay', 'action', 'charactersPresent', 'outfitFrom', 'props'],
+        required: [
+          'location',
+          'timeOfDay',
+          'action',
+          'charactersPresent',
+          'outfitFrom',
+          'props',
+          'mood',
+          'focus',
+        ],
         additionalProperties: false,
       },
     },
@@ -445,6 +464,7 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
               `    - characterId "${c.characterId}" = ${c.name} (${c.role.replace(/_/g, ' ')})`,
           ),
           `- Never invent a person, a pet, or a named place. The setting must sit plausibly BETWEEN the adjacent photos' settings (use their WHAT'S HERE notes); the action must grow out of what the adjacent photos actually show. Set "scene.outfitFrom" to whichever adjacent photo the outfits should copy.`,
+          `- Give each bridge scene a "mood" (1-3 feeling words) and a "focus" (who + what owns the composition) — the illustrator has NO photo for this page, so these two lines are its only emotional and compositional steer.`,
           `- Bridge text follows every rule in this prompt (refrain, hand-off, length limits) and must read as part of the same continuous story.`,
         ].join('\n')
       : '';
@@ -724,6 +744,19 @@ export interface BridgeScene {
   charactersPresent: string[];
   outfitFrom: 'previous' | 'next';
   props: string[];
+  /**
+   * X16 W1: 1-3 words for how this moment should FEEL — the illustrator has no
+   * photo for a bridge, so this is its only emotional steer. Drives the
+   * renderer's mood directive and QC moodMismatch. Null when the moment is
+   * neutral; absent on pre-X16 stored scenes (render code stays null-safe).
+   */
+  mood: string | null;
+  /**
+   * X16 W1: who + what owns the composition ("Emma reaching for the branch").
+   * The bridge's only compositional steer. Null when no single focus; absent
+   * on pre-X16 stored scenes.
+   */
+  focus: string | null;
 }
 
 export interface StoryBridgePageResponse {

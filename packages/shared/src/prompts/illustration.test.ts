@@ -330,6 +330,31 @@ describe('bridge prompt variant (source=BRIDGE pages)', () => {
     expect(bridgePrompt).not.toContain('Ben (parent)');
   });
 
+  it('bridge section renders mood and focus when present (X16 W1)', () => {
+    const prompt = createIllustrationPrompt({
+      style: 'vignette',
+      pageText: 'Almost there, almost there!',
+      bookTitle: "Aria's Big Day",
+      isTitlePage: false,
+      referenceImageCount: 3,
+      characterIdentity,
+      pageNumber: 4,
+      bridgeScene: {
+        ...bridgeScene,
+        mood: 'hushed wonder',
+        focus: 'Emma reaching for the branch',
+      },
+    });
+    expect(prompt).toContain('hushed wonder');
+    expect(prompt).toContain('Emma reaching for the branch');
+  });
+
+  it('omits the mood and focus lines when absent from a stored scene (X16 W1)', () => {
+    // Pre-X16 rows have no mood/focus keys — the section must stay null-safe.
+    expect(bridgePrompt).not.toContain('Focus:');
+    expect(bridgePrompt).not.toContain('Mood:');
+  });
+
   it('falls back to the photo-page identity filter when no authored id resolves', () => {
     const stalePrompt = createIllustrationPrompt({
       style: 'vignette',

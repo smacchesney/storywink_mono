@@ -115,6 +115,21 @@ describe('bridgePageResponseSchema (story response additions)', () => {
     );
     expect(bridgePageResponseSchema.safeParse({ ...valid, afterPhotoPage: 0 }).success).toBe(false);
   });
+
+  it('keeps scene mood + focus when the model emits them (X16 W1 — zod must NOT strip)', () => {
+    const parsed = bridgePageResponseSchema.parse({
+      ...valid,
+      scene: { ...valid.scene, mood: 'hushed wonder', focus: 'Emma reaching for the branch' },
+    });
+    expect(parsed.scene.mood).toBe('hushed wonder');
+    expect(parsed.scene.focus).toBe('Emma reaching for the branch');
+  });
+
+  it('degrades safely: absent scene mood/focus default to null (X16 W1)', () => {
+    const parsed = bridgePageResponseSchema.parse(valid);
+    expect(parsed.scene.mood).toBe(null);
+    expect(parsed.scene.focus).toBe(null);
+  });
 });
 
 describe('avatarPageSceneSchema (X13 Track L — mood + focus survive extraction)', () => {

@@ -3,6 +3,7 @@ import {
   createStoryGenerationPrompt,
   StoryGenerationInput,
   STORY_RESPONSE_SCHEMA,
+  STORY_RESPONSE_SCHEMA_WITH_BRIDGES,
   STORY_GENERATION_SYSTEM_PROMPT,
   arcRoleHintsUsable,
 } from './story.js';
@@ -116,6 +117,22 @@ describe('createStoryGenerationPrompt — bridge pages (BRIDGE_PAGES_ENABLED)', 
   it('states the trailing-bridge convention with the real page count', () => {
     const text = promptText({ ...rosterInput, bridgeCap: 1 });
     expect(text).toContain('(2 = after the last photo)');
+  });
+
+  it('instructs the model to give each bridge scene a mood and a focus (X16 W1)', () => {
+    const text = promptText({ ...rosterInput, bridgeCap: 1 });
+    expect(text).toContain('"mood"');
+    expect(text).toContain('"focus"');
+  });
+
+  it('bridge scene schema carries mood and focus (X16 W1)', () => {
+    // BRIDGE_PAGES_SCHEMA is PRIVATE — assert through the exported composite.
+    const sceneProps = (STORY_RESPONSE_SCHEMA_WITH_BRIDGES.properties as any).bridgePages.items
+      .properties.scene;
+    expect(sceneProps.properties.mood).toBeDefined();
+    expect(sceneProps.properties.focus).toBeDefined();
+    expect(sceneProps.required).toContain('mood');
+    expect(sceneProps.required).toContain('focus');
   });
 });
 
