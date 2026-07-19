@@ -444,6 +444,29 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
         ].join('\n')
       : '';
 
+  // X16 W1: signals that recur across photos are throughline fuel — surface
+  // them ONCE as candidates instead of leaving recurrence detection to the
+  // model across N images. Single-occurrence signals stay on their page line.
+  const signalPages = new Map<string, { label: string; pages: number[] }>();
+  for (const p of input.storyPages) {
+    for (const s of p.analysis?.eventSignals ?? []) {
+      const key = s.trim().toLowerCase();
+      if (!key) continue;
+      const entry = signalPages.get(key) ?? { label: s.trim(), pages: [] };
+      entry.pages.push(p.pageNumber);
+      signalPages.set(key, entry);
+    }
+  }
+  const throughlineCandidates = [...signalPages.values()].filter((e) => e.pages.length >= 2);
+  const throughlineSection = throughlineCandidates.length
+    ? [
+        `## Throughline candidates seen in the photos:`,
+        ...throughlineCandidates.map((e) => `- "${e.label}" (pages ${e.pages.join(', ')})`),
+        `- These objects/moments recur in the actual photos. Prefer ONE of them as the planted throughline object — plant it in the SITUATION, let it return, and pay it off in the RESOLUTION.`,
+        ``,
+      ]
+    : [];
+
   const baseInstructions = [
     `# Instructions & Guiding Principles:`,
     `- Imagine a parent curled up with their child, reading aloud. Every sentence should feel warm, playful, and alive in a parent's voice.`,
@@ -460,7 +483,8 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
     `- **SITUATION** (first ~20% of pages): establish the child's world AND the one desire or problem this book is about. Plant the throughline here — the recurring object, question, or quest the whole story hangs on (name it in "storyArc.throughline"). If the title names a thing, it appears in this stretch, never sprung near the end.`,
     `- **COMPLICATION & TRIES** (the middle): the SAME problem pushes back, and each try ESCALATES — bigger, closer, braver. NEVER stage a new, unrelated set-piece on each page; obstacle after unconnected obstacle is a tour, not a story. This is where the refrain repeats and evolves.`,
     `- **TURN** (about 3/4 through): the hardest moment — the try that almost fails. Let it wobble hardest here.`,
-    `- **RESOLUTION** (final 1-2 pages): the child's OWN action pays off the throughline, and the feeling lands with a warm exhale — the last page a parent lingers on. Only sweet or sleepy stories drift into a bedtime hush; an adventure earns a satisfied, wide-awake glow. Read the story's own energy to choose which — never ask the parent.`,
+    `- **Mishap (for adventurous or silly tones)**: plant one small physical mishap early — a drop, a slip, a wrong turn — and let it repeat or pay off. Surprise is what makes a child request the book again. In short books (4-5 pages) the "try" beat carries the wobble — never skip it.`,
+    `- **RESOLUTION** (final 1-2 pages): the child's OWN action pays off the throughline, and the feeling lands with a warm exhale — the last page a parent lingers on. Only sweet or sleepy stories drift into a bedtime hush; an adventure earns a satisfied, wide-awake glow. Read the story's own energy to choose which — never ask the parent. The climax's payoff must be COMPLETE before the final page begins — but the climax page itself must not end on the completed payoff; its last clause opens the door to the landing.`,
     `- NEVER end with "What a wonderful day" or similar summary statements. Let the accumulated feeling speak for itself.`,
     `- Where pages carry an ARC ROLE note, use it: "opening" pages plant the desire, "rising" pages escalate, a "peak" page carries the emotional high point, "quiet" pages are a breath of tenderness, "closing" pages land the story. The roles are suggestions from the photos — honor their shape even while you interpret freely.`,
     ``,
@@ -471,15 +495,17 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
     `- Every "try" beat escalates the SAME problem. If a beat's goal could belong to a different book, it is wrong.`,
     `- Then write each page to DELIVER its beat — a page that ignores its declared beat fails editorial review.`,
     ``,
+    ...throughlineSection,
     `## PAGE-TO-PAGE FLOW (critical — photos alone rarely tell a story):`,
     `- **Connective device**: If the photos read as a montage of separate moments rather than one continuous event, choose ONE thread and pull every page through it: a wondering question the child carries ("will the waves say hello back?"), a tiny quest, something the child is collecting or counting, or the refrain itself acting as a heartbeat. Never let pages sit side by side unconnected.`,
-    `- **Hand-off rule**: Every page except the last must END with something that leans into the next page — a shadow slipping across the floor, a glance toward something new, a question, an "and then...?" energy (a sound getting closer can work too, but don't lean on it). The listener should NEED the page turn.`,
-    `- **Callbacks**: In the RESOLUTION, echo one concrete detail from the SITUATION pages (an object, a gesture, the refrain in its softest form). This is what makes a story feel whole instead of a list of moments.`,
+    `- **Hand-off rule**: Every page except the last must END with something that leans into the next page — a shadow slipping across the floor, a glance toward something new, a question, an "and then...?" energy (a sound getting closer can work too, but don't lean on it). The listener should NEED the page turn. The CLIMAX page especially must not end on the completed payoff sentence.`,
+    `- **Callbacks**: In the RESOLUTION, echo one concrete detail from the SITUATION pages (an object, a gesture, the refrain in its softest form). This is what makes a story feel whole instead of a list of moments. A named person present in the SITUATION pages (Mummy, Grandma) must be present or explicitly echoed on the final page — the landing belongs to the family, not the child alone.`,
     ...(bridgeSection ? [bridgeSection] : []),
     ``,
     `## Recurring Refrain (REQUIRED):`,
     `- Create a short phrase (4-8 words) that echoes through the story at least 3 times.`,
     `- Vary it slightly each time — change one word, add emphasis, or whisper it the last time.`,
+    `- At least TWO echoes must be standalone narrator lines — their own sentence, OUTSIDE any quotation marks. At most ONE echo may live inside a character's dialogue. The parent needs a chantable line, not contorted speech.`,
     `- Great refrains feel like a heartbeat — reach for an action, a feeling, or the child's name: "One more step, brave Kai!" → "Two more steps, brave Kai!" → "You did it, brave Kai!". At most one sound-based refrain per book, and only if it truly earns its place.`,
     `- Report this phrase in the "storyArc.refrain" field.`,
     ``,
@@ -503,6 +529,7 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
     `- **Sound words are one spice among many** — reach for a vivid verb or an image first. Use AT MOST one sound word per page, and never as the page's main event.`,
     `- Sentences should have a **musical quality** when read aloud — rhythm matters more than vocabulary.`,
     `- Use concrete nouns and action verbs. No abstractions. One idea per sentence.`,
+    `- **Physical truth**: feats stay within a preschooler's real body. If the child soars, flies, or does the impossible, frame it explicitly as imagination or play — never literal.`,
     ``,
     `## Dialogic Moments:`,
     `- Include 2-3 questions across the whole book that invite the listening child to participate: "Can you see...?", "What do you think happens next?", "What do YOU think is behind the door?"`,
@@ -591,6 +618,7 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
     `    - Jumping/Flying: arc trails`,
     `    - Surprise/Discovery: subtle glow`,
     `    - Hugging/Love: small floating hearts (2-3 max)`,
+    `  - Match the effect to the page's BEAT: action effects (motion lines, arc trails, impact dust) belong on try/turn/climax pages; floating hearts, sparkles, and soft glows belong on quiet/breath/resolution pages ONLY — never over the climax.`,
     `  - **NEVER suggest words, letters, numbers, or sound-effect text in "illustrationNotes"** — the illustration is wordless; describe visual-only effects only.`,
     `  - Use sparkles ONLY for actual magic/wonder moments, not as a default effect.`,
     `  - Match the effect to the specific action - if a kid is eating, suggest food effects, not sparkles.`,
@@ -919,7 +947,7 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
     `- **SITUATION** (first ~20% of pages): establish the child's world AND the one desire or problem this book is about. Plant the throughline here — the recurring object, question, or quest the whole story hangs on (name it in "storyArc.throughline"). If the title names a thing, it appears in this stretch, never sprung near the end.`,
     `- **COMPLICATION & TRIES** (the middle): the SAME problem pushes back, and each try ESCALATES — bigger, closer, braver. NEVER stage a new, unrelated set-piece on each page; obstacle after unconnected obstacle is a tour, not a story. This is where the refrain repeats and evolves.`,
     `- **TURN** (about 3/4 through): the hardest moment — the try that almost fails. Let it wobble hardest here.`,
-    `- **RESOLUTION** (final 1-2 pages): the child's OWN action pays off the throughline, and the feeling lands with a warm exhale — the last page a parent lingers on. Only sweet or sleepy stories drift into a bedtime hush; an adventure earns a satisfied, wide-awake glow. Read the story's own energy to choose which — never ask the parent.`,
+    `- **RESOLUTION** (final 1-2 pages): the child's OWN action pays off the throughline, and the feeling lands with a warm exhale — the last page a parent lingers on. Only sweet or sleepy stories drift into a bedtime hush; an adventure earns a satisfied, wide-awake glow. Read the story's own energy to choose which — never ask the parent. The climax's payoff must be COMPLETE before the final page begins — but the climax page itself must not end on the completed payoff; its last clause opens the door to the landing.`,
     `- NEVER end with "What a wonderful day" or similar summary statements. Let the accumulated feeling speak for itself.`,
     ``,
     `## BEAT SHEET (required — plan it BEFORE any page text, in "beatSheet"):`,
@@ -931,12 +959,13 @@ export function createAvatarStoryPrompt(input: AvatarStoryGenerationInput): Stor
     ``,
     `## PAGE-TO-PAGE FLOW (critical):`,
     `- **Connective device**: choose ONE thread and pull every page through it: a wondering question the child carries, a tiny quest, something the child is collecting or counting, or the refrain itself acting as a heartbeat. Never let pages sit side by side unconnected.`,
-    `- **Hand-off rule**: Every page except the last must END with something that leans into the next page — a shadow slipping across the floor, a glance toward something new, a question, an "and then...?" energy (a sound getting closer can work too, but don't lean on it). The listener should NEED the page turn.`,
+    `- **Hand-off rule**: Every page except the last must END with something that leans into the next page — a shadow slipping across the floor, a glance toward something new, a question, an "and then...?" energy (a sound getting closer can work too, but don't lean on it). The listener should NEED the page turn. The CLIMAX page especially must not end on the completed payoff sentence.`,
     `- **Callbacks**: In the RESOLUTION, echo one concrete detail from the SITUATION pages (an object, a gesture, the refrain in its softest form). This is what makes a story feel whole instead of a list of moments.`,
     ``,
     `## Recurring Refrain (REQUIRED):`,
     `- Create a short phrase (4-8 words) that echoes through the story at least 3 times.`,
     `- Vary it slightly each time — change one word, add emphasis, or whisper it the last time.`,
+    `- At least TWO echoes must be standalone narrator lines — their own sentence, OUTSIDE any quotation marks. At most ONE echo may live inside a character's dialogue. The parent needs a chantable line, not contorted speech.`,
     `- Great refrains feel like a heartbeat — reach for an action, a feeling, or the child's name: "One more step, brave Kai!" → "Two more steps, brave Kai!" → "You did it, brave Kai!". At most one sound-based refrain per book, and only if it truly earns its place.`,
     `- Report this phrase in the "storyArc.refrain" field.`,
     ``,

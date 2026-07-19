@@ -421,3 +421,46 @@ describe('STORY QUALITY V2 — beat sheet, throughline, length, moodCue', () => 
     expect(text).toContain('At most TWO named characters ACT');
   });
 });
+
+describe('X16 W1 craft bundle', () => {
+  // story.test.ts already has: `promptText(input)` helper (line 9) and a shared
+  // `baseInput` CONST (line 15, two storyPages, both analysis: null). Clone it —
+  // never mutate the shared const.
+  it('adds refrain-as-narrator, mishap, plausibility, bookend, and climax handoff rules', () => {
+    const prompt = promptText(structuredClone(baseInput));
+    expect(prompt).toContain('standalone narrator line');
+    expect(prompt).toContain('plant one small physical mishap');
+    expect(prompt).toContain("a preschooler's real body");
+    expect(prompt).toContain('present or explicitly echoed on the final page');
+    expect(prompt).toContain('must not end on the completed payoff');
+    expect(prompt).toContain('belong on try/turn/climax pages');
+  });
+
+  it('synthesizes recurring eventSignals into throughline candidates', () => {
+    const input = structuredClone(baseInput);
+    // baseInput has only 2 pages — add a third so recurrence spans pages 1 and 3.
+    input.storyPages.push({ ...structuredClone(input.storyPages[1]), pageNumber: 3 });
+    input.storyPages[0].analysis = {
+      setting: 's',
+      action: 'a',
+      emotion: 'e',
+      eventSignals: ['red balloon'],
+      narrativeRole: 'opening',
+    };
+    input.storyPages[2].analysis = {
+      setting: 's',
+      action: 'a',
+      emotion: 'e',
+      eventSignals: ['Red Balloon'],
+      narrativeRole: 'peak',
+    };
+    const prompt = promptText(input);
+    expect(prompt).toContain('Throughline candidates seen in the photos');
+    expect(prompt).toMatch(/red balloon.*pages 1, 3/i);
+  });
+
+  it('omits the candidates block when no signal recurs', () => {
+    const prompt = promptText(structuredClone(baseInput));
+    expect(prompt).not.toContain('Throughline candidates seen in the photos');
+  });
+});
