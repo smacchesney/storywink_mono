@@ -188,10 +188,8 @@ export const STORY_QC_THRESHOLDS = {
   maxWordsEn: 30,
   maxSentences: 4,
   maxCharsJa: 48,
-  // Log-only today: truthToEvent is scored and logged but never triggers a
-  // regen. Flip to enforcing only after Railway data validates the
-  // distribution (every new failure trigger is a silent extra generation
-  // during the parent's wait).
+  // Enforced under STORY_QUALITY_V2 on photo books WITH an eventSummary
+  // (X16 W1); log-only otherwise. Avatar premiseTruth remains log-only.
   minTruthToEvent: 6,
   // Log-only (X6d): premiseTruth is scored on AVATAR_STORY books and logged,
   // never enforced — same telemetry-first philosophy as truthToEvent.

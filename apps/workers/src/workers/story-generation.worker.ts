@@ -351,6 +351,17 @@ async function evaluateStoryQuality(
         `Agency scored ${qc.agency}/10 — the child must be the DOER: one clear goal, a real obstacle, and a try-wobble-try before the payoff.`,
       );
     }
+    // X16 W1: the parent-confirmed day is enforced, not advisory. Photo books
+    // without an eventSummary score null and are exempt.
+    if (
+      input.eventSummary &&
+      qc.truthToEvent !== null &&
+      qc.truthToEvent < STORY_QC_THRESHOLDS.minTruthToEvent
+    ) {
+      problems.push(
+        `truthToEvent scored ${qc.truthToEvent}/10 — the story must deliver the parent's actual day ("${input.eventSummary}"): its people, its place, its moments. A story that could be about any day fails.`,
+      );
+    }
     const beats = new Map((storyResponse.beatSheet ?? []).map((b) => [b.pageNumber, b]));
     for (const page of qc.pages) {
       if (page.deliversBeat === false) {
