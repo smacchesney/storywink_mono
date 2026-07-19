@@ -437,3 +437,46 @@ describe('createIllustrationPrompt — photo-path mood cue (STORY_ILLUS_MOOD_ENA
     expect(prompt.endsWith('This is a wordless illustration.')).toBe(true);
   });
 });
+
+describe('scene anchor (X16 W1)', () => {
+  // No photoPageFixture()/avatarPageFixture() helpers exist here — adapt the
+  // mood-cue describe's `base` options object as the photo-path fixture, and
+  // build the avatar case inline with contentAnchor: 'sheet'.
+  const photoBase = {
+    style: 'vignette' as const,
+    pageText: 'Aria spun in the sunshine.',
+    bookTitle: "Aria's Big Day",
+    isTitlePage: false,
+    referenceImageCount: 1,
+    characterIdentity,
+    pageNumber: 3,
+  };
+
+  it('renders the photo moment on photo pages', () => {
+    const prompt = createIllustrationPrompt({
+      ...photoBase,
+      sceneAnchor: {
+        setting: 'backyard, golden late afternoon',
+        action: 'mid-splash in the paddling pool',
+      },
+    });
+    expect(prompt).toContain("THIS PHOTO'S MOMENT");
+    expect(prompt).toContain('backyard, golden late afternoon');
+    expect(prompt).toContain('must survive stylization');
+  });
+
+  it('omits the section without an anchor (byte-identical legacy)', () => {
+    const off = createIllustrationPrompt(photoBase);
+    expect(off).not.toContain("THIS PHOTO'S MOMENT");
+    expect(createIllustrationPrompt({ ...photoBase, sceneAnchor: null })).toBe(off);
+  });
+
+  it('never renders on bridge or sheet-anchored pages', () => {
+    const sheet = createIllustrationPrompt({
+      ...photoBase,
+      contentAnchor: 'sheet',
+      sceneAnchor: { setting: 'x', action: 'y' },
+    });
+    expect(sheet).not.toContain("THIS PHOTO'S MOMENT");
+  });
+});

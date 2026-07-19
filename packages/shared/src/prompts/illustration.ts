@@ -80,6 +80,8 @@ export interface IllustrationPromptOptions {
    * threads it only when the flag is on.
    */
   illustrationMood?: string | null;
+  /** X16 W1: perception's {setting, action} for this page (fresh rows only) — photo-path scene anchor. */
+  sceneAnchor?: { setting: string; action: string } | null;
 }
 
 // ----------------------------------
@@ -494,6 +496,22 @@ function buildMoodCueSection(moodCue: string | null): string | null {
   return `EMOTIONAL TONE (subordinate to the photo — it never changes pose, clothing, or scene composition): let this moment feel ${cue}; express it ONLY through lighting, atmosphere, and the characters' expressions.`;
 }
 
+/**
+ * X16 W1: perception's setting/action for THIS page, as a bounded anchor —
+ * text resistance against scene drift, and a named must-survive list for the
+ * white-vignette styles. Photo-anchored interior pages only.
+ */
+function buildSceneAnchorSection(
+  anchor: { setting: string; action: string } | null | undefined,
+): string | null {
+  if (!anchor) return null;
+  const setting = sanitizeIllustrationNotes(anchor.setting)?.trim().slice(0, 140);
+  const action = sanitizeIllustrationNotes(anchor.action)?.trim().slice(0, 140);
+  if (!setting && !action) return null;
+  const moment = [setting, action].filter(Boolean).join(' — ');
+  return `THIS PHOTO'S MOMENT (keep it recognizable): ${moment}. The place and the action above must survive stylization — simplify them into the art style, never erase or replace them.`;
+}
+
 export function createIllustrationPrompt(opts: IllustrationPromptOptions): string {
   const style = getStyleDefinition(opts.style);
   const contentAnchor = opts.contentAnchor ?? 'photo';
@@ -611,6 +629,17 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
       ? buildMoodCueSection(sanitizeIllustrationNotes(opts.illustrationMood ?? null))
       : null;
 
+  // 4d. X16 W1 scene anchor: perception's {setting, action} for THIS page as a
+  //     bounded moment line — text resistance against scene drift and a named
+  //     must-survive list for the white-vignette styles. Photo path only, and
+  //     never on bridge pages (their scene comes from the story model). The
+  //     worker threads sceneAnchor only from a FRESH analysis row; absent →
+  //     null → the assembly is byte-identical.
+  const sceneAnchorSection =
+    contentAnchor === 'photo' && !opts.bridgeScene
+      ? buildSceneAnchorSection(opts.sceneAnchor)
+      : null;
+
   // 5. Cross-cutting: QC feedback (neutralized too — feedback text quoting a
   //    display name would smuggle the name prior right back in).
   const qcSection = neutralize(buildQCFeedbackSection(opts.qcFeedback));
@@ -626,6 +655,7 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
     exactCastSection,
     livingToySection,
     moodSection,
+    sceneAnchorSection,
     qcSection,
     noTextSection,
   ]

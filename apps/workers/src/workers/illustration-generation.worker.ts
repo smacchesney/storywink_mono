@@ -641,6 +641,19 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
           })
         : undefined;
 
+    // X16 W1: perception scene anchor — only a FRESH analysis row (assetId
+    // still matches) may describe the photo; a swapped photo's stale row must
+    // never anchor the wrong scene. Mirrors the story worker's staleness gate.
+    const pageAnalysisRaw = page.analysis as {
+      assetId?: string;
+      setting?: string;
+      action?: string;
+    } | null;
+    const freshPageAnalysis =
+      pageAnalysisRaw && page.assetId && pageAnalysisRaw.assetId === page.assetId
+        ? pageAnalysisRaw
+        : null;
+
     // For the primary illustration, always use story-style prompt (isTitlePage: false).
     // Cover pages get a separate cover-style illustration generated afterwards.
     const promptInput: IllustrationPromptOptions = {
@@ -680,6 +693,19 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       // prompt byte-identical.
       ...(storyIllusMoodEnabled() && !isBridgePage && !isAvatarBook && page.illustrationMood
         ? { illustrationMood: page.illustrationMood }
+        : {}),
+      // X16 W1 scene anchor: perception's {setting, action} threads into the
+      // photo path only, from a FRESH analysis row. Bridge pages (story-model
+      // scene) and avatar books (photo-less) never anchor to a photo moment.
+      // The prompt builder gates internally to contentAnchor 'photo' && no
+      // bridgeScene; absent → omitted → prompt byte-identical.
+      ...(freshPageAnalysis && !isBridgePage && !isAvatarBook
+        ? {
+            sceneAnchor: {
+              setting: freshPageAnalysis.setting ?? '',
+              action: freshPageAnalysis.action ?? '',
+            },
+          }
         : {}),
     };
 
