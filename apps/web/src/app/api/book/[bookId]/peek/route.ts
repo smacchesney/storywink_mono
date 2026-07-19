@@ -82,7 +82,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const state = (job ? await job.getState() : null) as PeekJobState;
     const outcome = peekOutcome(parsed.data.action, state, book.status);
     logger.info(
-      { bookId, action: parsed.data.action, state, outcome: outcome.kind },
+      { bookId, dbUserId: dbUser.id, action: parsed.data.action, state, outcome: outcome.kind },
       'Peek action',
     );
 
@@ -94,21 +94,44 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
         return NextResponse.json({ started: true }, { status: 202 });
       case 'already-running':
         return NextResponse.json({ started: true, alreadyRunning: true }, { status: 202 });
-      case 'start-fresh':
+      case 'start-fresh': {
         // No armed job (grace off on workers, or a lost enqueue) — start the
         // chain the way the illustrations route does.
         await prisma.book.update({ where: { id: bookId }, data: { status: 'ILLUSTRATING' } });
-        await queue.add(
-          `extract-characters-${bookId}`,
-          { bookId, userId: dbUser.id, artStyle: book.artStyle || 'vignette' },
-          {
-            attempts: 3,
-            backoff: { type: 'exponential', delay: 10000 },
-            removeOnComplete: { count: 100 },
-            removeOnFail: { count: 500 },
-          },
-        );
+        try {
+          await queue.add(
+            `extract-characters-${bookId}`,
+            { bookId, userId: dbUser.id, artStyle: book.artStyle || 'vignette' },
+            {
+              attempts: 3,
+              backoff: { type: 'exponential', delay: 10000 },
+              removeOnComplete: { count: 100 },
+              removeOnFail: { count: 500 },
+            },
+          );
+        } catch (addError) {
+          // Enqueue failed after the status flip — revert ILLUSTRATING →
+          // STORY_READY so the book isn't stranded (the manual start would
+          // otherwise 409). House revert-catch idiom from
+          // story-generation.worker.ts; the parent can retry the 500.
+          logger.error(
+            {
+              bookId,
+              dbUserId: dbUser.id,
+              error: addError instanceof Error ? addError.message : 'Unknown error',
+            },
+            'Peek start-fresh enqueue failed — reverting to STORY_READY',
+          );
+          await prisma.book
+            .updateMany({
+              where: { id: bookId, status: 'ILLUSTRATING' },
+              data: { status: 'STORY_READY' },
+            })
+            .catch(() => {});
+          return NextResponse.json({ error: 'Something went wrong' }, { status: 500 });
+        }
         return NextResponse.json({ started: true }, { status: 202 });
+      }
       case 'not-waiting':
         return NextResponse.json(
           { error: 'Book is not waiting to illustrate', code: 'NOT_WAITING' },
@@ -120,7 +143,13 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
           await job!.remove();
         } catch {
           // The delay elapsed and the job went active between getState() and
-          // remove() — painting has started; report it instead of a 500.
+          // remove() — painting has started; report it instead of a 500. The
+          // earlier 'Peek action' log recorded outcome:'rearm'; log the
+          // conversion so the logs match the ALREADY_PAINTING response.
+          logger.info(
+            { bookId, dbUserId: dbUser.id, action: parsed.data.action },
+            'Peek rearm raced painting — converted to ALREADY_PAINTING',
+          );
           return NextResponse.json({ rearmed: false, code: 'ALREADY_PAINTING' }, { status: 409 });
         }
         await queue.add(`extract-characters-${bookId}`, data, {
