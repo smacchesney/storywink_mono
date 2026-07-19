@@ -183,7 +183,7 @@
     "themeSoundsLike": "Sounds like…",
     "themeEditLabel": "Fix the theme",
     "themePlaceholder": "What was the day really about?",
-    "rambleLabel": "Tell us more about the day — talk or type.",
+    "rambleLabel": "Tell us more about the day. Talk or type.",
     "rambleCharsLeft": "{count} characters left",
     "starLabel": "Who's the star?",
     "starEveryone": "Everyone!",
@@ -268,7 +268,7 @@
     "contentFlagged": "This page needs a different photo",
     "noPreview": "No preview",
     "paintMyPictures": "Paint my pictures",
-    "peekHint": "Take a peek — we'll start painting in a few minutes.",
+    "peekHint": "Take a peek. We'll start painting in a few minutes.",
     "peekStarting": "Painting has started!"
   },
   "library": {
