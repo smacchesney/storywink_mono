@@ -19,9 +19,11 @@ import type { StripPhase } from '@/components/create/setup/strip-phase';
 import AvatarMatchChip from '@/components/create/setup/AvatarMatchChip';
 import CaptureChips, { CaptureQuestion } from '@/components/create/setup/CaptureChips';
 import type { DiscoveryChip, RosterCharacterLike } from '@/components/create/setup/discovery-feed';
+import { recurringChildren } from '@/components/create/setup/discovery-feed';
 import DiscoveryFeed from '@/components/create/setup/DiscoveryFeed';
 import ThemeCard from '@/components/create/setup/ThemeCard';
-import { CREATE_DISCOVERY_FLAG } from '@/lib/discovery-client';
+import StarPicker from '@/components/create/setup/StarPicker';
+import { CREATE_DISCOVERY_FLAG, ENSEMBLE_BOOKS_FLAG } from '@/lib/discovery-client';
 
 export interface SetupFormState {
   childName: string;
@@ -72,6 +74,9 @@ interface SetupSheetProps {
   /** Refetch trigger after photos are added/removed inline. */
   onPhotosChanged?: () => void | Promise<void>;
   onChange: <K extends keyof SetupFormState>(key: K, value: SetupFormState[K]) => void;
+  /** X17 B3 — star pick fixes the name binding; Everyone flips ensemble mode. */
+  onPickStar: (character: RosterCharacterLike) => void;
+  onPickEveryone: () => void;
   onSubmit: () => void;
 }
 
@@ -93,13 +98,20 @@ export function SetupSheet({
   bookId,
   mainCharacterId,
   discoveryChips,
+  roster,
   onReorder,
   onPhotosChanged,
   onChange,
+  onPickStar,
+  onPickEveryone,
   onSubmit,
 }: SetupSheetProps) {
   const t = useTranslations('setup');
   const reducedMotion = useReducedMotion() ?? false;
+
+  // X17 B3 — the star ask renders only when the roster holds 2+ recurring kids;
+  // solo books never see it (empty array → block below stays unrendered).
+  const starChildren = recurringChildren(roster ?? []);
 
   const hasChips = form.captureQuestions.length > 0;
   // Reserved chips space while the librarian is still reading — arrival then
@@ -223,6 +235,22 @@ export function SetupSheet({
         <ThemeCard themeLine={form.themeLine} onChange={(v) => onChange('themeLine', v)} />
       )}
 
+      {/* X17 B3 — "Who's the star?": one chip per recurring kid + "Everyone!".
+          Renders only when 2+ recurring kids exist (solo books never see it);
+          the "Everyone!" chip is additionally gated on ENSEMBLE_BOOKS_FLAG.
+          Whole block flag-gated so flag-off output stays byte-identical.
+          (Final flag-on order lands in Task 11 Step 3.) */}
+      {CREATE_DISCOVERY_FLAG && starChildren.length >= 2 && (
+        <StarPicker
+          childrenChars={starChildren}
+          castMode={form.castMode}
+          starCharacterId={form.starCharacterId}
+          ensembleAllowed={ENSEMBLE_BOOKS_FLAG}
+          onPickStar={onPickStar}
+          onPickEveryone={onPickEveryone}
+        />
+      )}
+
       {/* Capture chips — space is reserved while the librarian reads, and the
           rows rise into that same box on arrival (no layout shift below).
           When reading ends with zero questions the box collapses gently. */}
@@ -244,6 +272,7 @@ export function SetupSheet({
                 )}
                 <CaptureChips
                   questions={form.captureQuestions}
+                  caps={form.castMode === 'ensemble' ? { naming: 4, total: 5 } : undefined}
                   onChange={(qs) => onChange('captureQuestions', qs)}
                 />
               </div>

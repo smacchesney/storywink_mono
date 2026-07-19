@@ -16,9 +16,11 @@ import { createPatchDebouncer, type PatchDebouncer } from '@/lib/patch-debounce'
 import { CREATE_DISCOVERY_FLAG } from '@/lib/discovery-client';
 import {
   buildDiscoveryChips,
+  recurringChildren,
   type DiscoveryChip,
   type RosterCharacterLike,
 } from '@/components/create/setup/discovery-feed';
+import { ensureMemberNamingQuestions } from '@/components/create/setup/star-ask';
 import {
   allPagesAnalyzed,
   arrivalStripPhase,
@@ -388,6 +390,43 @@ export default function SetupPage() {
     [],
   );
 
+  // X17 B3: star pick fixes the name binding; Everyone flips ensemble mode.
+  const handlePickStar = useCallback((c: RosterCharacterLike) => {
+    touched.current.castMode = true;
+    setForm((prev) => ({
+      ...prev,
+      castMode: 'star',
+      starCharacterId: c.characterId,
+      castMemberIds: [],
+      childName: prev.childName.trim() ? prev.childName : (c.name ?? prev.childName),
+    }));
+    patcherRef.current?.queue({ castMode: 'star', starCharacterId: c.characterId });
+  }, []);
+
+  const handlePickEveryone = useCallback(() => {
+    // Side effects stay OUTSIDE the setForm updater (StrictMode double-invokes
+    // updaters) — compute once from current state, then set + queue.
+    touched.current.castMode = true;
+    const kids = recurringChildren(roster);
+    const members = kids.map((m) => m.characterId);
+    const questions = ensureMemberNamingQuestions(form.captureQuestions, kids, (descriptor) =>
+      t('memberNameQuestion', { descriptor }),
+    );
+    setForm((prev) => ({
+      ...prev,
+      castMode: 'ensemble',
+      castMemberIds: members,
+      starCharacterId: null,
+      captureQuestions: questions,
+    }));
+    patcherRef.current?.queue({
+      castMode: 'ensemble',
+      castMemberIds: members,
+      starCharacterId: null,
+      captureQuestions: questions,
+    });
+  }, [roster, form.captureQuestions, t]);
+
   // Refetch the book after photos are added/removed inline in the strip. Reuses
   // mergeBook, which respects parent edits (touched fields) and re-derives the
   // photo strip from the fresh page set.
@@ -520,6 +559,8 @@ export default function SetupPage() {
       onReorder={handleReorder}
       onPhotosChanged={refetchBook}
       onChange={handleChange}
+      onPickStar={handlePickStar}
+      onPickEveryone={handlePickEveryone}
       onSubmit={handleSubmit}
     />
   );
