@@ -106,7 +106,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (isExtract) return handleExtract(body, dbUser.id);
+    // `await` so an extract-path rejection lands in this try's catch (structured
+    // log + branded 500) instead of escaping as an unhandled route rejection.
+    if (isExtract) return await handleExtract(body, dbUser.id);
 
     const parsed = proposeRequestSchema.safeParse(body);
     if (!parsed.success) {
