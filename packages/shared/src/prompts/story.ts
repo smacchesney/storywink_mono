@@ -326,6 +326,10 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
   // ---------- STORYBOARD (IMAGES) ----------
   parts.push({ text: '# Storyboard Sequence' });
 
+  // A parent reorder can leave per-photo ARC ROLE hints contradicting the
+  // current sequence; drop them book-wide when the ordering is implausible.
+  const arcHintsUsable = arcRoleHintsUsable(input.storyPages.map((p) => p.analysis?.narrativeRole));
+
   input.storyPages.forEach((page) => {
     parts.push({ text: `--- Page ${page.pageNumber} ---` });
     if (page.originalImageUrl) {
@@ -343,8 +347,9 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
       const signals = page.analysis.eventSignals?.length
         ? ` Signals: ${page.analysis.eventSignals.join(', ')}.`
         : '';
+      const arcRole = arcHintsUsable ? ` ARC ROLE: ${page.analysis.narrativeRole}.` : '';
       parts.push({
-        text: `WHAT'S HERE (raw notes, NOT the story): ${page.analysis.setting}; ${page.analysis.action}; ${page.analysis.emotion}.${signals} ARC ROLE: ${page.analysis.narrativeRole}.`,
+        text: `WHAT'S HERE (raw notes, NOT the story): ${page.analysis.setting}; ${page.analysis.action}; ${page.analysis.emotion}.${signals}${arcRole}`,
       });
     }
   });
@@ -638,6 +643,27 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
   });
 
   return parts;
+}
+
+/**
+ * X16 W1: perception assigns narrativeRole per photo at analysis time; a
+ * parent reorder can leave the roles contradicting the current sequence
+ * (reorder never re-runs perception). When the ordering is implausible as an
+ * arc, the hints are dropped book-wide — the beat sheet plans unaided.
+ */
+export function arcRoleHintsUsable(roles: (string | null | undefined)[]): boolean {
+  const present = roles
+    .map((r, i) => ({ role: r ?? null, index: i }))
+    .filter((e): e is { role: string; index: number } => e.role !== null);
+  if (present.length === 0) return true;
+  const first = present[0].role;
+  const last = present[present.length - 1].role;
+  if (first === 'closing' || first === 'peak') return false;
+  if (last === 'opening') return false;
+  const firstOpening = present.find((e) => e.role === 'opening')?.index ?? -1;
+  const anyClosingBeforeOpening =
+    firstOpening >= 0 && present.some((e) => e.role === 'closing' && e.index < firstOpening);
+  return !anyClosingBeforeOpening;
 }
 
 // Export types for response parsing

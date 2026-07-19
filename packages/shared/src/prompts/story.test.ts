@@ -4,6 +4,7 @@ import {
   StoryGenerationInput,
   STORY_RESPONSE_SCHEMA,
   STORY_GENERATION_SYSTEM_PROMPT,
+  arcRoleHintsUsable,
 } from './story.js';
 
 function promptText(input: StoryGenerationInput): string {
@@ -462,5 +463,56 @@ describe('X16 W1 craft bundle', () => {
   it('omits the candidates block when no signal recurs', () => {
     const prompt = promptText(structuredClone(baseInput));
     expect(prompt).not.toContain('Throughline candidates seen in the photos');
+  });
+});
+
+describe('arcRoleHintsUsable (X16 W1)', () => {
+  it('accepts a sane arc', () => {
+    expect(arcRoleHintsUsable(['opening', 'rising', 'peak', 'closing'])).toBe(true);
+  });
+  it('accepts partial/missing hints', () => {
+    expect(arcRoleHintsUsable([null, 'rising', null, 'closing'])).toBe(true);
+  });
+  it('accepts all-null roles', () => {
+    expect(arcRoleHintsUsable([null, null, undefined])).toBe(true);
+  });
+  it('rejects closing-before-opening', () => {
+    expect(arcRoleHintsUsable(['closing', 'rising', 'opening', 'peak'])).toBe(false);
+  });
+  it('rejects a book that opens on the peak or closing', () => {
+    expect(arcRoleHintsUsable(['peak', 'rising', 'opening', 'closing'])).toBe(false);
+    expect(arcRoleHintsUsable(['closing', 'opening'])).toBe(false);
+  });
+  it('rejects a book that ends on the opening', () => {
+    expect(arcRoleHintsUsable(['rising', 'peak', 'opening'])).toBe(false);
+  });
+});
+
+describe('ARC ROLE staleness suppression in the prompt (X16 W1)', () => {
+  const withRole = (role: string) => ({
+    setting: 's',
+    action: 'a',
+    emotion: 'e',
+    eventSignals: [],
+    narrativeRole: role,
+  });
+
+  it('drops every ARC ROLE line when the ordering contradicts the sequence', () => {
+    const input = structuredClone(baseInput);
+    input.storyPages[0].analysis = withRole('closing');
+    input.storyPages[1].analysis = withRole('opening');
+    const prompt = promptText(input);
+    expect(prompt).not.toContain('ARC ROLE:');
+    // Setting/action/emotion notes still render — only the role fragment is gone.
+    expect(prompt).toContain("WHAT'S HERE (raw notes, NOT the story): s; a; e.");
+  });
+
+  it('renders ARC ROLE lines when the ordering is a sane arc', () => {
+    const input = structuredClone(baseInput);
+    input.storyPages[0].analysis = withRole('opening');
+    input.storyPages[1].analysis = withRole('closing');
+    const prompt = promptText(input);
+    expect(prompt).toContain('ARC ROLE: opening.');
+    expect(prompt).toContain('ARC ROLE: closing.');
   });
 });
