@@ -170,6 +170,13 @@ export interface CharacterExtractionJob {
   bookId: string;
   userId: string;
   artStyle: string;
+  /**
+   * X15 sheet pre-warm: enqueued alongside the story job so character-sheet
+   * generation overlaps story generation. The worker only warms
+   * Book.characterReferences (no status/phase/identity writes, no
+   * illustration flow) and exits.
+   */
+  prepareOnly?: boolean;
   pageIds?: string[];
   /**
    * Set by whole-book recovery/retry paths (reaper, book-level retry route):
@@ -193,6 +200,14 @@ export interface IllustrationGenerationJobV2 extends IllustrationGenerationJob {
    * CHARACTER_SHEETS_ENABLED produced (or reused) sheets for this run.
    */
   characterSheets?: CharacterSheetRef[];
+  /**
+   * X15: when true this child re-renders ONLY the QC-failed cover as part of
+   * a requeue flow (no page render, no page DB writes). pageId/pageNumber
+   * carry the title page so diagnostics stay meaningful. Carries the cover
+   * verdict whose suggestedPromptAdditions become the regen feedback.
+   */
+  coverRegen?: boolean;
+  coverQcResult?: CoverQCResult | null;
 }
 
 /**

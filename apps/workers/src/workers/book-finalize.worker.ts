@@ -12,13 +12,12 @@ import { QUEUE_NAMES } from '@storywink/shared/constants';
 import { categorizePages, isTitlePage, resolveCoverPage } from '@storywink/shared/utils';
 import { createBullMQConnection } from '@storywink/shared/redis';
 import OpenAI from 'openai';
-import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
+import { optimizeCloudinaryUrlForVision } from '@storywink/shared/utils';
 import {
   createQCPrompt,
   QC_SYSTEM_PROMPT,
   QC_RESPONSE_SCHEMA,
 } from '@storywink/shared/prompts/quality-check';
-import { isValidStyle } from '@storywink/shared/prompts/styles';
 import { trackEvent } from '@storywink/shared';
 import { computeBookStatus } from '../lib/computeBookStatus.js';
 import { mapQcResultsToPages, RawQcPageResult } from '../lib/qc-mapping.js';
@@ -32,6 +31,7 @@ import {
   requeueFeedbackFor,
   buildQcClassFlagLog,
   coverJudgeEligible,
+  coverRegenEligible,
   type QcBatchOutcome,
 } from '../lib/qc-batching.js';
 import { assembleQcBatchParts, pageFeedFor, type QcAssemblyPage } from '../lib/qc-assembly.js';
@@ -45,9 +45,7 @@ import {
 } from '../lib/escalation.js';
 import { maybeSendReadyEmail } from '../lib/email.js';
 import { normalizeBookPalette, paletteNormalizeEnabled } from '../lib/palette.js';
-import { generateAndStoreCover } from '../lib/cover-generation.js';
-import { fetchImageInput, resizeForReference } from '../lib/images.js';
-import { ANALYSIS_MODEL } from '../config/models.js';
+import { ANALYSIS_MODEL, ANALYSIS_OPENAI_TIMEOUT_MS } from '../config/models.js';
 import pino from 'pino';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -126,7 +124,10 @@ async function runQualityCheck(
     });
   }
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    timeout: ANALYSIS_OPENAI_TIMEOUT_MS,
+  });
 
   // One JSON-schema'd judge call, shared by the page batches and the isolated
   // cover call. Throws on an empty response (an infra failure, not a pass) —
@@ -165,8 +166,12 @@ async function runQualityCheck(
   // and a cover failure can never taint the pages. Throw/empty/omitted →
   // cover sentinel, persisted like a page sentinel; the qc_error prefix keeps
   // it from ever buying a regen off garbage feedback.
-  let coverResult: CoverQCResult | null = null;
-  if (cover) {
+  // Started here, awaited AFTER the page batches launch (X15): the cover
+  // judge runs concurrently with them. Never rejects — every failure path
+  // resolves to a sentinel, exactly as the old sequential block did.
+  const coverJudgePromise: Promise<CoverQCResult | null> = (async () => {
+    if (!cover) return null;
+    let scored: CoverQCResult;
     try {
       const contentParts: typeof sheetParts = [...sheetParts];
       // Non-numeric label; scored via the coverResult schema field with its
@@ -188,38 +193,39 @@ async function runQualityCheck(
       });
 
       const parsed = await callQcJudge(contentParts);
-      coverResult = parsed.coverResult ?? sentinelCoverResult('no cover result returned');
+      scored = parsed.coverResult ?? sentinelCoverResult('no cover result returned');
     } catch (err) {
-      coverResult = sentinelCoverResult(err instanceof Error ? err.message : 'Unknown error');
+      scored = sentinelCoverResult(err instanceof Error ? err.message : 'Unknown error');
     }
 
-    const coverErrored = isQcErrorFeedback(coverResult.suggestedPromptAdditions);
+    const coverErrored = isQcErrorFeedback(scored.suggestedPromptAdditions);
     if (coverErrored) {
       logger.error(
         {
           bookId,
           event: 'qc_cover_result',
           ok: false,
-          error: coverResult.suggestedPromptAdditions,
+          error: scored.suggestedPromptAdditions,
         },
         'QC cover call failed — sentinel recorded',
       );
     } else {
       logger.info(
-        { bookId, event: 'qc_cover_result', ok: true, passed: coverResult.passed },
+        { bookId, event: 'qc_cover_result', ok: true, passed: scored.passed },
         'QC cover scored',
       );
     }
     console.log(
       `[BookFinalize/QC] cover: ${
         coverErrored
-          ? `error — ${coverResult.suggestedPromptAdditions}`
-          : coverResult.passed
+          ? `error — ${scored.suggestedPromptAdditions}`
+          : scored.passed
             ? 'passed'
             : 'failed'
       }`,
     );
-  }
+    return scored;
+  })();
 
   // Split the book into small batches so no single vision call carries the
   // whole book (the oversized-call failure mode that shipped a book with ZERO
@@ -277,6 +283,9 @@ async function runQualityCheck(
       }`,
     );
   });
+
+  // The cover judge has been running alongside the batches — join it here.
+  const coverResult = await coverJudgePromise;
 
   // Genuine quality failures only — qc_error sentinels are excluded so an
   // outage never re-illustrates a page.
@@ -338,155 +347,10 @@ async function runQualityCheck(
   return bookQCResult;
 }
 
-/**
- * Cover QC's single regeneration round: re-render the cover in-process with
- * the cover-targeted QC feedback, the character sheets, and the approved
- * interior title-page render as references. Non-fatal by design — a failed
- * regen keeps the existing cover (an imperfect cover beats none).
- */
-async function regenerateCoverFromQc(
-  book: {
-    id: string;
-    title: string | null;
-    artStyle: string | null;
-    language: string | null;
-    coverAssetId: string | null;
-    bookType?: string | null;
-    characterIdentity: unknown;
-    pages: Array<{
-      assetId: string | null;
-      text: string | null;
-      illustrationNotes: string | null;
-      pageNumber: number;
-      generatedImageUrl: string | null;
-      isTitlePage?: boolean;
-      [key: string]: unknown;
-    }>;
-  },
-  sheets: CharacterSheetRef[],
-  coverResult: CoverQCResult,
-): Promise<void> {
-  try {
-    logger.info(
-      { bookId: book.id, issues: coverResult.issues, titleMatches: coverResult.titleMatches },
-      'Cover failed QC — regenerating once with cover-targeted feedback',
-    );
-
-    if (!book.artStyle || !isValidStyle(book.artStyle)) {
-      logger.warn(
-        { bookId: book.id, artStyle: book.artStyle },
-        'Cover regen skipped: invalid art style',
-      );
-      return;
-    }
-
-    const isAvatarBook = book.bookType === 'AVATAR_STORY';
-    const titlePage = resolveCoverPage(book.pages, book.coverAssetId, book.bookType);
-    if (!titlePage?.text) {
-      logger.warn({ bookId: book.id }, 'Cover regen skipped: no title page with text');
-      return;
-    }
-
-    // Photo books anchor to the title photo; avatar books anchor to the
-    // approved interior render of page 1 (same anchor the original cover
-    // render used — there is no photo anywhere in the book).
-    let contentImage;
-    if (isAvatarBook) {
-      if (!titlePage.generatedImageUrl) {
-        logger.warn(
-          { bookId: book.id },
-          'Cover regen skipped: avatar title page has no interior render',
-        );
-        return;
-      }
-      contentImage = await fetchImageInput(
-        optimizeCloudinaryUrlForVision(titlePage.generatedImageUrl),
-      );
-    } else {
-      const asset = titlePage.assetId
-        ? await prisma.asset.findUnique({ where: { id: titlePage.assetId } })
-        : null;
-      const rawAnchorUrl = asset?.url || asset?.thumbnailUrl;
-      if (!rawAnchorUrl) {
-        logger.warn({ bookId: book.id }, 'Cover regen skipped: title page has no source photo');
-        return;
-      }
-      // Same vision-normalized anchor the original render used.
-      contentImage = await fetchImageInput(
-        optimizeCloudinaryUrlForVision(convertHeicToJpeg(rawAnchorUrl)),
-      );
-    }
-
-    const sheetRefs = [];
-    for (const sheet of sheets) {
-      try {
-        sheetRefs.push(await fetchImageInput(optimizeCloudinaryUrlForVision(sheet.url)));
-      } catch (sheetError: any) {
-        logger.warn(
-          { bookId: book.id, characterId: sheet.characterId, error: sheetError.message },
-          'Cover regen: failed to fetch character sheet — continuing without it',
-        );
-      }
-    }
-
-    // Avatar books: the interior render IS the content anchor above — a
-    // second copy as a reference would be redundant payload.
-    let interiorRenderRef = null;
-    if (!isAvatarBook && titlePage.generatedImageUrl) {
-      try {
-        const interior = await fetchImageInput(
-          optimizeCloudinaryUrlForVision(titlePage.generatedImageUrl),
-        );
-        interiorRenderRef = await resizeForReference(interior.buffer);
-      } catch (interiorError: any) {
-        logger.warn(
-          { bookId: book.id, error: interiorError.message },
-          'Cover regen: failed to fetch interior title render — continuing without it',
-        );
-      }
-    }
-
-    const outcome = await generateAndStoreCover({
-      bookId: book.id,
-      styleKey: book.artStyle,
-      bookTitle: book.title,
-      pageText: titlePage.text,
-      illustrationNotes: titlePage.illustrationNotes ?? null,
-      language: book.language || 'en',
-      characterIdentity: book.characterIdentity as CharacterIdentity | null,
-      pageNumber: titlePage.pageNumber,
-      contentImage,
-      characterSheetRefs: sheetRefs,
-      interiorRenderRef,
-      ...(isAvatarBook ? { contentAnchor: 'interior' as const } : {}),
-      // This is the one place cover feedback is allowed to flow: it was
-      // scored against the cover itself, under the cover rubric.
-      qcFeedback: coverResult.suggestedPromptAdditions,
-      logger,
-    });
-
-    if ('coverUrl' in outcome) {
-      logger.info(
-        { bookId: book.id, coverUrl: outcome.coverUrl },
-        'Cover regenerated after QC failure',
-      );
-    } else {
-      logger.warn(
-        { bookId: book.id, reason: outcome.blockedReason },
-        'Cover regen blocked — keeping existing cover',
-      );
-    }
-  } catch (error: any) {
-    logger.error(
-      { bookId: book.id, error: error.message },
-      'Cover regen failed (non-fatal) — keeping existing cover',
-    );
-  }
-}
-
 export async function processBookFinalize(job: Job<BookFinalizeJob>) {
   const { bookId, userId } = job.data;
   const qcRound = job.data.qcRound || 0;
+  let qcMs: number | null = null;
 
   logger.info({ bookId, userId, jobId: job.id, qcRound }, 'Starting book finalization');
   console.log(
@@ -650,6 +514,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
         // The endgame is real work — say so instead of sitting on a full bar.
         await setGenerationPhase(bookId, 'finishing');
 
+        const qcStartedAt = Date.now();
         const qcResult = await runQualityCheck(
           bookId,
           qcPages,
@@ -658,6 +523,8 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
           sheetsForJudge,
           coverForQc,
         );
+        qcMs = Date.now() - qcStartedAt;
+        logger.info({ bookId, qcRound, qcMs }, 'Quality check complete');
 
         // C4 TELEMETRY: one searchable qc_class_flags record per page — the
         // dataset the promotion criterion reads to decide when a telemetry-only
@@ -733,33 +600,27 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
           }
         }
 
-        // Cover QC regen: exactly ONE round, taken only on the first QC pass
-        // (qcRound === 0) so a book run can never re-buy the cover twice.
-        // Inline (not re-queued): cover failure never blocks or requeues
-        // pages, and the finalize lock is long enough for one render.
-        // Skipped when the TITLE PAGE itself is being requeued below — its
-        // successful re-render regenerates the cover anyway, and this regen
-        // would be overwritten uncorrected (one wasted render).
+        // Cover QC regen (X15: a requeue-flow CHILD, no longer rendered
+        // inline inside finalize — the finalize job stops holding its lock
+        // through a ~100s render, and when pages also failed the cover
+        // re-render runs in parallel with them). Exactly-once and sentinel
+        // semantics unchanged — see coverRegenEligible.
         const titlePageRequeued = Boolean(
           qcResult &&
           !qcResult.passed &&
           book.pages.some((p: any) => p.isTitlePage && qcResult.failedPageIds.includes(p.id)),
         );
-        // A qc_error cover sentinel never buys a regen: the cover was not
-        // judged, so there is no quality verdict (and no usable feedback) to
-        // regenerate from — the sentinel row is the record that QC didn't run.
-        if (
-          coverForQc &&
-          qcResult?.coverResult &&
-          !qcResult.coverResult.passed &&
-          !isQcErrorFeedback(qcResult.coverResult.suggestedPromptAdditions) &&
-          qcRound === 0 &&
-          !titlePageRequeued
-        ) {
-          await regenerateCoverFromQc(book, sheets, qcResult.coverResult);
-        }
+        const coverRegenNeeded = Boolean(
+          qcResult &&
+            coverRegenEligible({
+              coverJudged: Boolean(coverForQc),
+              coverResult: qcResult.coverResult,
+              qcRound,
+              titlePageRequeued,
+            }),
+        );
 
-        if (qcResult && !qcResult.passed && qcResult.failedPageIds.length > 0) {
+        if (qcResult && ((!qcResult.passed && qcResult.failedPageIds.length > 0) || coverRegenNeeded)) {
           const nextRound = qcRound + 1;
           qcResult.qcRound = nextRound;
 
@@ -781,13 +642,14 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
               bookId,
               qcRound: nextRound,
               failedPages: qcResult.failedPageIds.length,
+              coverRegen: coverRegenNeeded,
               ...(escalationModelId ? { escalationModel: escalationModelId } : {}),
             },
-            'QC failed — re-queuing failed pages for re-illustration',
+            'QC requeue — re-rendering failed pages and/or the cover',
           );
 
           console.log(
-            `[BookFinalize/QC] QC round ${nextRound} failed for book ${bookId} — re-queuing ${qcResult.failedPageIds.length} pages`,
+            `[BookFinalize/QC] QC round ${nextRound} requeue for book ${bookId} — re-rendering ${qcResult.failedPageIds.length} pages${coverRegenNeeded ? ' + cover regen' : ''}`,
           );
 
           // Build re-illustration jobs for failed pages
@@ -864,6 +726,51 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
             },
           }));
 
+          // X15: the cover regen rides the same flow as the page re-renders
+          // (parallel with them; alone in the flow on a cover-only failure —
+          // the round-1 finalize then just recomputes status and completes).
+          // pageId/pageNumber carry the title page so diagnostics stay
+          // meaningful; escalation never applies (cover model policy lives in
+          // cover-generation).
+          const coverTitlePage = coverRegenNeeded
+            ? resolveCoverPage(book.pages, book.coverAssetId, book.bookType)
+            : null;
+          const coverChildren =
+            coverRegenNeeded && coverTitlePage && qcResult.coverResult
+              ? [
+                  {
+                    name: `cover-regen-${bookId}-qc${nextRound}`,
+                    queueName: QUEUE_NAMES.ILLUSTRATION_GENERATION,
+                    data: {
+                      userId,
+                      bookId,
+                      pageId: coverTitlePage.id,
+                      pageNumber: coverTitlePage.pageNumber,
+                      text: coverTitlePage.text,
+                      artStyle: book.artStyle,
+                      bookTitle: book.title,
+                      isTitlePage: true,
+                      illustrationNotes: coverTitlePage.illustrationNotes,
+                      originalImageUrl: coverTitlePage.originalImageUrl,
+                      characterIdentity,
+                      language: book.language,
+                      ...(sheets.length ? { characterSheets: sheets } : {}),
+                      qcRound: nextRound,
+                      coverRegen: true,
+                      coverQcResult: qcResult.coverResult,
+                    },
+                    opts: {
+                      attempts: 5,
+                      backoff: { type: 'exponential' as const, delay: 10000 },
+                      removeOnComplete: { count: 1000 },
+                      removeOnFail: { count: 5000 },
+                      failParentOnFailure: false,
+                      removeDependencyOnFailure: true,
+                    },
+                  },
+                ]
+              : [];
+
           const flowProducer = new FlowProducer({ connection: createBullMQConnection() });
 
           try {
@@ -882,7 +789,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
                 removeOnComplete: { count: 100 },
                 removeOnFail: { count: 500 },
               },
-              children: pageChildren,
+              children: [...pageChildren, ...coverChildren],
             });
 
             logger.info(
@@ -890,6 +797,7 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
                 bookId,
                 qcRound: nextRound,
                 reIllustrateCount: pageChildren.length,
+                coverRegen: coverRegenNeeded,
                 flowJobId: flow.job.id,
               },
               'Created QC re-illustration flow',
@@ -1052,6 +960,14 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
               p.moderationStatus === 'FAILED' ||
               p.moderationStatus === 'FLAGGED',
           ).length,
+          ...(qcMs !== null ? { qcMs } : {}),
+          ...(pagesWithIllustrations.length > 1
+            ? {
+                artSpanMs:
+                  Math.max(...pagesWithIllustrations.map((p: any) => p.updatedAt.getTime())) -
+                  Math.min(...pagesWithIllustrations.map((p: any) => p.updatedAt.getTime())),
+              }
+            : {}),
         },
       },
       logger,

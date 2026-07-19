@@ -63,7 +63,12 @@ import {
 } from '../lib/avatar-story.js';
 import { storyQualityV2Enabled, deterministicStoryChecks } from '../lib/story-quality.js';
 import { persistStoryQc } from '../lib/story-qc-persist.js';
-import { STORY_MODEL, ANALYSIS_MODEL } from '../config/models.js';
+import {
+  STORY_MODEL,
+  ANALYSIS_MODEL,
+  STORY_OPENAI_TIMEOUT_MS,
+  storyReasoningEffort,
+} from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -700,6 +705,7 @@ export async function processStoryGeneration(
     // Initialize OpenAI client
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
+      timeout: STORY_OPENAI_TIMEOUT_MS,
     });
 
     // Safe access to job data
@@ -1019,9 +1025,16 @@ export async function processStoryGeneration(
         }
       }
 
+      const reasoningEffort = storyReasoningEffort();
       const result = await openai.responses.create({
         model: STORY_MODEL,
         instructions: isAvatarStory ? AVATAR_STORY_SYSTEM_PROMPT : STORY_GENERATION_SYSTEM_PROMPT,
+        // X15 experiment knob, default ABSENT (model default effort). Adopt
+        // only after the quality gate: >=3 fresh generations at the candidate
+        // effort with no story-QC metric below the default-run floor, plus an
+        // owner read. Rollback = unset the env var. Invalid values are
+        // ignored (default behavior) rather than 400-looping the story job.
+        ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
         input: [{ role: 'user', content: contentParts }],
         text: {
           format: {
@@ -1075,7 +1088,10 @@ export async function processStoryGeneration(
       }
     };
 
+    const storyStartedAt = Date.now();
     let storyResponse = await generateStory();
+    const storyMs = Date.now() - storyStartedAt;
+    logger.info({ bookId, storyMs }, 'Story model call complete');
 
     // Validate-or-DROP the model's proposed bridges (cap, one-per-gap,
     // roster-only characters). A bad bridge never fails the story — the book
@@ -1112,6 +1128,7 @@ export async function processStoryGeneration(
     let regenerated = false;
     let regenCount = 0;
     let targetedRewrites = 0;
+    let storyQcMs = 0;
 
     // Shared context for the surgical rewrites.
     const bookLanguage = (isAvatarStory ? avatarInput!.language : storyInput.language) || 'en';
@@ -1121,10 +1138,22 @@ export async function processStoryGeneration(
         : [storyInput.childName, ...(storyInput.charactersInPhotos ?? []).map((c) => c.name)]
     ).filter((n): n is string => !!n?.trim());
 
-    const evaluate = (): Promise<StoryQcVerdict> =>
-      isAvatarStory
-        ? evaluateAvatarStoryQuality(openai, storyResponse, avatarInput!, bookId)
-        : evaluateStoryQuality(openai, storyResponse, storyInput, bookId, acceptedBridges);
+    // storyQcMs accumulates across rounds (X15 instrumentation). X16 W1 moved
+    // this definition above applyTargetedRewrites so the re-judge path can
+    // call it; every call (initial, regen, re-judge) is timed.
+    const evaluate = async (): Promise<StoryQcVerdict> => {
+      const qcStartedAt = Date.now();
+      const verdict = isAvatarStory
+        ? await evaluateAvatarStoryQuality(openai, storyResponse, avatarInput!, bookId)
+        : await evaluateStoryQuality(openai, storyResponse, storyInput, bookId, acceptedBridges);
+      const roundMs = Date.now() - qcStartedAt;
+      storyQcMs += roundMs;
+      logger.info(
+        { bookId, storyQcMs: roundMs, qcPassed: verdict.passed },
+        'Story QC call complete',
+      );
+      return verdict;
+    };
 
     const applyTargetedRewrites = async (verdict: StoryQcVerdict): Promise<StoryQcVerdict> => {
       if (
@@ -1268,7 +1297,12 @@ export async function processStoryGeneration(
         // Back to 'story' so the story stage emits a mid-flight signal —
         // this write is also what keeps the UI's stall clock honest.
         await setGenerationPhase(bookId, 'story');
+        const regenStartedAt = Date.now();
         storyResponse = await generateStory(verdict.feedback);
+        logger.info(
+          { bookId, storyRegenMs: Date.now() - regenStartedAt, attempt: regenCount },
+          'Story regen call complete',
+        );
         acceptedBridges = validateBridges(storyResponse);
         await setGenerationPhase(bookId, 'story_check');
         verdict = await evaluate();
@@ -1667,6 +1701,8 @@ export async function processStoryGeneration(
           qcPassed,
           bridgePages: acceptedBridges.length,
           bookType: book.bookType,
+          storyMs,
+          qcMs: storyQcMs,
         },
       },
       logger,

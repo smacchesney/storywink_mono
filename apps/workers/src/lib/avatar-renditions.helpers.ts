@@ -20,6 +20,14 @@ export interface SheetValidationVerdict {
   passed: boolean;
   failedAxes: string[];
   notes: string;
+  /**
+   * X15 clothing-consistency REPORT (never a pass/fail axis): whether the
+   * sheet's clothing matches the identity's typicalClothing, and what the
+   * sheet actually shows. Null when the validator (or an older cached
+   * verdict) didn't report them.
+   */
+  clothingMatchesDescription: boolean | null;
+  observedClothing: string | null;
 }
 
 /**
@@ -48,6 +56,14 @@ export function parseSheetValidationVerdict(text: string): SheetValidationVerdic
     passed: verdict.passed === true,
     failedAxes,
     notes: typeof verdict.notes === 'string' ? verdict.notes : '',
+    clothingMatchesDescription:
+      typeof verdict.clothingMatchesDescription === 'boolean'
+        ? verdict.clothingMatchesDescription
+        : null,
+    observedClothing:
+      typeof verdict.observedClothing === 'string' && verdict.observedClothing.trim()
+        ? verdict.observedClothing.trim()
+        : null,
   };
 }
 
@@ -56,5 +72,7 @@ function unparseable(text: string): SheetValidationVerdict {
     passed: false,
     failedAxes: ['unparseable'],
     notes: text.slice(0, UNPARSEABLE_NOTES_CAP),
+    clothingMatchesDescription: null,
+    observedClothing: null,
   };
 }

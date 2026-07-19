@@ -40,7 +40,7 @@ import { optimizeCloudinaryUrlForVision } from '@storywink/shared/utils';
 import { getIllustrator } from './illustrators/index.js';
 import type { IllustrationImageInput } from './illustrators/index.js';
 import { fetchImageInput } from './images.js';
-import { ANALYSIS_MODEL } from '../config/models.js';
+import { ANALYSIS_MODEL, ANALYSIS_OPENAI_TIMEOUT_MS } from '../config/models.js';
 import {
   MAX_SHEET_GENERATIONS_PER_BOOK,
   SHEET_BUDGET_MS,
@@ -360,6 +360,19 @@ async function generateAndValidateSheet(
       });
 
       if (validation.passed) {
+        // X15: book-path clothing mismatches are TELEMETRY-ONLY (the book
+        // identity is rebuilt per book; the avatar path owns auto-reconcile).
+        if (validation.clothingMismatch) {
+          logger.warn(
+            {
+              bookId,
+              characterId: character.characterId,
+              event: 'sheet_clothing_mismatch',
+              observedClothing: validation.clothingMismatch.observedClothing,
+            },
+            'Validated sheet clothing differs from identity text (book path — telemetry only)',
+          );
+        }
         logger.info(
           { bookId, characterId: character.characterId, artStyle, attempts },
           'Character sheet generated and validated',
@@ -438,9 +451,12 @@ interface ValidateSheetParams {
   styleExemplarUrls: string[];
 }
 
-async function validateSheet(
-  params: ValidateSheetParams,
-): Promise<{ passed: boolean; notes: string }> {
+async function validateSheet(params: ValidateSheetParams): Promise<{
+  passed: boolean;
+  notes: string;
+  /** X15 clothing report (never gates passed) — book path is telemetry-only. */
+  clothingMismatch?: { observedClothing: string } | null;
+}> {
   const { character, artStyle, photoUrls, sheetUrl, styleExemplarUrls } = params;
 
   if (!process.env.OPENAI_API_KEY) {
@@ -475,7 +491,10 @@ async function validateSheet(
     { type: 'input_text', text: promptText },
   ];
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    timeout: ANALYSIS_OPENAI_TIMEOUT_MS,
+  });
   const result = await openai.responses.create({
     model: ANALYSIS_MODEL,
     instructions: SHEET_VALIDATION_SYSTEM_PROMPT,
@@ -493,8 +512,22 @@ async function validateSheet(
   const raw = result.output_text;
   if (!raw) return { passed: false, notes: 'Validator returned empty response' };
 
-  const parsed = JSON.parse(raw) as { passed: boolean; notes: string };
-  return { passed: Boolean(parsed.passed), notes: parsed.notes ?? '' };
+  const parsed = JSON.parse(raw) as {
+    passed: boolean;
+    notes: string;
+    clothingMatchesDescription?: boolean;
+    observedClothing?: string;
+  };
+  return {
+    passed: Boolean(parsed.passed),
+    notes: parsed.notes ?? '',
+    clothingMismatch:
+      parsed.clothingMatchesDescription === false &&
+      parsed.observedClothing?.trim() &&
+      parsed.observedClothing.trim().toLowerCase() !== 'none'
+        ? { observedClothing: parsed.observedClothing.trim() }
+        : null,
+  };
 }
 
 /**

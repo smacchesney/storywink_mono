@@ -1,5 +1,6 @@
 import OpenAI, { toFile } from 'openai';
 import pino from 'pino';
+import { IMAGE_OPENAI_TIMEOUT_MS } from '../../config/models.js';
 import type { IllustrationInput, IllustrationOutput, IllustrationProvider } from './types.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -60,7 +61,10 @@ export class OpenAIProvider implements IllustrationProvider {
     if (!process.env.OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY is required when ILLUSTRATION_PROVIDER=openai');
     }
-    this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    this.client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      timeout: IMAGE_OPENAI_TIMEOUT_MS,
+    });
     this.quality = opts?.quality ?? readQuality();
     this.thinking = readThinking();
     this.modelId = opts?.modelId || process.env.OPENAI_IMAGE_MODEL || DEFAULT_OPENAI_IMAGE_MODEL;
@@ -93,17 +97,34 @@ export class OpenAIProvider implements IllustrationProvider {
     const { quality, thinking } = this;
 
     try {
-      const response = await this.client.images.edit({
-        model: this.modelId,
-        image: imageFiles,
-        prompt: input.prompt,
-        size: '2048x2048',
-        quality,
-        // NOTE: as of gpt-image-2 launch (2026-04-21), the "thinking" mode parameter
-        // name is still settling in the SDK. Pass via generic `reasoning` field if
-        // set; fall back to omitting it (standard mode) if SDK rejects.
-        ...(thinking ? { reasoning: { effort: 'medium' } } : {}),
-      } as any);
+      const { data: response, response: raw } = await this.client.images
+        .edit({
+          model: this.modelId,
+          image: imageFiles,
+          prompt: input.prompt,
+          size: '2048x2048',
+          quality,
+          // NOTE: as of gpt-image-2 launch (2026-04-21), the "thinking" mode parameter
+          // name is still settling in the SDK. Pass via generic `reasoning` field if
+          // set; fall back to omitting it (standard mode) if SDK rejects.
+          ...(thinking ? { reasoning: { effort: 'medium' } } : {}),
+        } as any)
+        .withResponse();
+
+      // Rate-limit headroom (headers may be absent) — the observability input
+      // for raising ILLUSTRATION_CONCURRENCY safely.
+      const remainingImages = raw.headers.get('x-ratelimit-remaining-images');
+      const remainingTokens = raw.headers.get('x-ratelimit-remaining-tokens');
+      if (remainingImages !== null || remainingTokens !== null) {
+        logger.info(
+          {
+            provider: 'openai',
+            ...(remainingImages !== null ? { remainingImages } : {}),
+            ...(remainingTokens !== null ? { remainingTokens } : {}),
+          },
+          'OpenAI images rate-limit headroom',
+        );
+      }
 
       const imageBase64 = response.data?.[0]?.b64_json;
       if (imageBase64) {

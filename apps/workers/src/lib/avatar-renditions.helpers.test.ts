@@ -17,11 +17,53 @@ describe('parseSheetValidationVerdict', () => {
     notes: 'Looks great.',
   });
 
+  it('surfaces the clothing report fields when present (X15 safety)', () => {
+    const withClothing = JSON.stringify({
+      sameCharacter: true,
+      allPanelsConsistent: true,
+      styleMatches: true,
+      noTextArtifacts: true,
+      passed: true,
+      notes: 'Looks great.',
+      clothingMatchesDescription: false,
+      observedClothing: 'orange raglan tee with white sleeves',
+    });
+    const v = parseSheetValidationVerdict(withClothing);
+    expect(v.passed).toBe(true);
+    expect(v.clothingMatchesDescription).toBe(false);
+    expect(v.observedClothing).toBe('orange raglan tee with white sleeves');
+  });
+
+  it('clothing report is NEVER a pass/fail axis: mismatch does not fail the sheet or join failedAxes', () => {
+    const v = parseSheetValidationVerdict(
+      JSON.stringify({
+        sameCharacter: true,
+        allPanelsConsistent: true,
+        styleMatches: true,
+        noTextArtifacts: true,
+        passed: true,
+        notes: '',
+        clothingMatchesDescription: false,
+        observedClothing: 'orange tee',
+      }),
+    );
+    expect(v.passed).toBe(true);
+    expect(v.failedAxes).toEqual([]);
+  });
+
+  it('tolerates verdicts without the clothing fields (nulls, pre-X15 shape)', () => {
+    const v = parseSheetValidationVerdict(passing);
+    expect(v.clothingMatchesDescription).toBeNull();
+    expect(v.observedClothing).toBeNull();
+  });
+
   it('reports a clean pass with no failed axes', () => {
     expect(parseSheetValidationVerdict(passing)).toEqual({
       passed: true,
       failedAxes: [],
       notes: 'Looks great.',
+      clothingMatchesDescription: null,
+      observedClothing: null,
     });
   });
 
@@ -38,6 +80,8 @@ describe('parseSheetValidationVerdict', () => {
       passed: false,
       failedAxes: ['styleMatches'],
       notes: 'Palette drifted from the style bible.',
+      clothingMatchesDescription: null,
+      observedClothing: null,
     });
   });
 
@@ -70,6 +114,8 @@ describe('parseSheetValidationVerdict', () => {
       passed: false,
       failedAxes: [],
       notes: 'Humanoid action figure reads as a real person — off-rubric.',
+      clothingMatchesDescription: null,
+      observedClothing: null,
     });
   });
 
@@ -78,6 +124,8 @@ describe('parseSheetValidationVerdict', () => {
       passed: false,
       failedAxes: ['unparseable'],
       notes: 'not json at all',
+      clothingMatchesDescription: null,
+      observedClothing: null,
     });
   });
 
@@ -86,6 +134,8 @@ describe('parseSheetValidationVerdict', () => {
       passed: false,
       failedAxes: ['unparseable'],
       notes: '',
+      clothingMatchesDescription: null,
+      observedClothing: null,
     });
   });
 
@@ -94,6 +144,8 @@ describe('parseSheetValidationVerdict', () => {
       passed: false,
       failedAxes: ['unparseable'],
       notes: 'true',
+      clothingMatchesDescription: null,
+      observedClothing: null,
     });
   });
 

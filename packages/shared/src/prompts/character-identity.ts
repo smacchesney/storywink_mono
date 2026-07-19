@@ -163,6 +163,13 @@ export interface SheetCharacterInput {
     distinguishingFeatures: string[];
   };
   styleTranslation: string;
+  /**
+   * Canonical outfit from the stored identity. Optional: both the avatar and
+   * book paths pass their full character objects, which carry it when the
+   * extractor produced one. Read ONLY by the validation prompt's clothing
+   * report — the generation prompt is unchanged.
+   */
+  typicalClothing?: string | null;
 }
 
 function sheetCharacterBlock(character: SheetCharacterInput): string {
@@ -257,7 +264,17 @@ export function createSheetValidationPrompt(input: {
     `3. styleMatches: Does the sheet's rendering match the art style exemplars (line work, palette, construction method)?`,
     `4. noTextArtifacts: Is the sheet free of any text, labels, captions, watermarks, and obvious anatomical errors (wrong finger count, fused features)?`,
     `Set passed=true only if ALL four checks pass. Describe any failure precisely in notes.`,
-  ].join('\n\n');
+    // Placed BELOW the pass rubric on purpose: no pass/fail check may read
+    // the expected clothing as part of "the description above" — a clothing
+    // disagreement must never brick sheet generation.
+    `Separately — a REPORT that is never part of passed: ${
+      character.typicalClothing && character.typicalClothing !== 'none'
+        ? `the character's stored clothing description is "${character.typicalClothing}". Set clothingMatchesDescription to whether the sheet's clothing matches it (garment types and colors).`
+        : `no stored clothing description was given — set clothingMatchesDescription to true.`
+    } Set observedClothing to a one-line plain description of the clothing actually shown on the sheet ("none" if the character wears none).`,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 export const SHEET_VALIDATION_RESPONSE_SCHEMA = {
@@ -269,6 +286,10 @@ export const SHEET_VALIDATION_RESPONSE_SCHEMA = {
     noTextArtifacts: { type: 'boolean' },
     passed: { type: 'boolean' },
     notes: { type: 'string' },
+    // X15 clothing report (never gates passed): lets the pipeline reconcile
+    // identity text to an approved sheet instead of shipping a contradiction.
+    clothingMatchesDescription: { type: 'boolean' },
+    observedClothing: { type: 'string' },
   },
   required: [
     'sameCharacter',
@@ -277,6 +298,8 @@ export const SHEET_VALIDATION_RESPONSE_SCHEMA = {
     'noTextArtifacts',
     'passed',
     'notes',
+    'clothingMatchesDescription',
+    'observedClothing',
   ],
   additionalProperties: false,
 } as const;
