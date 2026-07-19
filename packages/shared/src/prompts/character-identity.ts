@@ -163,6 +163,13 @@ export interface SheetCharacterInput {
     distinguishingFeatures: string[];
   };
   styleTranslation: string;
+  /**
+   * Canonical outfit from the stored identity. Optional: both the avatar and
+   * book paths pass their full character objects, which carry it when the
+   * extractor produced one. Read ONLY by the validation prompt's clothing
+   * report — the generation prompt is unchanged.
+   */
+  typicalClothing?: string | null;
 }
 
 function sheetCharacterBlock(character: SheetCharacterInput): string {
@@ -238,13 +245,19 @@ export function createSheetValidationPrompt(input: {
       `then 1 candidate 2x2 character model sheet, ` +
       `then ${styleRefCount} art style exemplar image(s) for the "${artStyle}" style.`,
     sheetCharacterBlock(character),
+    character.typicalClothing && character.typicalClothing !== 'none'
+      ? `EXPECTED CLOTHING (from the stored identity): ${character.typicalClothing}`
+      : null,
     `Evaluate the candidate sheet:`,
     `1. sameCharacter: Is the character on the sheet recognizably the SAME child as in the photos (hair color/style, skin tone, distinguishing features)? Judge against the photos and the description above.`,
     `2. allPanelsConsistent: Do all four panels depict the same character with identical features, proportions, and outfit?`,
     `3. styleMatches: Does the sheet's rendering match the art style exemplars (line work, palette, construction method)?`,
     `4. noTextArtifacts: Is the sheet free of any text, labels, captions, watermarks, and obvious anatomical errors (wrong finger count, fused features)?`,
     `Set passed=true only if ALL four checks pass. Describe any failure precisely in notes.`,
-  ].join('\n\n');
+    `Separately — a REPORT, never part of passed: set clothingMatchesDescription to whether the sheet's clothing matches the EXPECTED CLOTHING above (garment types and colors; true when no expected clothing was given), and set observedClothing to a one-line plain description of the clothing actually shown on the sheet ("none" if the character wears none).`,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 export const SHEET_VALIDATION_RESPONSE_SCHEMA = {
@@ -256,6 +269,10 @@ export const SHEET_VALIDATION_RESPONSE_SCHEMA = {
     noTextArtifacts: { type: 'boolean' },
     passed: { type: 'boolean' },
     notes: { type: 'string' },
+    // X15 clothing report (never gates passed): lets the pipeline reconcile
+    // identity text to an approved sheet instead of shipping a contradiction.
+    clothingMatchesDescription: { type: 'boolean' },
+    observedClothing: { type: 'string' },
   },
   required: [
     'sameCharacter',
@@ -264,6 +281,8 @@ export const SHEET_VALIDATION_RESPONSE_SCHEMA = {
     'noTextArtifacts',
     'passed',
     'notes',
+    'clothingMatchesDescription',
+    'observedClothing',
   ],
   additionalProperties: false,
 } as const;
