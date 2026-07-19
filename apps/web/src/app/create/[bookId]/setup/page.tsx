@@ -20,7 +20,10 @@ import {
   type DiscoveryChip,
   type RosterCharacterLike,
 } from '@/components/create/setup/discovery-feed';
-import { ensureMemberNamingQuestions } from '@/components/create/setup/star-ask';
+import {
+  ensureMemberNamingQuestions,
+  mergeCaptureQuestions,
+} from '@/components/create/setup/star-ask';
 import {
   allPagesAnalyzed,
   arrivalStripPhase,
@@ -185,7 +188,10 @@ export default function SetupPage() {
       if (!touched.current.childName && book.childName) next.childName = book.childName;
       if (!touched.current.eventSummary && book.eventSummary) next.eventSummary = book.eventSummary;
       if (!touched.current.captureQuestions && book.captureQuestions?.length) {
-        next.captureQuestions = book.captureQuestions;
+        // Id-preserving merge: a poll tick landing before handlePickEveryone's
+        // PATCH round-trips must not clobber the synthetic `name_` naming rows
+        // it injected without marking captureQuestions touched.
+        next.captureQuestions = mergeCaptureQuestions(book.captureQuestions, prev.captureQuestions);
       }
       if (book.artStyle && isValidStyle(book.artStyle)) {
         next.artStyle = book.artStyle as StyleKey;

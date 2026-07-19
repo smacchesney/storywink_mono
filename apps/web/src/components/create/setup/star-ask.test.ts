@@ -7,7 +7,7 @@ vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
-import { ensureMemberNamingQuestions } from './star-ask';
+import { ensureMemberNamingQuestions, mergeCaptureQuestions } from './star-ask';
 import { orderQuestions, type CaptureQuestion } from './CaptureChips';
 import type { RosterCharacterLike } from './discovery-feed';
 
@@ -50,6 +50,46 @@ describe('ensureMemberNamingQuestions', () => {
       (d) => d,
     );
     expect(out).toHaveLength(10);
+  });
+});
+
+describe('mergeCaptureQuestions', () => {
+  const q = (id: string): CaptureQuestion => ({ id, question: 'x', options: [] });
+  const nameRow = (id: string, answer: string | null = null): CaptureQuestion => ({
+    id: `name_${id}`,
+    question: `What should we call ${id}?`,
+    options: [],
+    characterId: id,
+    kind: 'naming',
+    answer,
+  });
+
+  it('returns the server list verbatim when no local synthetics exist', () => {
+    const server = [q('a'), q('b')];
+    const out = mergeCaptureQuestions(server, [q('a')]);
+    // Byte-identical legacy behavior: same reference, no copy.
+    expect(out).toBe(server);
+  });
+
+  it('keeps both when local synthetics are absent from a fresh server list', () => {
+    const server = [q('perc_1')];
+    const local = [q('perc_1'), nameRow('child_2')];
+    const out = mergeCaptureQuestions(server, local);
+    expect(out.map((r) => r.id)).toEqual(['perc_1', 'name_child_2']);
+  });
+
+  it('dedupes once the server echoes the same name_ id, server version wins', () => {
+    const server = [q('perc_1'), nameRow('child_2', 'Mia')];
+    const local = [q('perc_1'), nameRow('child_2', null)];
+    const out = mergeCaptureQuestions(server, local);
+    expect(out.map((r) => r.id)).toEqual(['perc_1', 'name_child_2']);
+    expect(out.find((r) => r.id === 'name_child_2')?.answer).toBe('Mia');
+  });
+
+  it('survives an empty server list — synthetics are preserved', () => {
+    const local = [nameRow('child_1'), nameRow('child_2')];
+    const out = mergeCaptureQuestions([], local);
+    expect(out.map((r) => r.id)).toEqual(['name_child_1', 'name_child_2']);
   });
 });
 

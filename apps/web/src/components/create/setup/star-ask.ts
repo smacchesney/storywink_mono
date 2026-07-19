@@ -25,3 +25,29 @@ export function ensureMemberNamingQuestions(
     }));
   return [...questions, ...additions].slice(0, 10);
 }
+
+/**
+ * X17 B3 review fix — id-preserving merge for the perception poll.
+ *
+ * `handlePickEveryone` injects synthetic `name_<characterId>` naming rows into
+ * local `captureQuestions` WITHOUT marking `touched.current.captureQuestions`
+ * (deliberate — so perception's own late-arriving questions can still merge).
+ * The gap: while the poll is still live, a tick landing before the debounced
+ * PATCH round-trips would otherwise replace the local list wholesale and
+ * silently drop those naming chips.
+ *
+ * This keeps the server list as the base (server order, server wins on any id
+ * collision) and re-appends only the local `name_` rows the server has not yet
+ * echoed, in their local relative order. When no local `name_` rows exist the
+ * server list is returned by reference — byte-identical to the legacy wholesale
+ * replacement, so every pre-X17 book is unaffected.
+ */
+export function mergeCaptureQuestions(
+  serverQuestions: CaptureQuestion[],
+  localQuestions: CaptureQuestion[],
+): CaptureQuestion[] {
+  const serverIds = new Set(serverQuestions.map((q) => q.id));
+  const survivors = localQuestions.filter((q) => q.id.startsWith('name_') && !serverIds.has(q.id));
+  if (survivors.length === 0) return serverQuestions;
+  return [...serverQuestions, ...survivors];
+}
