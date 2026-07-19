@@ -41,6 +41,7 @@ import {
   parseSheetValidationVerdict,
   type SheetValidationVerdict,
 } from './avatar-renditions.helpers.js';
+import { sheetSubjectKind } from './character-sheets.helpers.js';
 import { ANALYSIS_MODEL } from '../config/models.js';
 
 type Logger = pino.Logger;
@@ -245,6 +246,7 @@ export async function generateAvatarSheet(
     photoCount: photos.length,
     styleRefCount: styleRefs.length,
     styleBible: getStyleBible(artStyle),
+    subjectKind: sheetSubjectKind(subject.role),
   });
 
   let lastError = 'sheet generation failed';
@@ -378,6 +380,7 @@ async function validateAvatarSheet(
     photoCount: sourceUrls.length,
     styleRefCount: styleExemplarUrls.length,
     artStyle,
+    subjectKind: sheetSubjectKind(subject.role),
   });
   const response = await params.openai.responses.create({
     model: ANALYSIS_MODEL,

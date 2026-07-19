@@ -49,6 +49,8 @@ import {
   parseCharacterReferences,
   resolveCharacterPhotoUrls,
   selectSheetCharacters,
+  sheetSubjectKind,
+  subjectAnchorFor,
   upsertCharacterReference,
   type PageWithAsset,
 } from './character-sheets.helpers.js';
@@ -300,6 +302,8 @@ async function generateAndValidateSheet(
       photoCount: photos.length,
       styleRefCount: styleExemplars.length,
       styleBible: getStyleBible(artStyle),
+      subjectKind: sheetSubjectKind(character.role),
+      subjectAnchor: subjectAnchorFor(character),
     });
 
     // First generation + at most one regeneration on validation failure.
@@ -450,6 +454,7 @@ async function validateSheet(
     photoCount: photoUrls.length,
     styleRefCount: styleExemplarUrls.length,
     artStyle,
+    subjectKind: sheetSubjectKind(character.role),
   });
 
   const contentParts: Array<

@@ -7,6 +7,8 @@ import {
   upsertCharacterReference,
   sheetRefsForStyle,
   resolveCharacterPhotoUrls,
+  sheetSubjectKind,
+  subjectAnchorFor,
 } from './character-sheets.helpers.js';
 
 function makeCharacter(overrides: Partial<CharacterDescription>): CharacterDescription {
@@ -158,6 +160,50 @@ describe('characterReferences keying and reuse', () => {
 
   it('sheetRefsForStyle returns [] without a style', () => {
     expect(sheetRefsForStyle([entry('child_1', 'kawaii')], null, null)).toEqual([]);
+  });
+});
+
+describe('sheetSubjectKind (X16 W1)', () => {
+  it('keeps children on the default so existing child sheets stay byte-identical', () => {
+    expect(sheetSubjectKind('main_child')).toBe('child');
+    expect(sheetSubjectKind('friend')).toBe('child');
+    expect(sheetSubjectKind(undefined)).toBe('child');
+    expect(sheetSubjectKind(null)).toBe('child');
+  });
+
+  it('maps clearly-adult roles to grown-up (never kindFromRole "person")', () => {
+    expect(sheetSubjectKind('parent')).toBe('grown-up');
+    expect(sheetSubjectKind('grandparent')).toBe('grown-up');
+    expect(sheetSubjectKind('adult')).toBe('grown-up');
+  });
+
+  it('maps pets and companion objects', () => {
+    expect(sheetSubjectKind('pet')).toBe('pet');
+    expect(sheetSubjectKind('companion_object')).toBe('toy');
+  });
+});
+
+describe('subjectAnchorFor (X16 W1)', () => {
+  it('distills a one-line anchor from the canonical traits', () => {
+    const anchor = subjectAnchorFor(
+      makeCharacter({
+        physicalTraits: {
+          apparentAge: 'woman in her 60s',
+          hairColor: 'silver',
+          hairStyle: 'short',
+          skinTone: 'fair',
+          bodyBuild: 'slim',
+          distinguishingFeatures: ['round glasses', 'floral scarf'],
+        },
+      }),
+    );
+    expect(anchor).toBe(
+      'the woman in her 60s with silver short hair (round glasses, floral scarf)',
+    );
+  });
+
+  it('returns null when there are no traits', () => {
+    expect(subjectAnchorFor({ physicalTraits: null })).toBeNull();
   });
 });
 
