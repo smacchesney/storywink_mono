@@ -28,6 +28,7 @@ import { ImagePlus, X } from 'lucide-react';
 import { Storydust, SPARK4 } from '@/components/ui/storydust';
 import { optimizeCloudinaryUrl, BOOK_CONSTRAINTS } from '@storywink/shared';
 import { makeFileKey, uploadPhotos, validateFile } from '@/lib/uploadPhotos';
+import { stripThumbFlags } from '@/components/create/setup/photo-strip-flags';
 import logger from '@/lib/logger';
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif';
@@ -54,6 +55,10 @@ interface PhotoStripProps {
   onPhotosChanged?: () => void | Promise<void>;
   /** X17 B1: true while perception reads — a spark sweeps the thumbnails. */
   reading?: boolean;
+  /** False when the book has a composed cover (coverAssetId null). Default
+   * true keeps legacy photo-cover semantics — SetupSheet is the only
+   * callsite today, so undefined = legacy everywhere else forever. */
+  hasPhotoCover?: boolean;
 }
 
 function SortableThumb({
@@ -132,8 +137,9 @@ function SortableThumb({
         </span>
       )}
 
-      {/* Remove (✕) — hidden on the cover (cover can't be deleted). */}
-      {removable && !isCover && (
+      {/* Remove (✕) — gated by `removable`, which already encodes the cover
+          rule (composed covers have no cover thumb; legacy hides it on 0). */}
+      {removable && (
         <button
           type="button"
           onClick={onRemove}
@@ -195,6 +201,7 @@ export function PhotoStrip({
   bookId,
   onPhotosChanged,
   reading,
+  hasPhotoCover = true,
 }: PhotoStripProps) {
   const t = useTranslations('setup');
   const tUpload = useTranslations('upload');
@@ -346,19 +353,22 @@ export function PhotoStrip({
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={items.map((p) => p.id)} strategy={horizontalListSortingStrategy}>
         <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-          {items.map((photo, idx) => (
-            <SortableThumb
-              key={photo.id}
-              photo={photo}
-              isCover={idx === 0}
-              coverLabel={t('coverBadge')}
-              removable={!!bookId}
-              removing={removingId === photo.id}
-              onRemove={() => void handleRemove(photo)}
-              removeLabel={tUpload('remove')}
-              sparkling={sweepIndex === idx}
-            />
-          ))}
+          {items.map((photo, idx) => {
+            const flags = stripThumbFlags(idx, items.length, hasPhotoCover);
+            return (
+              <SortableThumb
+                key={photo.id}
+                photo={photo}
+                isCover={flags.isCover}
+                coverLabel={t('coverBadge')}
+                removable={!!bookId && flags.removable}
+                removing={removingId === photo.id}
+                onRemove={() => void handleRemove(photo)}
+                removeLabel={tUpload('remove')}
+                sparkling={sweepIndex === idx}
+              />
+            );
+          })}
 
           {canAdd && <AddTile onClick={openPicker} busy={uploading} label={tUpload('addPhotos')} />}
         </div>

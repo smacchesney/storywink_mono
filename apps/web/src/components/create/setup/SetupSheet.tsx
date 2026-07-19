@@ -99,6 +99,7 @@ export function SetupSheet({
   mainCharacterId,
   discoveryChips,
   roster,
+  coverAssetId,
   onReorder,
   onPhotosChanged,
   onChange,
@@ -149,6 +150,7 @@ export function SetupSheet({
           bookId={bookId}
           onPhotosChanged={onPhotosChanged}
           reading={CREATE_DISCOVERY_FLAG && stripPhase === 'reading'}
+          hasPhotoCover={coverAssetId !== null}
         />
       </section>
 
