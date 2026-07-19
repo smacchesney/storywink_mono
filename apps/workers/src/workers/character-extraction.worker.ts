@@ -34,6 +34,7 @@ import {
   ANALYSIS_OPENAI_TIMEOUT_MS,
   VISION_OPENAI_TIMEOUT_MS,
 } from '../config/models.js';
+import { shouldRunAfterClaim } from '../lib/peek.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -124,6 +125,32 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         'Sheet pre-warm failed (non-fatal) — the extraction pass will generate sheets',
       );
       return { prepared: false, reason: 'error' };
+    }
+  }
+
+  // X17 B4: a delayed grace-window job claims the book at run time. Claim
+  // count 0 + ILLUSTRATING means THIS job's earlier attempt claimed and then
+  // failed mid-run — proceed (retry safety). Any other status means the peek
+  // was cancelled or the book moved on: exit as a clean no-op. Foreign
+  // ILLUSTRATING is impossible here because the manual illustrations route
+  // removes an armed peek job before it starts (Task 16).
+  if (job.data.claimBook) {
+    const claimed = await prisma.book.updateMany({
+      where: { id: bookId, status: 'STORY_READY' },
+      data: { status: 'ILLUSTRATING' },
+    });
+    if (claimed.count === 0) {
+      const current = await prisma.book.findUnique({
+        where: { id: bookId },
+        select: { status: true },
+      });
+      if (!shouldRunAfterClaim(claimed.count, current?.status)) {
+        logger.info(
+          { bookId, status: current?.status },
+          'Peek job skipped — book no longer waiting to illustrate',
+        );
+        return { skipped: true, reason: 'not_claimable' };
+      }
     }
   }
 

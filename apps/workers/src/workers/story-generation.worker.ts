@@ -66,6 +66,7 @@ import {
 } from '../lib/avatar-story.js';
 import { storyQualityV2Enabled, deterministicStoryChecks } from '../lib/story-quality.js';
 import { persistStoryQc } from '../lib/story-qc-persist.js';
+import { peekExtractJobId, resolveAutoChainPlan, storyPeekGraceMs } from '../lib/peek.js';
 import {
   STORY_MODEL,
   ANALYSIS_MODEL,
@@ -1743,11 +1744,17 @@ export async function processStoryGeneration(
       logger,
     );
 
-    // Auto-chain: hand the book straight to illustration. The chain re-enters
-    // via character extraction, which owns the illustration FlowProducer flow.
-    // A chain failure must NOT fail the story job — the book stays STORY_READY
-    // and the user can start illustration manually.
-    if (book.autoIllustrate) {
+    // Auto-chain: hand the book to illustration. X17 B4: with a grace window
+    // configured, photo books arm a CANCELLABLE delayed job instead and stay
+    // STORY_READY — the peek route promotes (paint now) or re-arms (tweak) it
+    // by its deterministic id; the extraction worker claims the status when
+    // the job finally runs. Grace unset/0 = today's immediate chain.
+    const chainPlan = resolveAutoChainPlan({
+      autoIllustrate: book.autoIllustrate,
+      bookType: book.bookType,
+      graceMs: storyPeekGraceMs(),
+    });
+    if (chainPlan.mode === 'immediate') {
       try {
         await prisma.book.update({
           where: { id: bookId },
@@ -1782,6 +1789,41 @@ export async function processStoryGeneration(
             data: { status: 'STORY_READY' },
           })
           .catch(() => {});
+      }
+    } else if (chainPlan.mode === 'delayed') {
+      try {
+        const queue = getCharacterExtractionQueue();
+        const jobId = peekExtractJobId(bookId);
+        // A regenerated story can leave a finished job under this id — clear
+        // it so the fresh delayed add is never silently deduped.
+        const stale = await queue.getJob(jobId);
+        if (stale) await stale.remove().catch(() => {});
+        await queue.add(
+          `extract-characters-${bookId}`,
+          { bookId, userId, artStyle: book.artStyle || 'vignette', claimBook: true },
+          {
+            jobId,
+            delay: chainPlan.delayMs,
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 10000 },
+            removeOnComplete: { count: 100 },
+            removeOnFail: { count: 500 },
+          },
+        );
+        logger.info(
+          { bookId, delayMs: chainPlan.delayMs },
+          'Auto-chain armed as delayed peek job — book stays STORY_READY',
+        );
+      } catch (chainError) {
+        // Book is already STORY_READY — the review screen's manual start
+        // still works, so nothing to revert.
+        logger.error(
+          {
+            bookId,
+            error: chainError instanceof Error ? chainError.message : 'Unknown error',
+          },
+          'Delayed peek enqueue failed — book stays STORY_READY',
+        );
       }
     }
 

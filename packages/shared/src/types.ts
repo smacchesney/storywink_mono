@@ -177,6 +177,13 @@ export interface CharacterExtractionJob {
    * illustration flow) and exits.
    */
   prepareOnly?: boolean;
+  /**
+   * X17 B4: set on the delayed grace-window job. The worker claims the book
+   * (STORY_READY → ILLUSTRATING) at RUN time — the enqueuer deliberately did
+   * not, so a cancelled/tweaked window leaves the book untouched at
+   * STORY_READY.
+   */
+  claimBook?: boolean;
   pageIds?: string[];
   /**
    * Set by whole-book recovery/retry paths (reaper, book-level retry route):
