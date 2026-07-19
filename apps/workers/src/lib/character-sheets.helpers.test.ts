@@ -3,6 +3,7 @@ import type { CharacterDescription, CharacterReferenceEntry } from '@storywink/s
 import {
   characterPhotoCount,
   selectSheetCharacters,
+  sheetCapFor,
   parseCharacterReferences,
   upsertCharacterReference,
   sheetRefsForStyle,
@@ -95,6 +96,54 @@ describe('selectSheetCharacters', () => {
     });
     expect(characterPhotoCount(extractionIdentityChar)).toBe(2);
     expect(selectSheetCharacters([extractionIdentityChar])).toHaveLength(1);
+  });
+});
+
+const member = (id: string, role: string, assets: string[]) =>
+  ({
+    characterId: id,
+    role,
+    name: null,
+    appearsOnPages: assets.map((_, i) => i + 1),
+    appearsOnAssetIds: assets,
+  }) as unknown as CharacterDescription;
+
+describe('ensemble sheet selection (X17 A3)', () => {
+  const crew = [
+    member('child_1', 'main_child', ['a1', 'a2']),
+    member('child_2', 'sibling', ['a1', 'a2', 'a3']),
+    member('adult_1', 'grandparent', ['a2']),
+    member('pet_1', 'pet', ['a3', 'a4']),
+    member('friend_9', 'friend', []),
+  ];
+
+  it('selects members with photos, prioritized by photo count, capped at 4', () => {
+    const ids = selectSheetCharacters(crew, [
+      'child_1',
+      'child_2',
+      'adult_1',
+      'pet_1',
+      'friend_9',
+    ]).map((c) => c.characterId);
+    expect(ids).toEqual(['child_2', 'child_1', 'pet_1', 'adult_1']);
+  });
+
+  it('non-members never get ensemble sheets', () => {
+    expect(selectSheetCharacters(crew, ['child_1', 'pet_1']).map((c) => c.characterId)).toEqual([
+      'child_1',
+      'pet_1',
+    ]);
+  });
+
+  it('null/absent memberIds keeps the solo path byte-identical (main + best other)', () => {
+    expect(selectSheetCharacters(crew)).toEqual(selectSheetCharacters(crew, null));
+    expect(selectSheetCharacters(crew).map((c) => c.characterId)).toEqual(['child_1', 'child_2']);
+  });
+
+  it('sheetCapFor: 4 for ensemble, 2 otherwise', () => {
+    expect(sheetCapFor(['a', 'b'])).toBe(4);
+    expect(sheetCapFor(null)).toBe(2);
+    expect(sheetCapFor(undefined)).toBe(2);
   });
 });
 
