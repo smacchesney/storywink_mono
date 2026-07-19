@@ -41,6 +41,7 @@ import {
   parseSheetValidationVerdict,
   type SheetValidationVerdict,
 } from './avatar-renditions.helpers.js';
+import { sheetSubjectKind } from './character-sheets.helpers.js';
 import { ANALYSIS_MODEL } from '../config/models.js';
 
 type Logger = pino.Logger;
@@ -185,6 +186,13 @@ export interface AvatarSheetResult {
   provider: string;
   model: string;
   validated: boolean;
+  /**
+   * X15 safety: set when the validator PASSED the sheet but reported its
+   * clothing differs from the identity's typicalClothing. The worker then
+   * reconciles the identity TEXT to this approved sheet (the sheet is what
+   * the owner sees and what renders anchor to).
+   */
+  clothingMismatch?: { observedClothing: string } | null;
 }
 
 /** Portrait = the sheet's front-view panel (top-left quadrant crop). */
@@ -245,6 +253,7 @@ export async function generateAvatarSheet(
     photoCount: photos.length,
     styleRefCount: styleRefs.length,
     styleBible: getStyleBible(artStyle),
+    subjectKind: sheetSubjectKind(subject.role),
   });
 
   let lastError = 'sheet generation failed';
@@ -284,6 +293,15 @@ export async function generateAvatarSheet(
         provider: provider.name,
         model: provider.modelId,
         validated: true,
+        // "none" is the validator's no-clothing sentinel, not an outfit —
+        // never reconcile typicalClothing to it (telemetry still sees the
+        // mismatch via the verdict log).
+        clothingMismatch:
+          verdict.clothingMatchesDescription === false &&
+          verdict.observedClothing &&
+          verdict.observedClothing.toLowerCase() !== 'none'
+            ? { observedClothing: verdict.observedClothing }
+            : null,
       };
     }
     lastError = 'sheet failed validation';
@@ -371,13 +389,20 @@ async function validateAvatarSheet(
   const { subject, sheetUrl, sourceUrls, styleExemplarUrls, artStyle, logger } = params;
   if (!process.env.OPENAI_API_KEY) {
     logger.error({}, 'OPENAI_API_KEY missing — avatar sheet validation fails closed');
-    return { passed: false, failedAxes: [], notes: 'OPENAI_API_KEY not configured' };
+    return {
+      passed: false,
+      failedAxes: [],
+      notes: 'OPENAI_API_KEY not configured',
+      clothingMatchesDescription: null,
+      observedClothing: null,
+    };
   }
   const prompt = createSheetValidationPrompt({
     character: subject,
     photoCount: sourceUrls.length,
     styleRefCount: styleExemplarUrls.length,
     artStyle,
+    subjectKind: sheetSubjectKind(subject.role),
   });
   const response = await params.openai.responses.create({
     model: ANALYSIS_MODEL,

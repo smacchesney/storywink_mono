@@ -25,9 +25,14 @@ import {
   remapCharacterPages,
 } from '@storywink/shared/utils';
 import { mergeCastNames, CaptureAnswerLike } from '../lib/resolveCast.js';
+import { prepareIdentityForSheetPrewarm } from '../lib/sheet-prewarm.js';
 import { mergeLinkedAvatarSheets } from '../lib/avatar-sheets.js';
 import { bridgePagesEnabled } from '../lib/bridge-pages.js';
-import { ANALYSIS_MODEL } from '../config/models.js';
+import {
+  ANALYSIS_MODEL,
+  ANALYSIS_OPENAI_TIMEOUT_MS,
+  VISION_OPENAI_TIMEOUT_MS,
+} from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -48,6 +53,73 @@ async function setGenerationPhase(bookId: string, phase: string | null): Promise
 
 export async function processCharacterExtraction(job: Job<CharacterExtractionJob>) {
   const { bookId, userId, artStyle, pageIds, recovery } = job.data;
+
+  // X15 sheet pre-warm: enqueued alongside the story job so sheet generation
+  // (up to SHEET_BUDGET_MS of image-gen) overlaps the ~2min story call
+  // instead of running after it. Writes ONLY Book.characterReferences (keyed
+  // characterId+artStyle — the real extraction pass then reuses the sheets);
+  // deliberately never touches book status, generationPhase, or
+  // Book.characterIdentity (the story worker is writing that concurrently).
+  // Every failure path is a silent no-op — the real pass regenerates.
+  if (job.data.prepareOnly) {
+    if (!characterSheetsEnabled()) return { prepared: false, reason: 'sheets_disabled' };
+    try {
+      const book = await prisma.book.findUnique({
+        where: { id: bookId },
+        select: {
+          bookType: true,
+          childName: true,
+          captureQuestions: true,
+          characterIdentity: true,
+          characterReferences: true,
+          pages: {
+            orderBy: { index: 'asc' },
+            select: {
+              assetId: true,
+              asset: { select: { url: true, thumbnailUrl: true } },
+            },
+          },
+        },
+      });
+      // Avatar books render on avatar sheets, not book sheets — nothing to warm.
+      if (!book || book.bookType === 'AVATAR_STORY') {
+        return { prepared: false, reason: !book ? 'book_not_found' : 'avatar_story' };
+      }
+      // Mirror the real pass's identity preparation IN MEMORY (cast-name
+      // merge + style-translation refresh) so the pre-warmed sheet is built
+      // from the same prompt inputs the shipped path would use — a stale
+      // vignette styleTranslation baked into a kawaii sheet would otherwise
+      // be cache-hit by the real pass (final-review Critical). A failed
+      // refresh skips the warm entirely; nothing is ever persisted here.
+      const identity = await prepareIdentityForSheetPrewarm({
+        identity: book.characterIdentity as CharacterIdentity | null,
+        artStyle,
+        captureQuestions: (book.captureQuestions as CaptureAnswerLike[] | null) ?? [],
+        childName: book.childName,
+        refresh: (i) => refreshStyleTranslations(i, artStyle, bookId),
+      });
+      if (!identity) {
+        return { prepared: false, reason: 'no_usable_identity' };
+      }
+      const sheets = await ensureCharacterSheets({
+        bookId,
+        userId,
+        artStyle,
+        identity,
+        pages: book.pages,
+        existingReferences: book.characterReferences,
+        logger,
+      });
+      logger.info({ bookId, artStyle, sheetCount: sheets.length }, 'Sheet pre-warm complete');
+      return { prepared: true, sheetCount: sheets.length };
+    } catch (prepError) {
+      logger.warn(
+        { bookId, error: prepError instanceof Error ? prepError.message : 'Unknown error' },
+        'Sheet pre-warm failed (non-fatal) — the extraction pass will generate sheets',
+      );
+      return { prepared: false, reason: 'error' };
+    }
+  }
 
   logger.info({ bookId, userId, artStyle }, 'Starting character identity extraction');
 
@@ -283,8 +355,11 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
       // Add the text prompt after all images
       contentParts.push({ type: 'input_text', text: promptText.text });
 
-      // 6. Call OpenAI vision
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      // 6. Call OpenAI vision (fat multi-image call — vision-tier timeout)
+      const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+        timeout: VISION_OPENAI_TIMEOUT_MS,
+      });
 
       const result = await openai.responses.create({
         model: ANALYSIS_MODEL,
@@ -453,7 +528,10 @@ async function refreshStyleTranslations(
       artStyle,
     );
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      timeout: ANALYSIS_OPENAI_TIMEOUT_MS,
+    });
     const result = await openai.responses.create({
       model: ANALYSIS_MODEL,
       instructions: STYLE_TRANSLATION_REFRESH_SYSTEM_PROMPT,

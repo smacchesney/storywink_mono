@@ -163,6 +163,13 @@ export interface SheetCharacterInput {
     distinguishingFeatures: string[];
   };
   styleTranslation: string;
+  /**
+   * Canonical outfit from the stored identity. Optional: both the avatar and
+   * book paths pass their full character objects, which carry it when the
+   * extractor produced one. Read ONLY by the validation prompt's clothing
+   * report — the generation prompt is unchanged.
+   */
+  typicalClothing?: string | null;
 }
 
 function sheetCharacterBlock(character: SheetCharacterInput): string {
@@ -197,10 +204,15 @@ export function createCharacterSheetPrompt(input: {
   photoCount: number;
   styleRefCount: number;
   styleBible: string;
+  /** 'child' | 'grown-up' | 'pet' | 'toy' — defaults to 'child' (legacy callers byte-identical). */
+  subjectKind?: string;
+  /** One-line group-photo disambiguator ("the woman with short silver hair"). */
+  subjectAnchor?: string | null;
 }): string {
   const { character, photoCount, styleRefCount, styleBible } = input;
+  const kind = input.subjectKind || 'child';
   return [
-    `Create ONE image: a 2x2 character model sheet (turnaround grid) of the SAME child, ` +
+    `Create ONE image: a 2x2 character model sheet (turnaround grid) of the SAME ${kind}, ` +
       `using the ${photoCount + styleRefCount} images provided, in this order: ` +
       `the first ${photoCount === 1 ? 'image is a photo' : `${photoCount} images are photos`} of the character (ground truth for identity); ` +
       `the final ${styleRefCount === 1 ? 'image shows' : `${styleRefCount} images show`} the artistic style to apply.`,
@@ -210,10 +222,15 @@ export function createCharacterSheetPrompt(input: {
     `- Bottom-left: side profile view`,
     `- Bottom-right: back view`,
     `Every panel depicts the SAME character at the same scale with identical face, hair, skin tone, proportions, and outfit. Full body visible in each panel.`,
+    input.subjectAnchor
+      ? `THE SUBJECT: ${input.subjectAnchor}. Ignore every other person, pet, or object visible in the photos — the sheet depicts ONLY this subject.`
+      : '',
     sheetCharacterBlock(character),
     styleBible,
     `STRICT RULES: no text, no labels, no captions, no watermarks, no panel borders, no props, no background scenery — just the character four times on pure white. Do NOT copy any person, clothing, or pose from the style reference images; they define ONLY the artistic style.`,
-  ].join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 export const SHEET_VALIDATION_SYSTEM_PROMPT =
@@ -230,21 +247,34 @@ export function createSheetValidationPrompt(input: {
   photoCount: number;
   styleRefCount: number;
   artStyle: string;
+  /** 'child' | 'grown-up' | 'pet' | 'toy' — defaults to 'child' (legacy callers byte-identical). */
+  subjectKind?: string;
 }): string {
   const { character, photoCount, styleRefCount, artStyle } = input;
+  const kind = input.subjectKind || 'child';
   return [
     `You are shown ${photoCount + 1 + styleRefCount} images, in this order: ` +
-      `${photoCount === 1 ? '1 photo' : `${photoCount} photos`} of a real child (ground truth), ` +
+      `${photoCount === 1 ? '1 photo' : `${photoCount} photos`} of a real ${kind} (ground truth), ` +
       `then 1 candidate 2x2 character model sheet, ` +
       `then ${styleRefCount} art style exemplar image(s) for the "${artStyle}" style.`,
     sheetCharacterBlock(character),
     `Evaluate the candidate sheet:`,
-    `1. sameCharacter: Is the character on the sheet recognizably the SAME child as in the photos (hair color/style, skin tone, distinguishing features)? Judge against the photos and the description above.`,
+    `1. sameCharacter: Is the character on the sheet recognizably the SAME ${kind} as in the photos (hair color/style, skin tone, distinguishing features)? Judge against the photos and the description above.`,
     `2. allPanelsConsistent: Do all four panels depict the same character with identical features, proportions, and outfit?`,
     `3. styleMatches: Does the sheet's rendering match the art style exemplars (line work, palette, construction method)?`,
     `4. noTextArtifacts: Is the sheet free of any text, labels, captions, watermarks, and obvious anatomical errors (wrong finger count, fused features)?`,
     `Set passed=true only if ALL four checks pass. Describe any failure precisely in notes.`,
-  ].join('\n\n');
+    // Placed BELOW the pass rubric on purpose: no pass/fail check may read
+    // the expected clothing as part of "the description above" — a clothing
+    // disagreement must never brick sheet generation.
+    `Separately — a REPORT that is never part of passed: ${
+      character.typicalClothing && character.typicalClothing !== 'none'
+        ? `the character's stored clothing description is "${character.typicalClothing}". Set clothingMatchesDescription to whether the sheet's clothing matches it (garment types and colors).`
+        : `no stored clothing description was given — set clothingMatchesDescription to true.`
+    } Set observedClothing to a one-line plain description of the clothing actually shown on the sheet ("none" if the character wears none).`,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 export const SHEET_VALIDATION_RESPONSE_SCHEMA = {
@@ -256,6 +286,10 @@ export const SHEET_VALIDATION_RESPONSE_SCHEMA = {
     noTextArtifacts: { type: 'boolean' },
     passed: { type: 'boolean' },
     notes: { type: 'string' },
+    // X15 clothing report (never gates passed): lets the pipeline reconcile
+    // identity text to an approved sheet instead of shipping a contradiction.
+    clothingMatchesDescription: { type: 'boolean' },
+    observedClothing: { type: 'string' },
   },
   required: [
     'sameCharacter',
@@ -264,6 +298,8 @@ export const SHEET_VALIDATION_RESPONSE_SCHEMA = {
     'noTextArtifacts',
     'passed',
     'notes',
+    'clothingMatchesDescription',
+    'observedClothing',
   ],
   additionalProperties: false,
 } as const;

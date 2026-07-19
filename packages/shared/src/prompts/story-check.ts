@@ -87,8 +87,11 @@ Score the manuscript:
 6. soundOverload (boolean): true if the manuscript leans on sound words — any page that stacks 2+ sound words, or makes a sound word the page's main event. A story that reaches for a sound word where a vivid verb or image would do is overloaded. When true, name the offending pages in "feedback".
 7. agency (0-10): Is the child the DOER — one clear goal, a real obstacle, and a try-wobble-try before the payoff? A child who only moves THROUGH a tour of moments (witnessing, not acting) scores below 5.
 8. Per page, deliversBeat (boolean): each page header declares its beat (role — goal). true only if the page's text actually does that job for the throughline. A lovely page doing a DIFFERENT job is false. If a page shows no beat, set true.
-${input.language === 'ja' ? '\n9. The text must be Japanese in hiragana/katakana with NO kanji. Flag any kanji as a page issue.\n' : ''}
-If ANY of these fail (arcCoherence < 6, readAloudRhythm < 6, lastPageLanding false, soundOverload true, agency < 6, any page captionRisk >= 7, or any page deliversBeat false), write "feedback": a numbered list of specific corrections. Reference page numbers. Say exactly what is wrong and what a fix looks like — do not write replacement text yourself.
+9. Per page, endsLeaningForward (boolean): does the page's LAST clause pull the listener into the page turn — a question, a glance toward something new, an "and then...?" energy? The final page is always true. A climax page that ends ON the completed payoff sentence (nothing left to turn for) is false.
+10. orphanedLanding (boolean): true if a named person present in the opening pages (a parent, grandparent, sibling) has silently vanished from the final page — the landing belongs to the family, not the child alone. If no named person appears in the opening, return false.
+11. refrainAsNarrator (boolean): true only if the refrain appears at least TWICE as a standalone narrator line — its own sentence, OUTSIDE quotation marks. A refrain that lives only inside characters' quoted dialogue is false (parents need a chantable line, not contorted dialogue).
+${input.language === 'ja' ? '\n12. The text must be Japanese in hiragana/katakana with NO kanji. Flag any kanji as a page issue.\n' : ''}
+If ANY of these fail (arcCoherence < 6, readAloudRhythm < 6, lastPageLanding false, soundOverload true, agency < 6, any page captionRisk >= 7, any page deliversBeat false, any non-final page endsLeaningForward false, orphanedLanding true, or refrainAsNarrator false), write "feedback": a numbered list of specific corrections. Reference page numbers. Say exactly what is wrong and what a fix looks like — do not write replacement text yourself.
 
 BAD feedback:  "Page 3 is too caption-like"
 GOOD feedback: "Page 3 only describes the visible scene (girl on swing). Rewrite from her inner experience — what does the swoop feel like in her tummy? Add one sensory or imaginative element beyond the photo."
@@ -114,12 +117,16 @@ export const STORY_QC_RESPONSE_SCHEMA = {
             description:
               "Does this page's text do its declared beat's job? true when no beat was declared.",
           },
+          endsLeaningForward: {
+            type: 'boolean',
+            description: 'Does the last clause pull into the page turn? Final page: always true.',
+          },
           issue: {
             type: ['string', 'null'],
             description: 'Specific problem on this page, or null',
           },
         },
-        required: ['pageNumber', 'captionRisk', 'deliversBeat', 'issue'],
+        required: ['pageNumber', 'captionRisk', 'deliversBeat', 'endsLeaningForward', 'issue'],
         additionalProperties: false,
       },
     },
@@ -136,6 +143,14 @@ export const STORY_QC_RESPONSE_SCHEMA = {
       type: 'number',
       description: '0-10 — is the child the doer with a goal, an obstacle, and a try',
     },
+    orphanedLanding: {
+      type: ['boolean', 'null'],
+      description: 'A named opening-page person is missing from the landing',
+    },
+    refrainAsNarrator: {
+      type: ['boolean', 'null'],
+      description: 'Refrain appears >=2 times as a standalone narrator line outside quotes',
+    },
     feedback: {
       type: ['string', 'null'],
       description: 'Numbered corrections if failing, else null',
@@ -149,6 +164,8 @@ export const STORY_QC_RESPONSE_SCHEMA = {
     'truthToEvent',
     'soundOverload',
     'agency',
+    'orphanedLanding',
+    'refrainAsNarrator',
     'feedback',
   ],
   additionalProperties: false,
@@ -163,6 +180,8 @@ export interface StoryQCResponse {
     captionRisk: number;
     /** V2: does this page deliver its declared beat? true when no beat declared. */
     deliversBeat: boolean;
+    /** X16 W1: page-turn pull; final page always true. */
+    endsLeaningForward: boolean;
     issue: string | null;
   }[];
   truthToEvent: number | null;
@@ -170,6 +189,10 @@ export interface StoryQCResponse {
   soundOverload: boolean | null;
   /** Log-only at launch — is the child the doer (goal, obstacle, try)? */
   agency: number;
+  /** X16 W1: a named opening person vanished from the landing. */
+  orphanedLanding: boolean | null;
+  /** X16 W1: refrain chantable as narration (>=2 standalone echoes). */
+  refrainAsNarrator: boolean | null;
   feedback: string | null;
 }
 
@@ -188,10 +211,8 @@ export const STORY_QC_THRESHOLDS = {
   maxWordsEn: 30,
   maxSentences: 4,
   maxCharsJa: 48,
-  // Log-only today: truthToEvent is scored and logged but never triggers a
-  // regen. Flip to enforcing only after Railway data validates the
-  // distribution (every new failure trigger is a silent extra generation
-  // during the parent's wait).
+  // Enforced under STORY_QUALITY_V2 on photo books WITH an eventSummary
+  // (X16 W1); log-only otherwise. Avatar premiseTruth remains log-only.
   minTruthToEvent: 6,
   // Log-only (X6d): premiseTruth is scored on AVATAR_STORY books and logged,
   // never enforced — same telemetry-first philosophy as truthToEvent.

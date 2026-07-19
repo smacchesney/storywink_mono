@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   storyQualityV2Enabled,
   storyIllusMoodEnabled,
+  photoComeAliveEnabled,
   deterministicStoryChecks,
 } from './story-quality.js';
 
@@ -20,6 +21,15 @@ describe('storyIllusMoodEnabled', () => {
     expect(storyIllusMoodEnabled({ STORY_ILLUS_MOOD_ENABLED: 'true' })).toBe(true);
     expect(storyIllusMoodEnabled({ STORY_ILLUS_MOOD_ENABLED: 'false' })).toBe(false);
     expect(storyIllusMoodEnabled({})).toBe(false);
+  });
+});
+
+describe('photoComeAliveEnabled', () => {
+  it('defaults off and honors true/1', () => {
+    expect(photoComeAliveEnabled({})).toBe(false);
+    expect(photoComeAliveEnabled({ PHOTO_COME_ALIVE_ENABLED: 'true' })).toBe(true);
+    expect(photoComeAliveEnabled({ PHOTO_COME_ALIVE_ENABLED: '1' })).toBe(true);
+    expect(photoComeAliveEnabled({ PHOTO_COME_ALIVE_ENABLED: 'false' })).toBe(false);
   });
 });
 

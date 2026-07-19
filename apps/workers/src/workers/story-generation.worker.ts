@@ -62,7 +62,13 @@ import {
   avatarStoryQcProblems,
 } from '../lib/avatar-story.js';
 import { storyQualityV2Enabled, deterministicStoryChecks } from '../lib/story-quality.js';
-import { STORY_MODEL, ANALYSIS_MODEL } from '../config/models.js';
+import { persistStoryQc } from '../lib/story-qc-persist.js';
+import {
+  STORY_MODEL,
+  ANALYSIS_MODEL,
+  STORY_OPENAI_TIMEOUT_MS,
+  storyReasoningEffort,
+} from '../config/models.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -129,6 +135,10 @@ interface StoryQcVerdict {
   pageLocal: { pageNumber: number; issue: string }[];
   /** True when pageLocal is ALL that is failing — eligible for surgical rewrites. */
   pageLocalOnly: boolean;
+  /** True when pageLocal includes judge-scored findings — after rewriting, re-judge instead of the deterministic-only recheck. */
+  needsRejudge: boolean;
+  /** Full score payload for StoryQcResult persistence (same object the log line carries). */
+  telemetry: Record<string, unknown>;
 }
 
 let characterExtractionQueue: Queue | null = null;
@@ -283,37 +293,38 @@ async function evaluateStoryQuality(
     ? checkCastNameCoverage(cast, pageTexts, input.language || 'en')
     : null;
 
-  logger.info(
-    {
-      bookId,
-      refrainEchoes: echoes,
-      arcCoherence: qc.arcCoherence,
-      readAloudRhythm: qc.readAloudRhythm,
-      lastPageLanding: qc.lastPageLanding,
-      maxCaptionRisk: Math.max(0, ...qc.pages.map((p) => p.captionRisk)),
-      childNameCheck,
-      childNameEchoes,
-      childNameInLanding,
-      castNamesChecked: castCoverage?.checked ?? 0,
-      castNamesCovered: castCoverage?.covered ?? 0,
-      castNamesMissing: castCoverage?.missing ?? [],
-      castNamesSkippedScript: castCoverage?.skippedScript ?? 0,
-      truthToEvent: qc.truthToEvent,
-      // ENFORCED on photo (S2): a sound-overloaded draft is regenerated.
-      soundOverload: qc.soundOverload,
-      // ENFORCED under STORY_QUALITY_V2 (log-only when the flag is off).
-      agency: qc.agency,
-      hadEventSummary: !!input.eventSummary,
-      confirmedFactCount: input.confirmedFacts?.length ?? 0,
-      // STORY QUALITY V2 telemetry (always computed; enforced only when flagged).
-      v2Enforced,
-      wordBudgetViolations: detChecks.budget,
-      nameGarbles: detChecks.garbles,
-      rollCallPages: detChecks.rollCall.map((r) => r.pageNumber),
-      deliversBeatFalse: qc.pages.filter((p) => p.deliversBeat === false).map((p) => p.pageNumber),
-    },
-    'Story QC scores',
-  );
+  const telemetry = {
+    bookId,
+    refrainEchoes: echoes,
+    arcCoherence: qc.arcCoherence,
+    readAloudRhythm: qc.readAloudRhythm,
+    lastPageLanding: qc.lastPageLanding,
+    maxCaptionRisk: Math.max(0, ...qc.pages.map((p) => p.captionRisk)),
+    childNameCheck,
+    childNameEchoes,
+    childNameInLanding,
+    castNamesChecked: castCoverage?.checked ?? 0,
+    castNamesCovered: castCoverage?.covered ?? 0,
+    castNamesMissing: castCoverage?.missing ?? [],
+    castNamesSkippedScript: castCoverage?.skippedScript ?? 0,
+    truthToEvent: qc.truthToEvent,
+    // ENFORCED on photo (S2): a sound-overloaded draft is regenerated.
+    soundOverload: qc.soundOverload,
+    // ENFORCED under STORY_QUALITY_V2 (log-only when the flag is off).
+    agency: qc.agency,
+    hadEventSummary: !!input.eventSummary,
+    confirmedFactCount: input.confirmedFacts?.length ?? 0,
+    // STORY QUALITY V2 telemetry (always computed; enforced only when flagged).
+    v2Enforced,
+    wordBudgetViolations: detChecks.budget,
+    nameGarbles: detChecks.garbles,
+    rollCallPages: detChecks.rollCall.map((r) => r.pageNumber),
+    deliversBeatFalse: qc.pages.filter((p) => p.deliversBeat === false).map((p) => p.pageNumber),
+    orphanedLanding: qc.orphanedLanding,
+    refrainAsNarrator: qc.refrainAsNarrator,
+    endsFlatPages: qc.pages.filter((p) => p.endsLeaningForward === false).map((p) => p.pageNumber),
+  };
+  logger.info(telemetry, 'Story QC scores');
 
   if (qc.arcCoherence < STORY_QC_THRESHOLDS.minArcCoherence) {
     problems.push(
@@ -327,13 +338,6 @@ async function evaluateStoryQuality(
   }
   if (!qc.lastPageLanding) {
     problems.push('The final page must land as a soft, warm exhale — no summary statements.');
-  }
-  for (const page of qc.pages) {
-    if (page.captionRisk > STORY_QC_THRESHOLDS.maxCaptionRisk) {
-      problems.push(
-        `Page ${page.pageNumber} reads like a photo caption (risk ${page.captionRisk}/10). ${page.issue || "Rewrite from the child's inner experience."}`,
-      );
-    }
   }
   // ENFORCED on photo books (S2): the avatar path logs the same flag but never
   // regenerates on it (see evaluateAvatarStoryQuality).
@@ -350,52 +354,99 @@ async function evaluateStoryQuality(
         `Agency scored ${qc.agency}/10 — the child must be the DOER: one clear goal, a real obstacle, and a try-wobble-try before the payoff.`,
       );
     }
-    const beats = new Map((storyResponse.beatSheet ?? []).map((b) => [b.pageNumber, b]));
-    for (const page of qc.pages) {
-      if (page.deliversBeat === false) {
-        const beat = beats.get(page.pageNumber);
-        problems.push(
-          `Page ${page.pageNumber} does not deliver its declared beat${
-            beat ? ` (${beat.role} — ${beat.goal})` : ''
-          } — rewrite the page to do that job.${page.issue ? ` ${page.issue}` : ''}`,
-        );
-      }
+    // X16 W1: the parent-confirmed day is enforced, not advisory. Photo books
+    // without an eventSummary score null and are exempt.
+    if (
+      input.eventSummary &&
+      qc.truthToEvent !== null &&
+      qc.truthToEvent < STORY_QC_THRESHOLDS.minTruthToEvent
+    ) {
+      problems.push(
+        `truthToEvent scored ${qc.truthToEvent}/10 — the story must deliver the parent's actual day ("${input.eventSummary}"): its people, its place, its moments. A story that could be about any day fails.`,
+      );
+    }
+    if (qc.orphanedLanding === true) {
+      problems.push(
+        'A person from the opening pages has vanished by the landing — bring them back (or echo them) on the final page.',
+      );
+    }
+    if (qc.refrainAsNarrator === false) {
+      problems.push(
+        'The refrain must appear at least twice as its own standalone narrator line, OUTSIDE quotation marks — at most one echo may live inside dialogue.',
+      );
     }
   }
-  // Everything above needs a whole-book regen; the deterministic findings are
-  // page-local and can be fixed surgically when they are the only failures.
+  // GLOBAL dimensions (whole-book regen when failing) were pushed above:
+  // arcCoherence, readAloudRhythm, lastPageLanding, soundOverload, and under
+  // v2: agency, truthToEvent, orphanedLanding, refrainAsNarrator.
+  //
+  // JUDGE-SCORED PAGE-LOCAL failures (X16 W1): when the global dimensions all
+  // pass, a bad page is rewritten surgically instead of rerolling the book.
+  const judgePageLocal: { pageNumber: number; issue: string }[] = [];
+  const beats = new Map((storyResponse.beatSheet ?? []).map((b) => [b.pageNumber, b]));
+  const finalPageNumber = Math.max(...qc.pages.map((p) => p.pageNumber));
+  for (const page of qc.pages) {
+    if (page.captionRisk > STORY_QC_THRESHOLDS.maxCaptionRisk) {
+      judgePageLocal.push({
+        pageNumber: page.pageNumber,
+        issue: `Page ${page.pageNumber} reads like a photo caption (risk ${page.captionRisk}/10). ${page.issue || "Rewrite from the child's inner experience."}`,
+      });
+    }
+    if (v2Enforced && page.deliversBeat === false) {
+      const beat = beats.get(page.pageNumber);
+      judgePageLocal.push({
+        pageNumber: page.pageNumber,
+        issue: `Page ${page.pageNumber} does not deliver its declared beat${beat ? ` (${beat.role} — ${beat.goal})` : ''} — rewrite the page to do that job.${page.issue ? ` ${page.issue}` : ''}`,
+      });
+    }
+    if (v2Enforced && page.endsLeaningForward === false && page.pageNumber !== finalPageNumber) {
+      judgePageLocal.push({
+        pageNumber: page.pageNumber,
+        issue: `Page ${page.pageNumber} ends flat — its last clause must lean into the page turn (a question, a glance toward something new, an "and then...?" energy) without losing the page's beat.`,
+      });
+    }
+  }
   const globalProblemCount = problems.length;
+  problems.push(...judgePageLocal.map((p) => p.issue));
   if (v2Enforced) {
     problems.push(...detChecks.problems);
   }
+  // CRITICAL ordering: capture the page-local count BEFORE the qc.feedback
+  // push below — feedback is non-null on essentially every failing draft, and
+  // counting it as a "problem" would make pageLocalOnly false in exactly the
+  // surgical case it exists for.
+  const pageLocalProblemCount = problems.length - globalProblemCount;
   if (problems.length > 0 && qc.feedback) {
     problems.push(qc.feedback);
   }
 
-  const pageLocal = v2Enforced
-    ? [
-        // ja budget findings are log-only until the char band is calibrated.
-        ...(input.language === 'ja'
-          ? []
-          : detChecks.budget.map((b) => ({ pageNumber: b.pageNumber, issue: b.issue }))),
-        ...detChecks.garbles.map((g) => ({
-          pageNumber: g.pageNumber,
-          issue: `Page ${g.pageNumber} garbles character names ("${g.snippet}") — use each name correctly and separately.`,
-        })),
-      ].filter((p) => Number.isInteger(p.pageNumber))
-    : [];
+  const pageLocal = [
+    ...judgePageLocal,
+    ...(v2Enforced
+      ? [
+          ...(input.language === 'ja'
+            ? []
+            : detChecks.budget.map((b) => ({ pageNumber: b.pageNumber, issue: b.issue }))),
+          ...detChecks.garbles.map((g) => ({
+            pageNumber: g.pageNumber,
+            issue: `Page ${g.pageNumber} garbles character names ("${g.snippet}") — use each name correctly and separately.`,
+          })),
+        ]
+      : []),
+  ].filter((p) => Number.isInteger(p.pageNumber));
 
   return {
     passed: problems.length === 0,
     feedback: problems.map((p, i) => `${i + 1}. ${p}`).join('\n'),
     pageLocal,
     // Bridge violations (N + 0.5) have no in-memory page to rewrite — they
-    // force the whole-book path via the length mismatch.
+    // force the whole-book path via the integer filter above.
     pageLocalOnly:
-      v2Enforced &&
       globalProblemCount === 0 &&
       pageLocal.length > 0 &&
-      pageLocal.length === detChecks.problems.length,
+      pageLocalProblemCount === pageLocal.length,
+    needsRejudge: judgePageLocal.length > 0,
+    telemetry,
   };
 }
 
@@ -499,39 +550,37 @@ async function evaluateAvatarStoryQuality(
     }
   }
 
-  logger.info(
-    {
-      bookId,
-      bookType: 'AVATAR_STORY',
-      refrainEchoes: echoes,
-      arcCoherence: qc.arcCoherence,
-      readAloudRhythm: qc.readAloudRhythm,
-      lastPageLanding: qc.lastPageLanding,
-      // LOG-ONLY dimension: premiseTruth never pushes into `problems` at
-      // launch (flip to enforcing only after Railway data validates the
-      // distribution — every new trigger is a silent extra generation).
-      premiseTruth: qc.premiseTruth,
-      // soundOverload enforces on PHOTO books only; agency enforces under
-      // STORY_QUALITY_V2 (log-only when the flag is off).
-      soundOverload: qc.soundOverload,
-      agency: qc.agency,
-      pageIssues: qc.pages.filter((p) => p.issue).length,
-      childNameCheck,
-      childNameEchoes,
-      childNameInLanding,
-      castSize: input.cast.length,
-      // STORY QUALITY V2 telemetry (always computed; enforced only when flagged).
-      v2Enforced,
-      wordBudgetViolations: detChecks.budget,
-      nameGarbles: detChecks.garbles,
-      rollCallPages: detChecks.rollCall.map((r) => r.pageNumber),
-      deliversBeatFalse: qc.pages.filter((p) => p.deliversBeat === false).map((p) => p.pageNumber),
-      sceneMismatchPages: qc.pages
-        .filter((p) => p.sceneMatchesText === false)
-        .map((p) => p.pageNumber),
-    },
-    'Story QC scores',
-  );
+  const telemetry = {
+    bookId,
+    bookType: 'AVATAR_STORY',
+    refrainEchoes: echoes,
+    arcCoherence: qc.arcCoherence,
+    readAloudRhythm: qc.readAloudRhythm,
+    lastPageLanding: qc.lastPageLanding,
+    // LOG-ONLY dimension: premiseTruth never pushes into `problems` at
+    // launch (flip to enforcing only after Railway data validates the
+    // distribution — every new trigger is a silent extra generation).
+    premiseTruth: qc.premiseTruth,
+    // soundOverload enforces on PHOTO books only; agency enforces under
+    // STORY_QUALITY_V2 (log-only when the flag is off).
+    soundOverload: qc.soundOverload,
+    agency: qc.agency,
+    pageIssues: qc.pages.filter((p) => p.issue).length,
+    childNameCheck,
+    childNameEchoes,
+    childNameInLanding,
+    castSize: input.cast.length,
+    // STORY QUALITY V2 telemetry (always computed; enforced only when flagged).
+    v2Enforced,
+    wordBudgetViolations: detChecks.budget,
+    nameGarbles: detChecks.garbles,
+    rollCallPages: detChecks.rollCall.map((r) => r.pageNumber),
+    deliversBeatFalse: qc.pages.filter((p) => p.deliversBeat === false).map((p) => p.pageNumber),
+    sceneMismatchPages: qc.pages
+      .filter((p) => p.sceneMatchesText === false)
+      .map((p) => p.pageNumber),
+  };
+  logger.info(telemetry, 'Story QC scores');
 
   // The enforced-dimension verdict is pure and pinned by tests — premiseTruth
   // stays LOG-ONLY by construction. The no-deterministic variant tells the
@@ -561,6 +610,8 @@ async function evaluateAvatarStoryQuality(
     feedback: problems.map((p, i) => `${i + 1}. ${p}`).join('\n'),
     pageLocal,
     pageLocalOnly: v2Enforced && globalProblems.length === 0 && pageLocal.length > 0,
+    needsRejudge: false,
+    telemetry,
   };
 }
 
@@ -654,6 +705,7 @@ export async function processStoryGeneration(
     // Initialize OpenAI client
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
+      timeout: STORY_OPENAI_TIMEOUT_MS,
     });
 
     // Safe access to job data
@@ -973,9 +1025,16 @@ export async function processStoryGeneration(
         }
       }
 
+      const reasoningEffort = storyReasoningEffort();
       const result = await openai.responses.create({
         model: STORY_MODEL,
         instructions: isAvatarStory ? AVATAR_STORY_SYSTEM_PROMPT : STORY_GENERATION_SYSTEM_PROMPT,
+        // X15 experiment knob, default ABSENT (model default effort). Adopt
+        // only after the quality gate: >=3 fresh generations at the candidate
+        // effort with no story-QC metric below the default-run floor, plus an
+        // owner read. Rollback = unset the env var. Invalid values are
+        // ignored (default behavior) rather than 400-looping the story job.
+        ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
         input: [{ role: 'user', content: contentParts }],
         text: {
           format: {
@@ -1029,7 +1088,10 @@ export async function processStoryGeneration(
       }
     };
 
+    const storyStartedAt = Date.now();
     let storyResponse = await generateStory();
+    const storyMs = Date.now() - storyStartedAt;
+    logger.info({ bookId, storyMs }, 'Story model call complete');
 
     // Validate-or-DROP the model's proposed bridges (cap, one-per-gap,
     // roster-only characters). A bad bridge never fails the story — the book
@@ -1066,6 +1128,7 @@ export async function processStoryGeneration(
     let regenerated = false;
     let regenCount = 0;
     let targetedRewrites = 0;
+    let storyQcMs = 0;
 
     // Shared context for the surgical rewrites.
     const bookLanguage = (isAvatarStory ? avatarInput!.language : storyInput.language) || 'en';
@@ -1074,6 +1137,23 @@ export async function processStoryGeneration(
         ? [avatarInput!.childName, ...avatarInput!.cast.map((c) => c.name)]
         : [storyInput.childName, ...(storyInput.charactersInPhotos ?? []).map((c) => c.name)]
     ).filter((n): n is string => !!n?.trim());
+
+    // storyQcMs accumulates across rounds (X15 instrumentation). X16 W1 moved
+    // this definition above applyTargetedRewrites so the re-judge path can
+    // call it; every call (initial, regen, re-judge) is timed.
+    const evaluate = async (): Promise<StoryQcVerdict> => {
+      const qcStartedAt = Date.now();
+      const verdict = isAvatarStory
+        ? await evaluateAvatarStoryQuality(openai, storyResponse, avatarInput!, bookId)
+        : await evaluateStoryQuality(openai, storyResponse, storyInput, bookId, acceptedBridges);
+      const roundMs = Date.now() - qcStartedAt;
+      storyQcMs += roundMs;
+      logger.info(
+        { bookId, storyQcMs: roundMs, qcPassed: verdict.passed },
+        'Story QC call complete',
+      );
+      return verdict;
+    };
 
     const applyTargetedRewrites = async (verdict: StoryQcVerdict): Promise<StoryQcVerdict> => {
       if (
@@ -1148,6 +1228,14 @@ export async function processStoryGeneration(
           );
         }
       }
+      if (verdict.needsRejudge) {
+        // Judge-scored dimensions were rewritten — deterministic recheck can't
+        // re-score them. One full re-judge (gpt-5-mini) instead; its verdict
+        // returns with pageLocalOnly forced off so a rewrite round never chains
+        // into a second one on the same draft.
+        const rejudged = await evaluate();
+        return { ...rejudged, pageLocal: [], pageLocalOnly: false, needsRejudge: false };
+      }
       // Deterministic re-check only: the model-scored dimensions already
       // passed, and only the rewritten pages changed. The refrain floor IS
       // re-counted — a rewrite can delete the one echo a page carried.
@@ -1174,17 +1262,27 @@ export async function processStoryGeneration(
         feedback: recheckProblems.map((p, i) => `${i + 1}. ${p}`).join('\n'),
         pageLocal: [],
         pageLocalOnly: false,
+        needsRejudge: false,
+        telemetry: verdict.telemetry,
       };
     };
 
     try {
-      const evaluate = (): Promise<StoryQcVerdict> =>
-        isAvatarStory
-          ? evaluateAvatarStoryQuality(openai, storyResponse, avatarInput!, bookId)
-          : evaluateStoryQuality(openai, storyResponse, storyInput, bookId, acceptedBridges);
+      const persistVerdict = (v: StoryQcVerdict, round: number) =>
+        persistStoryQc(prisma, {
+          bookId,
+          bookType: book.bookType,
+          language: bookLanguage,
+          round,
+          passed: v.passed,
+          scores: v.telemetry as Record<string, unknown>,
+          feedback: v.feedback || null,
+          targetedRewrites,
+        });
 
       let verdict = await evaluate();
       verdict = await applyTargetedRewrites(verdict);
+      await persistVerdict(verdict, 0);
       while (
         !verdict.passed &&
         regenCount < MAX_STORY_REGENS &&
@@ -1199,11 +1297,17 @@ export async function processStoryGeneration(
         // Back to 'story' so the story stage emits a mid-flight signal —
         // this write is also what keeps the UI's stall clock honest.
         await setGenerationPhase(bookId, 'story');
+        const regenStartedAt = Date.now();
         storyResponse = await generateStory(verdict.feedback);
+        logger.info(
+          { bookId, storyRegenMs: Date.now() - regenStartedAt, attempt: regenCount },
+          'Story regen call complete',
+        );
         acceptedBridges = validateBridges(storyResponse);
         await setGenerationPhase(bookId, 'story_check');
         verdict = await evaluate();
         verdict = await applyTargetedRewrites(verdict);
+        await persistVerdict(verdict, regenCount);
       }
       qcPassed = verdict.passed;
       if (!verdict.passed) {
@@ -1597,6 +1701,8 @@ export async function processStoryGeneration(
           qcPassed,
           bridgePages: acceptedBridges.length,
           bookType: book.bookType,
+          storyMs,
+          qcMs: storyQcMs,
         },
       },
       logger,
@@ -1859,6 +1965,7 @@ async function processSinglePageTextGeneration(
       : '## This is near the end of the story.',
     '',
     `Also provide brief illustrationNotes describing any visual effects or mood for the illustrator, or null if the photo speaks for itself.`,
+    `Also set "moodCue" — 1-3 words for how this moment should FEEL in the picture ("hushed wonder"); null when neutral.`,
   ].join('\n');
 
   const imageUrl = photoUrl ? optimizeCloudinaryUrlForVision(convertHeicToJpeg(photoUrl)) : null;
@@ -1871,8 +1978,13 @@ async function processSinglePageTextGeneration(
         type: ['string', 'null'],
         description: 'Visual notes for illustrator, or null',
       },
+      moodCue: {
+        type: ['string', 'null'],
+        description:
+          "1-3 words for how this page's moment should FEEL in the picture; null when neutral",
+      },
     },
-    required: ['text', 'illustrationNotes'],
+    required: ['text', 'illustrationNotes', 'moodCue'],
     additionalProperties: false,
   } as const;
 
@@ -1903,7 +2015,11 @@ async function processSinglePageTextGeneration(
   const responseText = result.output_text;
   if (!responseText) throw new Error('OpenAI returned empty response for single page');
 
-  let parsed = JSON.parse(responseText) as { text: string; illustrationNotes: string | null };
+  let parsed = JSON.parse(responseText) as {
+    text: string;
+    illustrationNotes: string | null;
+    moodCue?: string | null;
+  };
 
   // STORY QUALITY V2: this path used to ship with no QC at all. Run the
   // deterministic caps + garble scan; one retry with the violation named,
@@ -1953,6 +2069,7 @@ async function processSinglePageTextGeneration(
         parsed = JSON.parse(retry.output_text) as {
           text: string;
           illustrationNotes: string | null;
+          moodCue?: string | null;
         };
         const recheck = deterministicStoryChecks(
           [{ pageNumber: targetPage.pageNumber, text: parsed.text }],
@@ -1975,9 +2092,9 @@ async function processSinglePageTextGeneration(
       text: parsed.text,
       illustrationNotes: parsed.illustrationNotes,
       textConfirmed: false,
-      // The old mood cue described the PREVIOUS text's moment — clear it so
-      // a stale tone can never color the new render (this path emits none).
-      illustrationMood: null,
+      // X16 W1: the rewrite emits a fresh mood for its new text (previously
+      // this path nulled the mood forever).
+      illustrationMood: parsed.moodCue?.trim() || null,
     },
   });
 

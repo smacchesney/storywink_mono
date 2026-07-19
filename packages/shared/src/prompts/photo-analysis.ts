@@ -110,7 +110,7 @@ Produce ALL of the following:
 - characterIds: which of your characters (below) appear in this photo.
 
 ## 2. Character identity ("characters" + "sceneContext")
-For EACH distinct person across the photos, AND each animal companion (pet) that appears in 2+ photos or is clearly central to a moment: characterId (child_1, adult_1, pet_1, ...), role (main_child, parent, grandparent, sibling, friend, pet...), name (from the context above if identifiable, else null), physicalTraits (apparentAge; hairColor as an exact shade; hairStyle with length/texture/parting/accessories; skinTone with warm/cool specificity; bodyBuild; distinguishingFeatures[]), typicalClothing, styleTranslation (how to render them in "${input.artStyle}" while staying instantly recognizable — materials, construction, colors, proportions), appearsOnPages (photo numbers 1-${input.storyPages.length}).
+For EACH distinct person across the photos, AND each animal companion (pet) that appears in 2+ photos or is clearly central to a moment: characterId (child_1, adult_1, pet_1, ...), role (main_child, parent, grandparent, sibling, friend, pet...), name (from the context above if identifiable, else null), physicalTraits (apparentAge; hairColor as an exact shade; hairStyle with length/texture/parting/accessories; skinTone with warm/cool specificity; bodyBuild; distinguishingFeatures[]), typicalClothing, styleTranslation (how to render them in "${input.artStyle}" while staying instantly recognizable — materials, construction, colors, proportions), appearsOnPages (photo numbers 1-${input.storyPages.length}), species (pets and companion objects ONLY: the plain-words kind — "golden retriever dog", "grey tabby cat", "plush rabbit toy"; null for people), isForeground (true when this person/pet is family or central to the day — recurring, interacting with the child; false for one-photo background figures).
 For pets, reuse the same trait fields naturally: hairColor = fur/coat color, hairStyle = coat length and texture, distinguishingFeatures = collar, markings, ear shape, size; typicalClothing = collar/harness or "none".
 Also include AT MOST ONE companion object: a toy, plush, blanket, or clearly beloved object that appears in 2+ photos or is central to a peak moment (being hugged, carried, presented). Give it characterId object_1 and role "companion_object", and reuse the trait fields naturally: hairColor = material and color, hairStyle = texture and wear ("well-loved, slightly flattened fur"), distinguishingFeatures = ears/patches/tags/size relative to the child; typicalClothing = "none". Pick the most-photographed candidate; if nothing qualifies, include no object.
 Be ruthlessly specific — an illustrator will use this as the canonical reference on every page. "Brown hair" is insufficient; "medium-length wavy dark brown hair parted slightly left, small red clip on the right" is the standard. Also give sceneContext: the overall environment pattern across photos.
@@ -200,6 +200,15 @@ export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
           typicalClothing: { type: 'string' },
           styleTranslation: { type: 'string' },
           appearsOnPages: { type: 'array', items: { type: 'number' } },
+          species: {
+            type: ['string', 'null'],
+            description:
+              'Plain-words kind for pets/objects ("golden retriever dog"); null for people',
+          },
+          isForeground: {
+            type: 'boolean',
+            description: 'Family/central to the day vs background figure',
+          },
         },
         required: [
           'characterId',
@@ -209,6 +218,8 @@ export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
           'typicalClothing',
           'styleTranslation',
           'appearsOnPages',
+          'species',
+          'isForeground',
         ],
         additionalProperties: false,
       },

@@ -10,7 +10,7 @@ import type { IllustrationInput, IllustrationProvider } from '../lib/illustrator
 import { maybeGeminiFallback } from '../lib/illustrators/fallback.js';
 import { shouldNeutralizeNames } from '../lib/illustrators/neutralize.js';
 import { toysComeAliveEnabled } from '../lib/toys-come-alive.js';
-import { storyIllusMoodEnabled } from '../lib/story-quality.js';
+import { storyIllusMoodEnabled, photoComeAliveEnabled } from '../lib/story-quality.js';
 import type { EscalationJobFields } from '../lib/escalation.js';
 import { v2 as cloudinary } from 'cloudinary';
 import pino from 'pino';
@@ -21,6 +21,7 @@ import {
 import type { BridgeScene } from '@storywink/shared/prompts/story';
 import { resolveBridgeAnchor } from '../lib/bridge-pages.js';
 import { orderCharacterSheets, selectSceneSheets } from '../lib/avatar-story.js';
+import { photoPresentCharacterIds } from '../lib/photo-cast.js';
 import { speciesLineFor, kindFromRole } from '@storywink/shared/prompts/character-identity';
 // Import STYLE_LIBRARY directly from styles module to avoid barrel export race condition
 import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
@@ -30,6 +31,7 @@ import { upscaleForPrint } from '../utils/image-processing.js';
 import { characterSheetsEnabled } from '../lib/character-sheets.js';
 import { capStyleRefs, styleRefsCapForProvider } from '../lib/style-refs.js';
 import { generateAndStoreCover } from '../lib/cover-generation.js';
+import { regenerateCoverFromQc, loadBookForCoverRegen } from '../lib/cover-regen.js';
 import { fetchImageInput, resizeForReference } from '../lib/images.js';
 import type { IllustrationImageInput } from '../lib/illustrators/index.js';
 
@@ -145,6 +147,29 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
   );
   console.log(`  - QC Round: ${qcRound || 0}`);
   if (qcFeedback) console.log(`  - QC Feedback: ${qcFeedback.substring(0, 200)}...`);
+
+  // X15: a cover-regen flow child re-renders ONLY the QC-failed cover (was
+  // inline in finalize). No page render, no page DB writes; non-fatal like
+  // the inline path — any failure keeps the existing cover and the flow's
+  // finalize parent still runs.
+  if (job.data.coverRegen) {
+    if (!job.data.coverQcResult) {
+      logger.warn({ jobId: job.id, bookId }, 'Cover regen job missing coverQcResult — skipping');
+      return { success: true, coverRegen: true, skipped: true };
+    }
+    const regenBook = await loadBookForCoverRegen(bookId);
+    if (!regenBook) {
+      logger.warn({ jobId: job.id, bookId }, 'Cover regen job: book not found — skipping');
+      return { success: true, coverRegen: true, skipped: true };
+    }
+    await regenerateCoverFromQc(
+      regenBook,
+      job.data.characterSheets ?? [],
+      job.data.coverQcResult,
+      logger,
+    );
+    return { success: true, coverRegen: true };
+  }
 
   try {
     // Validate prerequisites
@@ -401,36 +426,71 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       // order alone decides. The snapshot order comes from an unordered
       // findMany and must never pick the anchor.
       let sheetSources = job.data.characterSheets;
-      if (isAvatarBook && sheetSources.length > 1) {
+      if (sheetSources.length > 1) {
         const starId =
           characterIdentity?.characters?.find((c) => c.role?.startsWith('main'))?.characterId ??
           null;
-        // A6: interior avatar pages ship only the scene's cast (+ the star
-        // floor, cap 4) to shrink the fusion/duplication surface. The title
-        // page is EXEMPT — it feeds the cover, which keeps every sheet
-        // (see the cover call below); filtering it would starve that binding.
-        sheetSources = isTitlePage
-          ? orderCharacterSheets(sheetSources, starId)
-          : selectSceneSheets(sheetSources, {
-              charactersPresent: bridgeScene ? bridgeScene.charactersPresent : null,
+        if (isAvatarBook) {
+          // A6: interior avatar pages ship only the scene's cast (+ the star
+          // floor, cap 4) to shrink the fusion/duplication surface. The title
+          // page is EXEMPT — it feeds the cover, which keeps every sheet
+          // (see the cover call below); filtering it would starve that binding.
+          sheetSources = isTitlePage
+            ? orderCharacterSheets(sheetSources, starId)
+            : selectSceneSheets(sheetSources, {
+                charactersPresent: bridgeScene ? bridgeScene.charactersPresent : null,
+                starCharacterId: starId,
+              });
+        } else if (!isTitlePage) {
+          // A6 for the photo path (X16 W1): only sheets whose characters are
+          // on THIS page ride as references (star floor kept). Presence comes
+          // from the roster's reorder-proof asset stamps; no stamps -> fail
+          // open and keep every sheet. The title page is exempt — it feeds
+          // the cover, which keeps the full stack.
+          const presentIds = photoPresentCharacterIds(
+            characterIdentity?.characters,
+            page.assetId,
+            pageNumber,
+          );
+          if (presentIds.length > 0) {
+            sheetSources = selectSceneSheets(sheetSources, {
+              charactersPresent: presentIds,
               starCharacterId: starId,
             });
-      }
-      for (const sheet of sheetSources) {
-        try {
-          sheetRefs.push(await fetchImageInput(optimizeCloudinaryUrlForVision(sheet.url)));
-          fetchedSheetMeta.push({ characterId: sheet.characterId, name: sheet.name });
-        } catch (sheetFetchError: any) {
-          logger.warn(
-            {
-              jobId: job.id,
-              pageNumber,
-              characterId: sheet.characterId,
-              error: sheetFetchError.message,
-            },
-            'Failed to fetch character sheet — continuing without it',
-          );
+          }
         }
+      }
+      // Concurrent fetches; outcomes are collected in source order so the
+      // sheet-1-is-the-star position contract survives, and a failed fetch
+      // still just drops that sheet.
+      const sheetOutcomes = await Promise.all(
+        sheetSources.map(async (sheet) => {
+          try {
+            return {
+              sheet,
+              input: await fetchImageInput(optimizeCloudinaryUrlForVision(sheet.url)),
+            };
+          } catch (sheetFetchError: any) {
+            logger.warn(
+              {
+                jobId: job.id,
+                pageNumber,
+                characterId: sheet.characterId,
+                error: sheetFetchError.message,
+              },
+              'Failed to fetch character sheet — continuing without it',
+            );
+            return null;
+          }
+        }),
+      );
+      for (const outcome of sheetOutcomes) {
+        if (!outcome) continue;
+        sheetRefs.push(outcome.input);
+        fetchedSheetMeta.push({
+          characterId: outcome.sheet.characterId,
+          name: outcome.sheet.name,
+        });
       }
       console.log(
         `[IllustrationWorker] Fetched ${sheetRefs.length} character sheet(s) for page ${pageNumber}`,
@@ -522,42 +582,44 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       );
     }
 
-    // Fetch all style reference images
-    const styleReferenceBuffers: Array<{ buffer: Buffer; mimeType: string }> = [];
-
-    for (const styleRefUrl of styleReferenceUrls) {
-      try {
-        logger.info(
-          { jobId: job.id, pageNumber },
-          `Fetching style reference image from ${styleRefUrl}`,
-        );
-        const styleResponse = await fetch(styleRefUrl);
-        if (!styleResponse.ok) {
-          throw new Error(
-            `Failed to fetch style image: ${styleResponse.status} ${styleResponse.statusText}`,
+    // Fetch all style reference images concurrently, preserving list order.
+    // Any single failure still fails the page (same throw semantics as the
+    // old sequential loop).
+    const styleReferenceBuffers: Array<{ buffer: Buffer; mimeType: string }> = await Promise.all(
+      styleReferenceUrls.map(async (styleRefUrl) => {
+        try {
+          logger.info(
+            { jobId: job.id, pageNumber },
+            `Fetching style reference image from ${styleRefUrl}`,
           );
-        }
-        const styleContentTypeHeader = styleResponse.headers.get('content-type');
-        const mimeType = styleContentTypeHeader?.startsWith('image/')
-          ? styleContentTypeHeader
-          : styleRefUrl.endsWith('.png')
-            ? 'image/png'
-            : 'image/jpeg';
+          const styleResponse = await fetch(styleRefUrl);
+          if (!styleResponse.ok) {
+            throw new Error(
+              `Failed to fetch style image: ${styleResponse.status} ${styleResponse.statusText}`,
+            );
+          }
+          const styleContentTypeHeader = styleResponse.headers.get('content-type');
+          const mimeType = styleContentTypeHeader?.startsWith('image/')
+            ? styleContentTypeHeader
+            : styleRefUrl.endsWith('.png')
+              ? 'image/png'
+              : 'image/jpeg';
 
-        const styleArrayBuffer = await styleResponse.arrayBuffer();
-        styleReferenceBuffers.push({
-          buffer: Buffer.from(styleArrayBuffer),
-          mimeType,
-        });
-        logger.info({ jobId: job.id, pageNumber }, `Fetched style reference image (${mimeType}).`);
-      } catch (fetchError: any) {
-        logger.error(
-          { jobId: job.id, pageId, pageNumber, styleKey, error: fetchError.message },
-          'Failed to fetch style reference image.',
-        );
-        throw fetchError;
-      }
-    }
+          const styleArrayBuffer = await styleResponse.arrayBuffer();
+          logger.info(
+            { jobId: job.id, pageNumber },
+            `Fetched style reference image (${mimeType}).`,
+          );
+          return { buffer: Buffer.from(styleArrayBuffer), mimeType };
+        } catch (fetchError: any) {
+          logger.error(
+            { jobId: job.id, pageId, pageNumber, styleKey, error: fetchError.message },
+            'Failed to fetch style reference image.',
+          );
+          throw fetchError;
+        }
+      }),
+    );
 
     // Zero fetched buffers is only an error when the diet didn't deliberately
     // zero the list (ILLUSTRATION_STYLE_REFS_MAX=0 sends none by design).
@@ -603,21 +665,36 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
 
     // A4 name↔sheet map: bind each sheet ACTUALLY SENT (anchor first, then the
     // remaining refs) to its named character + a compact species phrase, so
-    // the model never guesses which unnamed grid is whom. Sheet-anchored
-    // (avatar) renders only — image 1 is a photo on every other path.
-    // fetchedSheetMeta is still in full sent order (the shift() above popped
-    // sheetRefs, not this list), so its order matches image 1..N.
-    const sheetRoster = sheetAnchored
-      ? fetchedSheetMeta.map((meta) => {
-          const rosterChar = characterIdentity?.characters?.find(
-            (c) => c.characterId === meta.characterId,
-          );
-          return {
-            name: meta.name || rosterChar?.name || meta.characterId,
-            species: speciesLineFor(rosterChar, kindFromRole(rosterChar?.role)),
-          };
-        })
-      : undefined;
+    // the model never guesses which unnamed grid is whom. On sheet-anchored
+    // (avatar) renders image 1 IS the anchor sheet; fetchedSheetMeta is still
+    // in full sent order (the shift() above popped sheetRefs, not this list),
+    // so its order matches image 1..N.
+    // X16 W1: photo pages bind too — fetchedSheetMeta aligns with images 2..N there.
+    const sheetRoster =
+      sheetAnchored || sheetRefs.length > 0
+        ? fetchedSheetMeta.map((meta) => {
+            const rosterChar = characterIdentity?.characters?.find(
+              (c) => c.characterId === meta.characterId,
+            );
+            return {
+              name: meta.name || rosterChar?.name || meta.characterId,
+              species: speciesLineFor(rosterChar, kindFromRole(rosterChar?.role)),
+            };
+          })
+        : undefined;
+
+    // X16 W1: perception scene anchor — only a FRESH analysis row (assetId
+    // still matches) may describe the photo; a swapped photo's stale row must
+    // never anchor the wrong scene. Mirrors the story worker's staleness gate.
+    const pageAnalysisRaw = page.analysis as {
+      assetId?: string;
+      setting?: string;
+      action?: string;
+    } | null;
+    const freshPageAnalysis =
+      pageAnalysisRaw && page.assetId && pageAnalysisRaw.assetId === page.assetId
+        ? pageAnalysisRaw
+        : null;
 
     // For the primary illustration, always use story-style prompt (isTitlePage: false).
     // Cover pages get a separate cover-style illustration generated afterwards.
@@ -659,6 +736,21 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       ...(storyIllusMoodEnabled() && !isBridgePage && !isAvatarBook && page.illustrationMood
         ? { illustrationMood: page.illustrationMood }
         : {}),
+      // X16 W1 scene anchor: perception's {setting, action} threads into the
+      // photo path only, from a FRESH analysis row. Bridge pages (story-model
+      // scene) and avatar books (photo-less) never anchor to a photo moment.
+      // The prompt builder gates internally to contentAnchor 'photo' && no
+      // bridgeScene; absent → omitted → prompt byte-identical.
+      ...(freshPageAnalysis && !isBridgePage && !isAvatarBook
+        ? {
+            sceneAnchor: {
+              setting: freshPageAnalysis.setting ?? '',
+              action: freshPageAnalysis.action ?? '',
+            },
+          }
+        : {}),
+      // PHOTO_COME_ALIVE_ENABLED (X16 W1): bounded liveliness on photo pages.
+      photoComeAlive: photoComeAliveEnabled() && !isBridgePage && !isAvatarBook,
     };
 
     logger.info(
@@ -737,10 +829,18 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
           prompt: textPrompt,
         };
 
+        const renderStartedAt = Date.now();
         const result = await illustrator.generate(illustrationInput);
 
         logger.info(
-          { jobId: job.id, pageId, pageNumber, provider: illustrator.name },
+          {
+            jobId: job.id,
+            pageId,
+            pageNumber,
+            provider: illustrator.name,
+            attempt: contentPolicyAttempt + 1,
+            renderMs: Date.now() - renderStartedAt,
+          },
           'Received response from illustration provider.',
         );
         console.log(
@@ -1025,13 +1125,14 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
         `[IllustrationWorker] Generating separate cover illustration for title page ${pageNumber}...`,
       );
       try {
-        // Cover binding (CHARACTER_SHEETS_ENABLED): the cover call receives
-        // the character sheet(s) plus the approved interior title-page render
-        // as references, so the two renders of the same photo stop diverging.
-        const interiorRenderRef =
-          (characterSheetsEnabled() || isAvatarBook) && interiorRenderBuffer
-            ? await resizeForReference(interiorRenderBuffer)
-            : null;
+        // Cover binding: the cover call receives the character sheet(s) plus
+        // the approved interior title-page render as references, so the two
+        // renders of the same photo stop diverging.
+        // X16 W1: the interior render exists unconditionally on the title-page
+        // job — cover coherence must not ride the sheets flag.
+        const interiorRenderRef = interiorRenderBuffer
+          ? await resizeForReference(interiorRenderBuffer)
+          : null;
 
         // AVATAR_STORY covers: there is no title photo — the approved
         // interior render of page 1 anchors the cover repaint, and ALL cast

@@ -230,6 +230,31 @@ export async function POST(req: NextRequest) {
       'API: /generate/story - Job added to StoryGeneration queue.',
     );
 
+    // X15 sheet pre-warm: character sheets depend only on (identity, artStyle),
+    // both known now — warm them concurrently with story generation so the
+    // illustration chain finds them cached. Purely opportunistic: one attempt,
+    // failures ignored, and the real extraction pass regenerates on any miss.
+    // (Photo books only — avatar books render on avatar sheets.)
+    if (book.bookType !== 'AVATAR_STORY') {
+      try {
+        const extractionQueue = getQueue(QueueName.CharacterExtraction);
+        await extractionQueue.add(
+          `sheet-prep-${bookId}`,
+          { bookId, userId: dbUser.id, artStyle, prepareOnly: true },
+          {
+            attempts: 1,
+            removeOnComplete: { count: 100 },
+            removeOnFail: { count: 100 },
+          },
+        );
+      } catch (prepEnqueueError) {
+        logger.warn(
+          { bookId, error: String(prepEnqueueError) },
+          'API: /generate/story - sheet pre-warm enqueue failed (non-fatal).',
+        );
+      }
+    }
+
     // 7. Return Accepted response
     return NextResponse.json(
       { message: 'Story generation initiated', bookId: bookId },

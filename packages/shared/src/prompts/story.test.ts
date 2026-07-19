@@ -3,7 +3,9 @@ import {
   createStoryGenerationPrompt,
   StoryGenerationInput,
   STORY_RESPONSE_SCHEMA,
+  STORY_RESPONSE_SCHEMA_WITH_BRIDGES,
   STORY_GENERATION_SYSTEM_PROMPT,
+  arcRoleHintsUsable,
 } from './story.js';
 
 function promptText(input: StoryGenerationInput): string {
@@ -115,6 +117,22 @@ describe('createStoryGenerationPrompt — bridge pages (BRIDGE_PAGES_ENABLED)', 
   it('states the trailing-bridge convention with the real page count', () => {
     const text = promptText({ ...rosterInput, bridgeCap: 1 });
     expect(text).toContain('(2 = after the last photo)');
+  });
+
+  it('instructs the model to give each bridge scene a mood and a focus (X16 W1)', () => {
+    const text = promptText({ ...rosterInput, bridgeCap: 1 });
+    expect(text).toContain('"mood"');
+    expect(text).toContain('"focus"');
+  });
+
+  it('bridge scene schema carries mood and focus (X16 W1)', () => {
+    // BRIDGE_PAGES_SCHEMA is PRIVATE — assert through the exported composite.
+    const sceneProps = (STORY_RESPONSE_SCHEMA_WITH_BRIDGES.properties as any).bridgePages.items
+      .properties.scene;
+    expect(sceneProps.properties.mood).toBeDefined();
+    expect(sceneProps.properties.focus).toBeDefined();
+    expect(sceneProps.required).toContain('mood');
+    expect(sceneProps.required).toContain('focus');
   });
 });
 
@@ -419,5 +437,99 @@ describe('STORY QUALITY V2 — beat sheet, throughline, length, moodCue', () => 
 
   it('caps named actors at two per page (anti roll-call)', () => {
     expect(text).toContain('At most TWO named characters ACT');
+  });
+});
+
+describe('X16 W1 craft bundle', () => {
+  // story.test.ts already has: `promptText(input)` helper (line 9) and a shared
+  // `baseInput` CONST (line 15, two storyPages, both analysis: null). Clone it —
+  // never mutate the shared const.
+  it('adds refrain-as-narrator, mishap, plausibility, bookend, and climax handoff rules', () => {
+    const prompt = promptText(structuredClone(baseInput));
+    expect(prompt).toContain('standalone narrator line');
+    expect(prompt).toContain('plant one small physical mishap');
+    expect(prompt).toContain("a preschooler's real body");
+    expect(prompt).toContain('present or explicitly echoed on the final page');
+    expect(prompt).toContain('must not end on the completed payoff');
+    expect(prompt).toContain('belong on try/turn/climax pages');
+  });
+
+  it('synthesizes recurring eventSignals into throughline candidates', () => {
+    const input = structuredClone(baseInput);
+    // baseInput has only 2 pages — add a third so recurrence spans pages 1 and 3.
+    input.storyPages.push({ ...structuredClone(input.storyPages[1]), pageNumber: 3 });
+    input.storyPages[0].analysis = {
+      setting: 's',
+      action: 'a',
+      emotion: 'e',
+      eventSignals: ['red balloon'],
+      narrativeRole: 'opening',
+    };
+    input.storyPages[2].analysis = {
+      setting: 's',
+      action: 'a',
+      emotion: 'e',
+      eventSignals: ['Red Balloon'],
+      narrativeRole: 'peak',
+    };
+    const prompt = promptText(input);
+    expect(prompt).toContain('Throughline candidates seen in the photos');
+    expect(prompt).toMatch(/red balloon.*pages 1, 3/i);
+  });
+
+  it('omits the candidates block when no signal recurs', () => {
+    const prompt = promptText(structuredClone(baseInput));
+    expect(prompt).not.toContain('Throughline candidates seen in the photos');
+  });
+});
+
+describe('arcRoleHintsUsable (X16 W1)', () => {
+  it('accepts a sane arc', () => {
+    expect(arcRoleHintsUsable(['opening', 'rising', 'peak', 'closing'])).toBe(true);
+  });
+  it('accepts partial/missing hints', () => {
+    expect(arcRoleHintsUsable([null, 'rising', null, 'closing'])).toBe(true);
+  });
+  it('accepts all-null roles', () => {
+    expect(arcRoleHintsUsable([null, null, undefined])).toBe(true);
+  });
+  it('rejects closing-before-opening', () => {
+    expect(arcRoleHintsUsable(['closing', 'rising', 'opening', 'peak'])).toBe(false);
+  });
+  it('rejects a book that opens on the peak or closing', () => {
+    expect(arcRoleHintsUsable(['peak', 'rising', 'opening', 'closing'])).toBe(false);
+    expect(arcRoleHintsUsable(['closing', 'opening'])).toBe(false);
+  });
+  it('rejects a book that ends on the opening', () => {
+    expect(arcRoleHintsUsable(['rising', 'peak', 'opening'])).toBe(false);
+  });
+});
+
+describe('ARC ROLE staleness suppression in the prompt (X16 W1)', () => {
+  const withRole = (role: string) => ({
+    setting: 's',
+    action: 'a',
+    emotion: 'e',
+    eventSignals: [],
+    narrativeRole: role,
+  });
+
+  it('drops every ARC ROLE line when the ordering contradicts the sequence', () => {
+    const input = structuredClone(baseInput);
+    input.storyPages[0].analysis = withRole('closing');
+    input.storyPages[1].analysis = withRole('opening');
+    const prompt = promptText(input);
+    expect(prompt).not.toContain('ARC ROLE:');
+    // Setting/action/emotion notes still render — only the role fragment is gone.
+    expect(prompt).toContain("WHAT'S HERE (raw notes, NOT the story): s; a; e.");
+  });
+
+  it('renders ARC ROLE lines when the ordering is a sane arc', () => {
+    const input = structuredClone(baseInput);
+    input.storyPages[0].analysis = withRole('opening');
+    input.storyPages[1].analysis = withRole('closing');
+    const prompt = promptText(input);
+    expect(prompt).toContain('ARC ROLE: opening.');
+    expect(prompt).toContain('ARC ROLE: closing.');
   });
 });

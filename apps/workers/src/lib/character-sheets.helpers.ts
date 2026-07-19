@@ -117,6 +117,47 @@ export function sheetRefsForStyle(
     }));
 }
 
+/**
+ * X16 W1: sheet-prompt subject kind. NOT kindFromRole — that collapses every
+ * human to 'person', which would rewrite existing child sheets. Children stay
+ * the default 'child'; only clearly-adult roles become 'grown-up'.
+ */
+export function sheetSubjectKind(role: string | null | undefined): string {
+  const r = (role || '').toLowerCase();
+  if (r === 'pet') return 'pet';
+  if (r === 'companion_object') return 'toy';
+  if (r === 'parent' || r === 'grandparent' || r.includes('adult') || r.includes('grown')) {
+    return 'grown-up';
+  }
+  return 'child';
+}
+
+/**
+ * X16 W1: outing photos are group photos — the sheet prompt needs one line
+ * saying WHICH figure is the subject. Distilled from the canonical traits.
+ */
+export function subjectAnchorFor(character: {
+  physicalTraits?: {
+    apparentAge?: string;
+    hairColor?: string;
+    hairStyle?: string;
+    distinguishingFeatures?: string[];
+  } | null;
+}): string | null {
+  const t = character.physicalTraits;
+  if (!t) return null;
+  const bits = [
+    t.apparentAge ? `the ${t.apparentAge}` : null,
+    t.hairColor || t.hairStyle
+      ? `with ${[t.hairColor, t.hairStyle].filter(Boolean).join(' ')} hair`
+      : null,
+    t.distinguishingFeatures?.length
+      ? `(${t.distinguishingFeatures.slice(0, 2).join(', ')})`
+      : null,
+  ].filter(Boolean);
+  return bits.length ? bits.join(' ') : null;
+}
+
 export interface PageWithAsset {
   assetId: string | null;
   asset: { url: string | null; thumbnailUrl: string | null } | null;

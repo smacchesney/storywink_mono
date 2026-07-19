@@ -25,6 +25,8 @@ function makeBridge(
       charactersPresent: ['char-1'],
       outfitFrom: 'previous',
       props: ['red bucket'],
+      mood: null,
+      focus: null,
     },
     ...overrides,
   };

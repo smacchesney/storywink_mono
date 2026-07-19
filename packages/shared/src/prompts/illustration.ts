@@ -80,6 +80,19 @@ export interface IllustrationPromptOptions {
    * threads it only when the flag is on.
    */
   illustrationMood?: string | null;
+  /** X16 W1: perception's {setting, action} for this page (fresh rows only) — photo-path scene anchor. */
+  sceneAnchor?: { setting: string; action: string } | null;
+  /**
+   * PHOTO_COME_ALIVE_ENABLED (X16 W1, default absent/false = today's prompt
+   * byte-identical): on the photo path's interior pages, add ONE bounded
+   * directive licensing storybook liveliness INSIDE the photo's truth — pose,
+   * composition, people, clothing, and setting stay exactly as the photo shows
+   * them, but gestures, gazes, secondary motion, and expression emphasis are
+   * amplified one notch in the photo's own direction. Bridge pages (story-model
+   * scene) and avatar books (photo-less) never emit it. The worker threads it
+   * only when the flag is on.
+   */
+  photoComeAlive?: boolean;
 }
 
 // ----------------------------------
@@ -306,6 +319,13 @@ function buildBridgeSceneSection(bridgeScene: BridgeScene | null | undefined): s
     `Location: ${bridgeScene.location}. Time of day: ${bridgeScene.timeOfDay}.`,
     props.length ? `Include these objects from the surrounding photos: ${props.join(', ')}.` : null,
     `Outfits: exactly as worn in the photo (image 1). The people must be instantly recognizable as the same people from the photo.`,
+    // X16 W1: mood + focus — the bridge has no photo, so these are its only
+    // emotional/compositional steer. Null-safe: pre-X16 stored scenes lack the
+    // keys, so the access is falsy and the line is dropped.
+    bridgeScene.focus ? `Focus: ${bridgeScene.focus} — this owns the composition.` : null,
+    bridgeScene.mood
+      ? `Mood: let this moment feel ${bridgeScene.mood} — expressed through lighting, atmosphere, and expression, never by changing the scene.`
+      : null,
   ]
     .filter(Boolean)
     .join(' ');
@@ -487,6 +507,32 @@ function buildMoodCueSection(moodCue: string | null): string | null {
   return `EMOTIONAL TONE (subordinate to the photo — it never changes pose, clothing, or scene composition): let this moment feel ${cue}; express it ONLY through lighting, atmosphere, and the characters' expressions.`;
 }
 
+/**
+ * X16 W1: perception's setting/action for THIS page, as a bounded anchor —
+ * text resistance against scene drift, and a named must-survive list for the
+ * white-vignette styles. Photo-anchored interior pages only.
+ */
+function buildSceneAnchorSection(
+  anchor: { setting: string; action: string } | null | undefined,
+): string | null {
+  if (!anchor) return null;
+  const setting = sanitizeIllustrationNotes(anchor.setting)?.trim().slice(0, 140);
+  const action = sanitizeIllustrationNotes(anchor.action)?.trim().slice(0, 140);
+  if (!setting && !action) return null;
+  const moment = [setting, action].filter(Boolean).join(' — ');
+  return `THIS PHOTO'S MOMENT (keep it recognizable): ${moment}. The place and the action above must survive stylization — simplify them into the art style, never erase or replace them.`;
+}
+
+/** X16 W1: "photo pins, amplify within" — bounded liveliness license for photo pages. */
+function buildComeAliveSection(enabled: boolean | undefined): string | null {
+  if (!enabled) return null;
+  return (
+    `BRING THE MOMENT ALIVE (within the photo's truth): keep pose, composition, people, clothing, and setting exactly as the photo shows them — then let the scene breathe: ` +
+    `readable gestures, gazes directed at the moment's focus, secondary motion in hair, clothing, water, and leaves, and expressions amplified one notch in the photo's own direction. ` +
+    `The result is a caught-mid-story storybook moment — never a posed catalog shot, never a re-composed scene.`
+  );
+}
+
 export function createIllustrationPrompt(opts: IllustrationPromptOptions): string {
   const style = getStyleDefinition(opts.style);
   const contentAnchor = opts.contentAnchor ?? 'photo';
@@ -604,6 +650,26 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
       ? buildMoodCueSection(sanitizeIllustrationNotes(opts.illustrationMood ?? null))
       : null;
 
+  // 4d. X16 W1 scene anchor: perception's {setting, action} for THIS page as a
+  //     bounded moment line — text resistance against scene drift and a named
+  //     must-survive list for the white-vignette styles. Photo path only, and
+  //     never on bridge pages (their scene comes from the story model). The
+  //     worker threads sceneAnchor only from a FRESH analysis row; absent →
+  //     null → the assembly is byte-identical.
+  const sceneAnchorSection =
+    contentAnchor === 'photo' && !opts.bridgeScene
+      ? buildSceneAnchorSection(opts.sceneAnchor)
+      : null;
+
+  // 4e. PHOTO_COME_ALIVE_ENABLED (X16 W1): one bounded liveliness license on
+  //     the photo path's interior pages — "photo pins, amplify within". Same
+  //     guard shape as the scene anchor (photo path, never bridge). Flag
+  //     absent/off → photoComeAlive absent → null → assembly byte-identical.
+  const comeAliveSection =
+    contentAnchor === 'photo' && !opts.bridgeScene
+      ? buildComeAliveSection(opts.photoComeAlive)
+      : null;
+
   // 5. Cross-cutting: QC feedback (neutralized too — feedback text quoting a
   //    display name would smuggle the name prior right back in).
   const qcSection = neutralize(buildQCFeedbackSection(opts.qcFeedback));
@@ -619,6 +685,8 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
     exactCastSection,
     livingToySection,
     moodSection,
+    sceneAnchorSection,
+    comeAliveSection,
     qcSection,
     noTextSection,
   ]

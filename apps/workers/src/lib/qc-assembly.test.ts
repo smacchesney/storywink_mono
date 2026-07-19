@@ -4,6 +4,7 @@ import {
   expectedCastForPage,
   heldPropsForPage,
   pageFeedFor,
+  sceneMeaningForPage,
   assembleQcBatchParts,
   type QcAssemblyPage,
 } from './qc-assembly.js';
@@ -137,6 +138,26 @@ describe('pageFeedFor', () => {
 
   it('nulls missing text', () => {
     expect(pageFeedFor(identity, page(1, { text: undefined })).text).toBe(null);
+  });
+});
+
+describe('photo-page mood feed (X16 W1)', () => {
+  it('falls back to illustrationMood when no scene mood exists', () => {
+    expect(sceneMeaningForPage({ illustrationMood: 'sleepy pride' })).toEqual({
+      mood: 'sleepy pride',
+      focus: null,
+    });
+  });
+  it('scene mood still wins over illustrationMood', () => {
+    expect(
+      sceneMeaningForPage({
+        bridgeScene: { mood: 'giddy joy', focus: 'the leap' },
+        illustrationMood: 'sleepy pride',
+      }),
+    ).toEqual({ mood: 'giddy joy', focus: 'the leap' });
+  });
+  it('null everywhere stays null', () => {
+    expect(sceneMeaningForPage({})).toEqual({ mood: null, focus: null });
   });
 });
 

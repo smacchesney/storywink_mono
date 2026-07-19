@@ -170,6 +170,13 @@ export interface CharacterExtractionJob {
   bookId: string;
   userId: string;
   artStyle: string;
+  /**
+   * X15 sheet pre-warm: enqueued alongside the story job so character-sheet
+   * generation overlaps story generation. The worker only warms
+   * Book.characterReferences (no status/phase/identity writes, no
+   * illustration flow) and exits.
+   */
+  prepareOnly?: boolean;
   pageIds?: string[];
   /**
    * Set by whole-book recovery/retry paths (reaper, book-level retry route):
@@ -193,6 +200,14 @@ export interface IllustrationGenerationJobV2 extends IllustrationGenerationJob {
    * CHARACTER_SHEETS_ENABLED produced (or reused) sheets for this run.
    */
   characterSheets?: CharacterSheetRef[];
+  /**
+   * X15: when true this child re-renders ONLY the QC-failed cover as part of
+   * a requeue flow (no page render, no page DB writes). pageId/pageNumber
+   * carry the title page so diagnostics stay meaningful. Carries the cover
+   * verdict whose suggestedPromptAdditions become the regen feedback.
+   */
+  coverRegen?: boolean;
+  coverQcResult?: CoverQCResult | null;
 }
 
 /**
@@ -262,6 +277,14 @@ export interface CharacterDescription {
    * field existed — consumers fall back to speciesLineFor's distillation.
    */
   species?: string | null;
+  /**
+   * Salience marker from the perception pass: true when this person/pet is
+   * family or central to the day (recurring, interacting with the child),
+   * false for one-photo background figures. Task 11's cast selection and
+   * Wave 2/3 consumers read it to keep bystanders out of the cast. Optional:
+   * absent on rosters written before this field existed.
+   */
+  isForeground?: boolean;
   /** Physical appearance traits extracted from photos */
   physicalTraits: {
     apparentAge: string;

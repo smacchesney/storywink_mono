@@ -13,6 +13,7 @@ import {
   requeueFeedbackFor,
   buildQcClassFlagLog,
   coverJudgeEligible,
+  coverRegenEligible,
   runQcBatches,
   buildQcRows,
   type QcBatchPageInfo,
@@ -395,11 +396,83 @@ describe('coverJudgeEligible', () => {
   });
 });
 
+describe('coverRegenEligible (X15: regen rides the requeue flow)', () => {
+  const failedCover = (): CoverQCResult =>
+    realCoverResult({
+      passed: false,
+      titleMatches: false,
+      issues: ['title corrupted'],
+      suggestedPromptAdditions: 'Fix the title lettering',
+    });
+
+  const base = {
+    coverJudged: true,
+    coverResult: failedCover(),
+    qcRound: 0,
+    titlePageRequeued: false,
+  };
+
+  it('buys the regen on a genuine round-0 cover failure', () => {
+    expect(coverRegenEligible(base)).toBe(true);
+  });
+
+  it('never regens from a qc_error sentinel (cover was not judged)', () => {
+    expect(coverRegenEligible({ ...base, coverResult: sentinelCoverResult('boom') })).toBe(false);
+  });
+
+  it('never regens on round 1+ (exactly-once rule)', () => {
+    expect(coverRegenEligible({ ...base, qcRound: 1 })).toBe(false);
+  });
+
+  it('skips when the title page itself is requeued (its re-render rebuys the cover)', () => {
+    expect(coverRegenEligible({ ...base, titlePageRequeued: true })).toBe(false);
+  });
+
+  it('skips a passed cover and a missing/unjudged cover', () => {
+    expect(
+      coverRegenEligible({ ...base, coverResult: { ...failedCover(), passed: true } }),
+    ).toBe(false);
+    expect(coverRegenEligible({ ...base, coverResult: null })).toBe(false);
+    expect(coverRegenEligible({ ...base, coverJudged: false })).toBe(false);
+  });
+});
+
 describe('runQcBatches', () => {
   const okOutcome = (batch: QcBatchPageInfo[]) => ({
     pageResults: batch.map((p) =>
       realResult({ pageId: p.pageId, pageNumber: p.pageNumber, passed: true }),
     ),
+  });
+
+  it('scores batches CONCURRENTLY while keeping page results in input batch order (X15)', async () => {
+    const batches = [
+      [pageInfo(1), pageInfo(2)],
+      [pageInfo(3), pageInfo(4)],
+      [pageInfo(5), pageInfo(6)],
+    ];
+
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const { pageResults, logs } = await runQcBatches(batches, async (batch, index) => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      // Reversed delays: batch 0 resolves LAST — order stability must come
+      // from aggregation, not from completion order.
+      await new Promise((resolve) => setTimeout(resolve, (batches.length - index) * 10));
+      inFlight--;
+      return okOutcome(batch);
+    });
+
+    expect(maxInFlight).toBeGreaterThan(1);
+    expect(pageResults.map((r) => r.pageId)).toEqual([
+      'page-1',
+      'page-2',
+      'page-3',
+      'page-4',
+      'page-5',
+      'page-6',
+    ]);
+    expect(logs.map((l) => l.batchIndex)).toEqual([0, 1, 2]);
   });
 
   it('one batch throws: sentinels for exactly that batch, real results for the others', async () => {
@@ -426,10 +499,23 @@ describe('runQcBatches', () => {
     // The errored batch is NOT requeued; genuine fails would be — here none.
     expect(selectRequeuePageIds(pageResults)).toEqual([]);
 
-    // Telemetry: one row per batch, marking ok/error.
+    // Telemetry: one row per batch, marking ok/error (+ per-batch duration).
     expect(logs).toEqual([
-      { event: 'qc_batch_result', batchIndex: 0, pageCount: 3, ok: true },
-      { event: 'qc_batch_result', batchIndex: 1, pageCount: 3, ok: false, error: 'rate limited' },
+      {
+        event: 'qc_batch_result',
+        batchIndex: 0,
+        pageCount: 3,
+        ok: true,
+        durationMs: expect.any(Number),
+      },
+      {
+        event: 'qc_batch_result',
+        batchIndex: 1,
+        pageCount: 3,
+        ok: false,
+        error: 'rate limited',
+        durationMs: expect.any(Number),
+      },
     ]);
   });
 

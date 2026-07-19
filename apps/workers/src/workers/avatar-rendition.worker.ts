@@ -14,6 +14,8 @@
 import { Job } from 'bullmq';
 import OpenAI from 'openai';
 import pino from 'pino';
+import { ANALYSIS_OPENAI_TIMEOUT_MS } from '../config/models.js';
+import { reconcileAvatarClothing } from '../lib/avatar-clothing.js';
 import { PrismaClient } from '@prisma/client';
 import { optimizeCloudinaryUrlForVision } from '@storywink/shared/utils';
 import { extractCloudinaryPublicId } from '@storywink/shared';
@@ -31,7 +33,10 @@ import {
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 const prisma = new PrismaClient();
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  timeout: ANALYSIS_OPENAI_TIMEOUT_MS,
+});
 
 export interface AvatarRenditionJobData {
   avatarId: string;
@@ -281,6 +286,20 @@ export async function processAvatarRendition(job: Job<AvatarRenditionJobData>): 
       data: { status: 'READY' },
     });
     logger.info({ avatarId, artStyle }, 'Avatar rendition READY');
+
+    // X15 safety: the approved sheet is the truth the owner sees and renders
+    // anchor to — when the validator reports its clothing differs from the
+    // identity TEXT, reconcile the text to the sheet (never the reverse).
+    // Non-fatal: the rendition is READY either way.
+    if (result.validated && result.clothingMismatch) {
+      await reconcileAvatarClothing({
+        openai,
+        avatarId,
+        userId: job.data.userId,
+        observedClothing: result.clothingMismatch.observedClothing,
+        logger,
+      });
+    }
 
     // A superseded SUFFIXED cutout (from an earlier promotion/backfill patch)
     // is no longer reachable from any stored URL — reap it. Compared on the

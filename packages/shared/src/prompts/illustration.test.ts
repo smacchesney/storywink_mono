@@ -330,6 +330,31 @@ describe('bridge prompt variant (source=BRIDGE pages)', () => {
     expect(bridgePrompt).not.toContain('Ben (parent)');
   });
 
+  it('bridge section renders mood and focus when present (X16 W1)', () => {
+    const prompt = createIllustrationPrompt({
+      style: 'vignette',
+      pageText: 'Almost there, almost there!',
+      bookTitle: "Aria's Big Day",
+      isTitlePage: false,
+      referenceImageCount: 3,
+      characterIdentity,
+      pageNumber: 4,
+      bridgeScene: {
+        ...bridgeScene,
+        mood: 'hushed wonder',
+        focus: 'Emma reaching for the branch',
+      },
+    });
+    expect(prompt).toContain('hushed wonder');
+    expect(prompt).toContain('Emma reaching for the branch');
+  });
+
+  it('omits the mood and focus lines when absent from a stored scene (X16 W1)', () => {
+    // Pre-X16 rows have no mood/focus keys — the section must stay null-safe.
+    expect(bridgePrompt).not.toContain('Focus:');
+    expect(bridgePrompt).not.toContain('Mood:');
+  });
+
   it('falls back to the photo-page identity filter when no authored id resolves', () => {
     const stalePrompt = createIllustrationPrompt({
       style: 'vignette',
@@ -388,7 +413,7 @@ describe('createIllustrationPrompt — photo-path mood cue (STORY_ILLUS_MOOD_ENA
     const off = createIllustrationPrompt(base);
     expect(createIllustrationPrompt({ ...base, illustrationMood: null })).toBe(off);
     expect(createIllustrationPrompt({ ...base, illustrationMood: '  ' })).toBe(off);
-    expect(off).not.toContain('EMOTIONAL TONE');
+    expect(off).not.toContain('EMOTIONAL TONE (subordinate to the photo');
   });
 
   it('never renders on covers or off the photo path', () => {
@@ -397,18 +422,86 @@ describe('createIllustrationPrompt — photo-path mood cue (STORY_ILLUS_MOOD_ENA
       isTitlePage: true,
       illustrationMood: 'hushed wonder',
     });
-    expect(cover).not.toContain('EMOTIONAL TONE');
+    expect(cover).not.toContain('EMOTIONAL TONE (subordinate to the photo');
     const avatar = createIllustrationPrompt({
       ...base,
       contentAnchor: 'sheet',
       illustrationMood: 'hushed wonder',
     });
-    expect(avatar).not.toContain('EMOTIONAL TONE');
+    expect(avatar).not.toContain('EMOTIONAL TONE (subordinate to the photo');
   });
 
   it('sanitizes shouty mood text and keeps the no-text rule last', () => {
     const prompt = createIllustrationPrompt({ ...base, illustrationMood: '"POOF!" excitement' });
     expect(prompt).not.toContain('POOF');
     expect(prompt.endsWith('This is a wordless illustration.')).toBe(true);
+  });
+});
+
+describe('scene anchor (X16 W1)', () => {
+  // No photoPageFixture()/avatarPageFixture() helpers exist here — adapt the
+  // mood-cue describe's `base` options object as the photo-path fixture, and
+  // build the avatar case inline with contentAnchor: 'sheet'.
+  const photoBase = {
+    style: 'vignette' as const,
+    pageText: 'Aria spun in the sunshine.',
+    bookTitle: "Aria's Big Day",
+    isTitlePage: false,
+    referenceImageCount: 1,
+    characterIdentity,
+    pageNumber: 3,
+  };
+
+  it('renders the photo moment on photo pages', () => {
+    const prompt = createIllustrationPrompt({
+      ...photoBase,
+      sceneAnchor: {
+        setting: 'backyard, golden late afternoon',
+        action: 'mid-splash in the paddling pool',
+      },
+    });
+    expect(prompt).toContain("THIS PHOTO'S MOMENT");
+    expect(prompt).toContain('backyard, golden late afternoon');
+    expect(prompt).toContain('must survive stylization');
+  });
+
+  it('omits the section without an anchor (byte-identical legacy)', () => {
+    const off = createIllustrationPrompt(photoBase);
+    expect(off).not.toContain("THIS PHOTO'S MOMENT");
+    expect(createIllustrationPrompt({ ...photoBase, sceneAnchor: null })).toBe(off);
+  });
+
+  it('never renders on bridge or sheet-anchored pages', () => {
+    const sheet = createIllustrationPrompt({
+      ...photoBase,
+      contentAnchor: 'sheet',
+      sceneAnchor: { setting: 'x', action: 'y' },
+    });
+    expect(sheet).not.toContain("THIS PHOTO'S MOMENT");
+  });
+});
+
+describe('come-alive directive (X16 W1)', () => {
+  const photoBase = {
+    style: 'vignette' as const,
+    pageText: 'Aria spun in the sunshine.',
+    bookTitle: "Aria's Big Day",
+    isTitlePage: false,
+    referenceImageCount: 1,
+    characterIdentity,
+    pageNumber: 3,
+  };
+
+  it('renders on photo pages when enabled', () => {
+    const prompt = createIllustrationPrompt({ ...photoBase, photoComeAlive: true });
+    expect(prompt).toContain('BRING THE MOMENT ALIVE');
+    expect(prompt).toContain('never a posed catalog shot');
+  });
+
+  it('absent when off / on non-photo anchors (byte-identical legacy)', () => {
+    expect(createIllustrationPrompt(photoBase)).not.toContain('BRING THE MOMENT ALIVE');
+    expect(
+      createIllustrationPrompt({ ...photoBase, contentAnchor: 'sheet', photoComeAlive: true }),
+    ).not.toContain('BRING THE MOMENT ALIVE');
   });
 });
