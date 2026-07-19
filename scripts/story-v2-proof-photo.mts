@@ -154,7 +154,9 @@ async function main() {
     ? syntheticBook()
     : candidates.find((b) => b.pages.length >= 4 && b.pages.every((p) => p.originalImageUrl));
   if (!book) {
-    console.log('[proof-photo] no local photo book with images on every page — listing candidates:');
+    console.log(
+      '[proof-photo] no local photo book with images on every page — listing candidates:',
+    );
     for (const b of candidates) {
       console.log(
         `  ${b.id} | ${b.title} | pages ${b.pages.length} | withImg ${b.pages.filter((p) => p.originalImageUrl).length}`,
@@ -309,7 +311,21 @@ async function main() {
     return { sorted, det, echoes, qc, problems };
   };
 
+  // Accumulate every evaluation round so the artifact keeps the pre-regen
+  // draft + its problems, not just the final surviving draft. This is the
+  // proof that the regen loop fired and what it fired on.
+  const rounds: {
+    round: number;
+    problems: string[];
+    pages: { pageNumber: number; text: string }[];
+  }[] = [];
+
   let round = await judge(story);
+  rounds.push({
+    round: 1,
+    problems: round.problems,
+    pages: round.sorted.map((p) => ({ pageNumber: p.pageNumber, text: p.text })),
+  });
   if (round.problems.length > 0) {
     console.log(
       `[proof-photo] round 1 failed (${round.problems.length} problems) — regenerating once with corrections (mirrors the worker loop)…`,
@@ -317,6 +333,11 @@ async function main() {
     regenerated = true;
     story = await generate(round.problems.map((p, i) => `${i + 1}. ${p}`).join('\n'));
     round = await judge(story);
+    rounds.push({
+      round: 2,
+      problems: round.problems,
+      pages: round.sorted.map((p) => ({ pageNumber: p.pageNumber, text: p.text })),
+    });
   }
   const { sorted, det, echoes, qc } = round;
 
@@ -361,7 +382,7 @@ async function main() {
   };
 
   const outJson = path.join(ROOT, '.screenshots/story-v2-proof-photo.json');
-  writeFileSync(outJson, JSON.stringify({ summary, story, qc, pages }, null, 2));
+  writeFileSync(outJson, JSON.stringify({ summary, story, qc, pages, rounds }, null, 2));
   const md = [
     `# Story Quality V2 proof — PHOTO path (book ${book.id}) on ${STORY_MODEL}`,
     ``,
