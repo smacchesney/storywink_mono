@@ -17,6 +17,7 @@ import {
 // X6d: avatar-first stories — no photos, a cast of account avatars, a
 // parent-picked spark, and a page count. Dark behind AVATARS_ENABLED.
 import { createAvatarBookSchema } from '@/lib/avatar-story-schema';
+import { coverComposedEnabled } from '@/lib/outing-v2';
 
 // Zod schema for request body validation
 const createBookSchema = z.object({
@@ -275,6 +276,12 @@ export async function POST(req: NextRequest) {
         'API: Fetched asset URLs within transaction.',
       );
 
+      // X17 A1 (COVER_COMPOSED_ENABLED): no photo is spent on the cover — the
+      // composed cover renders at finalize, keyed off coverAssetId == null
+      // (book state, not this flag). Flag off: legacy first-photo cover,
+      // byte-identical end to end.
+      const composedCover = coverComposedEnabled();
+
       // 1. Create the Book record - use database user ID
       const book = await tx.book.create({
         data: {
@@ -283,7 +290,7 @@ export async function POST(req: NextRequest) {
           status: BookStatus.DRAFT,
           pageLength: assetIds.length, // Set page length based on provided assets
           language,
-          coverAssetId: assetIds[0], // First photo becomes the cover
+          coverAssetId: composedCover ? null : assetIds[0], // legacy: first photo becomes the cover
           autoIllustrate: true, // Product default: chain straight into illustration after story success
           // Other fields like artStyle will be set later in the editor
         },
@@ -307,7 +314,7 @@ export async function POST(req: NextRequest) {
           assetId: assetId,
           originalImageUrl: asset.thumbnailUrl || asset.url, // <-- Use fetched URL (prefer thumbnail)
           pageType: PageType.SINGLE,
-          isTitlePage: index === 0,
+          isTitlePage: composedCover ? false : index === 0,
         };
       });
 

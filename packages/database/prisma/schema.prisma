@@ -101,6 +101,11 @@ model Book {
   generationPhase   String?   // Fine-grained pipeline phase for progress UI (finer than BookStatus)
   firstViewedAt     DateTime? // First time the owner opened a readable preview — gates the one-time reveal
   characterReferences Json?   // Character sheet refs keyed by (characterId, artStyle), retained across style flips
+  castMode          String    @default("star") // X17 A2: 'star' | 'ensemble' — who this book stars
+  starCharacterId   String?   // X17 A2: perception characterId the parent picked as the star (kills the sibling coin flip)
+  castMemberIds     Json?     // X17 A2: string[] of perception characterIds confirmed as ensemble members
+  themeLine         String?   // X17 A4: perception's distilled theme ("a splashy beach day with Grandma"); parent-editable via PATCH in Wave B
+  coverHeroAssetIds Json?     // X17 A1/A4: string[] of 1-3 hero-photo assetIds anchoring the composed cover (asset-stable, best first)
   promptTokens      Int?
   completionTokens  Int?
   totalTokens       Int?

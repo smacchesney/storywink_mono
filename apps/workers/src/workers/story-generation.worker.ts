@@ -7,6 +7,7 @@ import OpenAI from 'openai';
 import pino from 'pino';
 import {
   createStoryGenerationPrompt,
+  bindFactsToPages,
   StoryGenerationInput,
   STORY_GENERATION_SYSTEM_PROMPT,
   StoryResponse,
@@ -51,10 +52,12 @@ import {
   mergeCastNames,
   resolveCastEntries,
   checkCastNameCoverage,
+  computeCastBalance,
   MergedCastCharacter,
   ResolvedCastEntry,
   CastCoverageResult,
 } from '../lib/resolveCast.js';
+import { ensembleMemberIds } from '../lib/ensemble.js';
 import {
   buildAvatarCastForPrompt,
   extractAvatarScene,
@@ -63,6 +66,7 @@ import {
 } from '../lib/avatar-story.js';
 import { storyQualityV2Enabled, deterministicStoryChecks } from '../lib/story-quality.js';
 import { persistStoryQc } from '../lib/story-qc-persist.js';
+import { peekExtractJobId, resolveAutoChainPlan, storyPeekGraceMs } from '../lib/peek.js';
 import {
   STORY_MODEL,
   ANALYSIS_MODEL,
@@ -293,6 +297,13 @@ async function evaluateStoryQuality(
     ? checkCastNameCoverage(cast, pageTexts, input.language || 'en')
     : null;
 
+  // X17 A2 castBalance — LOG-FIRST (never problems): per confirmed-named
+  // member, pages mentioning them vs their photo count. Rides the telemetry
+  // object into StoryQcResult.scores; enforcement waits for Wave C.
+  const castBalance = cast.length
+    ? computeCastBalance(cast, pageTexts, input.language || 'en')
+    : [];
+
   const telemetry = {
     bookId,
     refrainEchoes: echoes,
@@ -307,6 +318,8 @@ async function evaluateStoryQuality(
     castNamesCovered: castCoverage?.covered ?? 0,
     castNamesMissing: castCoverage?.missing ?? [],
     castNamesSkippedScript: castCoverage?.skippedScript ?? 0,
+    castMode: input.castMode ?? 'star',
+    castBalance,
     truthToEvent: qc.truthToEvent,
     // ENFORCED on photo (S2): a sound-overloaded draft is regenerated.
     soundOverload: qc.soundOverload,
@@ -851,6 +864,7 @@ export async function processStoryGeneration(
         characters: mergedCharacters,
         captureQuestions,
         childName: book.childName,
+        starCharacterId: book.starCharacterId,
       });
       mergedCharacters = merge.characters;
       consumedQuestionIds = new Set(merge.consumedQuestionIds);
@@ -947,6 +961,11 @@ export async function processStoryGeneration(
       charactersInPhotos: charactersInPhotos.length > 0 ? charactersInPhotos : undefined,
       bridgeCap: bridgeCap > 0 ? bridgeCap : undefined,
       toysComeAlive: toysAlive,
+      // X17 A2: ensemble prompt variant — flag + book-state gated, degrading
+      // to the star prompt when the resolved roster is empty.
+      ...(ensembleMemberIds(book) && charactersInPhotos.length > 0
+        ? { castMode: 'ensemble' as const }
+        : {}),
       language: book.language || 'en',
       suggestTitle: job.data.titleWasGenerated === true,
       storyPages: storyPages.map((page, index) => {
@@ -970,6 +989,23 @@ export async function processStoryGeneration(
         };
       }),
     };
+
+    // X17 B4: split confirmed facts into page-bound (rendered on that page's
+    // WHAT'S HERE line) and global. Photo path only — avatar books have no
+    // per-page analysis to bind against.
+    if (!isAvatarStory && storyInput.confirmedFacts?.length) {
+      const { bound, unbound } = bindFactsToPages(
+        storyInput.confirmedFacts,
+        storyInput.storyPages.map((p) => ({
+          position: p.pageNumber,
+          eventSignals: p.analysis?.eventSignals,
+        })),
+      );
+      if (Object.keys(bound).length > 0) {
+        storyInput.pageBoundFacts = bound;
+        storyInput.confirmedFacts = unbound.length > 0 ? unbound : undefined;
+      }
+    }
 
     // AVATAR_STORY (X6d): the premise (stored on eventSummary at creation)
     // replaces the photo storyboard; the cast is the stored avatar roster,
@@ -1708,11 +1744,17 @@ export async function processStoryGeneration(
       logger,
     );
 
-    // Auto-chain: hand the book straight to illustration. The chain re-enters
-    // via character extraction, which owns the illustration FlowProducer flow.
-    // A chain failure must NOT fail the story job — the book stays STORY_READY
-    // and the user can start illustration manually.
-    if (book.autoIllustrate) {
+    // Auto-chain: hand the book to illustration. X17 B4: with a grace window
+    // configured, photo books arm a CANCELLABLE delayed job instead and stay
+    // STORY_READY — the peek route promotes (paint now) or re-arms (tweak) it
+    // by its deterministic id; the extraction worker claims the status when
+    // the job finally runs. Grace unset/0 = today's immediate chain.
+    const chainPlan = resolveAutoChainPlan({
+      autoIllustrate: book.autoIllustrate,
+      bookType: book.bookType,
+      graceMs: storyPeekGraceMs(),
+    });
+    if (chainPlan.mode === 'immediate') {
       try {
         await prisma.book.update({
           where: { id: bookId },
@@ -1747,6 +1789,41 @@ export async function processStoryGeneration(
             data: { status: 'STORY_READY' },
           })
           .catch(() => {});
+      }
+    } else if (chainPlan.mode === 'delayed') {
+      try {
+        const queue = getCharacterExtractionQueue();
+        const jobId = peekExtractJobId(bookId);
+        // A regenerated story can leave a finished job under this id — clear
+        // it so the fresh delayed add is never silently deduped.
+        const stale = await queue.getJob(jobId);
+        if (stale) await stale.remove().catch(() => {});
+        await queue.add(
+          `extract-characters-${bookId}`,
+          { bookId, userId, artStyle: book.artStyle || 'vignette', claimBook: true },
+          {
+            jobId,
+            delay: chainPlan.delayMs,
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 10000 },
+            removeOnComplete: { count: 100 },
+            removeOnFail: { count: 500 },
+          },
+        );
+        logger.info(
+          { bookId, delayMs: chainPlan.delayMs },
+          'Auto-chain armed as delayed peek job — book stays STORY_READY',
+        );
+      } catch (chainError) {
+        // Book is already STORY_READY — the review screen's manual start
+        // still works, so nothing to revert.
+        logger.error(
+          {
+            bookId,
+            error: chainError instanceof Error ? chainError.message : 'Unknown error',
+          },
+          'Delayed peek enqueue failed — book stays STORY_READY',
+        );
       }
     }
 
@@ -1870,6 +1947,7 @@ async function processSinglePageTextGeneration(
       characters: rawIdentity.characters,
       captureQuestions,
       childName: book.childName,
+      starCharacterId: book.starCharacterId,
     });
     consumedQuestionIds = new Set(merge.consumedQuestionIds);
     cast = resolveCastEntries(

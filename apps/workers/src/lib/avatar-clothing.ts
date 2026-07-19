@@ -32,7 +32,9 @@ export function applyClothingToIdentity<T extends StoredIdentity>(
   rewrittenStyleTranslation: string | null,
 ): T {
   const nested = 'character' in identity && identity.character !== null;
-  const target = (nested ? (identity as { character: ClothingCharacter }).character : identity) as ClothingCharacter;
+  const target = (
+    nested ? (identity as { character: ClothingCharacter }).character : identity
+  ) as ClothingCharacter;
   const patched: ClothingCharacter = {
     ...target,
     typicalClothing: observedClothing,
@@ -80,7 +82,9 @@ export async function reconcileAvatarClothing(params: {
     const avatar = await prisma.avatar.findUnique({ where: { id: avatarId } });
     const identity = avatar?.identity as StoredIdentity | null;
     if (!avatar || !identity) return;
-    const character = ('character' in identity ? identity.character : identity) as ClothingCharacter;
+    const character = (
+      'character' in identity ? identity.character : identity
+    ) as ClothingCharacter;
     if (!character) return;
 
     let rewrittenStyle: string | null = null;

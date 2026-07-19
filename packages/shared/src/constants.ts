@@ -59,6 +59,7 @@ export const PAGE_TEXT = {
     endingTitle: 'The End',
     endingLine: 'Until next time,',
     collageTitle: 'The real adventure',
+    andFriends: '& friends',
   },
   ja: {
     dedicationLine1: 'この えほんは',
@@ -66,6 +67,7 @@ export const PAGE_TEXT = {
     endingTitle: 'おしまい',
     endingLine: 'またね、',
     collageTitle: 'ほんとうの ぼうけんは ここから',
+    andFriends: 'と おともだち',
   },
 } as const;
 

@@ -184,3 +184,46 @@ describe('assembleInteriorPages — count authority parity with calculatePrinted
     });
   }
 });
+
+describe('composed-cover interior invariants (X17 A5)', () => {
+  it('23 photos, no title page: exactly 48 interior pages — the Lulu cap', () => {
+    const book = makeBook(23);
+    (book as { coverAssetId: string | null }).coverAssetId = null;
+    const pages = assembleInteriorPages(book);
+    expect(pages).toHaveLength(48); // dedication + 23 pairs + ending, 48 % 4 === 0
+    expect(pages.filter((p) => p.kind === 'text')).toHaveLength(23);
+    expect(pages.filter((p) => p.kind === 'illustration')).toHaveLength(23);
+    expect(pages.filter((p) => p.kind === 'blank')).toHaveLength(0);
+  });
+
+  it('interior HTML is byte-identical with and without a coverAssetId', () => {
+    const withCover = makeBook(5);
+    const without = makeBook(5);
+    (without as { coverAssetId: string | null }).coverAssetId = null;
+    expect(assembleInteriorPages(without).map((p) => p.html)).toEqual(
+      assembleInteriorPages(withCover).map((p) => p.html),
+    );
+  });
+});
+
+describe('ensemble dedication + ending (X17 A2)', () => {
+  it('dedication and ending carry the crew name list', () => {
+    const book = makeBook(3);
+    Object.assign(book, {
+      castMode: 'ensemble',
+      castMemberIds: ['c1', 'c2', 'c3'],
+      characterIdentity: {
+        characters: [
+          { characterId: 'c1', name: 'Leo' },
+          { characterId: 'c2', name: 'Maya' },
+          { characterId: 'c3', name: 'Sam' },
+        ],
+      },
+    });
+    const pages = assembleInteriorPages(book);
+    const dedication = pages.find((p) => p.kind === 'dedication')!.html;
+    const ending = pages.find((p) => p.kind === 'ending')!.html;
+    expect(dedication).toContain('Leo, Maya &amp; Sam');
+    expect(ending).toContain('Leo, Maya &amp; Sam');
+  });
+});

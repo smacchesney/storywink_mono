@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@storywink/database';
 import { getAuthenticatedUser } from '@/lib/db/ensureUser';
 import { db as prisma } from '@/lib/db';
 import { z } from 'zod'; // Import Zod
@@ -13,6 +14,7 @@ import {
 import { createBullMQConnection } from '@storywink/shared/redis';
 import { Queue } from 'bullmq';
 import logger from '@/lib/logger'; // Import logger
+import { ensembleBooksEnabled } from '@/lib/outing-v2';
 
 // Lazy singleton for the asset-cleanup queue (the shared QueueName enum in
 // @/lib/queue predates this queue; workers resolve it via QUEUE_NAMES).
@@ -64,13 +66,24 @@ const updateBookSchema = z
     tone: z.enum(STORY_MOODS).nullable().optional(),
     theme: z.string().max(100).nullable().optional(),
     // The experience-capture fields the setup surface fills before generation.
-    eventSummary: z.string().max(500).nullable().optional(),
+    // 1500 matches the ramble cap (X17 B4) — the field doubles as the
+    // parent's full account of the day, not just a one-line brief.
+    eventSummary: z.string().max(1500).nullable().optional(),
     learningWords: z
       .array(z.object({ word: z.string().min(1).max(30) }))
       .max(4)
       .nullable()
       .optional(),
     captureQuestions: z.array(captureQuestionSchema).max(10).nullable().optional(),
+    // X17 A2/B: cast + theme fields. castMode/castMemberIds are ensemble
+    // machinery, honored only when ENSEMBLE_BOOKS_ENABLED (stripped below when
+    // off — the spec's off behavior is "castMode ignored, star path").
+    // starCharacterId rides UNGATED: it fixes the wrong-sibling coin flip in
+    // star mode too (spec A2). themeLine is plain data and rides ungated.
+    castMode: z.enum(['star', 'ensemble']).optional(),
+    starCharacterId: z.string().max(50).nullable().optional(),
+    castMemberIds: z.array(z.string().min(1).max(50)).max(8).nullable().optional(),
+    themeLine: z.string().max(120).nullable().optional(),
     autoIllustrate: z.boolean().optional(),
   })
   .strict(); // Ensure no extra fields are passed
@@ -238,6 +251,30 @@ export async function PATCH(
     const dataForPrisma: Record<string, unknown> = { ...validatedData };
     if (validatedData.additionalCharacters !== undefined) {
       dataForPrisma.additionalCharacters = JSON.stringify(validatedData.additionalCharacters);
+    }
+
+    // ENSEMBLE_BOOKS_ENABLED off: the ensemble fields are ignored, not
+    // errored — a stale client with the flag freshly unset must not brick its
+    // PATCHes. starCharacterId is deliberately NOT stripped: the star pick is
+    // the wrong-sibling fix and must persist in star-only deployments.
+    if (!ensembleBooksEnabled()) {
+      for (const field of ['castMode', 'castMemberIds'] as const) {
+        if (field in dataForPrisma) {
+          delete dataForPrisma[field];
+          logger.info(
+            { dbUserId: dbUser.id, bookId, field },
+            'API: ensemble field stripped (ENSEMBLE_BOOKS_ENABLED off)',
+          );
+        }
+      }
+    }
+
+    // castMemberIds is a Json? column: Prisma rejects a literal JS null for JSON
+    // fields (it wants Prisma.DbNull/JsonNull). Map an explicit null clear to
+    // Prisma.DbNull (SQL NULL), mirroring avatar/[avatarId]/photo/route.ts. Only
+    // reached with the flag on — the strip above drops the field when off.
+    if (dataForPrisma.castMemberIds === null) {
+      dataForPrisma.castMemberIds = Prisma.DbNull;
     }
 
     // Use updateMany to ensure user owns the book AND the book exists

@@ -15,20 +15,36 @@ export interface CaptureQuestion {
   answer?: string | null;
 }
 
+export interface QuestionCaps {
+  naming: number;
+  total: number;
+}
+
 interface CaptureChipsProps {
   questions: CaptureQuestion[];
+  /** Raises the naming/total caps in ensemble mode; omit for the legacy shape. */
+  caps?: QuestionCaps;
   /** Fires with the full updated list whenever an answer changes. */
   onChange: (questions: CaptureQuestion[]) => void;
 }
 
 const SKIP = '__skip__';
 
-/** Naming questions render first, capped at 2 of the 3 rows so a
- * highlight/firsts question usually survives (mirrors the worker-side cap). */
-function orderQuestions(questions: CaptureQuestion[]): CaptureQuestion[] {
-  const naming = questions.filter((q) => q.characterId);
-  const other = questions.filter((q) => !q.characterId);
-  return [...naming.slice(0, 2), ...other, ...naming.slice(2)].slice(0, 3);
+/** Naming questions render first. Default caps mirror the legacy shape
+ * (2 naming / 3 total); ensemble mode raises them so every member's naming
+ * chip fits. Non-naming `ramble_*` rows are extraction facts, not questions
+ * for the parent — they persist and reach the story prompt but never render. */
+export function orderQuestions(
+  questions: CaptureQuestion[],
+  caps: QuestionCaps = { naming: 2, total: 3 },
+): CaptureQuestion[] {
+  const visible = questions.filter((q) => q.characterId || !q.id.startsWith('ramble_'));
+  const naming = visible.filter((q) => q.characterId);
+  const other = visible.filter((q) => !q.characterId);
+  return [...naming.slice(0, caps.naming), ...other, ...naming.slice(caps.naming)].slice(
+    0,
+    caps.total,
+  );
 }
 
 /**
@@ -38,10 +54,10 @@ function orderQuestions(questions: CaptureQuestion[]): CaptureQuestion[] {
  * input (commit on blur/enter). Answering PATCHes back through the parent.
  * Nothing renders until questions arrive.
  */
-export function CaptureChips({ questions, onChange }: CaptureChipsProps) {
+export function CaptureChips({ questions, caps, onChange }: CaptureChipsProps) {
   const t = useTranslations('setup');
   const [editingId, setEditingId] = React.useState<string | null>(null);
-  const rows = orderQuestions(questions);
+  const rows = orderQuestions(questions, caps);
 
   const setAnswer = (id: string, answer: string | null) => {
     onChange(questions.map((q) => (q.id === id ? { ...q, answer } : q)));

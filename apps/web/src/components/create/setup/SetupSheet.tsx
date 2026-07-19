@@ -18,6 +18,12 @@ import StoryFraming from '@/components/create/setup/StoryFraming';
 import type { StripPhase } from '@/components/create/setup/strip-phase';
 import AvatarMatchChip from '@/components/create/setup/AvatarMatchChip';
 import CaptureChips, { CaptureQuestion } from '@/components/create/setup/CaptureChips';
+import type { DiscoveryChip, RosterCharacterLike } from '@/components/create/setup/discovery-feed';
+import { recurringChildren } from '@/components/create/setup/discovery-feed';
+import DiscoveryFeed from '@/components/create/setup/DiscoveryFeed';
+import ThemeCard from '@/components/create/setup/ThemeCard';
+import StarPicker from '@/components/create/setup/StarPicker';
+import { CREATE_DISCOVERY_FLAG, ENSEMBLE_BOOKS_FLAG } from '@/lib/discovery-client';
 
 export interface SetupFormState {
   childName: string;
@@ -28,6 +34,11 @@ export interface SetupFormState {
   tone: StoryMood | null;
   learningWords: string[];
   reviewFirst: boolean;
+  /** X17b: theme card + star ask. Defaults keep legacy books inert. */
+  themeLine: string;
+  castMode: 'star' | 'ensemble';
+  starCharacterId: string | null;
+  castMemberIds: string[];
 }
 
 interface SetupSheetProps {
@@ -51,10 +62,23 @@ interface SetupSheetProps {
   bookId?: string;
   /** Perception roster id of this book's star, for the avatar confirm row. */
   mainCharacterId?: string | null;
+  /**
+   * X17b discovery surface — analysis-derived chips, the perception roster,
+   * and the composed-cover asset. Plumbed here for Tasks 6-11 to render behind
+   * the CREATE_DISCOVERY flag; unread today, so flag-off output is unchanged.
+   */
+  discoveryChips?: DiscoveryChip[];
+  roster?: RosterCharacterLike[];
+  coverAssetId?: string | null;
   onReorder: (photos: StripPhoto[]) => void;
   /** Refetch trigger after photos are added/removed inline. */
   onPhotosChanged?: () => void | Promise<void>;
   onChange: <K extends keyof SetupFormState>(key: K, value: SetupFormState[K]) => void;
+  /** X17 B3 — star pick fixes the name binding; Everyone flips ensemble mode. */
+  onPickStar: (character: RosterCharacterLike) => void;
+  onPickEveryone: () => void;
+  /** X17 B4 — ramble blur fires the perception extract (wired in Task 13). */
+  onRambleBlur?: () => void;
   onSubmit: () => void;
 }
 
@@ -75,13 +99,23 @@ export function SetupSheet({
   showNameError,
   bookId,
   mainCharacterId,
+  discoveryChips,
+  roster,
+  coverAssetId,
   onReorder,
   onPhotosChanged,
   onChange,
+  onPickStar,
+  onPickEveryone,
+  onRambleBlur,
   onSubmit,
 }: SetupSheetProps) {
   const t = useTranslations('setup');
   const reducedMotion = useReducedMotion() ?? false;
+
+  // X17 B3 — the star ask renders only when the roster holds 2+ recurring kids;
+  // solo books never see it (empty array → block below stays unrendered).
+  const starChildren = recurringChildren(roster ?? []);
 
   const hasChips = form.captureQuestions.length > 0;
   // Reserved chips space while the librarian is still reading — arrival then
@@ -118,6 +152,8 @@ export function SetupSheet({
           onReorder={onReorder}
           bookId={bookId}
           onPhotosChanged={onPhotosChanged}
+          reading={CREATE_DISCOVERY_FLAG && stripPhase === 'reading'}
+          hasPhotoCover={coverAssetId !== null}
         />
       </section>
 
@@ -175,16 +211,69 @@ export function SetupSheet({
         </div>
       </section>
 
-      {/* Story framing — always renders: the mood row needs zero analysis,
-          and a missing summary falls back to a quiet "add a note" button. */}
-      <StoryFraming
-        tone={form.tone}
-        eventSummary={form.eventSummary}
-        learningWords={form.learningWords}
-        onToneChange={(v) => onChange('tone', v)}
-        onSummaryChange={(v) => onChange('eventSummary', v)}
-        onLearningWordsChange={(v) => onChange('learningWords', v)}
-      />
+      {/* X17b — flag-on discovery flow. The name + title fields above keep
+          their LEGACY positions; every poll-fed element (ramble growth, the
+          feed past its 96px floor, the theme card mounting, the star ask
+          resolving) sits BELOW them, so a late arrival never shifts the
+          required name field mid-typing (the Task 6 regression). The ramble
+          variant of StoryFraming replaces the legacy row in the same
+          structural slot — its mount height is deterministic (mood row + 2-row
+          ramble). Whole block is flag-gated so flag-off output stays
+          byte-identical. */}
+      {CREATE_DISCOVERY_FLAG && (
+        <>
+          {/* X17 B4 — the truncated summary row becomes the always-visible,
+              dictation-first ramble bound to eventSummary; the mood row still
+              renders above it inside StoryFraming. */}
+          <StoryFraming
+            ramble
+            onRambleBlur={onRambleBlur}
+            tone={form.tone}
+            eventSummary={form.eventSummary}
+            learningWords={form.learningWords}
+            onToneChange={(v) => onChange('tone', v)}
+            onSummaryChange={(v) => onChange('eventSummary', v)}
+            onLearningWordsChange={(v) => onChange('learningWords', v)}
+          />
+
+          {/* X17 B1 — real perception findings cascade in as Geist data chips.
+              A min-height floor holds whenever the feed renders. */}
+          <DiscoveryFeed chips={discoveryChips ?? []} reserve={stripPhase === 'reading'} />
+
+          {/* X17 B2 — the feed's finale: the perception theme as a tap-to-edit
+              Excalifont card. Hidden entirely when perception found no theme. */}
+          <ThemeCard themeLine={form.themeLine} onChange={(v) => onChange('themeLine', v)} />
+
+          {/* X17 B3 — "Who's the star?": one chip per recurring kid + "Everyone!".
+              Renders only when 2+ recurring kids exist (solo books never see it);
+              the "Everyone!" chip is additionally gated on ENSEMBLE_BOOKS_FLAG. */}
+          {starChildren.length >= 2 && (
+            <StarPicker
+              childrenChars={starChildren}
+              castMode={form.castMode}
+              starCharacterId={form.starCharacterId}
+              ensembleAllowed={ENSEMBLE_BOOKS_FLAG}
+              onPickStar={onPickStar}
+              onPickEveryone={onPickEveryone}
+            />
+          )}
+        </>
+      )}
+
+      {/* Story framing — legacy (flag-off) slot: always renders when discovery
+          is off. The mood row needs zero analysis, and a missing summary falls
+          back to a quiet "add a note" button. Flag-on renders the ramble
+          variant of this component in the block directly above. */}
+      {!CREATE_DISCOVERY_FLAG && (
+        <StoryFraming
+          tone={form.tone}
+          eventSummary={form.eventSummary}
+          learningWords={form.learningWords}
+          onToneChange={(v) => onChange('tone', v)}
+          onSummaryChange={(v) => onChange('eventSummary', v)}
+          onLearningWordsChange={(v) => onChange('learningWords', v)}
+        />
+      )}
 
       {/* Capture chips — space is reserved while the librarian reads, and the
           rows rise into that same box on arrival (no layout shift below).
@@ -207,6 +296,7 @@ export function SetupSheet({
                 )}
                 <CaptureChips
                   questions={form.captureQuestions}
+                  caps={form.castMode === 'ensemble' ? { naming: 4, total: 5 } : undefined}
                   onChange={(qs) => onChange('captureQuestions', qs)}
                 />
               </div>

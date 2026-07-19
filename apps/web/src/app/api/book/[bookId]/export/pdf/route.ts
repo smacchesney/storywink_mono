@@ -6,7 +6,7 @@ import { generateBookPdf } from '@storywink/pdf';
 import { resolveCoverPage } from '@storywink/shared/utils';
 import { Book, Page } from '@prisma/client';
 import { loadWebPdfFonts } from '../pdfFonts';
-import { optimizeForScreen, pdfContentDisposition } from '@/lib/pdf-export';
+import { optimizeForScreen, pdfContentDisposition, syntheticTitlePage } from '@/lib/pdf-export';
 
 // Define the expected Book type with Pages for the PDF generator
 type BookWithPages = Book & { pages: (Page & { asset?: { url: string } | null })[] };
@@ -67,13 +67,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ boo
     // books derive from coverAssetId; avatar books use the persisted column,
     // with Book.coverImageUrl below carrying the generated painted-title cover).
     const coverPage = resolveCoverPage(bookData.pages, bookData.coverAssetId, bookData.bookType);
-    // Use coverImageUrl (dedicated cover illustration) if available, otherwise fall back to page illustration
-    const titlePageForPdf = coverPage
-      ? {
-          ...coverPage,
-          generatedImageUrl: bookData.coverImageUrl || coverPage.generatedImageUrl,
-        }
-      : undefined;
+    // X17 A5: composed-cover books (null coverAssetId) have no title-page row —
+    // synthesize the opening page from the generated cover.
+    const titlePageForPdf = syntheticTitlePage(
+      coverPage as (Page & { generatedImageUrl: string | null }) | undefined,
+      bookData.coverImageUrl,
+    );
 
     // 2. Generate the PDF buffer (user mode: title → dedication → ALL stories → back cover).
     // optimizeForScreen swaps Cloudinary's f_auto (WebP → ~9MB lossless flate
@@ -81,7 +80,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ boo
     const startedAt = Date.now();
     const pdfBuffer = await generateBookPdf(bookData as BookWithPages, {
       fonts: loadWebPdfFonts(),
-      titlePage: titlePageForPdf as Page | undefined,
+      titlePage: titlePageForPdf,
       includeBackCover: true,
       padToFour: false,
       includeCollage: process.env.COLLAGE_PAGES_ENABLED === 'true',

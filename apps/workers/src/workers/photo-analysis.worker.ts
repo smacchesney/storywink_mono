@@ -9,6 +9,7 @@ import {
   PhotoAnalysisInput,
   PhotoAnalysisResponse,
   scopeCaptureQuestions,
+  heroAssetIds,
 } from '@storywink/shared/prompts/photo-analysis';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
 import { ANALYSIS_MODEL, VISION_OPENAI_TIMEOUT_MS } from '../config/models.js';
@@ -196,7 +197,13 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
     // as long as the parent hasn't answered any of them.
     const current = await tx.book.findUnique({
       where: { id: bookId },
-      select: { eventSummary: true, captureQuestions: true, title: true, status: true },
+      select: {
+        eventSummary: true,
+        captureQuestions: true,
+        title: true,
+        status: true,
+        themeLine: true,
+      },
     });
 
     const isDraftRefresh = refresh && current?.status === 'DRAFT';
@@ -220,6 +227,17 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
         ...(!current?.eventSummary || isDraftRefresh
           ? { eventSummary: analysis.eventSummary }
           : {}),
+        // X17 A4: themeLine follows title's blank-only rule — the Wave B theme
+        // card is the parent's edit surface, so a non-blank value is never
+        // clobbered, even on a DRAFT photo-set refresh. Stale-guess risk is
+        // accepted: the card is tap-to-fix and B4 extraction can refine it.
+        ...(!current?.themeLine
+          ? { themeLine: (analysis.suggestedTheme ?? '').trim().slice(0, 120) || null }
+          : {}),
+        // X17 A1/A4: machine-owned (no parent edit surface) — always refreshed
+        // so the heroes track the current photo set. Asset-stable by
+        // construction (assetIds, not positions).
+        coverHeroAssetIds: heroAssetIds(analysis.coverHeroPages, assetIdByPosition),
         ...(!current?.captureQuestions || (isDraftRefresh && !hasAnswers)
           ? { captureQuestions: analysis.captureQuestions.map((q) => ({ ...q, answer: null })) }
           : {}),

@@ -93,6 +93,15 @@ export interface IllustrationPromptOptions {
    * only when the flag is on.
    */
   photoComeAlive?: boolean;
+  /**
+   * X17 A1 (composed covers): re-roles the reference stack on COVER calls —
+   * image 1 plus the next heroPhotoCount-1 references are real photos from
+   * the family's day (identity + setting fidelity), and the render composes
+   * ONE new cover scene around themeLine instead of repainting one photo.
+   * Absent = legacy photo-anchored cover, byte-identical. Interior pages
+   * never emit it.
+   */
+  coverComposition?: { themeLine: string | null; heroPhotoCount: number } | null;
 }
 
 // ----------------------------------
@@ -533,6 +542,27 @@ function buildComeAliveSection(enabled: boolean | undefined): string | null {
   );
 }
 
+/**
+ * X17 A1: the composed-cover brief — one bounded section (gpt-image-2
+ * prompt-mass rule), mirroring buildInteriorAnchorSection's supersede shape.
+ * themeLine is sanitized like illustrationNotes so a shouty theme can never
+ * smuggle lettering into the render.
+ */
+function buildCoverCompositionSection(
+  composition: { themeLine: string | null; heroPhotoCount: number } | null | undefined,
+): string | null {
+  if (!composition) return null;
+  const theme = sanitizeIllustrationNotes(composition.themeLine)?.trim().slice(0, 120);
+  const heroes = Math.max(1, composition.heroPhotoCount);
+  return (
+    `COVER COMPOSITION (this section supersedes the SCENE INTERPRETATION instructions above and item 2 of PEOPLE - SOURCE HIERARCHY): ` +
+    `the first ${heroes} image${heroes === 1 ? ' is a real photo' : 's are real photos'} from this family's actual day — identity and setting references, NOT a scene to copy. ` +
+    `Compose ONE new cover scene that captures${theme ? `: ${theme}` : ' the heart of their day'} — the SAME real people from the reference photos, in a setting recognizable from the day. ` +
+    `One composed scene with a single focal moment — never a collage, montage, grid, or split panels. ` +
+    `Identity (face, hair, skin tone, proportions) follows the CHARACTER SHEETS when provided; the interior-render reference anchors palette and style only.`
+  );
+}
+
 export function createIllustrationPrompt(opts: IllustrationPromptOptions): string {
   const style = getStyleDefinition(opts.style);
   const contentAnchor = opts.contentAnchor ?? 'photo';
@@ -576,6 +606,10 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
   const stylePrompt = opts.isTitlePage
     ? style.buildCoverPrompt(ctx)
     : style.buildInteriorPrompt(ctx);
+
+  // X17 A1: composed-cover brief — cover calls only; absent → byte-identical.
+  const coverCompositionSection =
+    opts.isTitlePage === true ? buildCoverCompositionSection(opts.coverComposition) : null;
 
   // 2. Re-role image 1 when it is not this page's photo:
   //    - bridge pages: the ADJACENT photo anchors identity, not the scene
@@ -680,6 +714,7 @@ export function createIllustrationPrompt(opts: IllustrationPromptOptions): strin
 
   const prompt = [
     stylePrompt,
+    coverCompositionSection,
     bridgeSection,
     charSection,
     exactCastSection,

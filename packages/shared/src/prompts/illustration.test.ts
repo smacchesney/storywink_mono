@@ -3,6 +3,7 @@ import {
   createIllustrationPrompt,
   isMainCharacterRole,
   sanitizeIllustrationNotes,
+  type IllustrationPromptOptions,
 } from './illustration.js';
 import type { CharacterIdentity } from '../types.js';
 
@@ -503,5 +504,57 @@ describe('come-alive directive (X16 W1)', () => {
     expect(
       createIllustrationPrompt({ ...photoBase, contentAnchor: 'sheet', photoComeAlive: true }),
     ).not.toContain('BRING THE MOMENT ALIVE');
+  });
+});
+
+describe('composed cover brief (X17 A1)', () => {
+  const coverBase: IllustrationPromptOptions = {
+    style: 'vignette',
+    pageText: 'a splashy beach day',
+    bookTitle: 'Splash Day',
+    isTitlePage: true,
+    referenceImageCount: 2,
+    characterSheetCount: 2,
+    language: 'en',
+  };
+
+  it('renders the brief on cover calls with themeLine + hero count', () => {
+    const prompt = createIllustrationPrompt({
+      ...coverBase,
+      coverComposition: { themeLine: 'a splashy beach day with Grandma', heroPhotoCount: 3 },
+    });
+    expect(prompt).toContain('COVER COMPOSITION');
+    expect(prompt).toContain('the first 3 images are real photos');
+    expect(prompt).toContain('a splashy beach day with Grandma');
+    expect(prompt).toContain('never a collage');
+  });
+
+  it('null themeLine keeps a usable brief', () => {
+    const prompt = createIllustrationPrompt({
+      ...coverBase,
+      coverComposition: { themeLine: null, heroPhotoCount: 1 },
+    });
+    expect(prompt).toContain('the first 1 image is a real photo');
+    expect(prompt).toContain('the heart of their day');
+  });
+
+  it('absent → legacy cover byte-identical; interiors never emit it', () => {
+    expect(createIllustrationPrompt(coverBase)).not.toContain('COVER COMPOSITION');
+    expect(
+      createIllustrationPrompt({
+        ...coverBase,
+        isTitlePage: false,
+        coverComposition: { themeLine: 'x', heroPhotoCount: 1 },
+      }),
+    ).not.toContain('COVER COMPOSITION');
+  });
+
+  it('stays inside the prompt budget (no truncation ellipsis)', () => {
+    const prompt = createIllustrationPrompt({
+      ...coverBase,
+      coverComposition: { themeLine: 'y'.repeat(300), heroPhotoCount: 3 },
+    });
+    expect(prompt.length).toBeLessThan(30000);
+    expect(prompt.endsWith('…')).toBe(false);
   });
 });

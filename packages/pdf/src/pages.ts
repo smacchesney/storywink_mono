@@ -2,6 +2,7 @@ import { PAGE_TEXT } from '@storywink/shared/constants';
 import { escapeHtml } from './escape.js';
 import { splitEmphasisSegments } from '@storywink/shared/text-emphasis';
 import { generateCollagePagesHtml } from './collage-page.js';
+import { castDisplayName } from './names.js';
 import type { BookWithPages, ImageUrlTransform, Page } from './types.js';
 import {
   PAGE_WIDTH_WITH_BLEED_IN,
@@ -343,6 +344,10 @@ export function assembleInteriorPages(
   } = options ?? {};
   const language = bookData.language || 'en';
 
+  // X17 A2: ensemble books dedicate to the whole crew; star/legacy books get
+  // childName back verbatim (frozen-snapshot byte-identical).
+  const displayName = castDisplayName(bookData);
+
   const sortedPages = [...bookData.pages].sort((a, b) => a.pageNumber - b.pageNumber);
   const pages: InteriorPage[] = [];
 
@@ -358,12 +363,7 @@ export function assembleInteriorPages(
   // Dedication page (recto).
   pages.push({
     kind: 'dedication',
-    html: generateDedicationPageHtml(
-      bookData.childName,
-      bookData.title,
-      language,
-      imageUrlTransform,
-    ),
+    html: generateDedicationPageHtml(displayName, bookData.title, language, imageUrlTransform),
   });
 
   // Story pages: text (verso) + illustration (recto) pairs.
@@ -383,7 +383,7 @@ export function assembleInteriorPages(
   // Ending page.
   pages.push({
     kind: 'ending',
-    html: generateEndingPageHtml(bookData.childName, bookData.title, language, imageUrlTransform),
+    html: generateEndingPageHtml(displayName, bookData.title, language, imageUrlTransform),
   });
 
   // Real-moments collage (flag-gated by the caller). Sits after the ending so

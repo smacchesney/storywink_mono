@@ -12,6 +12,7 @@ interface PageTrackerProps {
   allPagesConfirmed: boolean;
   isProcessing: boolean;
   onIllustrate: () => void;
+  ctaLabel?: string;
 }
 
 /**
@@ -26,6 +27,7 @@ const PageTracker = ({
   allPagesConfirmed,
   isProcessing,
   onIllustrate,
+  ctaLabel,
 }: PageTrackerProps) => {
   const t = useTranslations('review');
   return (
@@ -69,6 +71,8 @@ const PageTracker = ({
         >
           {isProcessing ? (
             <>{t('working')}</>
+          ) : ctaLabel ? (
+            <>{ctaLabel}</>
           ) : (
             <>
               <CheckCircle className="mr-1 h-4 w-4" />

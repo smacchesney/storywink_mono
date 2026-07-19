@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { optimizeForScreen, pdfContentDisposition, SCREEN_IMAGE_TRANSFORM } from './pdf-export';
+import {
+  optimizeForScreen,
+  pdfContentDisposition,
+  syntheticTitlePage,
+  SCREEN_IMAGE_TRANSFORM,
+} from './pdf-export';
 
 describe('optimizeForScreen', () => {
   it('inserts the screen transform into Cloudinary upload URLs', () => {
@@ -57,5 +62,28 @@ describe('pdfContentDisposition', () => {
     expect(pdfContentDisposition('   ')).toBe(
       `attachment; filename="book.pdf"; filename*=UTF-8''book.pdf`,
     );
+  });
+});
+
+describe('syntheticTitlePage (X17 A5)', () => {
+  const coverPage = { id: 'p1', pageNumber: 1, generatedImageUrl: 'render.png' } as never;
+
+  it('legacy: the resolved cover page wins; coverImageUrl overrides its render', () => {
+    expect(syntheticTitlePage(coverPage, 'cover.png')).toMatchObject({
+      id: 'p1',
+      generatedImageUrl: 'cover.png',
+    });
+    expect(syntheticTitlePage(coverPage, null)).toMatchObject({ generatedImageUrl: 'render.png' });
+  });
+
+  it('composed: synthesizes a page-0 stub from coverImageUrl', () => {
+    expect(syntheticTitlePage(undefined, 'cover.png')).toMatchObject({
+      pageNumber: 0,
+      generatedImageUrl: 'cover.png',
+    });
+  });
+
+  it('no cover anywhere: undefined — the export opens on the dedication', () => {
+    expect(syntheticTitlePage(undefined, null)).toBeUndefined();
   });
 });

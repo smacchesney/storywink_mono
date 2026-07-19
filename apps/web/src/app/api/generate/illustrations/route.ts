@@ -295,6 +295,37 @@ export async function POST(request: Request) {
     console.log(`  - Pages: ${book.pages.length}`);
     console.log(`  - Art Style: ${book.artStyle}`);
 
+    // X17 B4: a manual start supersedes any armed grace-window peek job —
+    // remove it so the peek job can never double-run the flow. This MUST
+    // happen BEFORE the status write: the workers' claim step
+    // (shouldRunAfterClaim) treats claim-count-0 + ILLUSTRATING as its OWN
+    // retry and proceeds, so a peek job that fires after this route flipped the
+    // book to ILLUSTRATING would re-run the extraction + FlowProducer flow a
+    // second time. De-arming while the book is still STORY_READY closes that
+    // window. Residual: if the peek job flips to 'active' in the milliseconds
+    // between getState() and remove(), remove() throws — the now-active job
+    // proceeds and double-runs the flow. That active-flip window is
+    // milliseconds wide and needs a manual start to land inside it.
+    const extractionQueue = getQueue(QueueName.CharacterExtraction);
+    try {
+      const peekJob = await extractionQueue.getJob(`peek-extract-${book.id}`);
+      if (peekJob) {
+        const peekState = await peekJob.getState();
+        // Remove both 'delayed' (grace not yet elapsed) and 'waiting' (grace
+        // elapsed but not yet picked up). A 'waiting' job would otherwise
+        // survive the de-arm and later double-run the flow. remove() succeeds
+        // on both states; only an 'active' job throws (caught below).
+        if (peekState === 'delayed' || peekState === 'waiting') {
+          await peekJob.remove();
+        }
+      }
+    } catch {
+      // Non-fatal — the peek job flipped to 'active' between getState() and
+      // remove() (the milliseconds-wide active-flip window). remove() throws on
+      // an active job; that job then proceeds and double-runs the flow. Only
+      // reachable when a manual start races a peek job inside that sub-ms window.
+    }
+
     // Step 2: Update Book Status to ILLUSTRATING
     await prisma.book.update({
       where: { id: book.id },
@@ -308,9 +339,8 @@ export async function POST(request: Request) {
     // Step 3: Queue character extraction job
     // The extraction worker will analyze all photos for character identity,
     // then create the FlowProducer illustration flow with characterIdentity
-    // baked into each illustration job's data.
-    const extractionQueue = getQueue(QueueName.CharacterExtraction);
-
+    // baked into each illustration job's data. (extractionQueue was resolved
+    // above for the peek de-arm.)
     const extractionJob = await extractionQueue.add(
       `extract-characters-${book.id}`,
       {

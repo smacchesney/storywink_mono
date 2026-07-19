@@ -3,11 +3,12 @@
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { toast } from 'sonner';
 import { BookStatus, Page, Book } from '@prisma/client';
 import { Storydust } from '@/components/ui/storydust';
 import { MASCOT_CAT_FLOATING } from '@/lib/mascots';
+import { CREATE_DISCOVERY_FLAG } from '@/lib/discovery-client';
 
 // Import the new components
 import PageTracker from '@/components/create/review/PageTracker';
@@ -67,6 +68,8 @@ function ReviewPageContent() {
 
   // Get bookId from URL query parameter
   const bookIdFromUrl = searchParams.get('bookId');
+  const peekMode = CREATE_DISCOVERY_FLAG && searchParams.get('peek') === '1';
+  const playful = useLocale() === 'ja' ? 'font-japanese' : 'font-playful';
 
   // State hooks
   const [pages, setPages] = useState<PageData[]>([]); // Holds ALL pages (cover at index 0)
@@ -359,6 +362,27 @@ function ReviewPageContent() {
     };
   }, [isFetchingInitialData, isAwaitingFinalStatus, bookIdFromUrl]); // Removed checkFinalBookStatus from dependencies
 
+  // X17 B4: while peeking, follow the book — when the grace window closes
+  // (or paint-now landed from another tab) the status flips ILLUSTRATING
+  // and the branded progress screen takes over.
+  useEffect(() => {
+    if (!peekMode || !bookIdFromUrl || isFetchingInitialData) return;
+    const id = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/book-status?bookId=${bookIdFromUrl}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.status === BookStatus.ILLUSTRATING) {
+          clearInterval(id);
+          router.push(`/create/${bookIdFromUrl}/setup`);
+        }
+      } catch {
+        // Retry next tick.
+      }
+    }, POLLING_INTERVAL);
+    return () => clearInterval(id);
+  }, [peekMode, bookIdFromUrl, isFetchingInitialData, router]);
+
   // Navigation handlers (operate on full pages array index)
   const goPrev = () => setCurrentIndex((i) => Math.max(i - 1, 0));
   const goNext = () => setCurrentIndex((i) => Math.min(i + 1, pages.length - 1));
@@ -416,6 +440,20 @@ function ReviewPageContent() {
         copy[currentIndex] = true;
         return copy;
       });
+
+      // X17 B4: a tweak buys a fresh grace window. Fire-and-forget — a 409
+      // means painting already started, which the poll below will surface.
+      if (peekMode && bookIdToUse) {
+        void fetch(`/api/book/${bookIdToUse}/peek`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'rearm' }),
+        })
+          .then((res) => {
+            if (res.status === 409) toast.message(t('peekStarting'));
+          })
+          .catch(() => {});
+      }
     } catch (error) {
       // Raw error text goes to the log, never to the parent.
       console.error('Error saving page:', error);
@@ -443,12 +481,37 @@ function ReviewPageContent() {
     setIsStartingIllustration(true);
 
     try {
+      // A 409 from paint-now (NOT_WAITING/ALREADY_PAINTING) means the book
+      // flipped ILLUSTRATING in the tap gap — success, not an error. Remember
+      // it: the legacy start below will then 409 too, and that pair reads as
+      // "already painting", not a red toast.
+      let peekRaced = false;
+      if (peekMode) {
+        const peekRes = await fetch(`/api/book/${bookIdToUse}/peek`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'paint-now' }),
+        });
+        if (peekRes.status === 202) {
+          router.push(`/create/${bookIdToUse}/setup`);
+          return;
+        }
+        if (peekRes.status === 409) peekRaced = true;
+        // 409/500: fall through to the legacy start below — never strand.
+      }
       const response = await fetch('/api/generate/illustrations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookId: bookIdToUse }),
       });
       if (!response.ok && response.status !== 202) {
+        // Raced peek + a 409 here: painting already started. Surface it as
+        // info and let the peek poll route the parent — no error toast. Any
+        // other failure shape (a genuine PARTIAL/FAILED retry) still errors.
+        if (peekRaced && response.status === 409) {
+          toast.message(t('peekStarting'));
+          return;
+        }
         const errorData = await response
           .json()
           .catch(() => ({ message: 'Unknown error occurred' }));
@@ -537,7 +600,15 @@ function ReviewPageContent() {
         allPagesConfirmed={allConfirmed}
         isProcessing={isWorking && !isAwaitingFinalStatus} // Modify isProcessing if needed
         onIllustrate={handleIllustrate}
+        ctaLabel={peekMode ? t('paintMyPictures') : undefined}
       />
+
+      {peekMode && (
+        <div className="flex items-center justify-center gap-2 border-b border-coral/10 bg-[#FFF9F5] px-4 py-2">
+          <Storydust variant="twinkle" size="inline" />
+          <p className={`${playful} text-sm text-gray-600`}>{t('peekHint')}</p>
+        </div>
+      )}
 
       {/* Main Content Area - Shows One Page at a Time */}
       <div className="flex-1 overflow-y-auto p-4">

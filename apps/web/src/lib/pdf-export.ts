@@ -6,6 +6,8 @@
  * screen-optimized transform lives with the only caller that wants it.
  */
 
+import type { Page } from '@prisma/client';
+
 /**
  * Screen/share-optimized Cloudinary transform.
  *
@@ -44,4 +46,22 @@ export function pdfContentDisposition(title: string | null | undefined): string 
     (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
   );
   return `attachment; filename="${asciiBase}.pdf"; filename*=UTF-8''${encoded}`;
+}
+
+/**
+ * X17 A5: resolve the user export's opening page. Legacy books keep the
+ * resolved cover page (coverImageUrl overriding its interior render, as
+ * before). Composed-cover books have NO title-page row — synthesize a
+ * page-0 stub from Book.coverImageUrl so the export still opens with the
+ * cover. No cover anywhere: undefined (the export opens on the dedication).
+ */
+export function syntheticTitlePage(
+  coverPage: (Page & { generatedImageUrl: string | null }) | undefined,
+  coverImageUrl: string | null,
+): Page | undefined {
+  if (coverPage) {
+    return { ...coverPage, generatedImageUrl: coverImageUrl || coverPage.generatedImageUrl };
+  }
+  if (!coverImageUrl) return undefined;
+  return { pageNumber: 0, generatedImageUrl: coverImageUrl } as unknown as Page;
 }

@@ -178,7 +178,20 @@
     "addNote": "そのひの メモを かく",
     "learningWordsAdd": "いま おきにいりの ことばは ありますか？",
     "learningWordRemove": "{word} を けす",
-    "learningWordsPlaceholder": "ことばを いれてね"
+    "learningWordsPlaceholder": "ことばを いれてね",
+    "feedSpotted": "おしゃしんから みつけた ちいさな はっけん…",
+    "themeSoundsLike": "こんな いちにちだった みたい…",
+    "themeEditLabel": "テーマを なおす",
+    "themePlaceholder": "どんな いちにちでしたか？",
+    "rambleLabel": "そのひの ことを もっと おしえてください。はなしても、かいても いいですよ。",
+    "rambleCharsLeft": "あと {count}もじ",
+    "starLabel": "しゅやくは だれですか？",
+    "starEveryone": "みんな！",
+    "memberNameQuestion": "{descriptor}の なまえは？",
+    "factLocationQ": "そのひの ばしょ",
+    "factHighlightQ": "いちばんの しゅんかん",
+    "factMishapQ": "ちょっとした ハプニング",
+    "factChildSaidQ": "おこさまの ひとこと"
   },
   "progress": {
     "readingPhotos": "しゃしんを みています…",
@@ -253,7 +266,10 @@
     "saveChanges": "へんこうを ほぞん",
     "saveTimeout": "ほぞんが とどきませんでした。せつぞくを かくにんして、もういちど おためしください。",
     "contentFlagged": "このページには べつの しゃしんが ひつようです",
-    "noPreview": "プレビューなし"
+    "noPreview": "プレビューなし",
+    "paintMyPictures": "えを かいてもらう",
+    "peekHint": "できた おはなしを のぞいてみて。まもなく えを かきはじめます。",
+    "peekStarting": "えを かきはじめました！"
   },
   "library": {
     "yourLibrary": "マイライブラリ",

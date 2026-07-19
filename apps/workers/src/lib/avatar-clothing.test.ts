@@ -23,7 +23,11 @@ const character = {
 describe('applyClothingToIdentity (X15 clothing reconcile)', () => {
   it('patches a NESTED identity (identity.character) preserving the shape', () => {
     const identity = { character: { ...character }, extractedForStyle: 'vignette' };
-    const out = applyClothingToIdentity(identity, 'orange tee', 'Paint the orange tee with gouache.');
+    const out = applyClothingToIdentity(
+      identity,
+      'orange tee',
+      'Paint the orange tee with gouache.',
+    );
     expect(out.character.typicalClothing).toBe('orange tee');
     expect(out.character.styleTranslation).toBe('Paint the orange tee with gouache.');
     expect(out.extractedForStyle).toBe('vignette');
@@ -84,15 +88,15 @@ describe('reconcileAvatarClothing orchestration (all-or-nothing, non-fatal)', ()
 
   it('happy path: persists via compare-and-set on the read updatedAt, with both fields patched', async () => {
     await reconcileAvatarClothing(
-      params(openaiWith(JSON.stringify({ styleTranslation: 'Paint the orange tee with gouache.' }))),
+      params(
+        openaiWith(JSON.stringify({ styleTranslation: 'Paint the orange tee with gouache.' })),
+      ),
     );
     expect(prismaMock.avatar.updateMany).toHaveBeenCalledTimes(1);
     const arg = prismaMock.avatar.updateMany.mock.calls[0][0];
     expect(arg.where).toEqual({ id: 'av1', updatedAt });
     expect(arg.data.identity.character.typicalClothing).toBe('orange raglan tee');
-    expect(arg.data.identity.character.styleTranslation).toBe(
-      'Paint the orange tee with gouache.',
-    );
+    expect(arg.data.identity.character.styleTranslation).toBe('Paint the orange tee with gouache.');
   });
 
   it('does NOT persist when the rewrite returns empty (all-or-nothing)', async () => {

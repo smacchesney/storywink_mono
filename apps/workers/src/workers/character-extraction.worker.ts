@@ -24,6 +24,7 @@ import {
   convertHeicToJpeg,
   remapCharacterPages,
 } from '@storywink/shared/utils';
+import { ensembleMemberIds } from '../lib/ensemble.js';
 import { mergeCastNames, CaptureAnswerLike } from '../lib/resolveCast.js';
 import { prepareIdentityForSheetPrewarm } from '../lib/sheet-prewarm.js';
 import { mergeLinkedAvatarSheets } from '../lib/avatar-sheets.js';
@@ -33,6 +34,7 @@ import {
   ANALYSIS_OPENAI_TIMEOUT_MS,
   VISION_OPENAI_TIMEOUT_MS,
 } from '../config/models.js';
+import { shouldRunAfterClaim } from '../lib/peek.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -69,6 +71,9 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         select: {
           bookType: true,
           childName: true,
+          starCharacterId: true,
+          castMode: true,
+          castMemberIds: true,
           captureQuestions: true,
           characterIdentity: true,
           characterReferences: true,
@@ -96,6 +101,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         artStyle,
         captureQuestions: (book.captureQuestions as CaptureAnswerLike[] | null) ?? [],
         childName: book.childName,
+        starCharacterId: book.starCharacterId,
         refresh: (i) => refreshStyleTranslations(i, artStyle, bookId),
       });
       if (!identity) {
@@ -108,6 +114,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         identity,
         pages: book.pages,
         existingReferences: book.characterReferences,
+        ensembleMemberIds: ensembleMemberIds(book),
         logger,
       });
       logger.info({ bookId, artStyle, sheetCount: sheets.length }, 'Sheet pre-warm complete');
@@ -118,6 +125,35 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         'Sheet pre-warm failed (non-fatal) — the extraction pass will generate sheets',
       );
       return { prepared: false, reason: 'error' };
+    }
+  }
+
+  // X17 B4: a delayed grace-window job claims the book at run time. Claim
+  // count 0 + ILLUSTRATING is adopted ONLY on a genuine retry
+  // (`job.attemptsMade` > 0) — THIS job's earlier attempt claimed and then
+  // failed mid-run, so retry safety demands it proceed. A fresh attempt that
+  // finds a foreign ILLUSTRATING exits as a clean no-op, closing the rearm /
+  // de-arm TOCTOU window. Any other status means the peek was cancelled or
+  // the book moved on: also a clean no-op. Coexistence is unlikely anyway —
+  // the manual illustrations route removes an armed peek job before it starts
+  // (Task 16).
+  if (job.data.claimBook) {
+    const claimed = await prisma.book.updateMany({
+      where: { id: bookId, status: 'STORY_READY' },
+      data: { status: 'ILLUSTRATING' },
+    });
+    if (claimed.count === 0) {
+      const current = await prisma.book.findUnique({
+        where: { id: bookId },
+        select: { status: true },
+      });
+      if (!shouldRunAfterClaim(claimed.count, current?.status, job.attemptsMade)) {
+        logger.info(
+          { bookId, status: current?.status },
+          'Peek job skipped — book no longer waiting to illustrate',
+        );
+        return { skipped: true, reason: 'not_claimable' };
+      }
     }
   }
 
@@ -205,6 +241,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         characters: existingIdentity.characters,
         captureQuestions: (book.captureQuestions as CaptureAnswerLike[] | null) ?? [],
         childName: book.childName,
+        starCharacterId: book.starCharacterId,
       });
       if (merge.changed) {
         existingIdentity = { ...existingIdentity, characters: merge.characters };
@@ -296,6 +333,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         identity: characterIdentity,
         pages: storyPages,
         existingReferences: book.characterReferences,
+        ensembleMemberIds: ensembleMemberIds(book),
         logger,
       });
 
@@ -416,6 +454,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
           characters: characterIdentity!.characters,
           captureQuestions: (book.captureQuestions as CaptureAnswerLike[] | null) ?? [],
           childName: book.childName,
+          starCharacterId: book.starCharacterId,
         });
         if (freshMerge.changed) {
           characterIdentity = { ...characterIdentity!, characters: freshMerge.characters };
@@ -457,6 +496,8 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
           where: { id: bookId },
           select: {
             characterReferences: true,
+            castMode: true,
+            castMemberIds: true,
             pages: {
               orderBy: { index: 'asc' },
               select: {
@@ -475,6 +516,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         identity: characterIdentity,
         pages: bookForSheets.pages,
         existingReferences: bookForSheets.characterReferences,
+        ensembleMemberIds: ensembleMemberIds(bookForSheets),
         logger,
       });
     }

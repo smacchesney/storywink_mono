@@ -36,7 +36,10 @@ import {
 } from '../lib/qc-batching.js';
 import { assembleQcBatchParts, pageFeedFor, type QcAssemblyPage } from '../lib/qc-assembly.js';
 import { toysComeAliveEnabled } from '../lib/toys-come-alive.js';
-import { characterSheetsEnabled, sheetRefsForStyle } from '../lib/character-sheets.js';
+import { characterSheetsEnabled, sheetCapFor, sheetRefsForStyle } from '../lib/character-sheets.js';
+import { ensembleMemberIds } from '../lib/ensemble.js';
+import { composedCoverEligible } from '../lib/composed-cover.helpers.js';
+import { runComposedCoverStep } from '../lib/composed-cover.js';
 import { mergeLinkedAvatarSheets } from '../lib/avatar-sheets.js';
 import {
   escalationModel,
@@ -480,7 +483,12 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
             artStyle: book.artStyle,
             bookType: book.bookType,
             base: sheetsEnabled
-              ? sheetRefsForStyle(book.characterReferences, book.artStyle, characterIdentity)
+              ? sheetRefsForStyle(
+                  book.characterReferences,
+                  book.artStyle,
+                  characterIdentity,
+                  sheetCapFor(ensembleMemberIds(book)),
+                )
               : [],
             logger,
           })) ??
@@ -612,15 +620,18 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
         );
         const coverRegenNeeded = Boolean(
           qcResult &&
-            coverRegenEligible({
-              coverJudged: Boolean(coverForQc),
-              coverResult: qcResult.coverResult,
-              qcRound,
-              titlePageRequeued,
-            }),
+          coverRegenEligible({
+            coverJudged: Boolean(coverForQc),
+            coverResult: qcResult.coverResult,
+            qcRound,
+            titlePageRequeued,
+          }),
         );
 
-        if (qcResult && ((!qcResult.passed && qcResult.failedPageIds.length > 0) || coverRegenNeeded)) {
+        if (
+          qcResult &&
+          ((!qcResult.passed && qcResult.failedPageIds.length > 0) || coverRegenNeeded)
+        ) {
           const nextRound = qcRound + 1;
           qcResult.qcRound = nextRound;
 
@@ -885,6 +896,16 @@ export async function processBookFinalize(job: Job<BookFinalizeJob>) {
         })),
         logger,
       });
+    }
+
+    // X17 A1: composed-cover step — photo books created with no title page
+    // (coverAssetId null) render their cover HERE, after page QC and palette
+    // work, before the terminal status write. Keyed off book state, NEVER off
+    // COVER_COMPOSED_ENABLED; idempotent (an existing coverImageUrl skips), so
+    // scoped re-runs double as a retry channel for a previously failed cover.
+    if (finalStatus === 'COMPLETED' && composedCoverEligible(book)) {
+      await setGenerationPhase(bookId, 'finishing');
+      await runComposedCoverStep({ bookId, userId, logger });
     }
 
     // Update book status (reset qcRound on completion so it's clean for

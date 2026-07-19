@@ -11,6 +11,7 @@ import { MASCOT_CAT_FLOATING } from '@/lib/mascots';
 import { useBookStatus } from '@/hooks/useBookStatus';
 import { resolveProgressHeadline } from '@/components/create/progress-headline';
 import BookIssueBanner from '@/components/create/BookIssueBanner';
+import { CREATE_DISCOVERY_FLAG } from '@/lib/discovery-client';
 
 interface GenerationProgressProps {
   bookId: string;
@@ -101,13 +102,19 @@ export function GenerationProgress({ bookId, reviewFirst, onComplete }: Generati
     }
   }, [status, reviewFirst, bookId, router]);
 
-  // On the auto-chain path STORY_READY is transient (seconds). If it PERSISTS,
-  // the book is genuinely parked there — reviewFirst was chosen in a previous
-  // session (the local prop is lost on reload) or the auto-chain failed and
-  // the worker reverted. Either way review is the right home; a grace timer
-  // avoids hijacking the momentary STORY_READY blip mid-chain.
+  // On the auto-chain path STORY_READY is transient — UNLESS the grace
+  // window (X17 B4) is holding it on purpose: then the peek IS the
+  // destination, immediately. Without the flag, the legacy 15s stall
+  // fallback stands. Config note: the flip runbook sets STORY_PEEK_GRACE_MS
+  // on workers wherever this client flag is on; if workers run grace-less,
+  // a mid-chain STORY_READY blip can flash the peek for one poll tick —
+  // the review poll routes straight back, so it self-heals.
   useEffect(() => {
     if (status !== BookStatus.STORY_READY || reviewFirst) return;
+    if (CREATE_DISCOVERY_FLAG) {
+      router.push(`/create/review?bookId=${bookId}&peek=1`);
+      return;
+    }
     const timer = setTimeout(() => {
       router.push(`/create/review?bookId=${bookId}`);
     }, 15000);

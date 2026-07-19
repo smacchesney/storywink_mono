@@ -100,8 +100,8 @@ export function isGenericCategoryAnswer(answer: string): boolean {
 /**
  * Merge chip answers + childName into the roster.
  *
- * - main_child gets `childName` (namedVia 'childName') — applied LAST so the
- *   setup sheet always wins for the star.
+ * - The STAR (starCharacterId when set, else the main_child role) gets childName
+ *   (namedVia 'childName') — applied LAST so the setup sheet always wins for the star.
  * - Each answered naming question joins on characterId. A generic-category
  *   answer ("Family friend") refines the ROLE and never sets a name; a
  *   child-vocabulary answer ("Grandma", "Our dog", free-typed names) becomes
@@ -118,10 +118,22 @@ export function mergeCastNames<T extends MergeableCharacter>(input: {
   characters: T[];
   captureQuestions: CaptureAnswerLike[] | null | undefined;
   childName: string | null | undefined;
+  /**
+   * X17 A2: perception characterId the parent picked as the star. When set
+   * (and still in the roster), childName binds to THIS character instead of
+   * the main_child role guess — the wrong-sibling fix. Stale/absent ids fall
+   * back to main_child, so pre-X17 callers are byte-identical.
+   */
+  starCharacterId?: string | null;
 }): MergeCastResult<T> {
   const characters = input.characters.map((c) => ({ ...c }));
   const consumedQuestionIds: string[] = [];
   let changed = false;
+
+  const starTarget =
+    (input.starCharacterId
+      ? characters.find((c) => c.characterId === input.starCharacterId)
+      : undefined) ?? characters.find((c) => c.role === 'main_child');
 
   const applyAnswer = (target: T, rawAnswer: string): void => {
     const answer = rawAnswer.trim();
@@ -150,20 +162,19 @@ export function mergeCastNames<T extends MergeableCharacter>(input: {
 
   for (const q of answered) {
     const target = characters.find((c) => c.characterId === q.characterId);
-    // A failed join, and a naming answer pointing at main_child (the star's
-    // name comes from the setup sheet), are both left unconsumed.
-    if (target && target.role !== 'main_child') {
+    // A failed join, and a naming answer pointing at the STAR (whose name
+    // comes from the setup sheet), are both left unconsumed.
+    if (target && target !== starTarget) {
       applyAnswer(target, q.answer!);
       consumedQuestionIds.push(q.id);
     }
   }
 
   const childName = input.childName?.trim();
-  if (childName) {
-    const main = characters.find((c) => c.role === 'main_child');
-    if (main && (main.name !== childName || main.namedVia !== 'childName')) {
-      main.name = childName;
-      main.namedVia = 'childName';
+  if (childName && starTarget) {
+    if (starTarget.name !== childName || starTarget.namedVia !== 'childName') {
+      starTarget.name = childName;
+      starTarget.namedVia = 'childName';
       changed = true;
     }
   }
@@ -284,4 +295,41 @@ export function checkCastNameCoverage(
   }
 
   return result;
+}
+
+export interface CastBalanceEntry {
+  name: string;
+  role: string;
+  /** Pages whose text mentions the name; null when the script gate makes the name un-checkable. */
+  textPages: number | null;
+  /** Expected presence: distinct photo pages this member appears on (0 = pages unknown). */
+  photoPages: number;
+}
+
+/**
+ * X17 A2 castBalance — LOG-FIRST QC dimension (never `problems`). Per
+ * parent-confirmed named member: how many pages actually mention them vs how
+ * many photos they are in. Rides StoryQcResult.scores via the telemetry
+ * object; enforcement waits for Wave C ledger evidence, per house pattern.
+ */
+export function computeCastBalance(
+  cast: CoverageCastEntry[],
+  pageTexts: string[],
+  language: string = 'en',
+): CastBalanceEntry[] {
+  const entries: CastBalanceEntry[] = [];
+  for (const member of cast) {
+    if (member.namedVia !== 'chip' && member.namedVia !== 'childName') continue;
+    if (!member.name?.trim()) continue;
+    const checkable = isChildNameCheckable(member.name, language);
+    entries.push({
+      name: member.name,
+      role: member.role,
+      textPages: checkable
+        ? pageTexts.filter((text) => nameMatches(member.name, text)).length
+        : null,
+      photoPages: new Set(member.appearsOnPages).size,
+    });
+  }
+  return entries;
 }

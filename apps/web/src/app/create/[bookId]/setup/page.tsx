@@ -11,6 +11,25 @@ import { STORY_MOODS, type StoryMood } from '@storywink/shared/constants';
 import SetupSheet, { SetupFormState } from '@/components/create/setup/SetupSheet';
 import type { StripPhoto } from '@/components/create/setup/PhotoStrip';
 import type { CaptureQuestion } from '@/components/create/setup/CaptureChips';
+import { buildSubmitPatchBody } from '@/components/create/setup/setup-submit';
+import { createPatchDebouncer, type PatchDebouncer } from '@/lib/patch-debounce';
+import { CREATE_DISCOVERY_FLAG } from '@/lib/discovery-client';
+import {
+  buildDiscoveryChips,
+  recurringChildren,
+  type DiscoveryChip,
+  type RosterCharacterLike,
+} from '@/components/create/setup/discovery-feed';
+import {
+  ensureMemberNamingQuestions,
+  mergeCaptureQuestions,
+} from '@/components/create/setup/star-ask';
+import { shouldExtract } from '@/components/create/setup/ramble';
+import {
+  mergeExtractionFacts,
+  applyExtractionToQuestions,
+} from '@/components/create/setup/extraction-merge';
+import type { RambleExtraction } from '@/lib/ramble-extract';
 import {
   allPagesAnalyzed,
   arrivalStripPhase,
@@ -49,7 +68,12 @@ interface BookData {
   tone: string | null;
   eventSummary: string | null;
   learningWords: { word?: string }[] | null;
-  characterIdentity?: { characters?: { characterId: string; role: string }[] } | null;
+  characterIdentity?: { characters?: RosterCharacterLike[] } | null;
+  themeLine?: string | null;
+  coverAssetId?: string | null;
+  castMode?: string | null;
+  starCharacterId?: string | null;
+  castMemberIds?: unknown;
   captureQuestions: CaptureQuestion[] | null;
   autoIllustrate: boolean;
   createdAt: string;
@@ -81,6 +105,10 @@ export default function SetupPage() {
     tone: null,
     learningWords: [],
     reviewFirst: false,
+    themeLine: '',
+    castMode: 'star',
+    starCharacterId: null,
+    castMemberIds: [],
   });
 
   // Track which fields the parent has edited so perception never clobbers them.
@@ -91,6 +119,8 @@ export default function SetupPage() {
     captureQuestions: false,
     tone: false,
     learningWords: false,
+    themeLine: false,
+    castMode: false,
   });
   const isMountedRef = useRef(true);
 
@@ -106,6 +136,11 @@ export default function SetupPage() {
   // Perception roster id of the star, for the X6c avatar confirm row.
   const [mainCharacterId, setMainCharacterId] = useState<string | null>(null);
   const [analysisDone, setAnalysisDone] = useState(false);
+  // X17b discovery surface — roster + analysis-derived chips + composed-cover
+  // asset, all fed by the same poll that fills title/summary/questions.
+  const [roster, setRoster] = useState<RosterCharacterLike[]>([]);
+  const [discoveryChips, setDiscoveryChips] = useState<DiscoveryChip[]>([]);
+  const [coverAssetId, setCoverAssetId] = useState<string | null>(null);
 
   const titlePending = !form.title && !touched.current.title && !perceptionSettled;
 
@@ -115,6 +150,19 @@ export default function SetupPage() {
       isMountedRef.current = false;
     };
   }, []);
+
+  // X17 B4: one debounced PATCH channel for the whole discovery surface.
+  const patcherRef = useRef<PatchDebouncer | null>(null);
+  if (patcherRef.current === null) {
+    patcherRef.current = createPatchDebouncer(async (body) => {
+      await fetch(`/api/book/${bookId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    });
+  }
+  useEffect(() => () => patcherRef.current?.dispose(), []);
 
   // Merge a freshly fetched book into form state, respecting parent edits.
   const mergeBook = useCallback((book: BookData) => {
@@ -131,13 +179,25 @@ export default function SetupPage() {
     const star = book.characterIdentity?.characters?.find((c) => c.role === 'main_child');
     if (star) setMainCharacterId(star.characterId);
 
+    const characters = book.characterIdentity?.characters ?? [];
+    setRoster(characters);
+    setCoverAssetId(book.coverAssetId ?? null);
+
+    const analyzed = allPagesAnalyzed(book.pages);
+    // Feed re-arms with the poll: chips exist only once analysis landed, and
+    // a photo add/remove (analysis wiped) clears them until the re-read.
+    setDiscoveryChips(analyzed ? buildDiscoveryChips(book.pages, characters) : []);
+
     setForm((prev) => {
       const next = { ...prev };
       if (!touched.current.title && book.title?.trim()) next.title = book.title;
       if (!touched.current.childName && book.childName) next.childName = book.childName;
       if (!touched.current.eventSummary && book.eventSummary) next.eventSummary = book.eventSummary;
       if (!touched.current.captureQuestions && book.captureQuestions?.length) {
-        next.captureQuestions = book.captureQuestions;
+        // Id-preserving merge: a poll tick landing before handlePickEveryone's
+        // PATCH round-trips must not clobber the synthetic `name_` naming rows
+        // it injected without marking captureQuestions touched.
+        next.captureQuestions = mergeCaptureQuestions(book.captureQuestions, prev.captureQuestions);
       }
       if (book.artStyle && isValidStyle(book.artStyle)) {
         next.artStyle = book.artStyle as StyleKey;
@@ -159,10 +219,21 @@ export default function SetupPage() {
           .slice(0, 4);
         if (words.length > 0) next.learningWords = words;
       }
+      if (!touched.current.themeLine && book.themeLine?.trim()) next.themeLine = book.themeLine;
+      if (!touched.current.castMode) {
+        if (book.castMode === 'ensemble' && Array.isArray(book.castMemberIds)) {
+          next.castMode = 'ensemble';
+          next.castMemberIds = (book.castMemberIds as unknown[]).filter(
+            (id): id is string => typeof id === 'string',
+          );
+        } else if (book.starCharacterId) {
+          next.castMode = 'star';
+          next.starCharacterId = book.starCharacterId;
+        }
+      }
       return next;
     });
 
-    const analyzed = allPagesAnalyzed(book.pages);
     setAnalysisDone(analyzed);
     // A strip that is narrating announces the arrival; every other phase is
     // sticky, so refetches never re-announce.
@@ -320,9 +391,108 @@ export default function SetupPage() {
       }
       if (key === 'childName') setShowNameError(false);
       setForm((prev) => ({ ...prev, [key]: value }));
+      if (CREATE_DISCOVERY_FLAG) {
+        if (key === 'themeLine')
+          patcherRef.current?.queue({ themeLine: (value as string).trim() || null });
+        if (key === 'eventSummary')
+          patcherRef.current?.queue({ eventSummary: (value as string).trim() || null });
+        if (key === 'captureQuestions') patcherRef.current?.queue({ captureQuestions: value });
+      }
     },
     [],
   );
+
+  // X17 B3: star pick fixes the name binding; Everyone flips ensemble mode.
+  const handlePickStar = useCallback((c: RosterCharacterLike) => {
+    touched.current.castMode = true;
+    setForm((prev) => ({
+      ...prev,
+      castMode: 'star',
+      starCharacterId: c.characterId,
+      castMemberIds: [],
+      childName: prev.childName.trim() ? prev.childName : (c.name ?? prev.childName),
+    }));
+    patcherRef.current?.queue({ castMode: 'star', starCharacterId: c.characterId });
+  }, []);
+
+  const handlePickEveryone = useCallback(() => {
+    // Side effects stay OUTSIDE the setForm updater (StrictMode double-invokes
+    // updaters) — compute once from current state, then set + queue.
+    touched.current.castMode = true;
+    const kids = recurringChildren(roster);
+    const members = kids.map((m) => m.characterId);
+    const questions = ensureMemberNamingQuestions(form.captureQuestions, kids, (descriptor) =>
+      t('memberNameQuestion', { descriptor }),
+    );
+    setForm((prev) => ({
+      ...prev,
+      castMode: 'ensemble',
+      castMemberIds: members,
+      starCharacterId: null,
+      captureQuestions: questions,
+    }));
+    patcherRef.current?.queue({
+      castMode: 'ensemble',
+      castMemberIds: members,
+      starCharacterId: null,
+      captureQuestions: questions,
+    });
+  }, [roster, form.captureQuestions, t]);
+
+  // X17 B4: ramble blur → extraction → fact merge. Optional garnish — every
+  // failure path is silent, and the 20/hr propose rate limit bounds cost.
+  const lastExtractRef = useRef<string | null>(null);
+  const handleRambleBlur = useCallback(async () => {
+    if (!CREATE_DISCOVERY_FLAG) return;
+    const text = form.eventSummary;
+    if (!shouldExtract(text, lastExtractRef.current)) return;
+    lastExtractRef.current = text.trim();
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12_000);
+      const res = await fetch('/api/story/propose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'extract', bookId, ramble: text.trim() }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (!res.ok || !isMountedRef.current) return;
+      const facts = (await res.json()) as RambleExtraction;
+      const labels = {
+        location: t('factLocationQ'),
+        highlight: t('factHighlightQ'),
+        mishap: t('factMishapQ'),
+        childSaid: t('factChildSaidQ'),
+        nameQuestionFor: (descriptor: string) => t('memberNameQuestion', { descriptor }),
+      };
+      const { changed } = mergeExtractionFacts(form, facts, roster, labels, {
+        childName: touched.current.childName,
+        themeLine: touched.current.themeLine,
+        castMode: touched.current.castMode,
+      });
+      if (Object.keys(changed).length === 0) return;
+      // Scalars carry their own touched guards, so spreading them onto the
+      // freshest state is safe. captureQuestions is different: the merge above
+      // was computed against a `form` snapshot that is now seconds stale, and a
+      // parent may have answered a naming chip mid-flight. Re-run the pure row
+      // logic INSIDE the updater against `prev.captureQuestions` so the parent's
+      // answer wins. `nextCq` is assigned deterministically from `prev`, so a
+      // StrictMode double-invoke assigns the same value (no queue call here).
+      const changedScalars: Record<string, unknown> = { ...changed };
+      delete changedScalars.captureQuestions;
+      let nextCq: CaptureQuestion[] | undefined;
+      setForm((prev) => {
+        const applied = applyExtractionToQuestions(prev.captureQuestions, facts, roster, labels);
+        nextCq = applied === prev.captureQuestions ? undefined : applied;
+        return { ...prev, ...changedScalars, captureQuestions: applied } as SetupFormState;
+      });
+      const patchBody = { ...changedScalars, ...(nextCq ? { captureQuestions: nextCq } : {}) };
+      if (Object.keys(patchBody).length > 0) patcherRef.current?.queue(patchBody);
+    } catch {
+      // Extraction is optional — silence on failure/timeout.
+    }
+  }, [bookId, form, roster, t]);
 
   // Refetch the book after photos are added/removed inline in the strip. Reuses
   // mergeBook, which respects parent edits (touched fields) and re-derives the
@@ -373,18 +543,13 @@ export default function SetupPage() {
     }
     setIsSubmitting(true);
     try {
-      const patchBody: Record<string, unknown> = {
-        childName: form.childName.trim(),
-        artStyle: form.artStyle,
-        autoIllustrate: !form.reviewFirst,
-      };
-      if (form.title.trim()) patchBody.title = form.title.trim();
-      if (form.eventSummary.trim()) patchBody.eventSummary = form.eventSummary.trim();
-      // Only ever set by a tap on the mood row — provenance stays parental.
-      if (form.tone) patchBody.tone = form.tone;
-      if (form.learningWords.length > 0)
-        patchBody.learningWords = form.learningWords.map((word) => ({ word }));
-      if (form.captureQuestions.length > 0) patchBody.captureQuestions = form.captureQuestions;
+      // Flush any pending debounce first (awaited, so it lands before the
+      // submit PATCH — no race). This matters for clears: buildSubmitPatchBody
+      // omits empty fields, so a field cleared within the debounce window would
+      // otherwise keep its stale DB value. flush() early-returns when nothing
+      // is pending, so the common path adds no request.
+      await patcherRef.current?.flush();
+      const patchBody = buildSubmitPatchBody(form);
 
       const patchRes = await fetch(`/api/book/${bookId}`, {
         method: 'PATCH',
@@ -446,6 +611,9 @@ export default function SetupPage() {
   return (
     <SetupSheet
       mainCharacterId={mainCharacterId}
+      discoveryChips={discoveryChips}
+      roster={roster}
+      coverAssetId={coverAssetId}
       photos={photos}
       form={form}
       prefilledName={prefilledName}
@@ -458,6 +626,9 @@ export default function SetupPage() {
       onReorder={handleReorder}
       onPhotosChanged={refetchBook}
       onChange={handleChange}
+      onPickStar={handlePickStar}
+      onPickEveryone={handlePickEveryone}
+      onRambleBlur={handleRambleBlur}
       onSubmit={handleSubmit}
     />
   );

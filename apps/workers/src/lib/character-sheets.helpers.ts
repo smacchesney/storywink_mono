@@ -21,6 +21,19 @@ export const MAX_SHEETS_PER_BOOK = 2;
 export const MAX_SOURCE_PHOTOS_PER_SHEET = 3;
 export const STYLE_EXEMPLARS_FOR_SHEET = 2;
 
+// X17 A3 (ENSEMBLE_BOOKS_ENABLED): ensemble books carry up to 4 sheets.
+// Sheets generate in parallel, so wall-clock stays ~one render + validation;
+// the 2x budget absorbs one regen round at 4-sheet load. 6 generations = 4
+// first renders + 2 regens (same 1.5x attempts-to-sheets ratio as solo 3/2).
+export const MAX_SHEETS_PER_BOOK_ENSEMBLE = 4;
+export const MAX_SHEET_GENERATIONS_PER_BOOK_ENSEMBLE = 6;
+export const SHEET_BUDGET_MS_ENSEMBLE = 120_000;
+
+/** X17 A3: per-book sheet cap — 4 for ensemble books, 2 otherwise. */
+export function sheetCapFor(ensembleMemberIds: string[] | null | undefined): number {
+  return ensembleMemberIds?.length ? MAX_SHEETS_PER_BOOK_ENSEMBLE : MAX_SHEETS_PER_BOOK;
+}
+
 /**
  * Feature flag for the whole character-sheet pipeline (sheet generation,
  * sheet refs on page/cover renders, sheet-as-QC-ground-truth, cover QC).
@@ -51,8 +64,22 @@ export function characterPhotoCount(character: CharacterDescription): number {
  * appearsOnAssetIds count. Characters without any resolvable photo are
  * skipped — a sheet needs ground-truth pixels.
  */
-export function selectSheetCharacters(characters: CharacterDescription[]): CharacterDescription[] {
+export function selectSheetCharacters(
+  characters: CharacterDescription[],
+  ensembleMemberIds?: string[] | null,
+): CharacterDescription[] {
   const withPhotos = characters.filter((c) => characterPhotoCount(c) > 0);
+
+  // X17 A3 (ENSEMBLE_BOOKS_ENABLED): every confirmed member with resolvable
+  // photos, prioritized by photo count (the star is in practice the most-
+  // photographed), capped at 4. Solo books keep the pre-X17 two-sheet pick.
+  if (ensembleMemberIds?.length) {
+    const memberSet = new Set(ensembleMemberIds);
+    return withPhotos
+      .filter((c) => memberSet.has(c.characterId))
+      .sort((a, b) => characterPhotoCount(b) - characterPhotoCount(a))
+      .slice(0, MAX_SHEETS_PER_BOOK_ENSEMBLE);
+  }
 
   const main =
     withPhotos.find((c) => c.role === 'main_child') ??
@@ -105,11 +132,12 @@ export function sheetRefsForStyle(
   referencesJson: unknown,
   artStyle: string | null | undefined,
   identity: CharacterIdentity | null,
+  cap: number = MAX_SHEETS_PER_BOOK,
 ): CharacterSheetRef[] {
   if (!artStyle) return [];
   return parseCharacterReferences(referencesJson)
     .filter((e) => e.artStyle === artStyle)
-    .slice(0, MAX_SHEETS_PER_BOOK)
+    .slice(0, cap)
     .map((e) => ({
       characterId: e.characterId,
       name: identity?.characters?.find((c) => c.characterId === e.characterId)?.name ?? null,

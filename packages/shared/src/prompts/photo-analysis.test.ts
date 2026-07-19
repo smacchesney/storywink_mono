@@ -3,6 +3,7 @@ import {
   scopeCaptureQuestions,
   createPhotoAnalysisPrompt,
   PHOTO_ANALYSIS_RESPONSE_SCHEMA,
+  heroAssetIds,
   CaptureQuestion,
   ScopeCharacterLike,
   PhotoAnalysisInput,
@@ -221,5 +222,50 @@ describe('scopeCaptureQuestions — companion objects', () => {
       ],
     );
     expect(result).toEqual([]);
+  });
+});
+
+describe('perception theme + cover heroes (X17 A4)', () => {
+  // Local copy of the X16 species describe's block-scoped minimalInput.
+  const minimalInput = (): PhotoAnalysisInput => ({
+    childName: null,
+    additionalCharacters: null,
+    artStyle: 'vignette',
+    language: 'en',
+    storyPages: [{ pageNumber: 1, assetId: 'a1', imageUrl: 'http://x/1.jpg' }],
+  });
+
+  it('prompt asks for suggestedTheme, coverHeroPages, and a theme-aligned title', () => {
+    const prompt = createPhotoAnalysisPrompt(minimalInput());
+    expect(prompt).toContain('suggestedTheme');
+    expect(prompt).toContain('coverHeroPages');
+    expect(prompt).toContain('aligned with the theme');
+  });
+
+  it('schema requires both at top level', () => {
+    const props = PHOTO_ANALYSIS_RESPONSE_SCHEMA.properties as Record<string, unknown>;
+    expect(props.suggestedTheme).toBeDefined();
+    expect(props.coverHeroPages).toBeDefined();
+    expect(PHOTO_ANALYSIS_RESPONSE_SCHEMA.required).toContain('suggestedTheme');
+    expect(PHOTO_ANALYSIS_RESPONSE_SCHEMA.required).toContain('coverHeroPages');
+  });
+});
+
+describe('heroAssetIds (X17 A4)', () => {
+  const byPos = new Map<number, string | null>([
+    [1, 'a1'],
+    [2, 'a2'],
+    [3, null],
+    [4, 'a4'],
+    [5, 'a5'],
+  ]);
+  it('maps positions to assetIds, preserving order, dropping unknowns/nulls', () => {
+    expect(heroAssetIds([4, 3, 1, 99], byPos)).toEqual(['a4', 'a1']);
+  });
+  it('dedupes and caps at 3', () => {
+    expect(heroAssetIds([1, 1, 2, 4, 5], byPos)).toEqual(['a1', 'a2', 'a4']);
+  });
+  it('absent → empty', () => {
+    expect(heroAssetIds(undefined, byPos)).toEqual([]);
   });
 });

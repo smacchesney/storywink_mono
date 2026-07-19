@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { Pencil } from 'lucide-react';
 import { STORY_MOODS, STORY_MOOD_LABELS, type StoryMood } from '@storywink/shared/constants';
 import { cn } from '@/lib/utils';
+import RambleTextarea from '@/components/create/setup/RambleTextarea';
 
 interface StoryFramingProps {
   tone: StoryMood | null;
@@ -14,6 +15,9 @@ interface StoryFramingProps {
   onToneChange: (tone: StoryMood | null) => void;
   onSummaryChange: (summary: string) => void;
   onLearningWordsChange: (words: string[]) => void;
+  /** X17 B4: render the ramble field instead of the truncated summary row. */
+  ramble?: boolean;
+  onRambleBlur?: () => void;
 }
 
 /**
@@ -30,9 +34,12 @@ export function StoryFraming({
   onToneChange,
   onSummaryChange,
   onLearningWordsChange,
+  ramble,
+  onRambleBlur,
 }: StoryFramingProps) {
   const t = useTranslations('setup');
   const locale = useLocale() === 'ja' ? 'ja' : 'en';
+  const playful = locale === 'ja' ? 'font-japanese' : 'font-playful';
   // Once the parent opens the textarea it stays open for the session — the
   // second tap into it is what opts into the keyboard (never autofocused).
   const [expanded, setExpanded] = React.useState(false);
@@ -79,8 +86,21 @@ export function StoryFraming({
 
       {/* Summary row — parent-editable AI text behind an explicit affordance.
           Same co-creation nudge as the avatar spark: a child-voiced placeholder
-          and a Geist hint that invites talking (dictation) or typing. */}
-      {expanded ? (
+          and a Geist hint that invites talking (dictation) or typing.
+          Under the ramble flag the truncated line becomes an always-visible
+          dictation-first field; the legacy branches below stay untouched. */}
+      {ramble ? (
+        <div className="flex flex-col gap-1.5">
+          <p className={`${playful} text-sm text-gray-600`}>{t('rambleLabel')}</p>
+          <RambleTextarea
+            value={eventSummary}
+            onChange={onSummaryChange}
+            onBlur={onRambleBlur}
+            placeholder={t('eventSummaryPlaceholder')}
+            hint={t('eventSummaryHint')}
+          />
+        </div>
+      ) : expanded ? (
         <div className="flex flex-col gap-1.5">
           <textarea
             id="eventSummary"
