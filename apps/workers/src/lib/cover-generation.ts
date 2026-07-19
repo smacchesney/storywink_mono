@@ -43,6 +43,14 @@ export interface CoverGenerationOptions {
   /** The approved interior title-page render, downscaled for reference use. */
   interiorRenderRef: IllustrationImageInput | null;
   /**
+   * X17 A1 (composed covers): hero-photo references beyond contentImage
+   * (which is hero #1). They ride FIRST in characterRefs so the prompt's
+   * "first N images" phrasing stays truthful. Absent = legacy cover.
+   */
+  extraHeroRefs?: IllustrationImageInput[];
+  /** X17 A1: when set, the cover prompt gains the COVER COMPOSITION brief. */
+  coverComposition?: { themeLine: string | null; heroPhotoCount: number } | null;
+  /**
    * AVATAR_STORY (X6d): 'interior' re-roles image 1 as the approved interior
    * render being repainted. Absent/'photo' keeps the photo-book cover prompt
    * byte-identical.
@@ -122,8 +130,27 @@ export async function generateAndStoreCover(
     qcFeedback,
     characterSheetCount: characterSheetRefs.length,
     interiorRenderCount: interiorRenderRef ? 1 : 0,
-    ...(opts.contentAnchor && opts.contentAnchor !== 'photo'
+    ...(opts.contentAnchor && opts.contentAnchor !== 'photo' && !opts.coverComposition
       ? { contentAnchor: opts.contentAnchor }
+      : {}),
+    // X17 A1: the composed-cover brief rides only when the caller supplies it.
+    // heroPhotoCount is derived SUPPLY-SIDE from the images actually sent —
+    // contentImage (hero #1) plus extraHeroRefs — clamped to 1-3, NEVER the
+    // caller's raw field, so the prompt's "first N images" claim matches the
+    // reference stack exactly (extraHeroRefs lead characterRefs in the generate
+    // call below). coverComposition and contentAnchor 'interior' are
+    // contradictory cover strategies (compose a NEW scene vs. repaint the
+    // interior render): when a composition brief is present it OWNS the cover,
+    // so the interior anchor above is dropped (`&& !opts.coverComposition`) —
+    // the two prompt sections can never both reach one render. Byte-identical
+    // for legacy callers, which never set coverComposition.
+    ...(opts.coverComposition
+      ? {
+          coverComposition: {
+            themeLine: opts.coverComposition.themeLine,
+            heroPhotoCount: Math.min(3, Math.max(1, 1 + (opts.extraHeroRefs?.length ?? 0))),
+          },
+        }
       : {}),
     neutralizeCharacterNames: shouldNeutralizeNames(illustrator.name),
   };
@@ -131,7 +158,11 @@ export async function generateAndStoreCover(
 
   const coverResult = await illustrator.generate({
     contentImage,
-    characterRefs: [...characterSheetRefs, ...(interiorRenderRef ? [interiorRenderRef] : [])],
+    characterRefs: [
+      ...(opts.extraHeroRefs ?? []),
+      ...characterSheetRefs,
+      ...(interiorRenderRef ? [interiorRenderRef] : []),
+    ],
     styleRefs: coverRefBuffers,
     prompt: coverTextPrompt,
   });
