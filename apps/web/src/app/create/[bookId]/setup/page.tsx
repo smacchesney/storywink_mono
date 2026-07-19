@@ -11,6 +11,12 @@ import { STORY_MOODS, type StoryMood } from '@storywink/shared/constants';
 import SetupSheet, { SetupFormState } from '@/components/create/setup/SetupSheet';
 import type { StripPhoto } from '@/components/create/setup/PhotoStrip';
 import type { CaptureQuestion } from '@/components/create/setup/CaptureChips';
+import { buildSubmitPatchBody } from '@/components/create/setup/setup-submit';
+import {
+  buildDiscoveryChips,
+  type DiscoveryChip,
+  type RosterCharacterLike,
+} from '@/components/create/setup/discovery-feed';
 import {
   allPagesAnalyzed,
   arrivalStripPhase,
@@ -49,7 +55,12 @@ interface BookData {
   tone: string | null;
   eventSummary: string | null;
   learningWords: { word?: string }[] | null;
-  characterIdentity?: { characters?: { characterId: string; role: string }[] } | null;
+  characterIdentity?: { characters?: RosterCharacterLike[] } | null;
+  themeLine?: string | null;
+  coverAssetId?: string | null;
+  castMode?: string | null;
+  starCharacterId?: string | null;
+  castMemberIds?: unknown;
   captureQuestions: CaptureQuestion[] | null;
   autoIllustrate: boolean;
   createdAt: string;
@@ -81,6 +92,10 @@ export default function SetupPage() {
     tone: null,
     learningWords: [],
     reviewFirst: false,
+    themeLine: '',
+    castMode: 'star',
+    starCharacterId: null,
+    castMemberIds: [],
   });
 
   // Track which fields the parent has edited so perception never clobbers them.
@@ -91,6 +106,8 @@ export default function SetupPage() {
     captureQuestions: false,
     tone: false,
     learningWords: false,
+    themeLine: false,
+    castMode: false,
   });
   const isMountedRef = useRef(true);
 
@@ -106,6 +123,11 @@ export default function SetupPage() {
   // Perception roster id of the star, for the X6c avatar confirm row.
   const [mainCharacterId, setMainCharacterId] = useState<string | null>(null);
   const [analysisDone, setAnalysisDone] = useState(false);
+  // X17b discovery surface — roster + analysis-derived chips + composed-cover
+  // asset, all fed by the same poll that fills title/summary/questions.
+  const [roster, setRoster] = useState<RosterCharacterLike[]>([]);
+  const [discoveryChips, setDiscoveryChips] = useState<DiscoveryChip[]>([]);
+  const [coverAssetId, setCoverAssetId] = useState<string | null>(null);
 
   const titlePending = !form.title && !touched.current.title && !perceptionSettled;
 
@@ -130,6 +152,15 @@ export default function SetupPage() {
 
     const star = book.characterIdentity?.characters?.find((c) => c.role === 'main_child');
     if (star) setMainCharacterId(star.characterId);
+
+    const characters = book.characterIdentity?.characters ?? [];
+    setRoster(characters);
+    setCoverAssetId(book.coverAssetId ?? null);
+
+    const analyzed = allPagesAnalyzed(book.pages);
+    // Feed re-arms with the poll: chips exist only once analysis landed, and
+    // a photo add/remove (analysis wiped) clears them until the re-read.
+    setDiscoveryChips(analyzed ? buildDiscoveryChips(book.pages, characters) : []);
 
     setForm((prev) => {
       const next = { ...prev };
@@ -159,10 +190,21 @@ export default function SetupPage() {
           .slice(0, 4);
         if (words.length > 0) next.learningWords = words;
       }
+      if (!touched.current.themeLine && book.themeLine?.trim()) next.themeLine = book.themeLine;
+      if (!touched.current.castMode) {
+        if (book.castMode === 'ensemble' && Array.isArray(book.castMemberIds)) {
+          next.castMode = 'ensemble';
+          next.castMemberIds = (book.castMemberIds as unknown[]).filter(
+            (id): id is string => typeof id === 'string',
+          );
+        } else if (book.starCharacterId) {
+          next.castMode = 'star';
+          next.starCharacterId = book.starCharacterId;
+        }
+      }
       return next;
     });
 
-    const analyzed = allPagesAnalyzed(book.pages);
     setAnalysisDone(analyzed);
     // A strip that is narrating announces the arrival; every other phase is
     // sticky, so refetches never re-announce.
@@ -373,18 +415,7 @@ export default function SetupPage() {
     }
     setIsSubmitting(true);
     try {
-      const patchBody: Record<string, unknown> = {
-        childName: form.childName.trim(),
-        artStyle: form.artStyle,
-        autoIllustrate: !form.reviewFirst,
-      };
-      if (form.title.trim()) patchBody.title = form.title.trim();
-      if (form.eventSummary.trim()) patchBody.eventSummary = form.eventSummary.trim();
-      // Only ever set by a tap on the mood row — provenance stays parental.
-      if (form.tone) patchBody.tone = form.tone;
-      if (form.learningWords.length > 0)
-        patchBody.learningWords = form.learningWords.map((word) => ({ word }));
-      if (form.captureQuestions.length > 0) patchBody.captureQuestions = form.captureQuestions;
+      const patchBody = buildSubmitPatchBody(form);
 
       const patchRes = await fetch(`/api/book/${bookId}`, {
         method: 'PATCH',
@@ -446,6 +477,9 @@ export default function SetupPage() {
   return (
     <SetupSheet
       mainCharacterId={mainCharacterId}
+      discoveryChips={discoveryChips}
+      roster={roster}
+      coverAssetId={coverAssetId}
       photos={photos}
       form={form}
       prefilledName={prefilledName}

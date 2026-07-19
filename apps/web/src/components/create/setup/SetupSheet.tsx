@@ -18,6 +18,7 @@ import StoryFraming from '@/components/create/setup/StoryFraming';
 import type { StripPhase } from '@/components/create/setup/strip-phase';
 import AvatarMatchChip from '@/components/create/setup/AvatarMatchChip';
 import CaptureChips, { CaptureQuestion } from '@/components/create/setup/CaptureChips';
+import type { DiscoveryChip, RosterCharacterLike } from '@/components/create/setup/discovery-feed';
 
 export interface SetupFormState {
   childName: string;
@@ -28,6 +29,11 @@ export interface SetupFormState {
   tone: StoryMood | null;
   learningWords: string[];
   reviewFirst: boolean;
+  /** X17b: theme card + star ask. Defaults keep legacy books inert. */
+  themeLine: string;
+  castMode: 'star' | 'ensemble';
+  starCharacterId: string | null;
+  castMemberIds: string[];
 }
 
 interface SetupSheetProps {
@@ -51,6 +57,14 @@ interface SetupSheetProps {
   bookId?: string;
   /** Perception roster id of this book's star, for the avatar confirm row. */
   mainCharacterId?: string | null;
+  /**
+   * X17b discovery surface — analysis-derived chips, the perception roster,
+   * and the composed-cover asset. Plumbed here for Tasks 6-11 to render behind
+   * the CREATE_DISCOVERY flag; unread today, so flag-off output is unchanged.
+   */
+  discoveryChips?: DiscoveryChip[];
+  roster?: RosterCharacterLike[];
+  coverAssetId?: string | null;
   onReorder: (photos: StripPhoto[]) => void;
   /** Refetch trigger after photos are added/removed inline. */
   onPhotosChanged?: () => void | Promise<void>;
