@@ -21,6 +21,7 @@ import {
 import type { BridgeScene } from '@storywink/shared/prompts/story';
 import { resolveBridgeAnchor } from '../lib/bridge-pages.js';
 import { orderCharacterSheets, selectSceneSheets } from '../lib/avatar-story.js';
+import { photoPresentCharacterIds } from '../lib/photo-cast.js';
 import { speciesLineFor, kindFromRole } from '@storywink/shared/prompts/character-identity';
 // Import STYLE_LIBRARY directly from styles module to avoid barrel export race condition
 import { STYLE_LIBRARY, StyleKey } from '@storywink/shared/prompts/styles';
@@ -401,20 +402,39 @@ export async function processIllustrationGeneration(job: Job<IllustrationGenerat
       // order alone decides. The snapshot order comes from an unordered
       // findMany and must never pick the anchor.
       let sheetSources = job.data.characterSheets;
-      if (isAvatarBook && sheetSources.length > 1) {
+      if (sheetSources.length > 1) {
         const starId =
           characterIdentity?.characters?.find((c) => c.role?.startsWith('main'))?.characterId ??
           null;
-        // A6: interior avatar pages ship only the scene's cast (+ the star
-        // floor, cap 4) to shrink the fusion/duplication surface. The title
-        // page is EXEMPT — it feeds the cover, which keeps every sheet
-        // (see the cover call below); filtering it would starve that binding.
-        sheetSources = isTitlePage
-          ? orderCharacterSheets(sheetSources, starId)
-          : selectSceneSheets(sheetSources, {
-              charactersPresent: bridgeScene ? bridgeScene.charactersPresent : null,
+        if (isAvatarBook) {
+          // A6: interior avatar pages ship only the scene's cast (+ the star
+          // floor, cap 4) to shrink the fusion/duplication surface. The title
+          // page is EXEMPT — it feeds the cover, which keeps every sheet
+          // (see the cover call below); filtering it would starve that binding.
+          sheetSources = isTitlePage
+            ? orderCharacterSheets(sheetSources, starId)
+            : selectSceneSheets(sheetSources, {
+                charactersPresent: bridgeScene ? bridgeScene.charactersPresent : null,
+                starCharacterId: starId,
+              });
+        } else if (!isTitlePage) {
+          // A6 for the photo path (X16 W1): only sheets whose characters are
+          // on THIS page ride as references (star floor kept). Presence comes
+          // from the roster's reorder-proof asset stamps; no stamps -> fail
+          // open and keep every sheet. The title page is exempt — it feeds
+          // the cover, which keeps the full stack.
+          const presentIds = photoPresentCharacterIds(
+            characterIdentity?.characters,
+            page.assetId,
+            pageNumber,
+          );
+          if (presentIds.length > 0) {
+            sheetSources = selectSceneSheets(sheetSources, {
+              charactersPresent: presentIds,
               starCharacterId: starId,
             });
+          }
+        }
       }
       for (const sheet of sheetSources) {
         try {
