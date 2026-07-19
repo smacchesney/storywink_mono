@@ -296,3 +296,40 @@ export function checkCastNameCoverage(
 
   return result;
 }
+
+export interface CastBalanceEntry {
+  name: string;
+  role: string;
+  /** Pages whose text mentions the name; null when the script gate makes the name un-checkable. */
+  textPages: number | null;
+  /** Expected presence: distinct photo pages this member appears on (0 = pages unknown). */
+  photoPages: number;
+}
+
+/**
+ * X17 A2 castBalance — LOG-FIRST QC dimension (never `problems`). Per
+ * parent-confirmed named member: how many pages actually mention them vs how
+ * many photos they are in. Rides StoryQcResult.scores via the telemetry
+ * object; enforcement waits for Wave C ledger evidence, per house pattern.
+ */
+export function computeCastBalance(
+  cast: CoverageCastEntry[],
+  pageTexts: string[],
+  language: string = 'en',
+): CastBalanceEntry[] {
+  const entries: CastBalanceEntry[] = [];
+  for (const member of cast) {
+    if (member.namedVia !== 'chip' && member.namedVia !== 'childName') continue;
+    if (!member.name?.trim()) continue;
+    const checkable = isChildNameCheckable(member.name, language);
+    entries.push({
+      name: member.name,
+      role: member.role,
+      textPages: checkable
+        ? pageTexts.filter((text) => nameMatches(member.name, text)).length
+        : null,
+      photoPages: new Set(member.appearsOnPages).size,
+    });
+  }
+  return entries;
+}

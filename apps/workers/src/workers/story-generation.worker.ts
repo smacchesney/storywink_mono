@@ -51,10 +51,12 @@ import {
   mergeCastNames,
   resolveCastEntries,
   checkCastNameCoverage,
+  computeCastBalance,
   MergedCastCharacter,
   ResolvedCastEntry,
   CastCoverageResult,
 } from '../lib/resolveCast.js';
+import { ensembleMemberIds } from '../lib/ensemble.js';
 import {
   buildAvatarCastForPrompt,
   extractAvatarScene,
@@ -293,6 +295,13 @@ async function evaluateStoryQuality(
     ? checkCastNameCoverage(cast, pageTexts, input.language || 'en')
     : null;
 
+  // X17 A2 castBalance — LOG-FIRST (never problems): per confirmed-named
+  // member, pages mentioning them vs their photo count. Rides the telemetry
+  // object into StoryQcResult.scores; enforcement waits for Wave C.
+  const castBalance = cast.length
+    ? computeCastBalance(cast, pageTexts, input.language || 'en')
+    : [];
+
   const telemetry = {
     bookId,
     refrainEchoes: echoes,
@@ -307,6 +316,8 @@ async function evaluateStoryQuality(
     castNamesCovered: castCoverage?.covered ?? 0,
     castNamesMissing: castCoverage?.missing ?? [],
     castNamesSkippedScript: castCoverage?.skippedScript ?? 0,
+    castMode: input.castMode ?? 'star',
+    castBalance,
     truthToEvent: qc.truthToEvent,
     // ENFORCED on photo (S2): a sound-overloaded draft is regenerated.
     soundOverload: qc.soundOverload,
@@ -948,6 +959,11 @@ export async function processStoryGeneration(
       charactersInPhotos: charactersInPhotos.length > 0 ? charactersInPhotos : undefined,
       bridgeCap: bridgeCap > 0 ? bridgeCap : undefined,
       toysComeAlive: toysAlive,
+      // X17 A2: ensemble prompt variant — flag + book-state gated, degrading
+      // to the star prompt when the resolved roster is empty.
+      ...(ensembleMemberIds(book) && charactersInPhotos.length > 0
+        ? { castMode: 'ensemble' as const }
+        : {}),
       language: book.language || 'en',
       suggestTitle: job.data.titleWasGenerated === true,
       storyPages: storyPages.map((page, index) => {

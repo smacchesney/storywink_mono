@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   mergeCastNames,
   checkCastNameCoverage,
+  computeCastBalance,
   isGenericCategoryAnswer,
   MergeableCharacter,
 } from './resolveCast.js';
@@ -279,6 +280,38 @@ describe('mergeCastNames — companion objects', () => {
     expect(obj.role).toBe('companion_object');
     expect(obj.name).toBe('Teacher');
     expect(obj.namedVia).toBe('chip');
+  });
+});
+
+describe('computeCastBalance (X17 A2)', () => {
+  const texts = ['Leo runs.', 'Maya and Leo splash.', 'Everyone rests.'];
+
+  it('counts text pages per confirmed-named member vs photo pages', () => {
+    expect(
+      computeCastBalance(
+        [
+          { name: 'Leo', role: 'main_child', namedVia: 'childName', appearsOnPages: [1, 2] },
+          { name: 'Maya', role: 'sibling', namedVia: 'chip', appearsOnPages: [2, 3] },
+        ],
+        texts,
+      ),
+    ).toEqual([
+      { name: 'Leo', role: 'main_child', textPages: 2, photoPages: 2 },
+      { name: 'Maya', role: 'sibling', textPages: 1, photoPages: 2 },
+    ]);
+  });
+
+  it('skips role-fallback names; script-gates uncheckable names to textPages null', () => {
+    expect(
+      computeCastBalance(
+        [
+          { name: 'grandparent', role: 'grandparent', appearsOnPages: [1] },
+          { name: '太郎', role: 'sibling', namedVia: 'chip', appearsOnPages: [1] },
+        ],
+        texts,
+        'en',
+      ),
+    ).toEqual([{ name: '太郎', role: 'sibling', textPages: null, photoPages: 1 }]);
   });
 });
 
