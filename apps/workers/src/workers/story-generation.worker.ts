@@ -130,6 +130,8 @@ interface StoryQcVerdict {
   pageLocal: { pageNumber: number; issue: string }[];
   /** True when pageLocal is ALL that is failing — eligible for surgical rewrites. */
   pageLocalOnly: boolean;
+  /** True when pageLocal includes judge-scored findings — after rewriting, re-judge instead of the deterministic-only recheck. */
+  needsRejudge: boolean;
   /** Full score payload for StoryQcResult persistence (same object the log line carries). */
   telemetry: Record<string, unknown>;
 }
@@ -332,13 +334,6 @@ async function evaluateStoryQuality(
   if (!qc.lastPageLanding) {
     problems.push('The final page must land as a soft, warm exhale — no summary statements.');
   }
-  for (const page of qc.pages) {
-    if (page.captionRisk > STORY_QC_THRESHOLDS.maxCaptionRisk) {
-      problems.push(
-        `Page ${page.pageNumber} reads like a photo caption (risk ${page.captionRisk}/10). ${page.issue || "Rewrite from the child's inner experience."}`,
-      );
-    }
-  }
   // ENFORCED on photo books (S2): the avatar path logs the same flag but never
   // regenerates on it (see evaluateAvatarStoryQuality).
   if (qc.soundOverload) {
@@ -365,17 +360,6 @@ async function evaluateStoryQuality(
         `truthToEvent scored ${qc.truthToEvent}/10 — the story must deliver the parent's actual day ("${input.eventSummary}"): its people, its place, its moments. A story that could be about any day fails.`,
       );
     }
-    const beats = new Map((storyResponse.beatSheet ?? []).map((b) => [b.pageNumber, b]));
-    for (const page of qc.pages) {
-      if (page.deliversBeat === false) {
-        const beat = beats.get(page.pageNumber);
-        problems.push(
-          `Page ${page.pageNumber} does not deliver its declared beat${
-            beat ? ` (${beat.role} — ${beat.goal})` : ''
-          } — rewrite the page to do that job.${page.issue ? ` ${page.issue}` : ''}`,
-        );
-      }
-    }
     if (qc.orphanedLanding === true) {
       problems.push(
         'A person from the opening pages has vanished by the landing — bring them back (or echo them) on the final page.',
@@ -387,40 +371,76 @@ async function evaluateStoryQuality(
       );
     }
   }
-  // Everything above needs a whole-book regen; the deterministic findings are
-  // page-local and can be fixed surgically when they are the only failures.
+  // GLOBAL dimensions (whole-book regen when failing) were pushed above:
+  // arcCoherence, readAloudRhythm, lastPageLanding, soundOverload, and under
+  // v2: agency, truthToEvent, orphanedLanding, refrainAsNarrator.
+  //
+  // JUDGE-SCORED PAGE-LOCAL failures (X16 W1): when the global dimensions all
+  // pass, a bad page is rewritten surgically instead of rerolling the book.
+  const judgePageLocal: { pageNumber: number; issue: string }[] = [];
+  const beats = new Map((storyResponse.beatSheet ?? []).map((b) => [b.pageNumber, b]));
+  const finalPageNumber = Math.max(...qc.pages.map((p) => p.pageNumber));
+  for (const page of qc.pages) {
+    if (page.captionRisk > STORY_QC_THRESHOLDS.maxCaptionRisk) {
+      judgePageLocal.push({
+        pageNumber: page.pageNumber,
+        issue: `Page ${page.pageNumber} reads like a photo caption (risk ${page.captionRisk}/10). ${page.issue || "Rewrite from the child's inner experience."}`,
+      });
+    }
+    if (v2Enforced && page.deliversBeat === false) {
+      const beat = beats.get(page.pageNumber);
+      judgePageLocal.push({
+        pageNumber: page.pageNumber,
+        issue: `Page ${page.pageNumber} does not deliver its declared beat${beat ? ` (${beat.role} — ${beat.goal})` : ''} — rewrite the page to do that job.${page.issue ? ` ${page.issue}` : ''}`,
+      });
+    }
+    if (v2Enforced && page.endsLeaningForward === false && page.pageNumber !== finalPageNumber) {
+      judgePageLocal.push({
+        pageNumber: page.pageNumber,
+        issue: `Page ${page.pageNumber} ends flat — its last clause must lean into the page turn (a question, a glance toward something new, an "and then...?" energy) without losing the page's beat.`,
+      });
+    }
+  }
   const globalProblemCount = problems.length;
+  problems.push(...judgePageLocal.map((p) => p.issue));
   if (v2Enforced) {
     problems.push(...detChecks.problems);
   }
+  // CRITICAL ordering: capture the page-local count BEFORE the qc.feedback
+  // push below — feedback is non-null on essentially every failing draft, and
+  // counting it as a "problem" would make pageLocalOnly false in exactly the
+  // surgical case it exists for.
+  const pageLocalProblemCount = problems.length - globalProblemCount;
   if (problems.length > 0 && qc.feedback) {
     problems.push(qc.feedback);
   }
 
-  const pageLocal = v2Enforced
-    ? [
-        // ja budget findings are log-only until the char band is calibrated.
-        ...(input.language === 'ja'
-          ? []
-          : detChecks.budget.map((b) => ({ pageNumber: b.pageNumber, issue: b.issue }))),
-        ...detChecks.garbles.map((g) => ({
-          pageNumber: g.pageNumber,
-          issue: `Page ${g.pageNumber} garbles character names ("${g.snippet}") — use each name correctly and separately.`,
-        })),
-      ].filter((p) => Number.isInteger(p.pageNumber))
-    : [];
+  const pageLocal = [
+    ...judgePageLocal,
+    ...(v2Enforced
+      ? [
+          ...(input.language === 'ja'
+            ? []
+            : detChecks.budget.map((b) => ({ pageNumber: b.pageNumber, issue: b.issue }))),
+          ...detChecks.garbles.map((g) => ({
+            pageNumber: g.pageNumber,
+            issue: `Page ${g.pageNumber} garbles character names ("${g.snippet}") — use each name correctly and separately.`,
+          })),
+        ]
+      : []),
+  ].filter((p) => Number.isInteger(p.pageNumber));
 
   return {
     passed: problems.length === 0,
     feedback: problems.map((p, i) => `${i + 1}. ${p}`).join('\n'),
     pageLocal,
     // Bridge violations (N + 0.5) have no in-memory page to rewrite — they
-    // force the whole-book path via the length mismatch.
+    // force the whole-book path via the integer filter above.
     pageLocalOnly:
-      v2Enforced &&
       globalProblemCount === 0 &&
       pageLocal.length > 0 &&
-      pageLocal.length === detChecks.problems.length,
+      pageLocalProblemCount === pageLocal.length,
+    needsRejudge: judgePageLocal.length > 0,
     telemetry,
   };
 }
@@ -585,6 +605,7 @@ async function evaluateAvatarStoryQuality(
     feedback: problems.map((p, i) => `${i + 1}. ${p}`).join('\n'),
     pageLocal,
     pageLocalOnly: v2Enforced && globalProblems.length === 0 && pageLocal.length > 0,
+    needsRejudge: false,
     telemetry,
   };
 }
@@ -1100,6 +1121,11 @@ export async function processStoryGeneration(
         : [storyInput.childName, ...(storyInput.charactersInPhotos ?? []).map((c) => c.name)]
     ).filter((n): n is string => !!n?.trim());
 
+    const evaluate = (): Promise<StoryQcVerdict> =>
+      isAvatarStory
+        ? evaluateAvatarStoryQuality(openai, storyResponse, avatarInput!, bookId)
+        : evaluateStoryQuality(openai, storyResponse, storyInput, bookId, acceptedBridges);
+
     const applyTargetedRewrites = async (verdict: StoryQcVerdict): Promise<StoryQcVerdict> => {
       if (
         verdict.passed ||
@@ -1173,6 +1199,14 @@ export async function processStoryGeneration(
           );
         }
       }
+      if (verdict.needsRejudge) {
+        // Judge-scored dimensions were rewritten — deterministic recheck can't
+        // re-score them. One full re-judge (gpt-5-mini) instead; its verdict
+        // returns with pageLocalOnly forced off so a rewrite round never chains
+        // into a second one on the same draft.
+        const rejudged = await evaluate();
+        return { ...rejudged, pageLocal: [], pageLocalOnly: false, needsRejudge: false };
+      }
       // Deterministic re-check only: the model-scored dimensions already
       // passed, and only the rewritten pages changed. The refrain floor IS
       // re-counted — a rewrite can delete the one echo a page carried.
@@ -1199,16 +1233,12 @@ export async function processStoryGeneration(
         feedback: recheckProblems.map((p, i) => `${i + 1}. ${p}`).join('\n'),
         pageLocal: [],
         pageLocalOnly: false,
+        needsRejudge: false,
         telemetry: verdict.telemetry,
       };
     };
 
     try {
-      const evaluate = (): Promise<StoryQcVerdict> =>
-        isAvatarStory
-          ? evaluateAvatarStoryQuality(openai, storyResponse, avatarInput!, bookId)
-          : evaluateStoryQuality(openai, storyResponse, storyInput, bookId, acceptedBridges);
-
       const persistVerdict = (v: StoryQcVerdict, round: number) =>
         persistStoryQc(prisma, {
           bookId,
