@@ -129,11 +129,14 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
   }
 
   // X17 B4: a delayed grace-window job claims the book at run time. Claim
-  // count 0 + ILLUSTRATING means THIS job's earlier attempt claimed and then
-  // failed mid-run — proceed (retry safety). Any other status means the peek
-  // was cancelled or the book moved on: exit as a clean no-op. Foreign
-  // ILLUSTRATING is impossible here because the manual illustrations route
-  // removes an armed peek job before it starts (Task 16).
+  // count 0 + ILLUSTRATING is adopted ONLY on a genuine retry
+  // (`job.attemptsMade` > 0) — THIS job's earlier attempt claimed and then
+  // failed mid-run, so retry safety demands it proceed. A fresh attempt that
+  // finds a foreign ILLUSTRATING exits as a clean no-op, closing the rearm /
+  // de-arm TOCTOU window. Any other status means the peek was cancelled or
+  // the book moved on: also a clean no-op. Coexistence is unlikely anyway —
+  // the manual illustrations route removes an armed peek job before it starts
+  // (Task 16).
   if (job.data.claimBook) {
     const claimed = await prisma.book.updateMany({
       where: { id: bookId, status: 'STORY_READY' },
@@ -144,7 +147,7 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         where: { id: bookId },
         select: { status: true },
       });
-      if (!shouldRunAfterClaim(claimed.count, current?.status)) {
+      if (!shouldRunAfterClaim(claimed.count, current?.status, job.attemptsMade)) {
         logger.info(
           { bookId, status: current?.status },
           'Peek job skipped — book no longer waiting to illustrate',

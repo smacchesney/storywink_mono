@@ -41,10 +41,19 @@ describe('claim + job id', () => {
   it('deterministic job id', () => {
     expect(peekExtractJobId('b1')).toBe('peek-extract-b1');
   });
-  it('runs when this job claimed, or when someone else already set ILLUSTRATING', () => {
-    expect(shouldRunAfterClaim(1, 'ILLUSTRATING')).toBe(true);
-    expect(shouldRunAfterClaim(0, 'ILLUSTRATING')).toBe(true);
-    expect(shouldRunAfterClaim(0, 'STORY_READY')).toBe(false);
-    expect(shouldRunAfterClaim(0, 'COMPLETED')).toBe(false);
+  it('runs when this job claimed the book', () => {
+    expect(shouldRunAfterClaim(1, 'ILLUSTRATING', 0)).toBe(true);
+    expect(shouldRunAfterClaim(1, 'STORY_READY', 0)).toBe(true);
+  });
+  it('count 0 + ILLUSTRATING adopts only on a genuine retry (attemptsMade > 0)', () => {
+    expect(shouldRunAfterClaim(0, 'ILLUSTRATING', 1)).toBe(true);
+  });
+  it('count 0 + foreign ILLUSTRATING on a fresh attempt does not adopt', () => {
+    expect(shouldRunAfterClaim(0, 'ILLUSTRATING', 0)).toBe(false);
+  });
+  it('count 0 + any other status → no-op regardless of attempt', () => {
+    expect(shouldRunAfterClaim(0, 'STORY_READY', 0)).toBe(false);
+    expect(shouldRunAfterClaim(0, 'STORY_READY', 2)).toBe(false);
+    expect(shouldRunAfterClaim(0, 'COMPLETED', 1)).toBe(false);
   });
 });

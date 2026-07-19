@@ -42,16 +42,21 @@ export function resolveAutoChainPlan(input: {
 /**
  * A delayed peek job must claim the book (STORY_READY → ILLUSTRATING) when
  * it finally runs — the enqueuer deliberately did not. Proceed when this
- * job's claim landed, or when the book is already ILLUSTRATING: that is the
- * RETRY case (attempt 1 claimed, then failed mid-run — attempt 2 must not
- * strand the book). It is never a foreign start: every other path that sets
- * ILLUSTRATING (the manual illustrations route, the peek route's
- * start-fresh) first removes any armed peek-extract job, so a live delayed
- * job cannot coexist with someone else's ILLUSTRATING.
+ * job's claim landed (count > 0). When the claim found nothing but the book
+ * is already ILLUSTRATING, proceed ONLY on a genuine retry — `attemptsMade`
+ * greater than 0 means an earlier attempt of THIS job claimed and then
+ * failed mid-run, so it must not strand the book. A fresh attempt
+ * (attemptsMade 0) that finds a foreign ILLUSTRATING must not adopt it: the
+ * de-arm ordering makes coexistence unlikely, but this closes the rearm /
+ * de-arm TOCTOU window rather than trusting the status alone. Every other
+ * path that sets ILLUSTRATING (the manual illustrations route, the peek
+ * route's start-fresh) first removes any armed peek-extract job.
  */
 export function shouldRunAfterClaim(
   claimedCount: number,
   currentStatus: string | null | undefined,
+  attemptsMade: number,
 ): boolean {
-  return claimedCount > 0 || currentStatus === 'ILLUSTRATING';
+  if (claimedCount > 0) return true;
+  return currentStatus === 'ILLUSTRATING' && attemptsMade > 0;
 }
