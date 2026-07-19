@@ -275,6 +275,10 @@ export interface StoryGenerationInput {
   qcFeedback?: string; // Editorial corrections from a failed story-QC round, injected on regeneration
   eventSummary?: string; // Parent-confirmed "what actually happened" brief. When present it REPLACES theme in the prompt.
   confirmedFacts?: string[]; // Parent's tapped answers to photo-derived questions ("This was Emma's first beach trip")
+  /** X17 B4: confirmed facts bound to a page (1-based pageNumber) — rendered
+   * on that page's WHAT'S HERE line; the global confirmedFacts list should
+   * then exclude them. */
+  pageBoundFacts?: Record<number, string[]>;
   /** Parent-supplied words the child is learning (max 4). Woven 3-4x each. */
   learningWords?: string[];
   charactersInPhotos?: {
@@ -342,6 +346,79 @@ Your north star: Would a parent want to re-read this 100 times? That requires em
 // STORY GENERATION PROMPT
 // ----------------------------------
 
+// X17 B4 — page binding of confirmed facts -------------------------------
+
+export interface FactBindingPage {
+  /** 1-based pageNumber, matching storyPages[].pageNumber. */
+  position: number;
+  eventSignals?: string[];
+}
+
+const FACT_STOPWORDS = new Set([
+  'the',
+  'a',
+  'an',
+  'and',
+  'with',
+  'was',
+  'were',
+  'our',
+  'his',
+  'her',
+  'their',
+  'then',
+  'that',
+  'this',
+  'from',
+  'into',
+  'onto',
+  'when',
+  'while',
+]);
+
+function factTokens(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length >= 4 && !FACT_STOPWORDS.has(w)),
+  );
+}
+
+/**
+ * Bind each confirmed fact to the single page whose eventSignals share the
+ * most content tokens (≥1 token of ≥4 chars). Bound facts anchor the moment
+ * to the right photo; facts with no overlap stay global. Purely lexical and
+ * deterministic — ja text (no space-delimited words) falls through to
+ * global, which is today's behavior.
+ */
+export function bindFactsToPages(
+  facts: string[],
+  pages: FactBindingPage[],
+): { bound: Record<number, string[]>; unbound: string[] } {
+  const bound: Record<number, string[]> = {};
+  const unbound: string[] = [];
+  const pageTokens = pages.map((p) => ({
+    position: p.position,
+    tokens: factTokens((p.eventSignals ?? []).join(' ')),
+  }));
+  for (const fact of facts) {
+    const tokens = factTokens(fact);
+    let best: { position: number; overlap: number } | null = null;
+    for (const page of pageTokens) {
+      let overlap = 0;
+      for (const token of tokens) if (page.tokens.has(token)) overlap += 1;
+      if (overlap > 0 && (!best || overlap > best.overlap)) {
+        best = { position: page.position, overlap };
+      }
+    }
+    if (best) (bound[best.position] ??= []).push(fact);
+    else unbound.push(fact);
+  }
+  return { bound, unbound };
+}
+
 export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryPromptPart[] {
   const parts: StoryPromptPart[] = [];
 
@@ -377,8 +454,10 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
         ? ` Signals: ${page.analysis.eventSignals.join(', ')}.`
         : '';
       const arcRole = arcHintsUsable ? ` ARC ROLE: ${page.analysis.narrativeRole}.` : '';
+      const boundFacts = input.pageBoundFacts?.[page.pageNumber];
+      const parentFacts = boundFacts?.length ? ` Parent confirmed: ${boundFacts.join('; ')}.` : '';
       parts.push({
-        text: `WHAT'S HERE (raw notes, NOT the story): ${page.analysis.setting}; ${page.analysis.action}; ${page.analysis.emotion}.${signals}${arcRole}`,
+        text: `WHAT'S HERE (raw notes, NOT the story): ${page.analysis.setting}; ${page.analysis.action}; ${page.analysis.emotion}.${signals}${arcRole}${parentFacts}`,
       });
     }
   });

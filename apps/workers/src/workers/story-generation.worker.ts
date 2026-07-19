@@ -7,6 +7,7 @@ import OpenAI from 'openai';
 import pino from 'pino';
 import {
   createStoryGenerationPrompt,
+  bindFactsToPages,
   StoryGenerationInput,
   STORY_GENERATION_SYSTEM_PROMPT,
   StoryResponse,
@@ -987,6 +988,23 @@ export async function processStoryGeneration(
         };
       }),
     };
+
+    // X17 B4: split confirmed facts into page-bound (rendered on that page's
+    // WHAT'S HERE line) and global. Photo path only — avatar books have no
+    // per-page analysis to bind against.
+    if (!isAvatarStory && storyInput.confirmedFacts?.length) {
+      const { bound, unbound } = bindFactsToPages(
+        storyInput.confirmedFacts,
+        storyInput.storyPages.map((p) => ({
+          position: p.pageNumber,
+          eventSignals: p.analysis?.eventSignals,
+        })),
+      );
+      if (Object.keys(bound).length > 0) {
+        storyInput.pageBoundFacts = bound;
+        storyInput.confirmedFacts = unbound.length > 0 ? unbound : undefined;
+      }
+    }
 
     // AVATAR_STORY (X6d): the premise (stored on eventSummary at creation)
     // replaces the photo storyboard; the cast is the stored avatar roster,

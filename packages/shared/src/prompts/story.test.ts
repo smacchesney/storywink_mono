@@ -6,6 +6,7 @@ import {
   STORY_RESPONSE_SCHEMA_WITH_BRIDGES,
   STORY_GENERATION_SYSTEM_PROMPT,
   arcRoleHintsUsable,
+  bindFactsToPages,
 } from './story.js';
 
 function promptText(input: StoryGenerationInput): string {
@@ -586,5 +587,90 @@ describe('ensemble crew block (X17 A2)', () => {
     const explicit = structuredClone(baseInput);
     explicit.castMode = 'star';
     expect(promptText(explicit)).toBe(promptText(star));
+  });
+});
+
+describe('bindFactsToPages (X17 B4)', () => {
+  const pages = [
+    { position: 1, eventSignals: ['packed suitcase', 'car seat'] },
+    { position: 2, eventSignals: ['sandcastle', 'first swim'] },
+    { position: 3, eventSignals: [] },
+  ];
+
+  it('binds a fact to the page with the best signal overlap', () => {
+    const { bound, unbound } = bindFactsToPages(
+      ['The best moment → her first swim in the sea', 'Something they said → again, again!'],
+      pages,
+    );
+    expect(bound[2]).toEqual(['The best moment → her first swim in the sea']);
+    expect(unbound).toEqual(['Something they said → again, again!']);
+  });
+
+  it('each fact binds to at most one page; no-overlap facts stay global', () => {
+    const { bound, unbound } = bindFactsToPages(['A little mishap → dropped ice cream'], pages);
+    expect(Object.keys(bound)).toHaveLength(0);
+    expect(unbound).toHaveLength(1);
+  });
+
+  it('short/stopword-only tokens never bind (ja facts fall through globally)', () => {
+    const { bound, unbound } = bindFactsToPages(['はじめての海 → 大喜び'], pages);
+    expect(Object.keys(bound)).toHaveLength(0);
+    expect(unbound).toHaveLength(1);
+  });
+});
+
+describe('pageBoundFacts in the prompt (X17 B4)', () => {
+  it("renders bound facts on that page's WHAT'S HERE line", () => {
+    const parts = createStoryGenerationPrompt({
+      bookTitle: 'T',
+      isDoubleSpread: false,
+      pageBoundFacts: { 1: ['The best moment → first swim'] },
+      storyPages: [
+        {
+          pageId: 'p1',
+          pageNumber: 1,
+          assetId: 'a1',
+          originalImageUrl: null,
+          analysis: {
+            setting: 's',
+            action: 'a',
+            emotion: 'e',
+            eventSignals: [],
+            narrativeRole: 'setup',
+          },
+        },
+      ],
+    });
+    const line = parts
+      .map((p) => ('text' in p ? p.text : ''))
+      .find((t) => t.includes("WHAT'S HERE"));
+    expect(line).toContain('Parent confirmed: The best moment → first swim.');
+  });
+
+  it('absent pageBoundFacts leaves the line byte-identical', () => {
+    const parts = createStoryGenerationPrompt({
+      bookTitle: 'T',
+      isDoubleSpread: false,
+      storyPages: [
+        {
+          pageId: 'p1',
+          pageNumber: 1,
+          assetId: 'a1',
+          originalImageUrl: null,
+          analysis: {
+            setting: 's',
+            action: 'a',
+            emotion: 'e',
+            eventSignals: [],
+            narrativeRole: 'setup',
+          },
+        },
+      ],
+    });
+    const line = parts
+      .map((p) => ('text' in p ? p.text : ''))
+      .find((t) => t.includes("WHAT'S HERE"));
+    expect(line).toContain("WHAT'S HERE (raw notes, NOT the story): s; a; e.");
+    expect(line).not.toContain('Parent confirmed');
   });
 });
