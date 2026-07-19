@@ -13,6 +13,7 @@ import {
 import { createBullMQConnection } from '@storywink/shared/redis';
 import { Queue } from 'bullmq';
 import logger from '@/lib/logger'; // Import logger
+import { ensembleBooksEnabled } from '@/lib/outing-v2';
 
 // Lazy singleton for the asset-cleanup queue (the shared QueueName enum in
 // @/lib/queue predates this queue; workers resolve it via QUEUE_NAMES).
@@ -71,6 +72,15 @@ const updateBookSchema = z
       .nullable()
       .optional(),
     captureQuestions: z.array(captureQuestionSchema).max(10).nullable().optional(),
+    // X17 A2/B: cast + theme fields. castMode/castMemberIds are ensemble
+    // machinery, honored only when ENSEMBLE_BOOKS_ENABLED (stripped below when
+    // off — the spec's off behavior is "castMode ignored, star path").
+    // starCharacterId rides UNGATED: it fixes the wrong-sibling coin flip in
+    // star mode too (spec A2). themeLine is plain data and rides ungated.
+    castMode: z.enum(['star', 'ensemble']).optional(),
+    starCharacterId: z.string().max(50).nullable().optional(),
+    castMemberIds: z.array(z.string().min(1).max(50)).max(8).nullable().optional(),
+    themeLine: z.string().max(120).nullable().optional(),
     autoIllustrate: z.boolean().optional(),
   })
   .strict(); // Ensure no extra fields are passed
@@ -238,6 +248,22 @@ export async function PATCH(
     const dataForPrisma: Record<string, unknown> = { ...validatedData };
     if (validatedData.additionalCharacters !== undefined) {
       dataForPrisma.additionalCharacters = JSON.stringify(validatedData.additionalCharacters);
+    }
+
+    // ENSEMBLE_BOOKS_ENABLED off: the ensemble fields are ignored, not
+    // errored — a stale client with the flag freshly unset must not brick its
+    // PATCHes. starCharacterId is deliberately NOT stripped: the star pick is
+    // the wrong-sibling fix and must persist in star-only deployments.
+    if (!ensembleBooksEnabled()) {
+      for (const field of ['castMode', 'castMemberIds'] as const) {
+        if (field in dataForPrisma) {
+          delete dataForPrisma[field];
+          logger.info(
+            { dbUserId: dbUser.id, bookId, field },
+            'API: ensemble field stripped (ENSEMBLE_BOOKS_ENABLED off)',
+          );
+        }
+      }
     }
 
     // Use updateMany to ensure user owns the book AND the book exists
