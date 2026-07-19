@@ -18,8 +18,9 @@ export const FEED_RESERVE_MIN_HEIGHT = 96;
 
 /**
  * X17 B1 — the perception pass's real findings, cascading in as quiet data
- * chips below the child-name field, directly above the capture-chips region.
- * Chips are Geist (they are data); the header line is Excalifont narration.
+ * chips below the name and title fields (the ramble, theme card, and star ask
+ * share this poll-fed region above the capture chips). Chips are Geist (they
+ * are data); the header line is Excalifont narration.
  * Non-interactive by design: the ramble is the correction channel, so a wrong
  * guess reads as charm.
  *

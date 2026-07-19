@@ -163,52 +163,6 @@ export function SetupSheet({
         <LibrarianStrip phase={stripPhase} questionCount={form.captureQuestions.length} />
       )}
 
-      {/* X17 B4 — flag-on discovery flow (Decision 11 order): the perception
-          feed right under the librarian strip, then the theme card, the
-          dictation-first ramble (mood row + summary), and the star ask. The
-          child-name + title sections follow BELOW this block. Whole block is
-          flag-gated so flag-off output stays byte-identical (child name renders
-          right under the strip, exactly as today). */}
-      {CREATE_DISCOVERY_FLAG && (
-        <>
-          {/* X17 B1 — real perception findings cascade in as Geist data chips.
-              A min-height floor holds whenever the feed renders. */}
-          <DiscoveryFeed chips={discoveryChips ?? []} reserve={stripPhase === 'reading'} />
-
-          {/* X17 B2 — the feed's finale: the perception theme as a tap-to-edit
-              Excalifont card. Hidden entirely when perception found no theme. */}
-          <ThemeCard themeLine={form.themeLine} onChange={(v) => onChange('themeLine', v)} />
-
-          {/* X17 B4 — the truncated summary row becomes the always-visible,
-              dictation-first ramble bound to eventSummary; the mood row still
-              renders above it inside StoryFraming. */}
-          <StoryFraming
-            ramble
-            onRambleBlur={onRambleBlur}
-            tone={form.tone}
-            eventSummary={form.eventSummary}
-            learningWords={form.learningWords}
-            onToneChange={(v) => onChange('tone', v)}
-            onSummaryChange={(v) => onChange('eventSummary', v)}
-            onLearningWordsChange={(v) => onChange('learningWords', v)}
-          />
-
-          {/* X17 B3 — "Who's the star?": one chip per recurring kid + "Everyone!".
-              Renders only when 2+ recurring kids exist (solo books never see it);
-              the "Everyone!" chip is additionally gated on ENSEMBLE_BOOKS_FLAG. */}
-          {starChildren.length >= 2 && (
-            <StarPicker
-              childrenChars={starChildren}
-              castMode={form.castMode}
-              starCharacterId={form.starCharacterId}
-              ensembleAllowed={ENSEMBLE_BOOKS_FLAG}
-              onPickStar={onPickStar}
-              onPickEveryone={onPickEveryone}
-            />
-          )}
-        </>
-      )}
-
       {/* Child name — the one required field */}
       <section className="flex flex-col gap-1.5">
         <label htmlFor="childName" className="text-sm font-medium text-gray-600">
@@ -257,10 +211,59 @@ export function SetupSheet({
         </div>
       </section>
 
+      {/* X17b — flag-on discovery flow. The name + title fields above keep
+          their LEGACY positions; every poll-fed element (ramble growth, the
+          feed past its 96px floor, the theme card mounting, the star ask
+          resolving) sits BELOW them, so a late arrival never shifts the
+          required name field mid-typing (the Task 6 regression). The ramble
+          variant of StoryFraming replaces the legacy row in the same
+          structural slot — its mount height is deterministic (mood row + 2-row
+          ramble). Whole block is flag-gated so flag-off output stays
+          byte-identical. */}
+      {CREATE_DISCOVERY_FLAG && (
+        <>
+          {/* X17 B4 — the truncated summary row becomes the always-visible,
+              dictation-first ramble bound to eventSummary; the mood row still
+              renders above it inside StoryFraming. */}
+          <StoryFraming
+            ramble
+            onRambleBlur={onRambleBlur}
+            tone={form.tone}
+            eventSummary={form.eventSummary}
+            learningWords={form.learningWords}
+            onToneChange={(v) => onChange('tone', v)}
+            onSummaryChange={(v) => onChange('eventSummary', v)}
+            onLearningWordsChange={(v) => onChange('learningWords', v)}
+          />
+
+          {/* X17 B1 — real perception findings cascade in as Geist data chips.
+              A min-height floor holds whenever the feed renders. */}
+          <DiscoveryFeed chips={discoveryChips ?? []} reserve={stripPhase === 'reading'} />
+
+          {/* X17 B2 — the feed's finale: the perception theme as a tap-to-edit
+              Excalifont card. Hidden entirely when perception found no theme. */}
+          <ThemeCard themeLine={form.themeLine} onChange={(v) => onChange('themeLine', v)} />
+
+          {/* X17 B3 — "Who's the star?": one chip per recurring kid + "Everyone!".
+              Renders only when 2+ recurring kids exist (solo books never see it);
+              the "Everyone!" chip is additionally gated on ENSEMBLE_BOOKS_FLAG. */}
+          {starChildren.length >= 2 && (
+            <StarPicker
+              childrenChars={starChildren}
+              castMode={form.castMode}
+              starCharacterId={form.starCharacterId}
+              ensembleAllowed={ENSEMBLE_BOOKS_FLAG}
+              onPickStar={onPickStar}
+              onPickEveryone={onPickEveryone}
+            />
+          )}
+        </>
+      )}
+
       {/* Story framing — legacy (flag-off) slot: always renders when discovery
           is off. The mood row needs zero analysis, and a missing summary falls
           back to a quiet "add a note" button. Flag-on renders the ramble
-          variant of this component higher up (Decision 11 order, above). */}
+          variant of this component in the block directly above. */}
       {!CREATE_DISCOVERY_FLAG && (
         <StoryFraming
           tone={form.tone}
