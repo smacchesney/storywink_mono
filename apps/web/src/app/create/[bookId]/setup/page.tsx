@@ -12,6 +12,8 @@ import SetupSheet, { SetupFormState } from '@/components/create/setup/SetupSheet
 import type { StripPhoto } from '@/components/create/setup/PhotoStrip';
 import type { CaptureQuestion } from '@/components/create/setup/CaptureChips';
 import { buildSubmitPatchBody } from '@/components/create/setup/setup-submit';
+import { createPatchDebouncer, type PatchDebouncer } from '@/lib/patch-debounce';
+import { CREATE_DISCOVERY_FLAG } from '@/lib/discovery-client';
 import {
   buildDiscoveryChips,
   type DiscoveryChip,
@@ -137,6 +139,19 @@ export default function SetupPage() {
       isMountedRef.current = false;
     };
   }, []);
+
+  // X17 B4: one debounced PATCH channel for the whole discovery surface.
+  const patcherRef = useRef<PatchDebouncer | null>(null);
+  if (patcherRef.current === null) {
+    patcherRef.current = createPatchDebouncer(async (body) => {
+      await fetch(`/api/book/${bookId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    });
+  }
+  useEffect(() => () => patcherRef.current?.dispose(), []);
 
   // Merge a freshly fetched book into form state, respecting parent edits.
   const mergeBook = useCallback((book: BookData) => {
@@ -362,6 +377,13 @@ export default function SetupPage() {
       }
       if (key === 'childName') setShowNameError(false);
       setForm((prev) => ({ ...prev, [key]: value }));
+      if (CREATE_DISCOVERY_FLAG) {
+        if (key === 'themeLine')
+          patcherRef.current?.queue({ themeLine: (value as string).trim() || null });
+        if (key === 'eventSummary')
+          patcherRef.current?.queue({ eventSummary: (value as string).trim() || null });
+        if (key === 'captureQuestions') patcherRef.current?.queue({ captureQuestions: value });
+      }
     },
     [],
   );
@@ -415,6 +437,9 @@ export default function SetupPage() {
     }
     setIsSubmitting(true);
     try {
+      // The submit PATCH is the full-form source of truth; drop any pending
+      // debounce so a racing partial PATCH can't land after it.
+      patcherRef.current?.dispose();
       const patchBody = buildSubmitPatchBody(form);
 
       const patchRes = await fetch(`/api/book/${bookId}`, {
