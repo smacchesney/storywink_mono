@@ -178,7 +178,20 @@
     "addNote": "Add a note about the day",
     "learningWordsAdd": "Any words they're loving right now?",
     "learningWordRemove": "Remove {word}",
-    "learningWordsPlaceholder": "Type a word"
+    "learningWordsPlaceholder": "Type a word",
+    "feedSpotted": "Little things we spotted…",
+    "themeSoundsLike": "Sounds like…",
+    "themeEditLabel": "Fix the theme",
+    "themePlaceholder": "What was the day really about?",
+    "rambleLabel": "Tell us more about the day — talk or type.",
+    "rambleCharsLeft": "{count} characters left",
+    "starLabel": "Who's the star?",
+    "starEveryone": "Everyone!",
+    "memberNameQuestion": "What should we call {descriptor}?",
+    "factLocationQ": "Where the day happened",
+    "factHighlightQ": "The best moment",
+    "factMishapQ": "A little mishap",
+    "factChildSaidQ": "Something they said"
   },
   "progress": {
     "readingPhotos": "Reading your photos…",
@@ -253,7 +266,10 @@
     "saveChanges": "Save changes",
     "saveTimeout": "That save didn't go through. Check your connection and try again.",
     "contentFlagged": "This page needs a different photo",
-    "noPreview": "No preview"
+    "noPreview": "No preview",
+    "paintMyPictures": "Paint my pictures",
+    "peekHint": "Take a peek — we'll start painting in a few minutes.",
+    "peekStarting": "Painting has started!"
   },
   "library": {
     "yourLibrary": "Your library",

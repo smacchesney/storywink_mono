@@ -178,7 +178,20 @@
     "addNote": "そのひの メモを かく",
     "learningWordsAdd": "いま おきにいりの ことばは ありますか？",
     "learningWordRemove": "{word} を けす",
-    "learningWordsPlaceholder": "ことばを いれてね"
+    "learningWordsPlaceholder": "ことばを いれてね",
+    "feedSpotted": "写真から見つけた小さな発見…",
+    "themeSoundsLike": "こんな一日だったみたい…",
+    "themeEditLabel": "テーマをなおす",
+    "themePlaceholder": "どんな一日でしたか？",
+    "rambleLabel": "その日のことをもっと教えてください。話しても、書いてもOKです。",
+    "rambleCharsLeft": "あと{count}文字",
+    "starLabel": "主役はだれ？",
+    "starEveryone": "みんな！",
+    "memberNameQuestion": "{descriptor}のお名前は？",
+    "factLocationQ": "その日の場所",
+    "factHighlightQ": "いちばんの瞬間",
+    "factMishapQ": "ちょっとしたハプニング",
+    "factChildSaidQ": "子どもの一言"
   },
   "progress": {
     "readingPhotos": "しゃしんを みています…",
@@ -253,7 +266,10 @@
     "saveChanges": "へんこうを ほぞん",
     "saveTimeout": "ほぞんが とどきませんでした。せつぞくを かくにんして、もういちど おためしください。",
     "contentFlagged": "このページには べつの しゃしんが ひつようです",
-    "noPreview": "プレビューなし"
+    "noPreview": "プレビューなし",
+    "paintMyPictures": "絵を描いてもらう",
+    "peekHint": "できたお話をのぞいてみて。まもなく絵を描きはじめます。",
+    "peekStarting": "絵を描きはじめました！"
   },
   "library": {
     "yourLibrary": "マイライブラリ",
