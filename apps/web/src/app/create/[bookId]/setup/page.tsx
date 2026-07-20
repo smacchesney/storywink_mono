@@ -141,6 +141,8 @@ export default function SetupPage() {
   const [roster, setRoster] = useState<RosterCharacterLike[]>([]);
   const [discoveryChips, setDiscoveryChips] = useState<DiscoveryChip[]>([]);
   const [coverAssetId, setCoverAssetId] = useState<string | null>(null);
+  // Raw page set (index-sorted) — CastRow's face-crop sources.
+  const [bookPages, setBookPages] = useState<BookPage[]>([]);
 
   const titlePending = !form.title && !touched.current.title && !perceptionSettled;
 
@@ -175,6 +177,7 @@ export default function SetupPage() {
           url: p.asset?.url ?? null,
         })),
     );
+    setBookPages([...book.pages].sort((a, b) => a.index - b.index));
 
     const star = book.characterIdentity?.characters?.find((c) => c.role === 'main_child');
     if (star) setMainCharacterId(star.characterId);
@@ -614,6 +617,7 @@ export default function SetupPage() {
       discoveryChips={discoveryChips}
       roster={roster}
       coverAssetId={coverAssetId}
+      pages={bookPages}
       photos={photos}
       form={form}
       prefilledName={prefilledName}
