@@ -10,6 +10,11 @@ import {
   resolveCharacterPhotoUrls,
   sheetSubjectKind,
   subjectAnchorFor,
+  SHEET_BUDGET_MS,
+  SHEET_BUDGET_MS_ENSEMBLE,
+  MAX_SHEET_GENERATIONS_PER_BOOK,
+  MAX_SHEET_GENERATIONS_PER_BOOK_ENSEMBLE,
+  MAX_SHEETS_PER_BOOK_ENSEMBLE,
 } from './character-sheets.helpers.js';
 
 function makeCharacter(overrides: Partial<CharacterDescription>): CharacterDescription {
@@ -144,6 +149,18 @@ describe('ensemble sheet selection (X17 A3)', () => {
     expect(sheetCapFor(['a', 'b'])).toBe(4);
     expect(sheetCapFor(null)).toBe(2);
     expect(sheetCapFor(undefined)).toBe(2);
+  });
+});
+
+describe('X17.2 P3 — ensemble sheet budget', () => {
+  it('raises the ensemble wall clock to 240s and attempts to 8', () => {
+    expect(SHEET_BUDGET_MS_ENSEMBLE).toBe(240_000);
+    expect(MAX_SHEET_GENERATIONS_PER_BOOK_ENSEMBLE).toBe(8);
+  });
+  it('solo numbers untouched', () => {
+    expect(SHEET_BUDGET_MS).toBe(60_000);
+    expect(MAX_SHEET_GENERATIONS_PER_BOOK).toBe(3);
+    expect(MAX_SHEETS_PER_BOOK_ENSEMBLE).toBe(4);
   });
 });
 

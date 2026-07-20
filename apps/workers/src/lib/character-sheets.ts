@@ -171,18 +171,21 @@ export async function ensureCharacterSheets(
       api_secret: process.env.CLOUDINARY_API_SECRET,
     });
 
-    const deadline = Date.now() + budgetMs;
-    // Shared across characters; incremented synchronously before each await,
-    // so the parallel tasks respect the book-wide hard cap.
-    const attemptBudget = { used: 0 };
-
     // Same 2 style exemplars the pages use — a prose-only sheet drifts
-    // off-style and then WINS the arbitration fight on every page.
+    // off-style and then WINS the arbitration fight on every page. Fetched
+    // BEFORE the deadline clock starts: these 2 static style refs are not the
+    // book's sheet work, and the serial fetch would otherwise burn budget
+    // before any generation begins (X17.2 P3).
     const styleExemplarUrls = STYLE_LIBRARY[artStyle].referenceImageUrls.slice(
       0,
       STYLE_EXEMPLARS_FOR_SHEET,
     );
     const styleExemplars = await Promise.all(styleExemplarUrls.map(fetchImageInput));
+
+    const deadline = Date.now() + budgetMs;
+    // Shared across characters; incremented synchronously before each await,
+    // so the parallel tasks respect the book-wide hard cap.
+    const attemptBudget = { used: 0 };
 
     // Per-character generations run in parallel.
     const generationRun = Promise.all(
