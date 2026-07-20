@@ -192,7 +192,7 @@
     "castReading": "Finding the faces…",
     "castNamePrompt": "Tap a face to add a name. Skipping is fine.",
     "castNameHelper": "Add a name for {descriptor}",
-    "castNameBadge": "{descriptor} needs a name — tap to add one",
+    "castNameBadge": "{descriptor} needs a name. Tap to add one",
     "castChange": "Change star",
     "castStarAria": "{name} is the star",
     "castStarWhich": "Which one is {childName}?",
