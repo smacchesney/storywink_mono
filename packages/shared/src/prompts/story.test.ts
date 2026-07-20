@@ -484,6 +484,48 @@ describe('X16 W1 craft bundle', () => {
   });
 });
 
+describe('X17.2 P2a — throughline grounding + refrain cap', () => {
+  const pageWith = (n: number, signals: string[]) => ({
+    pageId: `p${n}`,
+    pageNumber: n,
+    assetId: `a${n}`,
+    originalImageUrl: `http://x/${n}.jpg`,
+    analysis: {
+      setting: 's',
+      action: 'a',
+      emotion: 'e',
+      eventSignals: signals,
+      narrativeRole: 'rising',
+    },
+  });
+  const promptText = (pages: ReturnType<typeof pageWith>[]) =>
+    createStoryGenerationPrompt({ bookTitle: 'T', isDoubleSpread: false, storyPages: pages })
+      .filter((p): p is { text: string } => 'text' in p)
+      .map((p) => p.text)
+      .join('\n');
+
+  it('with recurring signals: the throughline MUST come from the candidate list', () => {
+    const text = promptText([pageWith(1, ['toy sword']), pageWith(2, ['toy sword'])]);
+    expect(text).toContain('Throughline candidates seen in the photos');
+    expect(text).toContain('You MUST pick your planted throughline object from this list');
+    expect(text).toContain('NEVER invent a recurring object the camera never saw');
+  });
+  it('without recurring signals: throughline must still be something visible', () => {
+    const text = promptText([pageWith(1, ['cake']), pageWith(2, ['slide'])]);
+    expect(text).not.toContain('Throughline candidates');
+    expect(text).toContain('visible in at least one photo');
+    expect(text).toContain('NEVER invent a recurring object the camera never saw');
+  });
+  it('refrain asks for exactly 3 echo pages with varied wording', () => {
+    const text = promptText([pageWith(1, [])]);
+    // Brief's impl step pins the prompt string as "EXACTLY 3 pages" (caps, house-style
+    // emphasis); its test snippet lowercased it. The prompt is the shipping product, so
+    // the assertion follows the impl step verbatim.
+    expect(text).toContain('EXACTLY 3 pages');
+    expect(text).toContain('never more');
+  });
+});
+
 describe('arcRoleHintsUsable (X16 W1)', () => {
   it('accepts a sane arc', () => {
     expect(arcRoleHintsUsable(['opening', 'rising', 'peak', 'closing'])).toBe(true);
