@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   mergeCastNames,
   checkCastNameCoverage,
+  checkCastPageConflicts,
   computeCastBalance,
   isGenericCategoryAnswer,
   MergeableCharacter,
@@ -116,15 +117,17 @@ describe('mergeCastNames', () => {
     expect(result.changed).toBe(false);
   });
 
-  it('never lets a chip answer rename the main child (childName wins)', () => {
+  it('a chip answer on the main child now wins over childName (P0a)', () => {
     const result = mergeCastNames({
       characters: [mainChild],
       captureQuestions: [{ id: 'q1', characterId: 'child_1', answer: 'Grandma' }],
       childName: 'Emma',
     });
-    expect(result.characters[0].name).toBe('Emma');
-    expect(result.characters[0].namedVia).toBe('childName');
-    expect(result.consumedQuestionIds).toEqual([]);
+    expect(result.characters[0].name).toBe('Grandma');
+    expect(result.characters[0].namedVia).toBe('chip');
+    expect(result.consumedQuestionIds).toEqual(['q1']);
+    expect(result.skippedDuplicates).toHaveLength(1);
+    expect(result.skippedDuplicates[0]).toMatchObject({ source: 'childName' });
   });
 
   it('reports changed=false when the merge is a no-op (already merged)', () => {
@@ -315,8 +318,46 @@ describe('computeCastBalance (X17 A2)', () => {
   });
 });
 
+describe('X17.2 — checkCastPageConflicts', () => {
+  const cast = [
+    { name: 'Uncle Jon', role: 'aunt_or_uncle', namedVia: 'chip' as const, appearsOnPages: [1, 3] },
+    { name: 'Asher', role: 'sibling', namedVia: 'chip' as const, appearsOnPages: [2] },
+  ];
+  it('flags a page mentioning a member who is not there (outside ±1)', () => {
+    const conflicts = checkCastPageConflicts(cast, [
+      'Uncle Jon laughs.', // p1: on-page — fine
+      'A quiet ride.', // p2
+      'The horses gleam.', // p3
+      'A gentle hush.', // p4
+      'Uncle Jon cheers from far away.', // p5: pages [1,3] ±1 → conflict
+    ]);
+    expect(conflicts).toEqual([
+      { pageNumber: 5, name: 'Uncle Jon', issue: expect.stringContaining('Uncle Jon') },
+    ]);
+  });
+  it('±1 tolerance and page-less entries are never flagged', () => {
+    expect(
+      checkCastPageConflicts(cast, ['x', 'Uncle Jon waves.', 'y']), // p2 is within ±1 of p1/p3
+    ).toEqual([]);
+    expect(
+      checkCastPageConflicts(
+        [{ name: 'Mia', role: 'friend', namedVia: 'chip' as const, appearsOnPages: [] }],
+        ['Mia everywhere.'],
+      ),
+    ).toEqual([]);
+  });
+  it('script-gated like coverage (kanji names skipped)', () => {
+    expect(
+      checkCastPageConflicts(
+        [{ name: '太郎', role: 'friend', namedVia: 'chip' as const, appearsOnPages: [1] }],
+        ['x', 'y'],
+      ),
+    ).toEqual([]);
+  });
+});
+
 describe('star binding (X17 A2)', () => {
-  const roster = () => [
+  const roster = (): MergeableCharacter[] => [
     { characterId: 'child_1', role: 'main_child', name: null },
     { characterId: 'child_2', role: 'sibling', name: null },
   ];
@@ -366,14 +407,111 @@ describe('star binding (X17 A2)', () => {
     expect(consumedQuestionIds).toEqual(['q1']);
   });
 
-  it('chip answers aimed at the star stay unconsumed (the sheet name wins)', () => {
+  it('a chip aimed at the star wins and is consumed (P0a)', () => {
     const { characters, consumedQuestionIds } = mergeCastNames({
       characters: roster(),
       captureQuestions: [{ id: 'q1', answer: 'Bobby', characterId: 'child_2' }],
       childName: 'Maya',
       starCharacterId: 'child_2',
     });
-    expect(characters.find((c) => c.characterId === 'child_2')?.name).toBe('Maya');
-    expect(consumedQuestionIds).toEqual([]);
+    expect(characters.find((c) => c.characterId === 'child_2')?.name).toBe('Bobby');
+    expect(characters.find((c) => c.characterId === 'child_2')?.namedVia).toBe('chip');
+    expect(consumedQuestionIds).toEqual(['q1']);
+  });
+});
+
+describe('X17.2 P0a — chip precedence + duplicate invariant', () => {
+  const roster = (): MergeableCharacter[] => [
+    { characterId: 'child_1', role: 'main_child', name: null },
+    { characterId: 'child_2', role: 'sibling', name: null },
+    { characterId: 'adult_1', role: 'parent', name: null },
+  ];
+
+  it('replays the two-Kais book: chip Astrid survives, childName skips as duplicate', () => {
+    const result = mergeCastNames({
+      characters: roster(),
+      captureQuestions: [
+        { id: 'q2', answer: 'Kai', characterId: 'child_2' },
+        { id: 'ramble_name_child_1', answer: 'Astrid', characterId: 'child_1' },
+      ],
+      childName: 'Kai',
+      starCharacterId: null, // ensemble book — starTarget falls back to main_child
+    });
+    const byId = Object.fromEntries(result.characters.map((c) => [c.characterId, c]));
+    expect(byId.child_1.name).toBe('Astrid');
+    expect(byId.child_1.namedVia).toBe('chip');
+    expect(byId.child_2.name).toBe('Kai');
+    const names = result.characters.map((c) => c.name).filter(Boolean);
+    expect(new Set(names).size).toBe(names.length); // hard invariant
+    expect(result.skippedDuplicates).toEqual([
+      { characterId: 'child_1', name: 'Kai', claimedByCharacterId: 'child_2', source: 'childName' },
+    ]);
+    expect(result.consumedQuestionIds).toEqual(['q2', 'ramble_name_child_1']);
+  });
+
+  it('childName still binds when the star is chip-unnamed and the name is unclaimed (legacy path)', () => {
+    const result = mergeCastNames({
+      characters: roster(),
+      captureQuestions: [{ id: 'q1', answer: 'Grandma', characterId: 'adult_1' }],
+      childName: 'Mia',
+      starCharacterId: null,
+    });
+    const star = result.characters.find((c) => c.characterId === 'child_1')!;
+    expect(star.name).toBe('Mia');
+    expect(star.namedVia).toBe('childName');
+    expect(result.skippedDuplicates).toEqual([]);
+  });
+
+  it('a chip on the star target wins over childName and is consumed', () => {
+    const result = mergeCastNames({
+      characters: roster(),
+      captureQuestions: [{ id: 'q9', answer: 'Astrid', characterId: 'child_1' }],
+      childName: 'Kai',
+      starCharacterId: 'child_1',
+    });
+    const star = result.characters.find((c) => c.characterId === 'child_1')!;
+    expect(star.name).toBe('Astrid');
+    expect(star.namedVia).toBe('chip');
+    expect(result.consumedQuestionIds).toContain('q9');
+  });
+
+  it('second chip with an already-claimed name is skipped, unconsumed, and reported', () => {
+    const result = mergeCastNames({
+      characters: roster(),
+      captureQuestions: [
+        { id: 'qA', answer: 'Kai', characterId: 'child_2' },
+        { id: 'qB', answer: 'kai ', characterId: 'adult_1' }, // case/space-insensitive
+      ],
+      childName: null,
+    });
+    expect(result.characters.find((c) => c.characterId === 'adult_1')!.name).toBeNull();
+    expect(result.consumedQuestionIds).toEqual(['qA']);
+    expect(result.skippedDuplicates[0]).toMatchObject({ characterId: 'adult_1', source: 'chip' });
+  });
+
+  it('underscore tokens refine the role, never become a name (dump: parent_or_uncle)', () => {
+    const result = mergeCastNames({
+      characters: roster(),
+      captureQuestions: [{ id: 'r1', answer: 'parent_or_uncle', characterId: 'adult_1' }],
+      childName: null,
+    });
+    const adult = result.characters.find((c) => c.characterId === 'adult_1')!;
+    expect(adult.name).toBeNull();
+    expect(adult.role).toBe('parent or uncle');
+  });
+
+  it('is byte-identical for conflict-free legacy books', () => {
+    const input = {
+      characters: roster(),
+      captureQuestions: [{ id: 'q1', answer: 'Grandma', characterId: 'adult_1' }],
+      childName: 'Kai',
+      starCharacterId: null,
+    };
+    const result = mergeCastNames(input);
+    expect(result.characters).toEqual([
+      { characterId: 'child_1', role: 'main_child', name: 'Kai', namedVia: 'childName' },
+      { characterId: 'child_2', role: 'sibling', name: null },
+      { characterId: 'adult_1', role: 'parent', name: 'Grandma', namedVia: 'chip' },
+    ]);
   });
 });

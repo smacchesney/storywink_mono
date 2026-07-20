@@ -108,8 +108,7 @@ export const STORY_RESPONSE_SCHEMA = {
         },
         refrain: {
           type: 'string',
-          description:
-            'A 4-8 word phrase that will recur 3+ times with variation throughout the story',
+          description: 'A 4-8 word phrase that recurs on exactly 3 pages, with varied wording',
         },
         emotionalPeak: {
           type: 'string',
@@ -617,10 +616,14 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
     ? [
         `## Throughline candidates seen in the photos:`,
         ...throughlineCandidates.map((e) => `- "${e.label}" (pages ${e.pages.join(', ')})`),
-        `- These objects/moments recur in the actual photos. Prefer ONE of them as the planted throughline object — plant it in the SITUATION, let it return, and pay it off in the RESOLUTION.`,
+        `- These objects/moments recur in the actual photos. You MUST pick your planted throughline object from this list — plant it in the SITUATION, let it return, and pay it off in the RESOLUTION. NEVER invent a recurring object the camera never saw (no conjured glints, sparkles, or magic tokens): the parent will look for your object in the pictures, and it has to be there.`,
         ``,
       ]
-    : [];
+    : [
+        `## Throughline grounding:`,
+        `- No single object recurs across these photos, so anchor the throughline in something visible in at least one photo (an object, a place, a repeated action) or in the child's own stated quest. NEVER invent a recurring object the camera never saw (no conjured glints, sparkles, or magic tokens).`,
+        ``,
+      ];
 
   const baseInstructions = [
     `# Instructions & Guiding Principles:`,
@@ -658,8 +661,8 @@ export function createStoryGenerationPrompt(input: StoryGenerationInput): StoryP
     ...(bridgeSection ? [bridgeSection] : []),
     ``,
     `## Recurring Refrain (REQUIRED):`,
-    `- Create a short phrase (4-8 words) that echoes through the story at least 3 times.`,
-    `- Vary it slightly each time — change one word, add emphasis, or whisper it the last time.`,
+    `- Create a short phrase (4-8 words) that echoes on EXACTLY 3 pages — never more. A refrain on every other page stops being a heartbeat and starts being noise.`,
+    `- Vary it each time — change one word, add emphasis, or whisper it the last time. Never paste the identical sentence three times.`,
     `- At least TWO echoes must be standalone narrator lines — their own sentence, OUTSIDE any quotation marks. At most ONE echo may live inside a character's dialogue. The parent needs a chantable line, not contorted speech.`,
     `- Great refrains feel like a heartbeat — reach for an action, a feeling, or the child's name: "One more step, brave Kai!" → "Two more steps, brave Kai!" → "You did it, brave Kai!". At most one sound-based refrain per book, and only if it truly earns its place.`,
     `- Report this phrase in the "storyArc.refrain" field.`,

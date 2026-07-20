@@ -3,10 +3,13 @@ import {
   scopeCaptureQuestions,
   createPhotoAnalysisPrompt,
   PHOTO_ANALYSIS_RESPONSE_SCHEMA,
+  PERCEPTION_ROLES,
   heroAssetIds,
+  stampFaceBox,
   CaptureQuestion,
   ScopeCharacterLike,
   PhotoAnalysisInput,
+  FaceBox,
 } from './photo-analysis.js';
 
 const q = (overrides: Partial<CaptureQuestion>): CaptureQuestion => ({
@@ -267,5 +270,109 @@ describe('heroAssetIds (X17 A4)', () => {
   });
   it('absent → empty', () => {
     expect(heroAssetIds(undefined, byPos)).toEqual([]);
+  });
+});
+
+describe('stampFaceBox (X17.2)', () => {
+  const byPos = new Map<number, string | null>([
+    [1, 'a1'],
+    [2, 'a2'],
+    [3, null],
+  ]);
+  const box = (): FaceBox => ({ pageNumber: 2, x: 0.1, y: 0.2, w: 0.3, h: 0.4 });
+
+  it('stamps the assetId behind a known position', () => {
+    expect(stampFaceBox(box(), byPos)).toEqual({
+      pageNumber: 2,
+      x: 0.1,
+      y: 0.2,
+      w: 0.3,
+      h: 0.4,
+      assetId: 'a2',
+    });
+  });
+
+  it('null box → null', () => {
+    expect(stampFaceBox(null, byPos)).toBeNull();
+  });
+
+  it('undefined box → null', () => {
+    expect(stampFaceBox(undefined, byPos)).toBeNull();
+  });
+
+  it('unknown position → box kept, assetId null', () => {
+    const b = { ...box(), pageNumber: 99 };
+    expect(stampFaceBox(b, byPos)).toEqual({ ...b, assetId: null });
+  });
+
+  it('bridge/photo-less position (mapped null) → assetId null', () => {
+    const b = { ...box(), pageNumber: 3 };
+    expect(stampFaceBox(b, byPos)).toEqual({ ...b, assetId: null });
+  });
+
+  it('never mutates its input', () => {
+    const input = box();
+    stampFaceBox(input, byPos);
+    expect(input).toEqual({ pageNumber: 2, x: 0.1, y: 0.2, w: 0.3, h: 0.4 });
+    expect(input).not.toHaveProperty('assetId');
+  });
+
+  it('legacy character WITHOUT faceBox: only faceBox:null is added, spread untouched', () => {
+    const legacyChar = {
+      characterId: 'child_1',
+      role: 'main_child',
+      name: 'Emma',
+      appearsOnPages: [1, 2],
+    };
+    // Mirror the worker's exact stamping expression.
+    const stamped = {
+      ...legacyChar,
+      appearsOnAssetIds: legacyChar.appearsOnPages.map((n) => byPos.get(n) ?? null),
+      faceBox: stampFaceBox((legacyChar as { faceBox?: FaceBox | null }).faceBox, byPos),
+    };
+    expect(stamped).toEqual({ ...legacyChar, appearsOnAssetIds: ['a1', 'a2'], faceBox: null });
+  });
+});
+
+describe('X17.2 perception schema additions', () => {
+  const charProps = (PHOTO_ANALYSIS_RESPONSE_SCHEMA.properties.characters.items as any).properties;
+  const charRequired = (PHOTO_ANALYSIS_RESPONSE_SCHEMA.properties.characters.items as any).required;
+  const pageProps = (PHOTO_ANALYSIS_RESPONSE_SCHEMA.properties.pageAnalysis.items as any)
+    .properties;
+  const pageRequired = (PHOTO_ANALYSIS_RESPONSE_SCHEMA.properties.pageAnalysis.items as any)
+    .required;
+
+  it('constrains role to the closed vocabulary (P0c)', () => {
+    expect(charProps.role.enum).toEqual(PERCEPTION_ROLES);
+    expect(PERCEPTION_ROLES).toContain('main_child');
+    expect(PERCEPTION_ROLES).toContain('companion_object');
+    expect(PERCEPTION_ROLES).not.toContain('parent_or_uncle');
+  });
+
+  it('requires descriptor and faceBox per character (P0d)', () => {
+    expect(charRequired).toContain('descriptor');
+    expect(charRequired).toContain('faceBox');
+    expect(charProps.faceBox.type).toEqual(['object', 'null']);
+    expect(charProps.faceBox.properties).toHaveProperty('pageNumber');
+    for (const k of ['x', 'y', 'w', 'h']) expect(charProps.faceBox.properties).toHaveProperty(k);
+  });
+
+  it('requires settingChip per page', () => {
+    expect(pageProps).toHaveProperty('settingChip');
+    expect(pageRequired).toContain('settingChip');
+  });
+
+  it('prompt names the role vocabulary and the descriptor/faceBox rules', () => {
+    const prompt = createPhotoAnalysisPrompt({
+      childName: null,
+      additionalCharacters: null,
+      artStyle: 'vignette',
+      storyPages: [{ pageNumber: 1, assetId: 'a1', imageUrl: 'http://x/1.jpg' }],
+    });
+    expect(prompt).toContain('role (EXACTLY one of:');
+    expect(prompt).toContain('descriptor');
+    expect(prompt).toContain('faceBox');
+    expect(prompt).toContain('settingChip');
+    expect(prompt).toContain('never invent a role outside this list');
   });
 });

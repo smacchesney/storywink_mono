@@ -3,6 +3,11 @@
 import React from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
+// RELATIVE (not `@/lib/discovery-client`): star-ask.test.ts and
+// capture-chips.test.ts both import `./CaptureChips` under root vitest, which
+// resolves no `@/` alias. discovery-client is a pure `process.env` constant
+// module, so loading it for real in tests is side-effect-free.
+import { CREATE_DISCOVERY_FLAG } from '../../../lib/discovery-client';
 
 export interface CaptureQuestion {
   id: string;
@@ -33,11 +38,25 @@ const SKIP = '__skip__';
 /** Naming questions render first. Default caps mirror the legacy shape
  * (2 naming / 3 total); ensemble mode raises them so every member's naming
  * chip fits. Non-naming `ramble_*` rows are extraction facts, not questions
- * for the parent — they persist and reach the story prompt but never render. */
+ * for the parent — they persist and reach the story prompt but never render.
+ * X17.2 (`dropNaming`, flag-on only): naming questions never render here —
+ * the Who's-in-this-book face row owns every person/pet ask
+ * (asked-exactly-once invariant). Only the companion-object question and
+ * characterId-less "other" questions remain. Flag-off (default) keeps
+ * today's list and ordering byte-identically. */
 export function orderQuestions(
   questions: CaptureQuestion[],
   caps: QuestionCaps = { naming: 2, total: 3 },
+  dropNaming = false,
 ): CaptureQuestion[] {
+  const isNaming = (q: CaptureQuestion) =>
+    (q.kind ?? (q.characterId ? 'naming' : 'other')) === 'naming';
+  if (dropNaming) {
+    const visible = questions.filter(
+      (q) => !isNaming(q) && (q.characterId || !q.id.startsWith('ramble_')),
+    );
+    return visible.slice(0, caps.total);
+  }
   const visible = questions.filter((q) => q.characterId || !q.id.startsWith('ramble_'));
   const naming = visible.filter((q) => q.characterId);
   const other = visible.filter((q) => !q.characterId);
@@ -57,7 +76,9 @@ export function orderQuestions(
 export function CaptureChips({ questions, caps, onChange }: CaptureChipsProps) {
   const t = useTranslations('setup');
   const [editingId, setEditingId] = React.useState<string | null>(null);
-  const rows = orderQuestions(questions, caps);
+  // Flag read in the COMPONENT, never in the pure function — flag-on drops the
+  // naming rows the face row now owns.
+  const rows = orderQuestions(questions, caps, CREATE_DISCOVERY_FLAG);
 
   const setAnswer = (id: string, answer: string | null) => {
     onChange(questions.map((q) => (q.id === id ? { ...q, answer } : q)));

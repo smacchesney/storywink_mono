@@ -22,7 +22,7 @@ import type { DiscoveryChip, RosterCharacterLike } from '@/components/create/set
 import { recurringChildren } from '@/components/create/setup/discovery-feed';
 import DiscoveryFeed from '@/components/create/setup/DiscoveryFeed';
 import ThemeCard from '@/components/create/setup/ThemeCard';
-import StarPicker from '@/components/create/setup/StarPicker';
+import CastRow from '@/components/create/setup/CastRow';
 import { CREATE_DISCOVERY_FLAG, ENSEMBLE_BOOKS_FLAG } from '@/lib/discovery-client';
 
 export interface SetupFormState {
@@ -70,6 +70,11 @@ interface SetupSheetProps {
   discoveryChips?: DiscoveryChip[];
   roster?: RosterCharacterLike[];
   coverAssetId?: string | null;
+  /** Face-crop sources for CastRow — plumbed from the setup page's BookData.pages. */
+  pages?: Array<{
+    assetId: string | null;
+    asset?: { url: string | null; thumbnailUrl: string | null } | null;
+  }>;
   onReorder: (photos: StripPhoto[]) => void;
   /** Refetch trigger after photos are added/removed inline. */
   onPhotosChanged?: () => void | Promise<void>;
@@ -102,6 +107,7 @@ export function SetupSheet({
   discoveryChips,
   roster,
   coverAssetId,
+  pages,
   onReorder,
   onPhotosChanged,
   onChange,
@@ -166,7 +172,11 @@ export function SetupSheet({
       {/* Child name — the one required field */}
       <section className="flex flex-col gap-1.5">
         <label htmlFor="childName" className="text-sm font-medium text-gray-600">
-          {t('childNameLabel')}
+          {t(
+            CREATE_DISCOVERY_FLAG && form.castMode === 'ensemble'
+              ? 'childNameLabelEnsemble'
+              : 'childNameLabel',
+          )}
         </label>
         <Input
           id="childName"
@@ -244,19 +254,24 @@ export function SetupSheet({
               Excalifont card. Hidden entirely when perception found no theme. */}
           <ThemeCard themeLine={form.themeLine} onChange={(v) => onChange('themeLine', v)} />
 
-          {/* X17 B3 — "Who's the star?": one chip per recurring kid + "Everyone!".
-              Renders only when 2+ recurring kids exist (solo books never see it);
-              the "Everyone!" chip is additionally gated on ENSEMBLE_BOOKS_FLAG. */}
-          {starChildren.length >= 2 && (
-            <StarPicker
-              childrenChars={starChildren}
-              castMode={form.castMode}
-              starCharacterId={form.starCharacterId}
-              ensembleAllowed={ENSEMBLE_BOOKS_FLAG}
-              onPickStar={onPickStar}
-              onPickEveryone={onPickEveryone}
-            />
-          )}
+          {/* X17.2 — the ONE cast surface: star ask + naming + avatar
+              confirm live on the faces. Reserved height from first mount;
+              sits below the name field, so it can never shift it. */}
+          <CastRow
+            bookId={bookId}
+            roster={roster ?? []}
+            pages={pages ?? []}
+            questions={form.captureQuestions}
+            castMode={form.castMode}
+            starCharacterId={form.starCharacterId}
+            childName={form.childName}
+            recurringKidCount={starChildren.length}
+            reading={stripPhase === 'reading'}
+            ensembleAllowed={ENSEMBLE_BOOKS_FLAG}
+            onPickStar={onPickStar}
+            onPickEveryone={onPickEveryone}
+            onQuestionsChange={(qs) => onChange('captureQuestions', qs)}
+          />
         </>
       )}
 
@@ -291,7 +306,10 @@ export function SetupSheet({
           >
             {hasChips && (
               <div className={stripPhase === 'hidden' ? undefined : 'chips-enter'}>
-                {bookId && mainCharacterId && (
+                {/* Flag-off ONLY: flag-on the avatar confirm lives exclusively
+                    in CastRow's ask slot (asked-exactly-once, never both).
+                    Kept here so a flag rollback restores the legacy confirm. */}
+                {!CREATE_DISCOVERY_FLAG && bookId && mainCharacterId && (
                   <AvatarMatchChip bookId={bookId} mainCharacterId={mainCharacterId} />
                 )}
                 <CaptureChips

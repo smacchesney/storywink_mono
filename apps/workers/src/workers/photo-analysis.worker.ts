@@ -10,6 +10,8 @@ import {
   PhotoAnalysisResponse,
   scopeCaptureQuestions,
   heroAssetIds,
+  stampFaceBox,
+  FaceBox,
 } from '@storywink/shared/prompts/photo-analysis';
 import { optimizeCloudinaryUrlForVision, convertHeicToJpeg } from '@storywink/shared/utils';
 import { ANALYSIS_MODEL, VISION_OPENAI_TIMEOUT_MS } from '../config/models.js';
@@ -174,6 +176,7 @@ export async function processPhotoAnalysis(job: Job<PhotoAnalysisJob>) {
   const stampedCharacters = analysis.characters.map((c) => ({
     ...c,
     appearsOnAssetIds: c.appearsOnPages.map((n) => assetIdByPosition.get(n) ?? null),
+    faceBox: stampFaceBox((c as { faceBox?: FaceBox | null }).faceBox, assetIdByPosition),
   }));
 
   // Persist per-page analysis, stamped with the page's current assetId so

@@ -52,6 +52,7 @@ import {
   mergeCastNames,
   resolveCastEntries,
   checkCastNameCoverage,
+  checkCastPageConflicts,
   computeCastBalance,
   MergedCastCharacter,
   ResolvedCastEntry,
@@ -304,6 +305,11 @@ async function evaluateStoryQuality(
     ? computeCastBalance(cast, pageTexts, input.language || 'en')
     : [];
 
+  // X17.2 P2b: cast-conflict pages are page-local — targeted rewrite, not regen.
+  const castConflicts = v2Enforced
+    ? checkCastPageConflicts(cast, pageTexts, input.language || 'en')
+    : [];
+
   const telemetry = {
     bookId,
     refrainEchoes: echoes,
@@ -320,6 +326,7 @@ async function evaluateStoryQuality(
     castNamesSkippedScript: castCoverage?.skippedScript ?? 0,
     castMode: input.castMode ?? 'star',
     castBalance,
+    castConflictPages: castConflicts.map((c) => c.pageNumber),
     truthToEvent: qc.truthToEvent,
     // ENFORCED on photo (S2): a sound-overloaded draft is regenerated.
     soundOverload: qc.soundOverload,
@@ -389,6 +396,12 @@ async function evaluateStoryQuality(
       );
     }
   }
+  // X17.2 P2b: over-echo cap — a chant-spam refrain is a whole-book problem.
+  if (v2Enforced && echoes > STORY_QC_THRESHOLDS.maxRefrainEchoes) {
+    problems.push(
+      `The refrain echoes on ${echoes} pages — too many. Keep it to exactly 3 pages (varied wording each time) and let the other pages breathe.`,
+    );
+  }
   // GLOBAL dimensions (whole-book regen when failing) were pushed above:
   // arcCoherence, readAloudRhythm, lastPageLanding, soundOverload, and under
   // v2: agency, truthToEvent, orphanedLanding, refrainAsNarrator.
@@ -422,7 +435,7 @@ async function evaluateStoryQuality(
   const globalProblemCount = problems.length;
   problems.push(...judgePageLocal.map((p) => p.issue));
   if (v2Enforced) {
-    problems.push(...detChecks.problems);
+    problems.push(...detChecks.problems, ...castConflicts.map((c) => c.issue));
   }
   // CRITICAL ordering: capture the page-local count BEFORE the qc.feedback
   // push below — feedback is non-null on essentially every failing draft, and
@@ -444,6 +457,7 @@ async function evaluateStoryQuality(
             pageNumber: g.pageNumber,
             issue: `Page ${g.pageNumber} garbles character names ("${g.snippet}") — use each name correctly and separately.`,
           })),
+          ...castConflicts.map((c) => ({ pageNumber: c.pageNumber, issue: c.issue })),
         ]
       : []),
   ].filter((p) => Number.isInteger(p.pageNumber));
@@ -868,6 +882,12 @@ export async function processStoryGeneration(
       });
       mergedCharacters = merge.characters;
       consumedQuestionIds = new Set(merge.consumedQuestionIds);
+      if (merge.skippedDuplicates.length > 0) {
+        logger.warn(
+          { bookId, skippedDuplicates: merge.skippedDuplicates },
+          'resolveCast: duplicate-name binds skipped (chip names outrank childName)',
+        );
+      }
       if (merge.changed) {
         try {
           await prisma.book.update({
@@ -885,6 +905,7 @@ export async function processStoryGeneration(
               bookId,
               namedCharacters: mergedCharacters.filter((c) => c.name).length,
               consumedAnswers: merge.consumedQuestionIds.length,
+              skippedDuplicates: merge.skippedDuplicates,
             },
             'resolveCast: merged capture answers + childName into character identity',
           );

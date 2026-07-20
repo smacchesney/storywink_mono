@@ -13,7 +13,7 @@
  *    extraction worker can skip its own vision call when this is fresh.
  */
 
-import type { CharacterIdentity } from '../types.js';
+import type { CharacterIdentity, FaceBox } from '../types.js';
 
 export const PHOTO_ANALYSIS_SYSTEM_PROMPT =
   "You are a perceptive story consultant and visual analyst for a children's picture-book studio. Parents upload family photos; you see what is happening, who appears, and what probably matters emotionally — and you know exactly which questions only the parent can answer. You are also an expert at extracting precise, consistent character descriptions for illustrators.";
@@ -41,6 +41,8 @@ export interface PageAnalysis {
   pageNumber: number;
   assetId?: string | null; // stamped by the worker for freshness checks
   setting: string;
+  /** X17.2: the setting as a short ambient UI chip, 4 words max. Optional-on-read for pre-X17.2 stored payloads; required on new generations. */
+  settingChip?: string;
   action: string;
   emotion: string;
   eventSignals: string[];
@@ -107,6 +109,7 @@ Produce ALL of the following:
 
 ## 1. Per-photo analysis ("pageAnalysis", one entry per photo, in order)
 - setting: place, time of day, weather if visible ("backyard, sunny afternoon")
+- settingChip: the setting again as a SHORT ambient label, 4 words max, complete phrase — this renders directly as a UI chip.
 - action: what is happening ("jumping into a puddle, mid-splash")
 - emotion: the child's visible feeling, specific ("delighted, mouth open mid-laugh")
 - eventSignals: cues about what this moment MEANS — birthday cake, packed suitcase, band-aid, trophy, holiday decorations, a first-time wobble. Empty array if none.
@@ -114,7 +117,7 @@ Produce ALL of the following:
 - characterIds: which of your characters (below) appear in this photo.
 
 ## 2. Character identity ("characters" + "sceneContext")
-For EACH distinct person across the photos, AND each animal companion (pet) that appears in 2+ photos or is clearly central to a moment: characterId (child_1, adult_1, pet_1, ...), role (main_child, parent, grandparent, sibling, friend, pet...), name (from the context above if identifiable, else null), physicalTraits (apparentAge; hairColor as an exact shade; hairStyle with length/texture/parting/accessories; skinTone with warm/cool specificity; bodyBuild; distinguishingFeatures[]), typicalClothing, styleTranslation (how to render them in "${input.artStyle}" while staying instantly recognizable — materials, construction, colors, proportions), appearsOnPages (photo numbers 1-${input.storyPages.length}), species (pets and companion objects ONLY: the plain-words kind — "golden retriever dog", "grey tabby cat", "plush rabbit toy"; null for people), isForeground (true when this person/pet is family or central to the day — recurring, interacting with the child; false for one-photo background figures).
+For EACH distinct person across the photos, AND each animal companion (pet) that appears in 2+ photos or is clearly central to a moment: characterId (child_1, adult_1, pet_1, ...), role (EXACTLY one of: ${PERCEPTION_ROLES.join(', ')} — never invent a role outside this list; pick the closest fit), name (from the context above if identifiable, else null), descriptor (a warm, chip-ready phrase of 8 words or fewer the parent instantly matches to this person — "the little boy in the striped shirt"; complete phrase, never cut off; ${lang === 'ja' ? 'in natural Japanese' : 'in the book language'}), faceBox (the tight box around their clearest, most frontal visible face: pageNumber of that photo plus x/y/w/h as 0-1 fractions of the photo's width and height, x/y at the box's top-left; null only when their face is never clearly visible), physicalTraits (apparentAge; hairColor as an exact shade; hairStyle with length/texture/parting/accessories; skinTone with warm/cool specificity; bodyBuild; distinguishingFeatures[]), typicalClothing, styleTranslation (how to render them in "${input.artStyle}" while staying instantly recognizable — materials, construction, colors, proportions), appearsOnPages (photo numbers 1-${input.storyPages.length}), species (pets and companion objects ONLY: the plain-words kind — "golden retriever dog", "grey tabby cat", "plush rabbit toy"; null for people), isForeground (true when this person/pet is family or central to the day — recurring, interacting with the child; false for one-photo background figures).
 For pets, reuse the same trait fields naturally: hairColor = fur/coat color, hairStyle = coat length and texture, distinguishingFeatures = collar, markings, ear shape, size; typicalClothing = collar/harness or "none".
 Also include AT MOST ONE companion object: a toy, plush, blanket, or clearly beloved object that appears in 2+ photos or is central to a peak moment (being hugged, carried, presented). Give it characterId object_1 and role "companion_object", and reuse the trait fields naturally: hairColor = material and color, hairStyle = texture and wear ("well-loved, slightly flattened fur"), distinguishingFeatures = ears/patches/tags/size relative to the child; typicalClothing = "none". Pick the most-photographed candidate; if nothing qualifies, include no object.
 Be ruthlessly specific — an illustrator will use this as the canonical reference on every page. "Brown hair" is insufficient; "medium-length wavy dark brown hair parted slightly left, small red clip on the right" is the standard. Also give sceneContext: the overall environment pattern across photos.
@@ -134,7 +137,7 @@ Ask ONLY what the photos cannot tell you and what would most change the story. T
 
 FIRST — naming questions (REQUIRED, with "characterId" set to the roster entry above):
 Emit ONE naming question for EVERY character above whose name you do not know, who appears in 2 or more photos AND shares at least one photo with the main child. Never ask about background strangers or one-photo passersby. At most 2 naming questions — if more characters qualify, pick the two who appear most often.
-- Anchor the question visually so the parent knows who you mean: "Who is the woman with the silver hair who's in several photos?" — for a pet: "Who is the fluffy grey cat?"
+- Anchor the question visually so the parent knows who you mean: "Who is the woman with the silver hair who's in several photos?" — for a pet: "Who is the fluffy grey cat?" Anchor each naming question with the character's descriptor verbatim so question and chip match.
 - Options must be the words the child would actually say: "Grandma" / "Grandpa" / "Auntie" / "Mummy" (for a pet: "Our dog" / "Grandma's dog"). A generic category like "Family friend" may appear as ONE option at most — it describes the relationship, it is not what a toddler calls someone.
 
 NEXT — the companion-object question (kind "object", at most ONE, only when a companion object is in your roster and unnamed): ask if it has a special family name, anchored visually so the parent knows which object you mean: "That well-loved grey bunny is in lots of photos — does it have a name?" Set "characterId" to the object's roster id and "options" to an EMPTY array — the UI supplies a type-a-name affordance and a skip; never offer generic options like "Just a bunny".
@@ -146,6 +149,31 @@ THEN — other question kinds ("characterId": null, kind "other"), up to 3 quest
 Set "kind" on every question: "naming" for person/pet naming, "object" for the companion-object question, "other" for the rest. Naming questions come FIRST in the array (people and pets before the object question). Give each an id like "q1", "q2". Never ask what you already know, never ask more than 3.`;
 }
 
+/**
+ * X17.2 P0c: the CLOSED role vocabulary. The dump shows free-string roles
+ * ("parent_or_uncle", "parent_or-uncle (cheerful)", "friend / kiosk rider")
+ * leaking into cast prompts and QC name demands. Strict-mode enum makes junk
+ * unrepresentable on new generations; stored junk is display-sanitized only.
+ */
+export const PERCEPTION_ROLES = [
+  'main_child',
+  'sibling',
+  'friend',
+  'parent',
+  'grandparent',
+  'aunt_or_uncle',
+  'adult_friend',
+  'caregiver',
+  'pet',
+  'companion_object',
+] as const;
+export type PerceptionRole = (typeof PERCEPTION_ROLES)[number];
+
+/** X17.2 P0d: normalized face rectangle in ONE photo — one definition in
+ * types.ts (which has zero imports), re-exported here beside the schema that
+ * shapes it, so there is no module cycle. */
+export type { FaceBox } from '../types.js';
+
 export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
@@ -156,6 +184,11 @@ export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
         properties: {
           pageNumber: { type: 'number' },
           setting: { type: 'string' },
+          settingChip: {
+            type: 'string',
+            description:
+              'The setting as a short ambient chip, 4 words max, a complete phrase ("neon kiddie cars at dusk" → "neon cars at dusk") — never a fragment',
+          },
           action: { type: 'string' },
           emotion: { type: 'string' },
           eventSignals: { type: 'array', items: { type: 'string' } },
@@ -168,6 +201,7 @@ export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
         required: [
           'pageNumber',
           'setting',
+          'settingChip',
           'action',
           'emotion',
           'eventSignals',
@@ -183,8 +217,27 @@ export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
         type: 'object',
         properties: {
           characterId: { type: 'string' },
-          role: { type: 'string' },
+          role: { type: 'string', enum: [...PERCEPTION_ROLES] },
           name: { type: ['string', 'null'] },
+          descriptor: {
+            type: 'string',
+            description:
+              'Chip-ready phrase a parent instantly matches to this person, 8 words max, a complete phrase — never a cut-off fragment ("the little boy in the striped shirt")',
+          },
+          faceBox: {
+            type: ['object', 'null'],
+            description:
+              "Tight box around THIS character's clearest visible face: pageNumber = the photo (1-N) where the face is clearest and most frontal; x/y/w/h are fractions (0-1) of that photo's width/height, x/y = top-left corner. Null ONLY when no clear face exists in any photo.",
+            properties: {
+              pageNumber: { type: 'number' },
+              x: { type: 'number' },
+              y: { type: 'number' },
+              w: { type: 'number' },
+              h: { type: 'number' },
+            },
+            required: ['pageNumber', 'x', 'y', 'w', 'h'],
+            additionalProperties: false,
+          },
           physicalTraits: {
             type: 'object',
             properties: {
@@ -228,6 +281,8 @@ export const PHOTO_ANALYSIS_RESPONSE_SCHEMA = {
           'appearsOnPages',
           'species',
           'isForeground',
+          'descriptor',
+          'faceBox',
         ],
         additionalProperties: false,
       },
@@ -288,6 +343,19 @@ export function heroAssetIds(
     if (assetId && !out.includes(assetId)) out.push(assetId);
   }
   return out.slice(0, 3);
+}
+
+/**
+ * X17.2: stamp a faceBox with the assetId behind its positional pageNumber
+ * (same convention as appearsOnAssetIds). Unknown position → box kept,
+ * assetId null (consumers fall back to the thumbnail path).
+ */
+export function stampFaceBox(
+  faceBox: FaceBox | null | undefined,
+  assetIdByPosition: Map<number, string | null>,
+): FaceBox | null {
+  if (!faceBox) return null;
+  return { ...faceBox, assetId: assetIdByPosition.get(faceBox.pageNumber) ?? null };
 }
 
 // ---------------------------------------------------------------------------

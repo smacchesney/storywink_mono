@@ -31,7 +31,7 @@ export const RAMBLE_EXTRACT_SYSTEM_PROMPT = [
   '- Use ONLY what the parent actually wrote. Never infer or invent.',
   '- Every field is null when the parent did not say it.',
   '- starName: the child this story is about, exactly as the parent wrote the name.',
-  '- people: names the parent gave for people or pets in the photos. Match each to a characterId from the provided roster when the description clearly fits; otherwise characterId null.',
+  '- people: ONLY personal names the parent actually wrote ("Kai", "Uncle Jon"). NEVER a role or relationship word (friend, uncle, parent, sibling, main_child) and NEVER an underscore token — if the parent did not name someone, OMIT them from people entirely.',
   '- location: the specific place, a few words.',
   '- highlight: the best moment, one short phrase.',
   '- mishap: a small thing that went wrong, one short phrase.',
@@ -100,6 +100,86 @@ const capField = (v: unknown, max: number): string | null => {
   return trimmed ? trimmed.slice(0, max) : null;
 };
 
+/**
+ * X17.2 P0b: relationship/role words the extractor keeps returning as
+ * "names" (dump: parent_or_uncle, friend, main_child, sibling). A name the
+ * parent actually wrote never exact-matches this list ("Uncle Jon" passes;
+ * bare "uncle" does not). Normalized: lowercase, underscores → spaces.
+ */
+const NON_NAME_TOKENS = new Set([
+  'friend',
+  'friends',
+  'uncle',
+  'aunt',
+  'auntie',
+  'parent',
+  'parents',
+  'cousin',
+  'grandma',
+  'grandpa',
+  'grandmother',
+  'grandfather',
+  'mom',
+  'mum',
+  'mommy',
+  'mummy',
+  'dad',
+  'daddy',
+  'mother',
+  'father',
+  'brother',
+  'sister',
+  'sibling',
+  'baby',
+  'boy',
+  'girl',
+  'kid',
+  'child',
+  'children',
+  'adult',
+  'man',
+  'woman',
+  'main child',
+  'parent or uncle',
+  'family friend',
+  'neighbor',
+  'neighbour',
+  'teacher',
+  'babysitter',
+  'caregiver',
+  // ja equivalents (compact — no spaces)
+  'ともだち',
+  'おともだち',
+  'おじさん',
+  'おばさん',
+  'おかあさん',
+  'おとうさん',
+  'おばあちゃん',
+  'おじいちゃん',
+  'おにいちゃん',
+  'おねえちゃん',
+  'いもうと',
+  'おとうと',
+  'あかちゃん',
+  'せんせい',
+]);
+
+// Built via `new RegExp` (not a literal) so the Unicode `u` flag is not
+// rejected under the web app's es5 tsc target; Node and SWC support it at runtime.
+const HAS_LETTER = new RegExp('\\p{L}', 'u');
+
+/** True when a string plausibly IS a personal name the parent wrote. */
+export function isLikelyPersonName(raw: string): boolean {
+  const name = raw.trim();
+  if (!name || name.length > 50) return false;
+  if (name.includes('_')) return false;
+  if (!HAS_LETTER.test(name)) return false;
+  const norm = name.toLowerCase().replace(/\s+/g, ' ');
+  if (NON_NAME_TOKENS.has(norm) || NON_NAME_TOKENS.has(norm.replace(/ /g, ''))) return false;
+  if (norm.split(' ').length > 4) return false;
+  return true;
+}
+
 /** Model output is untrusted — every bound is enforced here, not in the schema. */
 export function sanitizeRambleExtraction(raw: unknown, rosterIds: string[]): RambleExtraction {
   const obj = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
@@ -110,6 +190,7 @@ export function sanitizeRambleExtraction(raw: unknown, rosterIds: string[]): Ram
           const entry = (p && typeof p === 'object' ? p : {}) as Record<string, unknown>;
           const name = capField(entry.name, 50);
           if (!name) return null;
+          if (!isLikelyPersonName(name)) return null;
           const characterId =
             typeof entry.characterId === 'string' && idSet.has(entry.characterId)
               ? entry.characterId
@@ -120,7 +201,10 @@ export function sanitizeRambleExtraction(raw: unknown, rosterIds: string[]): Ram
         .slice(0, 6)
     : [];
   return {
-    starName: capField(obj.starName, 50),
+    starName: (() => {
+      const s = capField(obj.starName, 50);
+      return s && isLikelyPersonName(s) ? s : null;
+    })(),
     people,
     location: capField(obj.location, 120),
     highlight: capField(obj.highlight, 200),

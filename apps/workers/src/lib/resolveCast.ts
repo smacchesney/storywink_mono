@@ -38,6 +38,15 @@ export interface MergeableCharacter {
   namedVia?: NamedVia;
 }
 
+/** A name bind skipped because another character already owns the name. */
+export interface SkippedDuplicateName {
+  /** The character whose bind was skipped. */
+  characterId: string;
+  name: string;
+  claimedByCharacterId: string;
+  source: 'chip' | 'childName';
+}
+
 export interface MergeCastResult<T extends MergeableCharacter> {
   /** The merged roster (deep-copied entries — inputs are never mutated). */
   characters: T[];
@@ -49,6 +58,13 @@ export interface MergeCastResult<T extends MergeableCharacter> {
    * failed must stay a fact, never be silently dropped.
    */
   consumedQuestionIds: string[];
+  /**
+   * Hard invariant — no duplicate names across the roster; every skipped
+   * second bind lands here for the call-site log. A bind (chip or childName)
+   * that would collide with a name already owned by another character is
+   * dropped and reported here instead.
+   */
+  skippedDuplicates: SkippedDuplicateName[];
 }
 
 // Category labels a toddler wouldn't say. They refine the character's ROLE;
@@ -71,6 +87,13 @@ const GENERIC_CATEGORY_ANSWERS = new Set([
   'classmate',
   'a classmate',
   'someone else',
+  // Role-category tokens (often stored underscore-joined, e.g. "parent_or_uncle").
+  // Normalized `_` → space below, so match the spaced form here.
+  'parent or uncle',
+  'uncle or parent',
+  'main child',
+  'sibling',
+  'cousin',
   // ja equivalents (normalized without spaces)
   'かぞくのともだち',
   'ともだち',
@@ -83,7 +106,9 @@ const GENERIC_CATEGORY_ANSWERS = new Set([
 
 /** "A friend's cat", "ともだちの ねこ" — generic pet categories, not names. */
 export function isGenericCategoryAnswer(answer: string): boolean {
-  const norm = answer.trim().toLowerCase().replace(/\s+/g, ' ');
+  // Underscore tokens ("parent_or_uncle") are role words, not names —
+  // normalize `_` → space BEFORE the checks so they match the category set.
+  const norm = answer.trim().toLowerCase().replace(/_/g, ' ').replace(/\s+/g, ' ');
   const compact = norm.replace(/ /g, '');
   if (GENERIC_CATEGORY_ANSWERS.has(norm) || GENERIC_CATEGORY_ANSWERS.has(compact)) return true;
   if (/^a (friend|neighbor|neighbour)['’]s /.test(norm)) return true;
@@ -98,14 +123,21 @@ export function isGenericCategoryAnswer(answer: string): boolean {
 }
 
 /**
- * Merge chip answers + childName into the roster.
+ * Merge chip answers + childName into the roster. Precedence: chips > childName
+ * > relationship-word fallback. Chips are the parent's explicit per-person word,
+ * so they outrank the setup sheet's single childName field — including on the
+ * star target (the X17.2 "two-Kais" fix).
  *
- * - The STAR (starCharacterId when set, else the main_child role) gets childName
- *   (namedVia 'childName') — applied LAST so the setup sheet always wins for the star.
- * - Each answered naming question joins on characterId. A generic-category
- *   answer ("Family friend") refines the ROLE and never sets a name; a
- *   child-vocabulary answer ("Grandma", "Our dog", free-typed names) becomes
- *   the name with namedVia 'chip'. Both count as consumed.
+ * - Chip answers apply to EVERY joined target, including the star. A generic-
+ *   category answer ("Family friend", "parent_or_uncle") refines the ROLE and
+ *   never sets a name; a child-vocabulary answer ("Grandma", "Our dog", free-
+ *   typed names) becomes the name with namedVia 'chip'. Both count as consumed.
+ * - childName binds to the star ONLY when the star has no chip name AND the
+ *   name isn't already chip-claimed by another character.
+ * - Hard invariant: no duplicate names across the roster. Any second bind of an
+ *   already-claimed name (chip or childName) is skipped and reported in
+ *   `skippedDuplicates`; a skipped chip stays unconsumed so it survives as a
+ *   confirmedFacts line.
  * - A failed join is NEVER guessed at: after a photo removal the person the
  *   chip asked about may be gone entirely, and landing their name on some
  *   other unnamed character would misname a keepsake — the one unforgivable
@@ -128,24 +160,50 @@ export function mergeCastNames<T extends MergeableCharacter>(input: {
 }): MergeCastResult<T> {
   const characters = input.characters.map((c) => ({ ...c }));
   const consumedQuestionIds: string[] = [];
+  const skippedDuplicates: SkippedDuplicateName[] = [];
   let changed = false;
+
+  const normName = (n: string) => n.trim().toLowerCase().replace(/\s+/g, ' ');
+  // X17.2 hard invariant: one owner per name. Seed with names already
+  // chip-confirmed on the stored roster (idempotent re-runs must not flag
+  // a character's own persisted name as a duplicate).
+  const claimedBy = new Map<string, T>();
+  for (const c of characters) {
+    if (c.name?.trim() && c.namedVia === 'chip') claimedBy.set(normName(c.name), c);
+  }
 
   const starTarget =
     (input.starCharacterId
       ? characters.find((c) => c.characterId === input.starCharacterId)
       : undefined) ?? characters.find((c) => c.role === 'main_child');
 
-  const applyAnswer = (target: T, rawAnswer: string): void => {
+  const applyAnswer = (target: T, rawAnswer: string, questionId: string): void => {
     const answer = rawAnswer.trim();
-    // Generic-category answers ("Family friend") refine a PERSON's role. For a
-    // companion object every typed answer IS the name — a toy can be called
-    // anything, and objects have no relationship role to refine.
+    // Generic-category / role-word answers refine a PERSON's role, never name
+    // them (companion objects excepted — any word can be a toy's name).
     if (target.role !== 'companion_object' && isGenericCategoryAnswer(answer)) {
-      const refinedRole = /[a-z]/i.test(answer) ? answer.toLowerCase() : answer;
+      const refinedRole = (/[a-z]/i.test(answer) ? answer.toLowerCase() : answer).replace(
+        /_/g,
+        ' ',
+      );
       if (target.role !== refinedRole) {
         target.role = refinedRole;
         changed = true;
       }
+      consumedQuestionIds.push(questionId);
+      return;
+    }
+    const key = normName(answer);
+    const holder = claimedBy.get(key);
+    if (holder && holder !== target) {
+      // Second bind of a claimed name: skipped + reported, answer stays
+      // unconsumed so it survives as a confirmedFacts line (never dropped).
+      skippedDuplicates.push({
+        characterId: target.characterId,
+        name: answer,
+        claimedByCharacterId: holder.characterId,
+        source: 'chip',
+      });
       return;
     }
     if (target.name !== answer || target.namedVia !== 'chip') {
@@ -153,6 +211,8 @@ export function mergeCastNames<T extends MergeableCharacter>(input: {
       target.namedVia = 'chip';
       changed = true;
     }
+    claimedBy.set(key, target);
+    consumedQuestionIds.push(questionId);
   };
 
   const answered = (input.captureQuestions ?? []).filter((q) => {
@@ -160,26 +220,48 @@ export function mergeCastNames<T extends MergeableCharacter>(input: {
     return !!q.characterId && !!a && a !== SKIP_SENTINEL;
   });
 
+  // X17.2 P0a: chips apply to EVERY joined target — including the star.
+  // A failed join is still never guessed at (answer survives as a fact).
   for (const q of answered) {
     const target = characters.find((c) => c.characterId === q.characterId);
-    // A failed join, and a naming answer pointing at the STAR (whose name
-    // comes from the setup sheet), are both left unconsumed.
-    if (target && target !== starTarget) {
-      applyAnswer(target, q.answer!);
-      consumedQuestionIds.push(q.id);
-    }
+    if (target) applyAnswer(target, q.answer!, q.id);
   }
 
+  // childName binds ONLY when the star is chip-unnamed AND the name is not
+  // already chip-claimed elsewhere — the setup sheet's single field never
+  // overrules the parent's explicit per-person answers (the two-Kais fix).
   const childName = input.childName?.trim();
   if (childName && starTarget) {
-    if (starTarget.name !== childName || starTarget.namedVia !== 'childName') {
+    const holder = claimedBy.get(normName(childName));
+    // ORDER MATTERS (verification fix): the claimed-elsewhere check runs FIRST
+    // so the two-Kais shape reports the ACTUAL claim holder (child_2), which
+    // the dump-replay test asserts — and so exactly ONE skip is reported even
+    // when the star is also chip-named.
+    if (holder && holder !== starTarget) {
+      skippedDuplicates.push({
+        characterId: starTarget.characterId,
+        name: childName,
+        claimedByCharacterId: holder.characterId,
+        source: 'childName',
+      });
+    } else if (starTarget.namedVia === 'chip' && starTarget.name?.trim()) {
+      // Chip won on the star itself; report only when the names actually differ.
+      if (normName(starTarget.name) !== normName(childName)) {
+        skippedDuplicates.push({
+          characterId: starTarget.characterId,
+          name: childName,
+          claimedByCharacterId: starTarget.characterId,
+          source: 'childName',
+        });
+      }
+    } else if (starTarget.name !== childName || starTarget.namedVia !== 'childName') {
       starTarget.name = childName;
       starTarget.namedVia = 'childName';
       changed = true;
     }
   }
 
-  return { characters, changed, consumedQuestionIds };
+  return { characters, changed, consumedQuestionIds, skippedDuplicates };
 }
 
 /** A merged roster entry as stored on Book.characterIdentity (Json). */
@@ -332,4 +414,47 @@ export function computeCastBalance(
     });
   }
   return entries;
+}
+
+export interface CastPageConflict {
+  pageNumber: number;
+  name: string;
+  issue: string;
+}
+
+/**
+ * X17.2 P2b — the inverse of coverage: a parent-confirmed name on a page
+ * its character is NOT on (±1 tolerance). Page-local by construction, so
+ * the QC loop routes these to targeted single-page rewrites instead of
+ * whole-book regens. Page-less entries (photos changed mid-setup) are
+ * never flagged; script-gated like every deterministic name check.
+ */
+export function checkCastPageConflicts(
+  cast: CoverageCastEntry[],
+  pageTexts: string[],
+  language: string = 'en',
+): CastPageConflict[] {
+  const conflicts: CastPageConflict[] = [];
+  for (const entry of cast) {
+    if (entry.namedVia !== 'chip' && entry.namedVia !== 'childName') continue;
+    if (!entry.name?.trim()) continue;
+    if (entry.appearsOnPages.length === 0) continue;
+    if (!isChildNameCheckable(entry.name, language)) continue;
+    const allowed = new Set<number>();
+    for (const p of entry.appearsOnPages) {
+      for (const c of [p - 1, p, p + 1]) if (c >= 1 && c <= pageTexts.length) allowed.add(c);
+    }
+    pageTexts.forEach((text, i) => {
+      const pageNumber = i + 1;
+      if (allowed.has(pageNumber)) return;
+      if (nameMatches(entry.name, text)) {
+        conflicts.push({
+          pageNumber,
+          name: entry.name,
+          issue: `Page ${pageNumber} has ${entry.name} speaking or acting, but ${entry.name} is not in this page's photo (they appear on page(s) ${entry.appearsOnPages.join(', ')}). Rewrite the page without them, keeping its beat.`,
+        });
+      }
+    });
+  }
+  return conflicts;
 }

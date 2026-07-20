@@ -21,13 +21,15 @@ export const MAX_SHEETS_PER_BOOK = 2;
 export const MAX_SOURCE_PHOTOS_PER_SHEET = 3;
 export const STYLE_EXEMPLARS_FOR_SHEET = 2;
 
-// X17 A3 (ENSEMBLE_BOOKS_ENABLED): ensemble books carry up to 4 sheets.
-// Sheets generate in parallel, so wall-clock stays ~one render + validation;
-// the 2x budget absorbs one regen round at 4-sheet load. 6 generations = 4
-// first renders + 2 regens (same 1.5x attempts-to-sheets ratio as solo 3/2).
+// X17.2 P3 (evidence: book cmrt6pspo0017ms0dpnih2pmf hit budget_exceeded
+// twice): a real 4-sheet ensemble run with one regen round measured ~193s
+// wall clock against the old 120s race. 240s covers the measured worst case;
+// the step stays non-blocking by construction (Promise.race + sheetless
+// degrade + late-result persistence). 8 generations = 4 first renders + up
+// to 4 regens (validation rejects are the norm on busy outing photos).
 export const MAX_SHEETS_PER_BOOK_ENSEMBLE = 4;
-export const MAX_SHEET_GENERATIONS_PER_BOOK_ENSEMBLE = 6;
-export const SHEET_BUDGET_MS_ENSEMBLE = 120_000;
+export const MAX_SHEET_GENERATIONS_PER_BOOK_ENSEMBLE = 8;
+export const SHEET_BUDGET_MS_ENSEMBLE = 240_000;
 
 /** X17 A3: per-book sheet cap — 4 for ensemble books, 2 otherwise. */
 export function sheetCapFor(ensembleMemberIds: string[] | null | undefined): number {

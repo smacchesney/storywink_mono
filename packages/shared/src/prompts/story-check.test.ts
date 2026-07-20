@@ -472,6 +472,12 @@ describe('STORY_QC_THRESHOLDS — word budget caps', () => {
   });
 });
 
+describe('STORY_QC_THRESHOLDS — refrain over-echo cap (X17.2)', () => {
+  it('caps refrain echoes at 4 (one page of tolerance over the prompt band)', () => {
+    expect(STORY_QC_THRESHOLDS.maxRefrainEchoes).toBe(4);
+  });
+});
+
 describe('QC v2 — beat-aware photo judge', () => {
   const beatSheet: BeatSheetEntry[] = [
     {
