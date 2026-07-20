@@ -243,6 +243,12 @@ export async function processCharacterExtraction(job: Job<CharacterExtractionJob
         childName: book.childName,
         starCharacterId: book.starCharacterId,
       });
+      if (merge.skippedDuplicates.length > 0) {
+        logger.warn(
+          { bookId, skippedDuplicates: merge.skippedDuplicates },
+          'resolveCast: duplicate-name binds skipped (chip names outrank childName)',
+        );
+      }
       if (merge.changed) {
         existingIdentity = { ...existingIdentity, characters: merge.characters };
         try {

@@ -868,6 +868,12 @@ export async function processStoryGeneration(
       });
       mergedCharacters = merge.characters;
       consumedQuestionIds = new Set(merge.consumedQuestionIds);
+      if (merge.skippedDuplicates.length > 0) {
+        logger.warn(
+          { bookId, skippedDuplicates: merge.skippedDuplicates },
+          'resolveCast: duplicate-name binds skipped (chip names outrank childName)',
+        );
+      }
       if (merge.changed) {
         try {
           await prisma.book.update({
@@ -885,6 +891,7 @@ export async function processStoryGeneration(
               bookId,
               namedCharacters: mergedCharacters.filter((c) => c.name).length,
               consumedAnswers: merge.consumedQuestionIds.length,
+              skippedDuplicates: merge.skippedDuplicates,
             },
             'resolveCast: merged capture answers + childName into character identity',
           );
