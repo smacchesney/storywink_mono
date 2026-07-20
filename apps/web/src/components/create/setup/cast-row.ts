@@ -36,15 +36,25 @@ export interface CastPageLike {
   asset?: { url: string | null; thumbnailUrl: string | null } | null;
 }
 
-/** Faces shown in the row: foreground people + pets, never the toy. */
+/**
+ * Faces shown in the row: foreground people + pets, never the toy — UNION with
+ * every recurring kid, even a background-flagged one (Finding 2). A recurring
+ * kid enters `castMemberIds` via "Everyone" and the story casts them, so the
+ * row must give them a nameable face regardless of `isForeground`; otherwise
+ * the kid is unnameable while starring, and recurringKidCount would outrun the
+ * pickable faces. Ordering/dedupe semantics are unchanged: recurring kids first
+ * by photo count, then the remaining foreground members by photo count.
+ */
 export function castMembers(roster: RosterCharacterLike[]): RosterCharacterLike[] {
-  const eligible = roster.filter((c) => c.isForeground !== false && c.role !== 'companion_object');
-  const kids = recurringChildren(eligible).sort(
+  const kids = recurringChildren(roster).sort(
     (a, b) => (b.appearsOnPages?.length ?? 0) - (a.appearsOnPages?.length ?? 0),
   );
   const kidIds = new Set(kids.map((k) => k.characterId));
-  const rest = eligible
-    .filter((c) => !kidIds.has(c.characterId))
+  const rest = roster
+    .filter(
+      (c) =>
+        c.isForeground !== false && c.role !== 'companion_object' && !kidIds.has(c.characterId),
+    )
     .sort((a, b) => (b.appearsOnPages?.length ?? 0) - (a.appearsOnPages?.length ?? 0));
   return [...kids, ...rest];
 }
@@ -200,17 +210,41 @@ export function upsertNameAnswer(
     return next;
   }
   if (!value) return questions;
-  return [
-    ...questions,
-    {
-      id: `name_${member.characterId}`,
-      question: questionFor(describeCharacter(member)),
-      options: [],
-      characterId: member.characterId,
-      kind: 'naming' as const,
-      answer: value,
-    },
-  ].slice(0, 10);
+  const newRow = {
+    id: `name_${member.characterId}`,
+    question: questionFor(describeCharacter(member)),
+    options: [],
+    characterId: member.characterId,
+    kind: 'naming' as const,
+    answer: value,
+  };
+  if (questions.length < MAX_CAPTURE_ROWS) return [...questions, newRow];
+
+  // Cap reached: the freshly minted name row MUST land — a parent typing a name
+  // can never silently no-op (Finding 1). Free a slot by evicting the TAIL-most
+  // ramble FACT rows (ramble_location/highlight/…), never naming rows
+  // (name_*, ramble_name_*) and never perception q* rows. If nothing is
+  // evictable (pathological all-protected 10), return the ORIGINAL reference so
+  // the caller's change-gate fires no phantom PATCH.
+  const slotsToFree = questions.length - MAX_CAPTURE_ROWS + 1;
+  const evictableIdx = questions
+    .map((q, i) => (isEvictableFactRow(q) ? i : -1))
+    .filter((i) => i >= 0);
+  if (evictableIdx.length < slotsToFree) return questions;
+  const drop = new Set(evictableIdx.slice(-slotsToFree));
+  return [...questions.filter((_, i) => !drop.has(i)), newRow];
+}
+
+/** Hard cap on captureQuestions rows (mirrors extraction-merge's MAX_QUESTIONS). */
+const MAX_CAPTURE_ROWS = 10;
+
+/**
+ * Synthetic ramble FACT rows (ramble_location/highlight/mishap/child_said) are
+ * the only cap-eviction fodder: they carry no naming answer. `ramble_name_*`
+ * rows are naming rows (excluded), as are perception q* and name_* rows.
+ */
+function isEvictableFactRow(q: CaptureQuestion): boolean {
+  return q.id.startsWith('ramble_') && !q.id.startsWith('ramble_name_');
 }
 
 /** Star-ask applicability — drives the quiet "Change" affordance. */

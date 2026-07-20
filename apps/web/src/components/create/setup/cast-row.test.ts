@@ -12,6 +12,7 @@ import {
   starPickableIds,
   upsertNameAnswer,
 } from './cast-row';
+import { recurringChildren } from './discovery-feed';
 
 const pages = [
   {
@@ -57,6 +58,22 @@ describe('castMembers', () => {
       'child_2',
       'adult_2',
     ]);
+  });
+  it('includes a background-flagged recurring kid the story still casts (Finding 2)', () => {
+    // dump-shaped: child_4 is a friend on 2 pages but perception flagged it
+    // background — "Everyone" still casts it, so it must be a nameable face and
+    // counted consistently with the pickable set.
+    const roster = [
+      kid('child_1', 4),
+      { characterId: 'child_4', role: 'friend', isForeground: false, appearsOnPages: [1, 2] },
+      { characterId: 'adult_1', role: 'parent', isForeground: true, appearsOnPages: [1, 2, 3] },
+    ];
+    const members = castMembers(roster);
+    expect(members.map((m) => m.characterId)).toEqual(['child_1', 'child_4', 'adult_1']);
+    expect(starPickableIds(members).has('child_4')).toBe(true);
+    // recurringKidCount (SetupSheet counts recurringChildren(roster)) matches the
+    // pickable faces now that child_4 is a rendered member.
+    expect(recurringChildren(roster).length).toBe(starPickableIds(members).size);
   });
 });
 
@@ -247,5 +264,66 @@ describe('needsName + upsertNameAnswer', () => {
       },
     ];
     expect(upsertNameAnswer(rows, kid('c1', 2), '', () => 'q')[0].answer).toBeNull();
+  });
+  it('at the 10-row cap, a new name evicts a tail fact row so it never drops (Finding 1)', () => {
+    const q = (id: string) => ({ id, question: 'x', options: [], characterId: null, answer: 'v' });
+    // 3 perception + 3 name_* + 2 protected ramble_name_* + 2 evictable facts = 10.
+    const rows = [
+      q('q1'),
+      q('q2'),
+      q('q3'),
+      { ...q('name_a'), characterId: 'a', kind: 'naming' as const },
+      { ...q('name_b'), characterId: 'b', kind: 'naming' as const },
+      { ...q('name_c'), characterId: 'c', kind: 'naming' as const },
+      { ...q('ramble_name_d'), characterId: 'd', kind: 'naming' as const },
+      { ...q('ramble_name_e'), characterId: 'e', kind: 'naming' as const },
+      { ...q('ramble_location'), kind: 'other' as const },
+      { ...q('ramble_highlight'), kind: 'other' as const },
+    ];
+    const out = upsertNameAnswer(rows, kid('new', 2), 'Mia', () => 'q');
+    expect(out).toHaveLength(10);
+    // The freshly minted name landed.
+    expect(out.find((r) => r.id === 'name_new')?.answer).toBe('Mia');
+    // The TAIL-most fact row (ramble_highlight) was evicted; ramble_location stays.
+    expect(out.some((r) => r.id === 'ramble_highlight')).toBe(false);
+    expect(out.some((r) => r.id === 'ramble_location')).toBe(true);
+    // Every protected row survived.
+    for (const id of [
+      'q1',
+      'q2',
+      'q3',
+      'name_a',
+      'name_b',
+      'name_c',
+      'ramble_name_d',
+      'ramble_name_e',
+    ]) {
+      expect(out.some((r) => r.id === id)).toBe(true);
+    }
+  });
+  it('pathological all-protected 10: returns the ORIGINAL reference, no phantom PATCH (Finding 1)', () => {
+    const q = (id: string, cid: string) => ({
+      id,
+      question: 'x',
+      options: [],
+      characterId: cid,
+      kind: 'naming' as const,
+      answer: 'v',
+    });
+    // 10 rows, none an evictable fact row (all perception/naming).
+    const rows = [
+      q('q1', 'a1'),
+      q('q2', 'a2'),
+      q('q3', 'a3'),
+      q('name_a', 'a'),
+      q('name_b', 'b'),
+      q('name_c', 'c'),
+      q('name_d', 'd'),
+      q('name_e', 'e'),
+      q('ramble_name_f', 'f'),
+      q('ramble_name_g', 'g'),
+    ];
+    const out = upsertNameAnswer(rows, kid('new', 2), 'Mia', () => 'q');
+    expect(out).toBe(rows);
   });
 });
