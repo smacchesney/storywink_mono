@@ -33,6 +33,25 @@
  *   → sign in, then close the window. The Clerk __session cookie must be saved.
  *
  * ---------------------------------------------------------------------------
+ * CAPTURES (X17.2 who's-who additions, on top of the X17 x17b-* set)
+ *
+ *   x17v2-m-16-cast-row            "Who's in this book?" faces render as crops
+ *   x17v2-m-17-naming              one inline name input, committed under a face
+ *   x17v2-m-18-everyone-dedication Everyone flash → childName becomes dedication
+ *   x17v2-m-19-no-naming-chips     no naming-question rows left in CaptureChips
+ *   x17v2-m-20-change-star         "Change star" re-opens the star ask
+ *   x17v2-m-21-ja-cast             cast row narration in font-japanese
+ *   x17v2-m-22-star-ask-slot       ask slot: Which-one-is question + Everyone pill
+ *   x17v2-d-03-cast-row            cast row holds at 1280x800
+ *
+ *   All land in the SAME .screenshots/x17b-proof-manifest.json as the X17 run.
+ *
+ *   DATA PREREQUISITE (new): BOOK_ID should be a fresh DRAFT whose perception ran
+ *   AFTER Task 1 ships (faceBox present on the roster) so faces crop via c_crop.
+ *   Legacy books still pass — the g_face fallback renders and the m-16 crop
+ *   assertion accepts either c_crop or g_face.
+ *
+ * ---------------------------------------------------------------------------
  * ENV
  *
  *   STORAGE_STATE          (required) path to a logged-in storageState JSON.
@@ -101,6 +120,12 @@ const C = {
   rambleLabel: 'Tell us more about the day',
   starLabel: "Who's the star?",
   everyone: 'Everyone!',
+  castRowLabel: "Who's in this book?",
+  castNamePrompt: 'Tap a face to add a name',
+  castChange: 'Change star',
+  castStarWhich: 'Which one is',
+  everyoneFlash: "Everyone's the star!",
+  dedicationLabel: 'Who should we dedicate this book to?',
   makeMyBook: 'Make my book',
   paintMyPictures: 'Paint my pictures',
   peekHint: "We'll start painting",
@@ -266,7 +291,12 @@ test.describe.serial('x17b mobile 375x812', () => {
 
   test('m-06 star — pick prefills child name', async ({ page }) => {
     await page.goto(url(`/create/${BOOK_ID}/setup`));
-    const starSection = page.getByText(C.starLabel, { exact: false });
+    // m-01 types into #childName and the debounced PATCH persists it, so on every
+    // run after the first the star ask reads castStarWhich ("Which one is A?"),
+    // never starLabel — accept either copy as the landmark (m-20/m-22 do too).
+    const starSection = page
+      .getByText(C.starLabel, { exact: false })
+      .or(page.getByText(C.castStarWhich, { exact: false }));
     const ok = await shoot(page, 'x17b-m-06-star', {
       locator: starSection,
       label: '"Who\'s the star?" picker (needs 2+ recurring kids)',
@@ -276,7 +306,7 @@ test.describe.serial('x17b mobile 375x812', () => {
       console.warn('[x17b] star picker absent — book likely has <2 recurring kids.');
       return;
     }
-    // The first non-"Everyone!" chip is a star chip; tapping it prefills #childName.
+    // The first non-"Everyone!" face is a star-pickable face; tapping it prefills #childName.
     const starChip = page
       .locator('button[aria-pressed]')
       .filter({ hasNotText: C.everyone })
@@ -286,6 +316,195 @@ test.describe.serial('x17b mobile 375x812', () => {
       .soft(page.locator('#childName'), 'star pick prefilled the child name')
       .not.toHaveValue('');
     await shoot(page, 'x17b-m-06-star', { locator: starSection, label: 'star picked' });
+  });
+
+  test('m-16 cast row — faces render as images, never text-only chips', async ({ page }) => {
+    await page.goto(url(`/create/${BOOK_ID}/setup`));
+    const row = page.getByText(C.castRowLabel, { exact: false });
+    const ok = await shoot(page, 'x17v2-m-16-cast-row', {
+      locator: row,
+      label: '"Who\'s in this book?" row',
+      timeout: 60_000,
+    });
+    if (ok) {
+      // Every face is a 64px <img> whose src carries a Cloudinary crop
+      // (c_crop from a faceBox, or the g_face fallback on legacy rosters).
+      // Scoped to img.h-16: the avatar-confirm's 24px portrait (img.h-6) can
+      // share the section and must not pollute the every() scan.
+      const faceSrcs = await page
+        .locator('section', { has: row })
+        .locator('img.h-16')
+        .evaluateAll((imgs) => imgs.map((i) => (i as HTMLImageElement).src));
+      expect.soft(faceSrcs.length, 'at least one face image').toBeGreaterThan(0);
+      expect
+        .soft(
+          faceSrcs.every((s) => /c_crop|g_face/.test(s)),
+          'every face src is a crop or g_face fallback',
+        )
+        .toBeTruthy();
+    }
+    await assertNoEmoji(page, 'cast row');
+  });
+
+  test('m-17 naming — one inline input at a time', async ({ page }) => {
+    await page.goto(url(`/create/${BOOK_ID}/setup`));
+    const row = page.getByText(C.castRowLabel, { exact: false });
+    await row
+      .first()
+      .waitFor({ timeout: 60_000 })
+      .catch(() => {});
+    const section = page.locator('section', { has: row });
+    const faces = section.locator('button', { has: page.locator('img') });
+    const count = await faces.count();
+    if (count >= 2) {
+      await faces.nth(0).click();
+      await faces.nth(1).click(); // switches the ONE input, never opens a second
+      expect
+        .soft(await section.locator('input[type="text"]').count(), 'exactly one open name input')
+        .toBe(1);
+      await section.locator('input[type="text"]').fill('Proofname');
+      await page.keyboard.press('Enter');
+    }
+    await shoot(page, 'x17v2-m-17-naming', {
+      locator: page.getByText('Proofname', { exact: false }),
+      label: 'committed face name under the crop',
+    });
+  });
+
+  test('m-18 everyone — dedication label swap', async ({ page }) => {
+    await page.goto(url(`/create/${BOOK_ID}/setup`));
+    const everyoneBtn = page.getByRole('button', { name: C.everyone });
+    const present = await everyoneBtn
+      .first()
+      .isVisible()
+      .catch(() => false);
+    if (present) {
+      await everyoneBtn.first().click();
+      // UX review 6: the 2s ask-slot flash confirms the tap did something.
+      await expect
+        .soft(
+          page.getByText(C.everyoneFlash, { exact: false }).first(),
+          'Everyone flash visible in the ask slot',
+        )
+        .toBeVisible({ timeout: 3_000 });
+      await expect
+        .soft(
+          page.getByText(C.dedicationLabel, { exact: false }).first(),
+          'childName label became the dedication ask',
+        )
+        .toBeVisible({ timeout: 10_000 });
+    } else {
+      console.warn('[x17.2] Everyone chip absent — star already picked or flag off.');
+    }
+    await shoot(page, 'x17v2-m-18-everyone-dedication', {
+      locator: page.locator('#childName'),
+      label: 'ensemble dedication label',
+    });
+  });
+
+  test('m-19 chips — no naming questions left in CaptureChips', async ({ page }) => {
+    await page.goto(url(`/create/${BOOK_ID}/setup`));
+    await page.locator('#childName').waitFor({ timeout: 20_000 });
+    // Perception naming copy ("Who is the ...?") must not render as a chip
+    // question — the face row owns naming now.
+    const namingQuestions = await page.getByText(/^Who is the /).count();
+    expect.soft(namingQuestions, 'zero naming-question chip rows').toBe(0);
+    await shoot(page, 'x17v2-m-19-no-naming-chips', {
+      locator: page.locator('#childName'),
+      label: 'chips section without naming rows',
+    });
+  });
+
+  test('m-20 change-star — quiet "Change star" (ask slot) re-opens the star ask', async ({
+    page,
+  }) => {
+    await page.goto(url(`/create/${BOOK_ID}/setup`));
+    const change = page.getByRole('button', { name: C.castChange });
+    if (
+      await change
+        .first()
+        .isVisible()
+        .catch(() => false)
+    ) {
+      await change.first().click();
+      // The re-opened ask reads "Which one is {childName}?" when the field is
+      // filled, else "Who's the star?" — accept either landmark.
+      const asked =
+        (await page
+          .getByText(C.starLabel, { exact: false })
+          .first()
+          .isVisible()
+          .catch(() => false)) ||
+        (await page
+          .getByText(C.castStarWhich, { exact: false })
+          .first()
+          .isVisible()
+          .catch(() => false));
+      expect.soft(asked, 'star ask re-opened').toBeTruthy();
+    }
+    await shoot(page, 'x17v2-m-20-change-star', {
+      locator: page.getByText(C.castRowLabel, { exact: false }),
+      label: 'star ask re-entered via Change star',
+    });
+  });
+
+  test('m-22 star-ask — ask slot holds the question and the Everyone pill', async ({ page }) => {
+    await page.goto(url(`/create/${BOOK_ID}/setup`));
+    await page.locator('#childName').waitFor({ timeout: 20_000 });
+    await page.locator('#childName').fill('Kai');
+    // Re-enter the star ask when a star is already picked.
+    const change = page.getByRole('button', { name: C.castChange });
+    if (
+      await change
+        .first()
+        .isVisible()
+        .catch(() => false)
+    )
+      await change.first().click();
+    const section = page.locator('section', {
+      has: page.getByText(C.castRowLabel, { exact: false }),
+    });
+    const slot = section.locator('div.h-11');
+    const asking = await slot
+      .getByText(C.castStarWhich, { exact: false })
+      .first()
+      .isVisible()
+      .catch(() => false);
+    if (asking) {
+      // childName non-blank → "Which one is Kai?" replaces "Who's the star?".
+      expect
+        .soft(
+          await slot.getByText('Kai', { exact: false }).count(),
+          'question carries the typed name',
+        )
+        .toBeGreaterThan(0);
+      // The pill lives in the fixed ask slot — never inside the scrollable strip.
+      expect
+        .soft(
+          await slot.getByRole('button', { name: C.everyone }).count(),
+          'Everyone pill in the ask slot',
+        )
+        .toBe(1);
+      expect
+        .soft(
+          await section
+            .locator('.overflow-x-auto')
+            .getByRole('button', { name: C.everyone })
+            .count(),
+          'strip holds faces only',
+        )
+        .toBe(0);
+      // Non-star-pickable faces (adults/pets) dim during the ask (soft info —
+      // the fixture book may have no adult faces).
+      const dimmed = await section.locator('button.opacity-40').count();
+      console.log(`[x17.2] ${dimmed} dimmed non-kid face(s) during star ask`);
+    } else {
+      console.warn('[x17.2] star ask not reachable — solo book, star locked in, or flag off.');
+    }
+    await shoot(page, 'x17v2-m-22-star-ask-slot', {
+      locator: page.getByText(C.castRowLabel, { exact: false }),
+      label: 'ask slot: Which-one-is question + Everyone pill',
+    });
   });
 
   test('m-07 everyone — naming chips for unnamed members', async ({ page }) => {
@@ -475,6 +694,15 @@ test.describe('x17b desktop 1280x800', () => {
       timeout: 30_000,
     });
   });
+
+  test('d-03 cast-row — "Who\'s in this book?" holds at desktop width', async ({ page }) => {
+    await page.goto(url(`/create/${BOOK_ID}/setup`));
+    await shoot(page, 'x17v2-d-03-cast-row', {
+      locator: page.getByText(C.castRowLabel, { exact: false }),
+      label: '"Who\'s in this book?" row (desktop)',
+      timeout: 60_000,
+    });
+  });
 });
 
 // ===========================================================================
@@ -510,6 +738,21 @@ test.describe('x17b ja locale', () => {
     // The font-japanese class must be present on narration nodes under ja.
     const jaNodes = await page.locator('.font-japanese').count();
     expect.soft(jaNodes, 'font-japanese applied on ja narration').toBeGreaterThan(0);
+  });
+
+  test('m-21 ja-cast — cast row narration in font-japanese', async ({ page }) => {
+    // The describe's beforeEach already set the ja locale cookie.
+    await page.goto(url(`/create/${BOOK_ID}/setup`));
+    await page.locator('#childName').waitFor({ timeout: 20_000 });
+    // Landmark on structure (id), not copy — the ja cast copy is what we're proving.
+    await shoot(page, 'x17v2-m-21-ja-cast', {
+      locator: page.locator('#childName'),
+      label: 'ja cast row ("Who\'s in this book?" register)',
+      timeout: 60_000,
+    });
+    await assertNoEmoji(page, 'ja cast');
+    const jaNodes = await page.locator('.font-japanese').count();
+    expect.soft(jaNodes, 'font-japanese applied on ja cast narration').toBeGreaterThan(0);
   });
 });
 
