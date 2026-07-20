@@ -3,6 +3,7 @@ import {
   scopeCaptureQuestions,
   createPhotoAnalysisPrompt,
   PHOTO_ANALYSIS_RESPONSE_SCHEMA,
+  PERCEPTION_ROLES,
   heroAssetIds,
   CaptureQuestion,
   ScopeCharacterLike,
@@ -267,5 +268,48 @@ describe('heroAssetIds (X17 A4)', () => {
   });
   it('absent → empty', () => {
     expect(heroAssetIds(undefined, byPos)).toEqual([]);
+  });
+});
+
+describe('X17.2 perception schema additions', () => {
+  const charProps = (PHOTO_ANALYSIS_RESPONSE_SCHEMA.properties.characters.items as any).properties;
+  const charRequired = (PHOTO_ANALYSIS_RESPONSE_SCHEMA.properties.characters.items as any).required;
+  const pageProps = (PHOTO_ANALYSIS_RESPONSE_SCHEMA.properties.pageAnalysis.items as any)
+    .properties;
+  const pageRequired = (PHOTO_ANALYSIS_RESPONSE_SCHEMA.properties.pageAnalysis.items as any)
+    .required;
+
+  it('constrains role to the closed vocabulary (P0c)', () => {
+    expect(charProps.role.enum).toEqual(PERCEPTION_ROLES);
+    expect(PERCEPTION_ROLES).toContain('main_child');
+    expect(PERCEPTION_ROLES).toContain('companion_object');
+    expect(PERCEPTION_ROLES).not.toContain('parent_or_uncle');
+  });
+
+  it('requires descriptor and faceBox per character (P0d)', () => {
+    expect(charRequired).toContain('descriptor');
+    expect(charRequired).toContain('faceBox');
+    expect(charProps.faceBox.type).toEqual(['object', 'null']);
+    expect(charProps.faceBox.properties).toHaveProperty('pageNumber');
+    for (const k of ['x', 'y', 'w', 'h']) expect(charProps.faceBox.properties).toHaveProperty(k);
+  });
+
+  it('requires settingChip per page', () => {
+    expect(pageProps).toHaveProperty('settingChip');
+    expect(pageRequired).toContain('settingChip');
+  });
+
+  it('prompt names the role vocabulary and the descriptor/faceBox rules', () => {
+    const prompt = createPhotoAnalysisPrompt({
+      childName: null,
+      additionalCharacters: null,
+      artStyle: 'vignette',
+      storyPages: [{ pageNumber: 1, assetId: 'a1', imageUrl: 'http://x/1.jpg' }],
+    });
+    expect(prompt).toContain('role (EXACTLY one of:');
+    expect(prompt).toContain('descriptor');
+    expect(prompt).toContain('faceBox');
+    expect(prompt).toContain('settingChip');
+    expect(prompt).toContain('never invent a role outside this list');
   });
 });

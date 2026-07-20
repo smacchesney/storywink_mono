@@ -260,6 +260,23 @@ export interface CharacterIdentity {
   extractedForStyle?: string;
 }
 
+/**
+ * X17.2 P0d: normalized face rectangle in ONE photo (fractions of width/height).
+ * Declared here (types.ts has zero imports) and re-exported from
+ * prompts/photo-analysis.ts, so the schema source and the shared type share one
+ * definition without a module cycle.
+ */
+export interface FaceBox {
+  /** 1-based photo position at analysis time (asset-stamped by the worker). */
+  pageNumber: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Stamped by the worker post-hoc — survives reorders like appearsOnAssetIds. */
+  assetId?: string | null;
+}
+
 export interface CharacterDescription {
   /** Unique identifier linking to a specific person across photos (e.g., "child_1", "adult_1") */
   characterId: string;
@@ -315,6 +332,18 @@ export interface CharacterDescription {
    * extraction worker (which always runs against the current order).
    */
   appearsOnAssetIds?: (string | null)[];
+  /**
+   * X17.2: chip-ready parent-facing phrase ("the little boy in the striped
+   * shirt"), 8 words max. Absent on pre-X17.2 identities — consumers fall
+   * back to the describeCharacter distiller.
+   */
+  descriptor?: string | null;
+  /**
+   * X17.2: normalized face rectangle in this character's clearest photo,
+   * asset-stamped by the perception worker. Absent/null → face-crop
+   * consumers fall back to a g_face thumbnail of their clearest photo.
+   */
+  faceBox?: FaceBox | null;
 }
 
 /**
