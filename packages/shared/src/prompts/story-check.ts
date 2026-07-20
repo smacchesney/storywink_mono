@@ -202,6 +202,9 @@ export const STORY_QC_THRESHOLDS = {
   minReadAloudRhythm: 6,
   maxCaptionRisk: 6, // a page fails at >= 7
   minRefrainEchoes: 3,
+  // X17.2: over-echo cap — the prompt asks for exactly 3 echo pages; QC blocks
+  // only past 4 (one page of tolerance so prompt and judge never deadlock).
+  maxRefrainEchoes: 4,
   // Age-4 length budget (STORY_QUALITY_V2). Target band is 15-30 words /
   // 1-2 sentences (en) and 20-45 chars (ja); the caps below are the hard
   // enforcement line. No floor — short punchy pages are a feature. The

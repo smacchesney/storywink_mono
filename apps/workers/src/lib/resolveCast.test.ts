@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   mergeCastNames,
   checkCastNameCoverage,
+  checkCastPageConflicts,
   computeCastBalance,
   isGenericCategoryAnswer,
   MergeableCharacter,
@@ -314,6 +315,44 @@ describe('computeCastBalance (X17 A2)', () => {
         'en',
       ),
     ).toEqual([{ name: '太郎', role: 'sibling', textPages: null, photoPages: 1 }]);
+  });
+});
+
+describe('X17.2 — checkCastPageConflicts', () => {
+  const cast = [
+    { name: 'Uncle Jon', role: 'aunt_or_uncle', namedVia: 'chip' as const, appearsOnPages: [1, 3] },
+    { name: 'Asher', role: 'sibling', namedVia: 'chip' as const, appearsOnPages: [2] },
+  ];
+  it('flags a page mentioning a member who is not there (outside ±1)', () => {
+    const conflicts = checkCastPageConflicts(cast, [
+      'Uncle Jon laughs.', // p1: on-page — fine
+      'A quiet ride.', // p2
+      'The horses gleam.', // p3
+      'A gentle hush.', // p4
+      'Uncle Jon cheers from far away.', // p5: pages [1,3] ±1 → conflict
+    ]);
+    expect(conflicts).toEqual([
+      { pageNumber: 5, name: 'Uncle Jon', issue: expect.stringContaining('Uncle Jon') },
+    ]);
+  });
+  it('±1 tolerance and page-less entries are never flagged', () => {
+    expect(
+      checkCastPageConflicts(cast, ['x', 'Uncle Jon waves.', 'y']), // p2 is within ±1 of p1/p3
+    ).toEqual([]);
+    expect(
+      checkCastPageConflicts(
+        [{ name: 'Mia', role: 'friend', namedVia: 'chip' as const, appearsOnPages: [] }],
+        ['Mia everywhere.'],
+      ),
+    ).toEqual([]);
+  });
+  it('script-gated like coverage (kanji names skipped)', () => {
+    expect(
+      checkCastPageConflicts(
+        [{ name: '太郎', role: 'friend', namedVia: 'chip' as const, appearsOnPages: [1] }],
+        ['x', 'y'],
+      ),
+    ).toEqual([]);
   });
 });
 

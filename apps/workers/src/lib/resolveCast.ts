@@ -415,3 +415,46 @@ export function computeCastBalance(
   }
   return entries;
 }
+
+export interface CastPageConflict {
+  pageNumber: number;
+  name: string;
+  issue: string;
+}
+
+/**
+ * X17.2 P2b — the inverse of coverage: a parent-confirmed name on a page
+ * its character is NOT on (±1 tolerance). Page-local by construction, so
+ * the QC loop routes these to targeted single-page rewrites instead of
+ * whole-book regens. Page-less entries (photos changed mid-setup) are
+ * never flagged; script-gated like every deterministic name check.
+ */
+export function checkCastPageConflicts(
+  cast: CoverageCastEntry[],
+  pageTexts: string[],
+  language: string = 'en',
+): CastPageConflict[] {
+  const conflicts: CastPageConflict[] = [];
+  for (const entry of cast) {
+    if (entry.namedVia !== 'chip' && entry.namedVia !== 'childName') continue;
+    if (!entry.name?.trim()) continue;
+    if (entry.appearsOnPages.length === 0) continue;
+    if (!isChildNameCheckable(entry.name, language)) continue;
+    const allowed = new Set<number>();
+    for (const p of entry.appearsOnPages) {
+      for (const c of [p - 1, p, p + 1]) if (c >= 1 && c <= pageTexts.length) allowed.add(c);
+    }
+    pageTexts.forEach((text, i) => {
+      const pageNumber = i + 1;
+      if (allowed.has(pageNumber)) return;
+      if (nameMatches(entry.name, text)) {
+        conflicts.push({
+          pageNumber,
+          name: entry.name,
+          issue: `Page ${pageNumber} has ${entry.name} speaking or acting, but ${entry.name} is not in this page's photo (they appear on page(s) ${entry.appearsOnPages.join(', ')}). Rewrite the page without them, keeping its beat.`,
+        });
+      }
+    });
+  }
+  return conflicts;
+}
