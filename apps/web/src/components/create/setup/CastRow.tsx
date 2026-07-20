@@ -97,13 +97,18 @@ export function CastRow({
   // Re-enter the star ask from the quiet "Change star" affordance.
   const [changingStar, setChangingStar] = React.useState(false);
 
-  // 2s "Everyone's the star!" flash — the tap visibly did something.
+  // 2s "Everyone's the star!" flash — the tap visibly did something. The nonce
+  // restarts the window on a repeat Everyone tap (setEveryoneFlash(true) alone
+  // is a no-op when already true, so the effect wouldn't re-fire); clearing the
+  // flash on a face tap cancels the timer through this effect's cleanup (also
+  // StrictMode-safe — the early return means no timer is armed while idle).
   const [everyoneFlash, setEveryoneFlash] = React.useState(false);
+  const [flashNonce, setFlashNonce] = React.useState(0);
   React.useEffect(() => {
     if (!everyoneFlash) return;
     const timer = window.setTimeout(() => setEveryoneFlash(false), EVERYONE_FLASH_MS);
     return () => window.clearTimeout(timer);
-  }, [everyoneFlash]);
+  }, [everyoneFlash, flashNonce]);
 
   // One-shot twinkle burst on the picked star's ring. The global
   // prefers-reduced-motion block in globals.css freezes .wink-twinkle-star,
@@ -169,6 +174,10 @@ export function CastRow({
       onPickStar(member);
       return;
     }
+    // Opening naming cancels any in-flight Everyone flash (state + timer, via
+    // the effect cleanup) so a commit inside the 2s window can't flash the
+    // remainder afterward.
+    setEveryoneFlash(false);
     // Dimmed faces during the star ask fall through to naming — never a pick.
     setActiveCharacterId((prev) => (prev === member.characterId ? null : member.characterId));
   };
@@ -176,6 +185,7 @@ export function CastRow({
   const handleEveryone = () => {
     setChangingStar(false);
     setEveryoneFlash(true);
+    setFlashNonce((n) => n + 1); // restart the 2s window on a repeat Everyone tap
     onPickEveryone();
   };
 
@@ -221,10 +231,21 @@ export function CastRow({
 
       {/* Faces strip — FACES ONLY; constant 88px; the right-edge fade mask is
           the more-faces-off-screen affordance (pure CSS, background-agnostic;
-          browsers without mask-image simply show no fade). */}
+          browsers without mask-image simply show no fade).
+
+          overflow-x-auto makes overflow-y compute to auto, clipping to the
+          padding box — that flat-cuts the ring-2 rings (2px), the star glyph
+          (-top-0.5/-left-0.5, 2px), and the SPARK4 top spark (-top-1.5, 6px
+          above the face box; leftmost on the first face). pt-2/pl-2 add 8px of
+          interior room to contain those overhangs; -mt-2/-ml-2 cancel it so the
+          box's OUTER geometry is unchanged (content stays put, faces still
+          align with the label). VERTICAL arithmetic — external height must stay
+          88px so CAST_RESERVE_MIN_HEIGHT (168 = 20 + 8 + 88 + 8 + 44) holds:
+          content 84 (64 face + 4 gap + 16 name) + pt-2 8 + pb-1 4 = 96 border-
+          box, minus mt -8 = 88 external. HORIZONTAL: pl-2 8 + ml -8 net 0. */}
       <div
         className={cn(
-          'flex items-start gap-3 overflow-x-auto pb-1 [scrollbar-width:none]',
+          '-mt-2 -ml-2 flex items-start gap-3 overflow-x-auto pt-2 pb-1 pl-2 [scrollbar-width:none]',
           '[mask-image:linear-gradient(to_right,black_calc(100%_-_24px),transparent)]',
         )}
       >
