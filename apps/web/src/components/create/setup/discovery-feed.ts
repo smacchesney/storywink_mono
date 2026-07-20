@@ -9,6 +9,9 @@ export interface RosterCharacterLike {
   characterId: string;
   role: string;
   name?: string | null;
+  /** X17.2: perception-authored short label ("the little boy in the striped
+   * shirt"). Preferred over the distiller for unnamed characters. */
+  descriptor?: string | null;
   species?: string | null;
   isForeground?: boolean;
   appearsOnPages?: number[];
@@ -18,6 +21,16 @@ export interface RosterCharacterLike {
     hairStyle?: string;
     distinguishingFeatures?: string[];
   };
+  /** X17.2: face rectangle in ONE photo (structural mirror of the shared
+   * FaceBox — no shared import; this is the client's roster shape). */
+  faceBox?: {
+    pageNumber: number;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    assetId?: string | null;
+  } | null;
 }
 
 export interface AnalyzedPageLike {
@@ -31,7 +44,7 @@ export interface DiscoveryChip {
   label: string;
 }
 
-export const MAX_DISCOVERY_CHIPS = 6;
+export const MAX_DISCOVERY_CHIPS = 5;
 
 /** Roles that count as "a kid in the photos" for the star ask. */
 export const CHILD_ROLES = ['main_child', 'sibling', 'friend'] as const;
@@ -39,18 +52,30 @@ export const CHILD_ROLES = ['main_child', 'sibling', 'friend'] as const;
 /** B3 threshold: a child seen in 2+ photos is a recurring kid. */
 export const RECURRING_MIN_PAGES = 2;
 
+// Warm, short, article-prefixed English nouns — deliberately English like the
+// perception traits above (the describeCharacter comment notes traits arrive in
+// English regardless of book language; `memberNameQuestion` interpolates this
+// label into both en and ja copy, so all entries stay in one language). New
+// payloads carry `descriptor`, which wins over these; ROLE_NOUNS only fires for
+// legacy rows with no descriptor. Keys track the PERCEPTION_ROLES enum.
 const ROLE_NOUNS: Record<string, string> = {
   main_child: 'a little one',
   sibling: 'a little one',
   friend: 'a little friend',
   parent: 'a grown-up',
   grandparent: 'a grandparent',
+  aunt_or_uncle: 'an auntie or uncle',
+  adult_friend: 'a grown-up friend',
+  caregiver: 'a caring grown-up',
   pet: 'a pet',
   companion_object: 'a beloved toy',
 };
 
 interface PageAnalysisLike {
   setting?: string;
+  /** X17.2: perception-authored short setting label ("the 4D theatre"). Used
+   * RAW when present; a missing one keeps the truncated `setting` fallback. */
+  settingChip?: string;
   eventSignals?: string[];
 }
 
@@ -69,14 +94,22 @@ export function recurringChildren(characters: RosterCharacterLike[]): RosterChar
 }
 
 /**
- * Short human label for a roster character: their name when known, a species
- * phrase for pets/objects, else role noun + one distinguishing trait. Capped
- * at 5 words so a chip never wraps. Traits arrive in English from perception
- * regardless of book language — acceptable for data chips.
+ * Short human label for a roster character: their name when known, then the
+ * perception-authored descriptor, a species phrase for pets/objects, else role
+ * noun + one distinguishing trait. Name and descriptor pass through verbatim; the
+ * distiller path is capped at 5 words so a chip never wraps and the tail is
+ * stripped of any dangling punctuation (no "with big," fragments). Traits arrive
+ * in English from perception regardless of book language — acceptable for data chips.
  */
 export function describeCharacter(c: RosterCharacterLike): string {
-  const cap = (label: string) => label.split(/\s+/).slice(0, 5).join(' ');
+  const cap = (label: string) =>
+    label
+      .split(/\s+/)
+      .slice(0, 5)
+      .join(' ')
+      .replace(/[,;:、。]+$/, '');
   if (c.name?.trim()) return c.name.trim();
+  if (c.descriptor?.trim()) return c.descriptor.trim();
   if (c.species?.trim()) return cap(`a ${c.species.trim()}`);
   const noun = ROLE_NOUNS[c.role] ?? 'someone special';
   const trait =
@@ -95,10 +128,12 @@ function truncateLabel(text: string, max = 40): string {
 
 /**
  * Build the discovery chips: up to 2 distinct settings, up to 3 cast entries
- * (recurring kids first by photo count, then foreground others), up to 2
- * event signals by cross-page frequency — interleaved
- * [setting, cast, cast, signal, setting, cast, signal], capped at 6.
- * Settings ground the day, the cast is the emotional hook, signals add charm.
+ * (recurring kids first by photo count, then foreground others), up to 1
+ * event signal by cross-page frequency — interleaved
+ * [setting, cast, cast, signal, cast], capped at 5.
+ * Settings ground the day, the cast is the emotional hook, the signal adds charm.
+ * Perception-authored `settingChip` labels are used RAW; legacy `setting`
+ * strings keep their truncated fallback byte-identically.
  */
 export function buildDiscoveryChips(
   pages: AnalyzedPageLike[],
@@ -112,12 +147,15 @@ export function buildDiscoveryChips(
   const settings: string[] = [];
   const seenSettings = new Set<string>();
   for (const a of analyses) {
-    const s = a.setting?.trim();
-    if (!s) continue;
-    const key = s.toLowerCase();
+    const chip = a.settingChip?.trim();
+    const chosen = chip || a.setting?.trim();
+    if (!chosen) continue;
+    const key = chosen.toLowerCase();
     if (seenSettings.has(key)) continue;
     seenSettings.add(key);
-    if (settings.length < 2) settings.push(truncateLabel(s));
+    // A perception `settingChip` is a finished label — use it RAW. A legacy
+    // page keeps the exact `truncateLabel(setting)` it produced before X17.2.
+    if (settings.length < 2) settings.push(chip ? chip : truncateLabel(chosen));
   }
 
   const kids = recurringChildren(characters).sort(
@@ -145,6 +183,8 @@ export function buildDiscoveryChips(
     .slice(0, 2)
     .map((s) => s.label);
 
+  // X17.2: ambient 5-slot interleave [setting, cast, cast, signal, cast] — the
+  // second setting/signal tail is dropped so the feed stays a light 5-chip peek.
   const ordered: (DiscoveryChip | null)[] = [
     settings[0] ? { id: 'setting-0', kind: 'setting', label: settings[0] } : null,
     cast[0]
@@ -154,11 +194,9 @@ export function buildDiscoveryChips(
       ? { id: `cast-${cast[1].characterId}`, kind: 'cast', label: describeCharacter(cast[1]) }
       : null,
     signals[0] ? { id: 'signal-0', kind: 'signal', label: signals[0] } : null,
-    settings[1] ? { id: 'setting-1', kind: 'setting', label: settings[1] } : null,
     cast[2]
       ? { id: `cast-${cast[2].characterId}`, kind: 'cast', label: describeCharacter(cast[2]) }
       : null,
-    signals[1] ? { id: 'signal-1', kind: 'signal', label: signals[1] } : null,
   ];
   return ordered.filter((c): c is DiscoveryChip => c != null).slice(0, MAX_DISCOVERY_CHIPS);
 }
