@@ -13,7 +13,7 @@
  *    extraction worker can skip its own vision call when this is fresh.
  */
 
-import type { CharacterIdentity } from '../types.js';
+import type { CharacterIdentity, FaceBox } from '../types.js';
 
 export const PHOTO_ANALYSIS_SYSTEM_PROMPT =
   "You are a perceptive story consultant and visual analyst for a children's picture-book studio. Parents upload family photos; you see what is happening, who appears, and what probably matters emotionally — and you know exactly which questions only the parent can answer. You are also an expert at extracting precise, consistent character descriptions for illustrators.";
@@ -343,6 +343,19 @@ export function heroAssetIds(
     if (assetId && !out.includes(assetId)) out.push(assetId);
   }
   return out.slice(0, 3);
+}
+
+/**
+ * X17.2: stamp a faceBox with the assetId behind its positional pageNumber
+ * (same convention as appearsOnAssetIds). Unknown position → box kept,
+ * assetId null (consumers fall back to the thumbnail path).
+ */
+export function stampFaceBox(
+  faceBox: FaceBox | null | undefined,
+  assetIdByPosition: Map<number, string | null>,
+): FaceBox | null {
+  if (!faceBox) return null;
+  return { ...faceBox, assetId: assetIdByPosition.get(faceBox.pageNumber) ?? null };
 }
 
 // ---------------------------------------------------------------------------
