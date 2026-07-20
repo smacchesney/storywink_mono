@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildRambleExtractPrompt, sanitizeRambleExtraction } from './ramble-extract';
+import {
+  buildRambleExtractPrompt,
+  isLikelyPersonName,
+  sanitizeRambleExtraction,
+} from './ramble-extract';
 
 describe('buildRambleExtractPrompt', () => {
   it('includes roster ids, theme guess, and the ramble', () => {
@@ -72,5 +76,49 @@ describe('sanitizeRambleExtraction', () => {
   it('never throws on garbage', () => {
     expect(sanitizeRambleExtraction(null, []).people).toEqual([]);
     expect(sanitizeRambleExtraction('junk', []).starName).toBeNull();
+  });
+});
+
+describe('X17.2 P0b — isLikelyPersonName + sanitize filtering', () => {
+  it.each([
+    'parent_or_uncle',
+    'friend',
+    'main_child',
+    'sibling',
+    'uncle',
+    'grandma',
+    'DADDY',
+    'ともだち',
+  ])('rejects role/relationship token %s', (token) =>
+    expect(isLikelyPersonName(token)).toBe(false),
+  );
+  it.each(['Kai', 'Uncle Jon', 'Astrid', 'あすか', 'Mary Jane'])('accepts real name %s', (name) =>
+    expect(isLikelyPersonName(name)).toBe(true),
+  );
+  it('rejects underscore tokens, empties, digits-only, and 5+ word strings', () => {
+    expect(isLikelyPersonName('a_b')).toBe(false);
+    expect(isLikelyPersonName('  ')).toBe(false);
+    expect(isLikelyPersonName('123')).toBe(false);
+    expect(isLikelyPersonName('the little boy in stripes')).toBe(false);
+  });
+  it('sanitizeRambleExtraction drops non-name people and non-name starName', () => {
+    const out = sanitizeRambleExtraction(
+      {
+        starName: 'main_child',
+        people: [
+          { characterId: 'child_1', name: 'Astrid' },
+          { characterId: 'adult_1', name: 'parent_or_uncle' },
+          { characterId: 'child_4', name: 'friend' },
+        ],
+        location: 'legoland',
+        highlight: null,
+        mishap: null,
+        childSaid: null,
+        themeLine: null,
+      },
+      ['child_1', 'adult_1', 'child_4'],
+    );
+    expect(out.starName).toBeNull();
+    expect(out.people).toEqual([{ characterId: 'child_1', name: 'Astrid' }]);
   });
 });
