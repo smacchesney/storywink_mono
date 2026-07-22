@@ -10,11 +10,15 @@ npm run dev                    # Start all services with Turbo
 
 # Before committing
 npm run lint && npm run format && npm run check-types
+npm run test                   # Vitest — 100+ test files, includes frozen PDF snapshots
 
 # Database
 npm run db:studio              # GUI for database inspection
 npm run db:generate            # Regenerate Prisma client after schema changes
 npm run db:migrate             # Run migrations
+
+# i18n (after changing user-facing copy)
+npm run i18n:check             # Verify en/ja translation parity
 ```
 
 ## Architecture
@@ -23,13 +27,15 @@ npm run db:migrate             # Run migrations
 apps/
   web/          Next.js 15 — UI + all API routes (port 3000)
   workers/      BullMQ job processors (all AI work)
+  api/          DEAD — build artifacts only, no source. Ignore it.
 
 packages/
   database/     Prisma schema and client
   shared/       Shared types, schemas, prompts (builds to dist/)
+  pdf/          All PDF generation (Lulu + user export) — snapshot-frozen, see .claude/rules/print-on-demand.md
 ```
 
-The web app owns every HTTP endpoint. Deploy target is Railway (services: web, workers, migrate).
+The web app owns every HTTP endpoint. Deploy target is Railway (services: web, workers, migrate). UI copy is bilingual: `apps/web/messages/en.json` + `ja.json`.
 
 ## Critical: Import Pattern
 
@@ -47,7 +53,7 @@ import { BookStatus } from './shared';
 import { BookStatus } from '@/shared';
 ```
 
-Available exports: main, `/constants`, `/schemas`, `/utils`, `/types`, `/redis`, `/prompts`, `/prompts/story`, `/prompts/illustration`, `/prompts/styles`
+The full subpath list lives in `packages/shared/package.json` (`exports`) — check there, don't guess.
 
 ## Ways of Working
 
@@ -57,9 +63,24 @@ Available exports: main, `/constants`, `/schemas`, `/utils`, `/types`, `/redis`,
 - When making UI / UX changes, use playwright MCP to verify the quality of the UI changes, and ensure consistency with brand guidelines. Save screenshots in .screenshots folder.
 - The USP of this app is simplicity and intuitive UX for users. We need to hyper-focus on this in EVERYTHING we do.
 
+## Dual-Brain Workflow (Claude + Sol)
+
+For features and non-trivial fixes, GPT-5.6 Sol acts as a second brain via the `codex@openai-codex` plugin. Claude orchestrates and has **final say** on all Sol feedback — consider each point, adopt or reject with reasons.
+
+1. **Plan** — Claude drafts in plan mode, saves to `.claude/plans/`.
+2. **Plan review** — `/codex:rescue --wait --fresh --effort xhigh` pointing Sol at the plan file. Read-only: challenge assumptions, failure modes, simpler alternatives.
+3. **Fold in** — Claude integrates surviving critique into the plan.
+4. **Implement** — Claude by default (knows the codebase); Sol via `/codex:rescue --effort high` (write mode) when delegating. Never both editing at once.
+5. **QA** — Claude runs real verification (lint, check-types, test, Playwright vs brand). Then `/codex:adversarial-review --base main` in a fresh thread. Sol never reviews its own same-thread work.
+
+Skip step 2 for small fixes. Review gate stays OFF. Sol's instruction file is `AGENTS.md` — keep it in sync when rules here change materially.
+
 ## Additional Documentation
 
 See `docs/` folder for detailed technical documentation:
 
 - `docs/print-on-demand.md` - Lulu API, Stripe, PDF generation
 - `docs/architecture-details.md` - Text overlay, illustration handling, data flow
+- `docs/voice.md` - Storywink brand voice for user-facing copy
+- `docs/ja-review.md` - Japanese localization review notes
+- `docs/privacy-deletion.md` - Account/data deletion flow

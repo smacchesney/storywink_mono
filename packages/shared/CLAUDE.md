@@ -14,7 +14,7 @@ import { STYLE_LIBRARY } from '@storywink/shared/prompts/styles';
 
 ## Available Exports
 
-main, `/constants`, `/schemas`, `/utils`, `/types`, `/redis`, `/prompts`, `/prompts/story`, `/prompts/illustration`, `/prompts/styles`
+The `exports` map in `package.json` is the source of truth. Adding a new module? Add its subpath there and rebuild.
 
 ## Key Files
 
