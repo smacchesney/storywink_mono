@@ -75,6 +75,8 @@ For features and non-trivial fixes, GPT-5.6 Sol acts as a second brain via the `
 
 Skip step 2 for small fixes. Review gate stays OFF. Sol's instruction file is `AGENTS.md` — keep it in sync when rules here change materially.
 
+**Claude drives Sol directly — no user intervention.** The owner works in the Claude Code desktop app; never ask them to type `/codex:` commands. Invoke the plugin commands yourself via the Skill tool (`codex:rescue`, `codex:adversarial-review`, `codex:status`, `codex:result`) with the flags above as args. The review gate is already configured off; do not re-run setup unless a codex call fails. If a call reports an auth failure, that's the one thing Claude can't fix: ask the owner to run `codex logout && codex login` in a terminal, then retry.
+
 ## Additional Documentation
 
 See `docs/` folder for detailed technical documentation:
