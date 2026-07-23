@@ -84,7 +84,7 @@ Today only themeLine/eventSummary/captureQuestions ride the debounced PATCH chan
 
 - `NEXT_PUBLIC_CREATE_WIZARD_ENABLED` — web-only, build-time, D7 pattern. Requires all three plumbing points: `discovery-client.ts` helper, **Dockerfile ARG + ENV**, **turbo.json env allowlist** (Sol finding 5; verified the existing flags do all three).
 - Wizard renders only when discovery is also on; wizard-on + discovery-off falls back to the sheet.
-- **Flag-off invariant, restated honestly:** rendered DOM and behavior parity for the sheet (not byte-identical bundles). `themeSoundsLike` is kept; ThemeCard gains a label prop (default = today's key) so the fallback is untouched; StoryFraming's flag-off DOM is pinned by a render test at the wizard-off + discovery-on combination (today's prod).
+- **Flag-off invariant, restated honestly:** rendered DOM and behavior parity for the sheet (not byte-identical bundles). `themeSoundsLike` is kept; ThemeCard gains a label prop (default = today's key) so the fallback is untouched; StoryFraming's flag-off DOM is pinned by a Playwright screenshot diff at the wizard-off + discovery-on combination (today's prod) — this repo has no component render-test harness, so the extraction is verbatim-JSX-move plus visual diff, not a snapshot test.
 
 ## State architecture
 
@@ -95,7 +95,7 @@ Today only themeLine/eventSummary/captureQuestions ride the debounced PATCH chan
 
 ## Copy (en + ja, `npm run i18n:check` gates)
 
-New keys: step titles ×4, `next`, `photoOrderHint`, `themeWeThink`, `readerSlowPhotosStillGuide`, `foundForStep3`, `recapFor`, `recapDay`, `recapCast`, `recapPhotos`, `moreOptions`, `progressLabel` ("Step {n} of {total}: {title}"). Kept: `themeSoundsLike` (fallback). Voice per `docs/voice.md`; ja via `font-japanese`; new ja strings get a `docs/ja-review.md` entry for the native-speaker pass (not just screenshots). The settled-empty line promises only that the photos guide the story — no claim about late findings.
+New keys: step titles ×4, `next`, `back`, `photoOrderHint`, `themeWeThink`, `readerSlow`, `foundForStep3`, `recapFor`, `recapDay`, `recapCast`, `recapCastEveryone`, `recapPhotos`, `editPhotos`, `moreOptions`, `waitingForPhotos`, `progressLabel` ("Step {n} of {total}: {title}"). Kept: `themeSoundsLike` (fallback). Voice per `docs/voice.md`; ja via `font-japanese`; new ja strings get a `docs/ja-review.md` entry for the native-speaker pass (not just screenshots). The settled-empty line promises only that the photos guide the story — no claim about late findings.
 
 ## Telemetry
 
@@ -116,7 +116,7 @@ New keys: step titles ×4, `next`, `photoOrderHint`, `themeWeThink`, `readerSlow
 - **Photo edits invalidating answers** → photos live before the payoff (step 2), gate on in-flight mutations, explicit re-arm, stale-answer drop at merge + submit.
 - **Late extraction mutating state** → hard cutoff at step 4 entry + submit (abort). Deterministic by construction.
 - **History loops / double-push** → push only first-time linear advances, replace otherwise, nav lock, pure mapping under test.
-- **Flag-off drift** → DOM-parity render tests at wizard-off + discovery-on; SetupSheet untouched; ToneRow extraction pinned.
+- **Flag-off drift** → Playwright screenshot diffs at wizard-off + discovery-on; SetupSheet untouched; ToneRow extraction is a verbatim JSX move.
 - **ja lengths break step headers** → short keys, ja review entry, Playwright ja pass.
 
 ## Out of scope (parked)
