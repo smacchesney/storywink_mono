@@ -3,9 +3,10 @@
 import React from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Pencil } from 'lucide-react';
-import { STORY_MOODS, STORY_MOOD_LABELS, type StoryMood } from '@storywink/shared/constants';
-import { cn } from '@/lib/utils';
+import type { StoryMood } from '@storywink/shared/constants';
+import LearningWords from '@/components/create/setup/LearningWords';
 import RambleTextarea from '@/components/create/setup/RambleTextarea';
+import ToneRow from '@/components/create/setup/ToneRow';
 
 interface StoryFramingProps {
   tone: StoryMood | null;
@@ -43,14 +44,6 @@ export function StoryFraming({
   // Once the parent opens the textarea it stays open for the session — the
   // second tap into it is what opts into the keyboard (never autofocused).
   const [expanded, setExpanded] = React.useState(false);
-  const [wordsExpanded, setWordsExpanded] = React.useState(false);
-
-  const commitWord = (raw: string, input: HTMLInputElement) => {
-    const word = raw.trim().slice(0, 30);
-    input.value = '';
-    if (!word || learningWords.includes(word) || learningWords.length >= 4) return;
-    onLearningWordsChange([...learningWords, word]);
-  };
 
   const hasSummary = eventSummary.trim().length > 0;
 
@@ -59,30 +52,7 @@ export function StoryFraming({
       <label className="text-sm font-medium text-gray-600">{t('howToTellIt')}</label>
 
       {/* Mood row — horizontal scroll-snap, right-edge fade hints the rest. */}
-      <div className="relative">
-        <div className="flex snap-x gap-1.5 overflow-x-auto pr-6 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {STORY_MOODS.map((mood) => {
-            const selected = tone === mood;
-            return (
-              <button
-                key={mood}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => onToneChange(selected ? null : mood)}
-                className={cn(
-                  'min-h-[44px] shrink-0 snap-start rounded-full border px-4 font-playful text-sm whitespace-nowrap transition-colors',
-                  selected
-                    ? 'border-coral bg-coral text-white'
-                    : 'border-black/10 bg-white text-gray-700 hover:border-coral/50',
-                )}
-              >
-                {STORY_MOOD_LABELS[mood][locale]}
-              </button>
-            );
-          })}
-        </div>
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
-      </div>
+      <ToneRow tone={tone} onToneChange={onToneChange} />
 
       {/* Summary row — parent-editable AI text behind an explicit affordance.
           Same co-creation nudge as the avatar spark: a child-voiced placeholder
@@ -137,44 +107,7 @@ export function StoryFraming({
 
       {/* Learning words — curiosity, never curriculum. Collapsed to one quiet
           line; expanding shows removable word chips plus a small input. */}
-      {wordsExpanded || learningWords.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {learningWords.map((word) => (
-            <button
-              key={word}
-              type="button"
-              aria-label={t('learningWordRemove', { word })}
-              onClick={() => onLearningWordsChange(learningWords.filter((w) => w !== word))}
-              className="rounded-full border border-coral bg-coral px-3 py-1 font-playful text-sm text-white"
-            >
-              {word} ×
-            </button>
-          ))}
-          {learningWords.length < 4 && (
-            <input
-              type="text"
-              maxLength={30}
-              placeholder={t('learningWordsPlaceholder')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  commitWord(e.currentTarget.value, e.currentTarget);
-                }
-              }}
-              onBlur={(e) => commitWord(e.currentTarget.value, e.currentTarget)}
-              className="h-[30px] w-40 rounded-full border border-black/10 bg-white px-3 font-playful text-sm text-gray-800 focus:border-coral focus:ring-1 focus:ring-coral focus:outline-none"
-            />
-          )}
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setWordsExpanded(true)}
-          className="min-h-[44px] self-start px-1 text-left font-playful text-sm text-gray-500 underline decoration-black/20 decoration-dashed underline-offset-4 transition-colors hover:text-gray-700"
-        >
-          {t('learningWordsAdd')}
-        </button>
-      )}
+      <LearningWords words={learningWords} onChange={onLearningWordsChange} />
     </section>
   );
 }
