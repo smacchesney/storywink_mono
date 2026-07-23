@@ -327,3 +327,11 @@ Append-only. One line per key: `namespace.key` — why it needs a native check.
 - `avatarStories.helperSkip` — the shape-step decline, renamed from 「スキップ」 to 「じぶんのことばで」 ("Use my words"); proceeds with the parent's raw spark instead of the proposal. **NATIVE-REVIEW FLAG (reviewer): register** — confirm the bare 〜で noun phrase reads as a button action ("go with my own words") at the right warmth, and that it dodges the ambiguity the X11 entry warned about (そのまま risking a "keep this proposal" misread — the opposite meaning).
 - `setup.eventSummaryPlaceholder` — the photo-book note field's placeholder, retasked from an instruction to a child-voiced example 「おおきな すなの おしろを つくって、なみが きたの…」 ("We built a giant sandcastle, then the waves came…"). Check the 〜の ending reads as a small child retelling the day and the spaced-hiragana style matches its `setup` neighbours.
 - `setup.eventSummaryHint` — NEW, the Geist hint under the expanded eventSummary textarea 「なにを おぼえているか お子さんに きいてみて。そのまま はなしても かいても いいよ。」 ("Ask your little one what they remember, then talk or type it here."); deliberately parallel to `sparkHintCoCreate` (same co-creation moment in the other flow). Check きいてみて reads as an invitation rather than an instruction, and that the deliberate phrasing echo between the two hints is a feature, not an accident.
+
+## 2026-07-23 — X18 guided setup (PENDING native review)
+
+New `setup.*` keys: stepWhoTitle, stepDayTitle, stepSawTitle, stepFinishTitle,
+next, back, photoOrderHint, themeWeThink, readerSlow, foundForStep3, recapFor,
+recapDay, recapCast, recapCastEveryone, recapPhotos, editPhotos, moreOptions,
+progressLabel, waitingForPhotos. Drafted by Claude in the yasashii register;
+needs the standard native-speaker pass before the wizard flag flips.
