@@ -66,6 +66,7 @@ export function SetupWizard(props: SetupWizardProps) {
   // 1 forward slide, -1 back slide, 0 crossfade (recap jumps / pops).
   const [direction, setDirection] = React.useState<1 | -1 | 0>(1);
   const visited = React.useRef(new Set<WizardStepId>([step]));
+  const advancedFrom = React.useRef(new Set<WizardStepId>());
   const interacted = React.useRef(new Set<WizardStepId>());
   const viewed = React.useRef(new Set<WizardStepId>());
   const navLock = React.useRef(false);
@@ -91,18 +92,34 @@ export function SetupWizard(props: SetupWizardProps) {
   }, []);
 
   // System back/forward → step change; guards canonicalize via replace.
+  const wizardPathRef = React.useRef('');
+  React.useEffect(() => {
+    wizardPathRef.current = window.location.pathname;
+  }, []);
   React.useEffect(() => {
     const onPop = (e: PopStateEvent) => {
+      // Pop landed on a DIFFERENT route (Back past step 1): the App Router
+      // owns that entry — never rewrite it (adversarial review #10).
+      if (window.location.pathname !== wizardPathRef.current) return;
+      // Mid-submit the wizard is locked: undo the pop instead of stepping.
+      if (props.isSubmitting) {
+        window.history.pushState({ winkStep: step }, '', `?step=${step}`);
+        return;
+      }
       const raw =
         typeof e.state?.winkStep === 'number'
           ? e.state.winkStep
           : parseStepParam(window.location.search);
-      // Untagged pop on this pathname (edge: user meddled with the URL):
-      // guard and canonicalize rather than guessing.
-      let target = guardStep(raw, form.childName);
       // Forward-pop into a photo-gated step while mutations are in flight:
-      // bounce back to step 2 (canonicalized, no new entry).
-      if (target > 2 && step === 2 && photoPending > 0) target = 2;
+      // reverse the gesture (back to the step-2 entry) rather than replacing
+      // the forward entry away (adversarial review #10).
+      const target = guardStep(raw, form.childName);
+      if (target > 2 && step === 2 && photoPending > 0) {
+        window.history.back();
+        return;
+      }
+      // Untagged/out-of-range pop on this pathname (URL meddling): guard and
+      // canonicalize rather than guessing.
       if (target !== raw || typeof e.state?.winkStep !== 'number') {
         window.history.replaceState({ winkStep: target }, '', `?step=${target}`);
       }
@@ -113,7 +130,7 @@ export function SetupWizard(props: SetupWizardProps) {
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, [form.childName, step, photoPending, onReachFinish]);
+  }, [form.childName, step, photoPending, onReachFinish, props.isSubmitting]);
 
   // Per-step: telemetry (deduped), focus, scroll. (Cutoff runs in goToStep.)
   React.useEffect(() => {
@@ -123,7 +140,12 @@ export function SetupWizard(props: SetupWizardProps) {
       track('setup_step_viewed', { ...(bookId ? { bookId } : {}), props: { step } });
     }
     window.scrollTo({ top: 0 });
-    const id = setTimeout(() => headingRef.current?.focus(), TRANSITION_MS + 50);
+    const id = setTimeout(() => {
+      // Don't steal focus from a field the parent already tapped — yanking
+      // it back dismisses the mobile keyboard and can fire a spurious ramble
+      // blur (adversarial review #11). blurActive left focus on <body>.
+      if (document.activeElement === document.body) headingRef.current?.focus();
+    }, TRANSITION_MS + 50);
     return () => clearTimeout(id);
   }, [step, bookId]);
 
@@ -157,6 +179,7 @@ export function SetupWizard(props: SetupWizardProps) {
 
   const goToStep = React.useCallback(
     (target: WizardStepId, source: 'next' | 'recap') => {
+      if (props.isSubmitting) return; // shell-wide lock while submitting
       if (target === step) return;
       if (target > 1 && !canLeaveStep1(form.childName)) return;
       // Forward past the photo step is gated on in-flight mutations,
@@ -172,7 +195,7 @@ export function SetupWizard(props: SetupWizardProps) {
       window.history.pushState({ winkStep: target }, '', `?step=${target}`);
       setStep(target);
     },
-    [step, form.childName, photoPending, onReachFinish],
+    [step, form.childName, photoPending, onReachFinish, props.isSubmitting],
   );
 
   const handleNext = () => {
@@ -181,10 +204,15 @@ export function SetupWizard(props: SetupWizardProps) {
       return;
     }
     if (step === 2 && photoPending > 0) return;
-    if (step < WIZARD_STEP_COUNT) goToStep((step + 1) as WizardStepId, 'next');
+    if (step < WIZARD_STEP_COUNT) {
+      // Skips count only steps the parent advanced PAST (not recap visits).
+      advancedFrom.current.add(step);
+      goToStep((step + 1) as WizardStepId, 'next');
+    }
   };
 
   const handleBack = () => {
+    if (props.isSubmitting) return; // shell-wide lock while submitting
     if (!lockNav()) return;
     window.history.back(); // past step 1 this exits the flow via real history
   };
@@ -200,7 +228,7 @@ export function SetupWizard(props: SetupWizardProps) {
         stripPhaseAtSubmit: stripPhase,
         summaryEdited: props.summaryEdited,
         wizard: true,
-        skippedSteps: skippedSteps(visited.current, interacted.current),
+        skippedSteps: skippedSteps(advancedFrom.current, interacted.current),
         step3State: step3,
       },
     });

@@ -46,6 +46,64 @@ describe('createPatchDebouncer', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
+  it('flush awaits an already-running send so submit PATCHes order after it (X18 review #4)', async () => {
+    const order: string[] = [];
+    let release: () => void = () => {};
+    const send = vi.fn().mockImplementation((body: Record<string, unknown>) => {
+      order.push('send:' + Object.keys(body).join(','));
+      return new Promise<void>((r) => {
+        release = () => {
+          order.push('done:' + Object.keys(body).join(','));
+          r();
+        };
+      });
+    });
+    const d = createPatchDebouncer(send);
+    d.queue({ tone: 'sweet' });
+    await vi.advanceTimersByTimeAsync(BOOK_PATCH_DEBOUNCE_MS); // timer fires, send in flight
+    const flushed = vi.fn();
+    const flushPromise = d.flush().then(flushed);
+    await Promise.resolve();
+    expect(flushed).not.toHaveBeenCalled(); // must wait for the in-flight send
+    release();
+    await flushPromise;
+    expect(flushed).toHaveBeenCalled();
+    expect(order).toEqual(['send:tone', 'done:tone']);
+  });
+
+  it('an undefined-valued key cancels the pending field entirely (X18 review #4)', async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const d = createPatchDebouncer(send);
+    d.queue({ childName: 'Kai' });
+    d.queue({ childName: undefined });
+    await vi.advanceTimersByTimeAsync(BOOK_PATCH_DEBOUNCE_MS * 2);
+    expect(send).not.toHaveBeenCalled(); // nothing left to send — no {} PATCH either
+  });
+
+  it('serializes overlapping sends in order', async () => {
+    const order: string[] = [];
+    const resolvers: Array<() => void> = [];
+    const send = vi.fn().mockImplementation((body: Record<string, unknown>) => {
+      order.push('start:' + Object.keys(body).join(','));
+      return new Promise<void>((r) =>
+        resolvers.push(() => {
+          order.push('end:' + Object.keys(body).join(','));
+          r();
+        }),
+      );
+    });
+    const d = createPatchDebouncer(send);
+    d.queue({ tone: 'sweet' });
+    await vi.advanceTimersByTimeAsync(BOOK_PATCH_DEBOUNCE_MS); // send A in flight
+    d.queue({ title: 'T' });
+    await vi.advanceTimersByTimeAsync(BOOK_PATCH_DEBOUNCE_MS); // timer B fires while A running
+    resolvers.shift()?.();
+    await vi.advanceTimersByTimeAsync(0);
+    resolvers.shift()?.();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(order).toEqual(['start:tone', 'end:tone', 'start:title', 'end:title']);
+  });
+
   it('dispose drops pending fields', async () => {
     const send = vi.fn().mockResolvedValue(undefined);
     const d = createPatchDebouncer(send);

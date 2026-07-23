@@ -57,6 +57,18 @@ describe('deriveStep3State', () => {
   it('whitespace theme is not payload', () => {
     expect(deriveStep3State('settled', { ...empty, themeLine: '  ' }, false)).toBe('settledEmpty');
   });
+  it('a theme alone cannot end the reading state (extraction may have written it)', () => {
+    expect(deriveStep3State('reading', { ...empty, themeLine: 'a beach day' }, false)).toBe(
+      'reading',
+    );
+    expect(deriveStep3State('arrivedQuiet', { ...empty, themeLine: 'a beach day' }, false)).toBe(
+      'landed',
+    );
+    // Roster/chips are perception-only, so they flip even mid-reading.
+    expect(
+      deriveStep3State('reading', { ...empty, themeLine: 'a beach day', rosterCount: 1 }, false),
+    ).toBe('landed');
+  });
 });
 
 describe('guardStep / parseStepParam / canLeaveStep1', () => {
@@ -127,13 +139,14 @@ describe('filterStaleCastAnswers', () => {
 });
 
 describe('skippedSteps', () => {
-  it('optional steps visited without interaction are skipped', () => {
-    expect(skippedSteps(new Set<WizardStepId>([1, 2, 3, 4]), new Set<WizardStepId>([1, 3]))).toEqual(
-      [2],
-    );
+  it('optional steps advanced past without interaction are skipped', () => {
+    expect(skippedSteps(new Set<WizardStepId>([1, 2, 3]), new Set<WizardStepId>([1, 3]))).toEqual([
+      2,
+    ]);
   });
-  it('unvisited steps are not skipped (never shown)', () => {
-    expect(skippedSteps(new Set<WizardStepId>([1, 4]), new Set<WizardStepId>([1]))).toEqual([]);
+  it('a recap inspection (visited but never advanced from) is not a skip', () => {
+    expect(skippedSteps(new Set<WizardStepId>([1, 3]), new Set<WizardStepId>([1]))).toEqual([3]);
+    expect(skippedSteps(new Set<WizardStepId>([1]), new Set<WizardStepId>([1]))).toEqual([]);
   });
 });
 

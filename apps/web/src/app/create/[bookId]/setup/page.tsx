@@ -166,6 +166,9 @@ export default function SetupPage() {
     setReReading(v);
   }, []);
   const reReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Poll keep-alive deadline for the re-read — outlives the visible theater
+  // so late refreshes still merge on stale (>10min) drafts (review #7).
+  const reReadPollUntilRef = useRef<number | null>(null);
   // Normalized perception snapshot (identity + perception question rows).
   const perceptionSnapRef = useRef<string>('');
   // Set at mutation time; the FIRST post-mutation merge becomes the baseline
@@ -282,6 +285,28 @@ export default function SetupPage() {
         } else if (book.starCharacterId) {
           next.castMode = 'star';
           next.starCharacterId = book.starCharacterId;
+        }
+      }
+      // Adversarial review #2: a photo-refresh replaces characterIdentity
+      // wholesale, and touched.castMode blocks the merge above from ever
+      // updating a picked star/crew. Reconcile picks against the live roster:
+      // a vanished star clears (and un-touches castMode so the ask reopens);
+      // ensemble members intersect; an emptied crew falls back to star mode.
+      // Idempotent, so a StrictMode double-invoke is safe.
+      if (WIZARD_ENABLED && characters.length > 0) {
+        const rosterIds = new Set(characters.map((c) => c.characterId));
+        if (next.starCharacterId && !rosterIds.has(next.starCharacterId)) {
+          next.starCharacterId = null;
+          next.castMode = 'star';
+          touched.current.castMode = false;
+        }
+        if (next.castMode === 'ensemble') {
+          const kept = next.castMemberIds.filter((id) => rosterIds.has(id));
+          if (kept.length !== next.castMemberIds.length) next.castMemberIds = kept;
+          if (kept.length === 0) {
+            next.castMode = 'star';
+            touched.current.castMode = false;
+          }
         }
       }
       return next;
@@ -416,7 +441,12 @@ export default function SetupPage() {
     // strands the strip mid-narration.
     const needsAnalysis =
       !analysisDone && bookCreatedAt !== null && isFreshBook(bookCreatedAt, Date.now());
-    if (!needsTitle && !needsSummary && !needsQuestions && !needsAnalysis && !reReading) return;
+    // The re-read poll window outlives the visible theater (review #7): late
+    // refreshes on stale drafts must still merge after reReading expires.
+    const reReadPollAlive =
+      reReadPollUntilRef.current !== null && Date.now() < reReadPollUntilRef.current;
+    if (!needsTitle && !needsSummary && !needsQuestions && !needsAnalysis && !reReading && !reReadPollAlive)
+      return;
 
     let polls = 0;
     const MAX_POLLS = 40; // ~2 minutes at 3s
@@ -528,7 +558,11 @@ export default function SetupPage() {
   const extractAbortRef = useRef<AbortController | null>(null);
   const extractionClosedRef = useRef(false);
 
+  // Cutoff mechanics are WIZARD-ONLY (adversarial review #6): the legacy
+  // sheet never had a cutoff, and a failed legacy submit must not leave
+  // extraction permanently dead. Flag-off keeps today's per-call controller.
   const handleReachFinish = useCallback(() => {
+    if (!WIZARD_ENABLED) return;
     extractionClosedRef.current = true;
     extractAbortRef.current?.abort();
   }, []);
@@ -536,14 +570,14 @@ export default function SetupPage() {
   const handleNameErrorRequest = useCallback(() => setShowNameError(true), []);
 
   const handleRambleBlur = useCallback(async () => {
-    if (extractionClosedRef.current) return;
+    if (WIZARD_ENABLED && extractionClosedRef.current) return;
     if (!CREATE_DISCOVERY_FLAG) return;
     const text = form.eventSummary;
     if (!shouldExtract(text, lastExtractRef.current)) return;
     lastExtractRef.current = text.trim();
-    extractAbortRef.current?.abort();
+    if (WIZARD_ENABLED) extractAbortRef.current?.abort();
     const controller = new AbortController();
-    extractAbortRef.current = controller;
+    if (WIZARD_ENABLED) extractAbortRef.current = controller;
     const timeout = setTimeout(() => controller.abort(), 12_000);
     try {
       const res = await fetch('/api/story/propose', {
@@ -555,7 +589,7 @@ export default function SetupPage() {
       if (!res.ok || !isMountedRef.current) return;
       const facts = (await res.json()) as RambleExtraction;
       if (
-        extractionClosedRef.current ||
+        (WIZARD_ENABLED && extractionClosedRef.current) ||
         controller.signal.aborted ||
         !isMountedRef.current
       )
@@ -589,6 +623,10 @@ export default function SetupPage() {
         nextCq = applied === prev.captureQuestions ? undefined : applied;
         return { ...prev, ...changedScalars, captureQuestions: applied } as SetupFormState;
       });
+      // Re-check the cutoff right before queueing: it may have flipped in the
+      // microtask gap between the guard above and here (adversarial review #5)
+      // — a post-cutoff PATCH would diverge server state from the frozen form.
+      if (WIZARD_ENABLED && extractionClosedRef.current) return;
       const patchBody = { ...changedScalars, ...(nextCq ? { captureQuestions: nextCq } : {}) };
       if (Object.keys(patchBody).length > 0) patcherRef.current?.queue(patchBody);
     } catch {
@@ -624,6 +662,10 @@ export default function SetupPage() {
   // X18: every photo add/remove lands here (PhotoStrip's onPhotosChanged).
   // The mutation itself proves a refresh pass is in flight — no freshness
   // gate (the DELETE route enqueues refresh:true for any DRAFT).
+  // Known bounded edge (adversarial review #8, accepted): a failed immediate
+  // refetch or two overlapping mutations can mis-baseline the content hash;
+  // the worst case is a theater that runs to its 60s expiry (or ends one
+  // merge early), never data corruption — submit quarantine covers the data.
   const handlePhotosMutated = useCallback(async () => {
     if (WIZARD_ENABLED) {
       awaitingBaselineRef.current = true;
@@ -632,11 +674,18 @@ export default function SetupPage() {
       setPerceptionSettled(false);
       setAnalysisDone(false);
       setMutationNonce((n) => n + 1);
+      // The POLL outlives the visible theater (adversarial review #7): a
+      // stale (>10min) draft has no freshness-based poll term, so merges
+      // landing after the 60s theater would otherwise never arrive. The
+      // window is generous (refresh p95 ≪ this) and MAX_POLLS still caps.
+      reReadPollUntilRef.current = Date.now() + REREAD_WINDOW_MS * 2.5;
       if (reReadTimerRef.current) clearTimeout(reReadTimerRef.current);
       reReadTimerRef.current = setTimeout(() => {
-        // Window expiry: stop claiming to read; the next merge announces
-        // whatever is true (usually arrivedQuiet off the stale-but-only data).
+        // Window expiry: stop claiming to read. If nothing ever announced,
+        // settle the strip too — otherwise a payload-less step 3 could sit
+        // in reading theater forever (adversarial review #7).
         setReReadingBoth(false);
+        setStripPhase((prev) => (prev === 'reading' ? 'settled' : prev));
       }, REREAD_WINDOW_MS);
     }
     await refetchBook();
@@ -686,13 +735,24 @@ export default function SetupPage() {
       // otherwise keep its stale DB value. flush() early-returns when nothing
       // is pending, so the common path adds no request.
       await patcherRef.current?.flush();
+      // Adversarial review #1: while a re-read is open, the in-state roster
+      // is STALE (the refresh hasn't landed), so filtering against it proves
+      // nothing. Quarantine every character-bound input instead — the story
+      // still gets the ramble, tone, style, and unbound answers; the worker
+      // re-derives the cast from the fresh identity it already owns.
+      const quarantine = WIZARD_ENABLED && reReadingRef.current;
       const submitForm = WIZARD_ENABLED
         ? {
             ...form,
-            captureQuestions: filterStaleCastAnswers(
-              form.captureQuestions,
-              new Set(roster.map((c) => c.characterId)),
-            ),
+            captureQuestions: quarantine
+              ? form.captureQuestions.filter((q) => !q.characterId)
+              : filterStaleCastAnswers(
+                  form.captureQuestions,
+                  new Set(roster.map((c) => c.characterId)),
+                ),
+            ...(quarantine
+              ? { starCharacterId: null, castMode: 'star' as const, castMemberIds: [] }
+              : {}),
           }
         : form;
       const patchBody = buildSubmitPatchBody(submitForm);

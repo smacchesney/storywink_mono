@@ -42,11 +42,13 @@ export function deriveStep3State(
   reReading: boolean,
 ): Step3State {
   if (reReading) return 'reading';
+  // themeLine alone can't end the reading state: ramble extraction may fill
+  // it from the parent's own words while photo analysis is still running
+  // (adversarial review #9). Roster/chips/perception-questions only ever
+  // come from a landed analysis, so they flip regardless of phase.
+  const themeCounts = phase !== 'reading' && p.themeLine.trim().length > 0;
   const hasPayload =
-    p.rosterCount > 0 ||
-    p.chipCount > 0 ||
-    p.themeLine.trim().length > 0 ||
-    p.perceptionQuestionCount > 0;
+    p.rosterCount > 0 || p.chipCount > 0 || themeCounts || p.perceptionQuestionCount > 0;
   if (hasPayload) return 'landed';
   return phase === 'reading' ? 'reading' : 'settledEmpty';
 }
@@ -83,12 +85,16 @@ export function filterStaleCastAnswers(
   return questions.filter((q) => !q.characterId || rosterIds.has(q.characterId));
 }
 
-/** Optional steps (2, 3) that were shown but never touched. */
+/**
+ * Optional steps the parent ADVANCED PAST without touching. Keyed on
+ * advanced-from (Next left the step), not visited — a recap inspection from
+ * step 4 followed by Back is not a skip (adversarial review #12).
+ */
 export function skippedSteps(
-  visited: ReadonlySet<WizardStepId>,
+  advancedFrom: ReadonlySet<WizardStepId>,
   interacted: ReadonlySet<WizardStepId>,
 ): WizardStepId[] {
-  return ([2, 3] as WizardStepId[]).filter((s) => visited.has(s) && !interacted.has(s));
+  return ([2, 3] as WizardStepId[]).filter((s) => advancedFrom.has(s) && !interacted.has(s));
 }
 
 export type RibbonLineKey =
