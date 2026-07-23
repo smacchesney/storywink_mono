@@ -70,7 +70,7 @@ For features and non-trivial fixes, GPT-5.6 Sol acts as a second brain via the `
 1. **Plan** — Claude drafts in plan mode, saves to `.claude/plans/`.
 2. **Plan review** — `/codex:rescue --wait --fresh --effort xhigh` pointing Sol at the plan file. Read-only: challenge assumptions, failure modes, simpler alternatives.
 3. **Fold in** — Claude integrates surviving critique into the plan.
-4. **Implement** — Claude by default (knows the codebase); Sol via `/codex:rescue --effort high` (write mode) when delegating. Never both editing at once.
+4. **Implement** — Claude by default (knows the codebase); Sol via `/codex:rescue --effort high` (write mode) when delegating. Never both editing at once. **Write mode is not the default**: when driving the runtime directly (the `codex-companion.mjs task` invocation inside the rescue subagent), pass `--write` explicitly or Sol lands in a read-only sandbox and every edit is rejected. Review/diagnosis runs correctly omit it.
 5. **QA** — Claude runs real verification (lint, check-types, test, Playwright vs brand). Then `/codex:adversarial-review --base main` in a fresh thread. Sol never reviews its own same-thread work.
 
 Skip step 2 for small fixes. Review gate stays OFF. Sol's instruction file is `AGENTS.md` — keep it in sync when rules here change materially.
