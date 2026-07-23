@@ -6,8 +6,7 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Storydust } from '@/components/ui/storydust';
 import { BookStatus } from '@prisma/client';
-import { isValidStyle, StyleKey } from '@storywink/shared/prompts/styles';
-import { STORY_MOODS, type StoryMood } from '@storywink/shared/constants';
+import { StyleKey } from '@storywink/shared/prompts/styles';
 import SetupSheet, { SetupFormState } from '@/components/create/setup/SetupSheet';
 import type { StripPhoto } from '@/components/create/setup/PhotoStrip';
 import type { CaptureQuestion } from '@/components/create/setup/CaptureChips';
@@ -20,10 +19,8 @@ import {
   type DiscoveryChip,
   type RosterCharacterLike,
 } from '@/components/create/setup/discovery-feed';
-import {
-  ensureMemberNamingQuestions,
-  mergeCaptureQuestions,
-} from '@/components/create/setup/star-ask';
+import { ensureMemberNamingQuestions } from '@/components/create/setup/star-ask';
+import { mergeBookIntoForm } from '@/components/create/setup/merge-book-form';
 import { shouldExtract } from '@/components/create/setup/ramble';
 import {
   mergeExtractionFacts,
@@ -117,6 +114,7 @@ export default function SetupPage() {
     title: false,
     eventSummary: false,
     captureQuestions: false,
+    artStyle: false,
     tone: false,
     learningWords: false,
     themeLine: false,
@@ -191,51 +189,7 @@ export default function SetupPage() {
     // a photo add/remove (analysis wiped) clears them until the re-read.
     setDiscoveryChips(analyzed ? buildDiscoveryChips(book.pages, characters) : []);
 
-    setForm((prev) => {
-      const next = { ...prev };
-      if (!touched.current.title && book.title?.trim()) next.title = book.title;
-      if (!touched.current.childName && book.childName) next.childName = book.childName;
-      if (!touched.current.eventSummary && book.eventSummary) next.eventSummary = book.eventSummary;
-      if (!touched.current.captureQuestions && book.captureQuestions?.length) {
-        // Id-preserving merge: a poll tick landing before handlePickEveryone's
-        // PATCH round-trips must not clobber the synthetic `name_` naming rows
-        // it injected without marking captureQuestions touched.
-        next.captureQuestions = mergeCaptureQuestions(book.captureQuestions, prev.captureQuestions);
-      }
-      if (book.artStyle && isValidStyle(book.artStyle)) {
-        next.artStyle = book.artStyle as StyleKey;
-      }
-      // Only ever fills a resumed draft's own earlier choice — nothing but
-      // the parent's tap writes Book.tone, so untouched means unwritten.
-      if (
-        !touched.current.tone &&
-        book.tone &&
-        (STORY_MOODS as readonly string[]).includes(book.tone)
-      ) {
-        next.tone = book.tone as StoryMood;
-      }
-      // Resumed drafts show their earlier learning words; parent edits win.
-      if (!touched.current.learningWords && Array.isArray(book.learningWords)) {
-        const words = (book.learningWords as { word?: string }[])
-          .map((w) => (typeof w?.word === 'string' ? w.word : ''))
-          .filter(Boolean)
-          .slice(0, 4);
-        if (words.length > 0) next.learningWords = words;
-      }
-      if (!touched.current.themeLine && book.themeLine?.trim()) next.themeLine = book.themeLine;
-      if (!touched.current.castMode) {
-        if (book.castMode === 'ensemble' && Array.isArray(book.castMemberIds)) {
-          next.castMode = 'ensemble';
-          next.castMemberIds = (book.castMemberIds as unknown[]).filter(
-            (id): id is string => typeof id === 'string',
-          );
-        } else if (book.starCharacterId) {
-          next.castMode = 'star';
-          next.starCharacterId = book.starCharacterId;
-        }
-      }
-      return next;
-    });
+    setForm((prev) => mergeBookIntoForm(prev, book, touched.current));
 
     setAnalysisDone(analyzed);
     // A strip that is narrating announces the arrival; every other phase is
