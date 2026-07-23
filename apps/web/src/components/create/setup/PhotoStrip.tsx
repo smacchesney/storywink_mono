@@ -53,6 +53,11 @@ interface PhotoStripProps {
    * removed, so the parent can refetch the book (which re-derives the strip).
    */
   onPhotosChanged?: () => void | Promise<void>;
+  /** X18: mutation counter protocol — +1 when an upload batch or a page
+   * delete starts, -1 in its finally. The page owns the count (overlapping
+   * ops compose; unmount can't strand it: these callbacks close over page
+   * state and every -1 runs in finally). */
+  onPendingChange?: (delta: 1 | -1) => void;
   /** X17 B1: true while perception reads — a spark sweeps the thumbnails. */
   reading?: boolean;
   /** False when the book has a composed cover (coverAssetId null). Default
@@ -200,6 +205,7 @@ export function PhotoStrip({
   onReorder,
   bookId,
   onPhotosChanged,
+  onPendingChange,
   reading,
   hasPhotoCover = true,
 }: PhotoStripProps) {
@@ -295,6 +301,7 @@ export function PhotoStrip({
       if (valid.length === 0) return;
 
       setUploading(true);
+      onPendingChange?.(1);
       try {
         const assets = await uploadPhotos(
           valid.map((file) => ({ key: makeFileKey(), file })),
@@ -309,15 +316,17 @@ export function PhotoStrip({
         toast.error(tUpload('errorGeneric'));
       } finally {
         setUploading(false);
+        onPendingChange?.(-1);
       }
     },
-    [bookId, remaining, getToken, onPhotosChanged, tUpload],
+    [bookId, remaining, getToken, onPhotosChanged, onPendingChange, tUpload],
   );
 
   const handleRemove = useCallback(
     async (photo: StripPhoto) => {
       if (!bookId) return;
       setRemovingId(photo.id);
+      onPendingChange?.(1);
       try {
         const token = await getToken();
         const res = await fetch(`/api/book/${bookId}/page/${photo.id}`, {
@@ -344,9 +353,10 @@ export function PhotoStrip({
         toast.error(tUpload('errorGeneric'));
       } finally {
         setRemovingId(null);
+        onPendingChange?.(-1);
       }
     },
-    [bookId, getToken, onPhotosChanged, t, tUpload],
+    [bookId, getToken, onPhotosChanged, onPendingChange, t, tUpload],
   );
 
   return (

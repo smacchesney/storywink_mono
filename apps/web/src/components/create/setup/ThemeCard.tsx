@@ -17,6 +17,9 @@ interface ThemeCardProps {
   themeLine: string;
   /** Fires per keystroke; the caller's debounced PATCH channel persists. */
   onChange: (value: string) => void;
+  /** X18: wizard passes t('themeWeThink'); default keeps the flag-off sheet
+   * rendering today's copy untouched. */
+  label?: string;
 }
 
 /**
@@ -24,14 +27,14 @@ interface ThemeCardProps {
  * Excalifont card in the warm shape-card wash (create/characters idiom).
  * Tap to edit inline; a parent who doesn't care never has to touch it.
  */
-export function ThemeCard({ themeLine, onChange }: ThemeCardProps) {
+export function ThemeCard({ themeLine, onChange, label }: ThemeCardProps) {
   const t = useTranslations('setup');
   const playful = useLocale() === 'ja' ? 'font-japanese' : 'font-playful';
   const [editing, setEditing] = React.useState(false);
   if (!themeLine.trim() && !editing) return null;
   return (
     <div className="rounded-2xl border border-coral/15 bg-[#FFF9F5] px-4 py-3">
-      <p className={`${playful} text-sm text-gray-500`}>{t('themeSoundsLike')}</p>
+      <p className={`${playful} text-sm text-gray-500`}>{label ?? t('themeSoundsLike')}</p>
       {editing ? (
         <textarea
           autoFocus
