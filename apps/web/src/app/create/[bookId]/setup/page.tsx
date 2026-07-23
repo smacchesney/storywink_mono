@@ -6,8 +6,7 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Storydust } from '@/components/ui/storydust';
 import { BookStatus } from '@prisma/client';
-import { isValidStyle, StyleKey } from '@storywink/shared/prompts/styles';
-import { STORY_MOODS, type StoryMood } from '@storywink/shared/constants';
+import { StyleKey } from '@storywink/shared/prompts/styles';
 import SetupSheet, { SetupFormState } from '@/components/create/setup/SetupSheet';
 import SetupWizard from '@/components/create/setup/SetupWizard';
 import type { StripPhoto } from '@/components/create/setup/PhotoStrip';
@@ -25,10 +24,8 @@ import {
   type DiscoveryChip,
   type RosterCharacterLike,
 } from '@/components/create/setup/discovery-feed';
-import {
-  ensureMemberNamingQuestions,
-  mergeCaptureQuestions,
-} from '@/components/create/setup/star-ask';
+import { ensureMemberNamingQuestions } from '@/components/create/setup/star-ask';
+import { mergeBookIntoForm } from '@/components/create/setup/merge-book-form';
 import { shouldExtract } from '@/components/create/setup/ramble';
 import {
   mergeExtractionFacts,
@@ -237,75 +234,32 @@ export default function SetupPage() {
     setDiscoveryChips(analyzed ? buildDiscoveryChips(book.pages, characters) : []);
 
     setForm((prev) => {
-      const next = { ...prev };
-      if (!touched.current.title && book.title?.trim()) next.title = book.title;
-      if (!touched.current.childName && book.childName) next.childName = book.childName;
-      if (!touched.current.eventSummary && book.eventSummary) next.eventSummary = book.eventSummary;
-      if (!touched.current.captureQuestions && book.captureQuestions?.length) {
-        // Id-preserving merge: a poll tick landing before handlePickEveryone's
-        // PATCH round-trips must not clobber the synthetic `name_` naming rows
-        // it injected without marking captureQuestions touched.
-        next.captureQuestions = mergeCaptureQuestions(book.captureQuestions, prev.captureQuestions);
-      }
+      // Legacy field merge lives in the pure helper (vibrant-cray session);
+      // its unconditional artStyle touched-guard supersedes X18's
+      // WIZARD_ENABLED-gated variant — the flag-off clobber was a real bug.
+      const next = mergeBookIntoForm(prev, book, touched.current);
       if (WIZARD_ENABLED) {
-        const ids = new Set(characters.map((c) => c.characterId));
-        next.captureQuestions = filterStaleCastAnswers(next.captureQuestions, ids);
-      }
-      if (
-        (!WIZARD_ENABLED || !touched.current.artStyle) &&
-        book.artStyle &&
-        isValidStyle(book.artStyle)
-      ) {
-        next.artStyle = book.artStyle as StyleKey;
-      }
-      // Only ever fills a resumed draft's own earlier choice — nothing but
-      // the parent's tap writes Book.tone, so untouched means unwritten.
-      if (
-        !touched.current.tone &&
-        book.tone &&
-        (STORY_MOODS as readonly string[]).includes(book.tone)
-      ) {
-        next.tone = book.tone as StoryMood;
-      }
-      // Resumed drafts show their earlier learning words; parent edits win.
-      if (!touched.current.learningWords && Array.isArray(book.learningWords)) {
-        const words = (book.learningWords as { word?: string }[])
-          .map((w) => (typeof w?.word === 'string' ? w.word : ''))
-          .filter(Boolean)
-          .slice(0, 4);
-        if (words.length > 0) next.learningWords = words;
-      }
-      if (!touched.current.themeLine && book.themeLine?.trim()) next.themeLine = book.themeLine;
-      if (!touched.current.castMode) {
-        if (book.castMode === 'ensemble' && Array.isArray(book.castMemberIds)) {
-          next.castMode = 'ensemble';
-          next.castMemberIds = (book.castMemberIds as unknown[]).filter(
-            (id): id is string => typeof id === 'string',
-          );
-        } else if (book.starCharacterId) {
-          next.castMode = 'star';
-          next.starCharacterId = book.starCharacterId;
-        }
-      }
-      // Adversarial review #2: a photo-refresh replaces characterIdentity
-      // wholesale, and touched.castMode blocks the merge above from ever
-      // updating a picked star/crew. Reconcile picks against the live roster:
-      // a vanished star clears (and un-touches castMode so the ask reopens);
-      // ensemble members intersect; an emptied crew falls back to star mode.
-      // Idempotent, so a StrictMode double-invoke is safe.
-      if (WIZARD_ENABLED && characters.length > 0) {
         const rosterIds = new Set(characters.map((c) => c.characterId));
-        if (next.starCharacterId && !rosterIds.has(next.starCharacterId)) {
-          next.starCharacterId = null;
-          next.castMode = 'star';
-          touched.current.castMode = false;
-        }
-        if (next.castMode === 'ensemble') {
-          const kept = next.castMemberIds.filter((id) => rosterIds.has(id));
-          if (kept.length !== next.castMemberIds.length) next.castMemberIds = kept;
-          if (kept.length === 0) {
+        next.captureQuestions = filterStaleCastAnswers(next.captureQuestions, rosterIds);
+        // Adversarial review #2: a photo-refresh replaces characterIdentity
+        // wholesale, and touched.castMode blocks the merge above from ever
+        // updating a picked star/crew. Reconcile picks against the live
+        // roster: a vanished star clears (and un-touches castMode so the ask
+        // reopens); ensemble members intersect; an emptied crew falls back to
+        // star mode. Idempotent, so a StrictMode double-invoke is safe.
+        if (characters.length > 0) {
+          if (next.starCharacterId && !rosterIds.has(next.starCharacterId)) {
+            next.starCharacterId = null;
             next.castMode = 'star';
             touched.current.castMode = false;
+          }
+          if (next.castMode === 'ensemble') {
+            const kept = next.castMemberIds.filter((id) => rosterIds.has(id));
+            if (kept.length !== next.castMemberIds.length) next.castMemberIds = kept;
+            if (kept.length === 0) {
+              next.castMode = 'star';
+              touched.current.castMode = false;
+            }
           }
         }
       }
