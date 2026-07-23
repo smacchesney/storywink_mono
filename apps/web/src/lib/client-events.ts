@@ -34,6 +34,10 @@ export const CLIENT_EVENT_NAMES = [
   'story_helper_accepted',
   'story_helper_edited',
   'story_helper_skipped',
+  // X18: guided-setup wizard funnel — per-step views (deduped client-side)
+  // and the step-3 reading→terminal transition.
+  'setup_step_viewed',
+  'setup_step3_transition',
 ] as const;
 
 export type ClientEventName = (typeof CLIENT_EVENT_NAMES)[number];

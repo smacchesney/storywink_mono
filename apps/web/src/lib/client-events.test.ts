@@ -23,6 +23,15 @@ describe('client event allowlist (POST /api/events schema)', () => {
     }
   });
 
+  it('accepts the X18 wizard funnel events', () => {
+    for (const name of ['setup_step_viewed', 'setup_step3_transition'] as const) {
+      expect(CLIENT_EVENT_NAMES).toContain(name);
+      expect(clientEventSchema.safeParse({ name }).success, `expected '${name}' accepted`).toBe(
+        true,
+      );
+    }
+  });
+
   it('accepts a full payload with bookId and props', () => {
     const result = clientEventSchema.safeParse({
       name: 'preview_opened',
