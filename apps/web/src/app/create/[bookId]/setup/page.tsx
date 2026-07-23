@@ -9,11 +9,16 @@ import { BookStatus } from '@prisma/client';
 import { isValidStyle, StyleKey } from '@storywink/shared/prompts/styles';
 import { STORY_MOODS, type StoryMood } from '@storywink/shared/constants';
 import SetupSheet, { SetupFormState } from '@/components/create/setup/SetupSheet';
+import SetupWizard from '@/components/create/setup/SetupWizard';
 import type { StripPhoto } from '@/components/create/setup/PhotoStrip';
 import type { CaptureQuestion } from '@/components/create/setup/CaptureChips';
 import { buildSubmitPatchBody } from '@/components/create/setup/setup-submit';
 import { createPatchDebouncer, type PatchDebouncer } from '@/lib/patch-debounce';
-import { CREATE_DISCOVERY_FLAG } from '@/lib/discovery-client';
+import {
+  CREATE_DISCOVERY_FLAG,
+  ENSEMBLE_BOOKS_FLAG,
+  WIZARD_ENABLED,
+} from '@/lib/discovery-client';
 import {
   buildDiscoveryChips,
   recurringChildren,
@@ -37,6 +42,14 @@ import {
   isFreshBook,
   type StripPhase,
 } from '@/components/create/setup/strip-phase';
+import {
+  REREAD_WINDOW_MS,
+  filterStaleCastAnswers,
+  livePatchFor,
+  perceptionQuestionCount,
+  perceptionSnapshot,
+  suppressArrival,
+} from '@/components/create/setup/wizard-steps';
 import GenerationProgress from '@/components/create/GenerationProgress';
 
 const DEFAULT_STYLE: StyleKey = 'vignette';
@@ -117,6 +130,7 @@ export default function SetupPage() {
     title: false,
     eventSummary: false,
     captureQuestions: false,
+    artStyle: false,
     tone: false,
     learningWords: false,
     themeLine: false,
@@ -136,6 +150,34 @@ export default function SetupPage() {
   // Perception roster id of the star, for the X6c avatar confirm row.
   const [mainCharacterId, setMainCharacterId] = useState<string | null>(null);
   const [analysisDone, setAnalysisDone] = useState(false);
+  // X18: photo-mutation re-read. reReading is REACTIVE state — StepSaw must
+  // fall back to the reading theater even though the stale roster/theme
+  // payload is still merged. Cleared by real perception-content change or
+  // window expiry (timer), never by the poll cap alone.
+  const [reReading, setReReading] = useState(false);
+  // Ref mirror for mergeBook's suppression path: the merge fired by the very
+  // mutation that opened the window runs inside a callback chain built BEFORE
+  // the state update rendered, so a state read there is stale (false) and the
+  // first merge would announce arrival off stale questions. Refs don't go
+  // stale; state stays the render signal for StepSaw/poll.
+  const reReadingRef = useRef(false);
+  const setReReadingBoth = useCallback((v: boolean) => {
+    reReadingRef.current = v;
+    setReReading(v);
+  }, []);
+  const reReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Normalized perception snapshot (identity + perception question rows).
+  const perceptionSnapRef = useRef<string>('');
+  // Set at mutation time; the FIRST post-mutation merge becomes the baseline
+  // (the DELETE/upload response itself is not the refresh landing).
+  const awaitingBaselineRef = useRef(false);
+  const baselineSnapRef = useRef<string>('');
+  const [mutationNonce, setMutationNonce] = useState(0);
+  // Page-owned in-flight photo-mutation counter (uploads + removes + reorder).
+  const [photoPending, setPhotoPending] = useState(0);
+  const handlePhotoPendingDelta = useCallback((delta: 1 | -1) => {
+    setPhotoPending((n) => Math.max(0, n + delta));
+  }, []);
   // X17b discovery surface — roster + analysis-derived chips + composed-cover
   // asset, all fed by the same poll that fills title/summary/questions.
   const [roster, setRoster] = useState<RosterCharacterLike[]>([]);
@@ -202,7 +244,15 @@ export default function SetupPage() {
         // it injected without marking captureQuestions touched.
         next.captureQuestions = mergeCaptureQuestions(book.captureQuestions, prev.captureQuestions);
       }
-      if (book.artStyle && isValidStyle(book.artStyle)) {
+      if (WIZARD_ENABLED) {
+        const ids = new Set(characters.map((c) => c.characterId));
+        next.captureQuestions = filterStaleCastAnswers(next.captureQuestions, ids);
+      }
+      if (
+        (!WIZARD_ENABLED || !touched.current.artStyle) &&
+        book.artStyle &&
+        isValidStyle(book.artStyle)
+      ) {
         next.artStyle = book.artStyle as StyleKey;
       }
       // Only ever fills a resumed draft's own earlier choice — nothing but
@@ -238,16 +288,37 @@ export default function SetupPage() {
     });
 
     setAnalysisDone(analyzed);
-    // A strip that is narrating announces the arrival; every other phase is
-    // sticky, so refetches never re-announce.
-    setStripPhase((prev) =>
-      arrivalStripPhase(prev, {
-        captureQuestionCount: book.captureQuestions?.length ?? 0,
-        hasEventSummary: !!book.eventSummary,
-        allAnalyzed: analyzed,
-      }),
-    );
-  }, []);
+    const snap = perceptionSnapshot(book.characterIdentity ?? null, book.captureQuestions);
+    if (awaitingBaselineRef.current) {
+      // First merge after a mutation: this response is the baseline, not the
+      // refresh landing — record and suppress.
+      awaitingBaselineRef.current = false;
+      baselineSnapRef.current = snap;
+    }
+    const contentChanged = reReadingRef.current && snap !== baselineSnapRef.current;
+    perceptionSnapRef.current = snap;
+    if (contentChanged) {
+      // Refresh landed — close the window so arrival can announce.
+      if (reReadTimerRef.current) clearTimeout(reReadTimerRef.current);
+      setReReadingBoth(false);
+    }
+    if (!suppressArrival(reReadingRef.current, contentChanged)) {
+      setStripPhase((prev) =>
+        arrivalStripPhase(prev, {
+          // Wizard mode: the parent's own ramble/extraction must not read as
+          // perception arrival — count only perception-authored questions and
+          // ignore a parent-authored summary (Sol: premature settledEmpty).
+          captureQuestionCount: WIZARD_ENABLED
+            ? perceptionQuestionCount(book.captureQuestions ?? [])
+            : (book.captureQuestions?.length ?? 0),
+          hasEventSummary: WIZARD_ENABLED
+            ? !!book.eventSummary && !touched.current.eventSummary
+            : !!book.eventSummary,
+          allAnalyzed: analyzed,
+        }),
+      );
+    }
+  }, [setReReadingBoth]);
 
   // Initial load + childName prefill from the most recent other book.
   useEffect(() => {
@@ -345,7 +416,7 @@ export default function SetupPage() {
     // strands the strip mid-narration.
     const needsAnalysis =
       !analysisDone && bookCreatedAt !== null && isFreshBook(bookCreatedAt, Date.now());
-    if (!needsTitle && !needsSummary && !needsQuestions && !needsAnalysis) return;
+    if (!needsTitle && !needsSummary && !needsQuestions && !needsAnalysis && !reReading) return;
 
     let polls = 0;
     const MAX_POLLS = 40; // ~2 minutes at 3s
@@ -385,6 +456,8 @@ export default function SetupPage() {
     analysisDone,
     bookCreatedAt,
     mergeBook,
+    reReading,
+    mutationNonce,
   ]);
 
   const handleChange = useCallback(
@@ -400,6 +473,13 @@ export default function SetupPage() {
         if (key === 'eventSummary')
           patcherRef.current?.queue({ eventSummary: (value as string).trim() || null });
         if (key === 'captureQuestions') patcherRef.current?.queue({ captureQuestions: value });
+      }
+      if (WIZARD_ENABLED) {
+        // Wizard sessions are minutes long — persist edits as they land so a
+        // refresh resumes. livePatchFor's undefined-valued keys CANCEL a
+        // pending value (clearing "Kai" mid-debounce must not flush "Kai").
+        const patch = livePatchFor(key, value);
+        if (patch) patcherRef.current?.queue(patch);
       }
     },
     [],
@@ -445,23 +525,41 @@ export default function SetupPage() {
   // X17 B4: ramble blur → extraction → fact merge. Optional garnish — every
   // failure path is silent, and the 20/hr propose rate limit bounds cost.
   const lastExtractRef = useRef<string | null>(null);
+  const extractAbortRef = useRef<AbortController | null>(null);
+  const extractionClosedRef = useRef(false);
+
+  const handleReachFinish = useCallback(() => {
+    extractionClosedRef.current = true;
+    extractAbortRef.current?.abort();
+  }, []);
+
+  const handleNameErrorRequest = useCallback(() => setShowNameError(true), []);
+
   const handleRambleBlur = useCallback(async () => {
+    if (extractionClosedRef.current) return;
     if (!CREATE_DISCOVERY_FLAG) return;
     const text = form.eventSummary;
     if (!shouldExtract(text, lastExtractRef.current)) return;
     lastExtractRef.current = text.trim();
+    extractAbortRef.current?.abort();
+    const controller = new AbortController();
+    extractAbortRef.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 12_000);
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 12_000);
       const res = await fetch('/api/story/propose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'extract', bookId, ramble: text.trim() }),
         signal: controller.signal,
       });
-      clearTimeout(timeout);
       if (!res.ok || !isMountedRef.current) return;
       const facts = (await res.json()) as RambleExtraction;
+      if (
+        extractionClosedRef.current ||
+        controller.signal.aborted ||
+        !isMountedRef.current
+      )
+        return;
       const labels = {
         location: t('factLocationQ'),
         highlight: t('factHighlightQ'),
@@ -486,6 +584,7 @@ export default function SetupPage() {
       delete changedScalars.captureQuestions;
       let nextCq: CaptureQuestion[] | undefined;
       setForm((prev) => {
+        if (extractionClosedRef.current) return prev;
         const applied = applyExtractionToQuestions(prev.captureQuestions, facts, roster, labels);
         nextCq = applied === prev.captureQuestions ? undefined : applied;
         return { ...prev, ...changedScalars, captureQuestions: applied } as SetupFormState;
@@ -494,6 +593,9 @@ export default function SetupPage() {
       if (Object.keys(patchBody).length > 0) patcherRef.current?.queue(patchBody);
     } catch {
       // Extraction is optional — silence on failure/timeout.
+    } finally {
+      clearTimeout(timeout);
+      if (extractAbortRef.current === controller) extractAbortRef.current = null;
     }
   }, [bookId, form, roster, t]);
 
@@ -507,21 +609,50 @@ export default function SetupPage() {
       const book: BookData = await res.json();
       if (!isMountedRef.current) return;
       mergeBook(book);
-      // A photo add/remove enqueues a refresh pass, so un-analyzed pages on a
-      // fresh book mean reading has started over. Stale books stay quiet —
-      // their poll gate would never re-arm, so a strip would strand.
-      if (!allPagesAnalyzed(book.pages) && isFreshBook(book.createdAt, Date.now())) {
-        setPerceptionSettled(false);
-        setStripPhase('reading');
+      if (!WIZARD_ENABLED) {
+        // Legacy inference, byte-identical to today's behavior:
+        if (!allPagesAnalyzed(book.pages) && isFreshBook(book.createdAt, Date.now())) {
+          setPerceptionSettled(false);
+          setStripPhase('reading');
+        }
       }
     } catch {
       // Non-fatal — the strip keeps its optimistic state until the next fetch.
     }
   }, [bookId, mergeBook]);
 
+  // X18: every photo add/remove lands here (PhotoStrip's onPhotosChanged).
+  // The mutation itself proves a refresh pass is in flight — no freshness
+  // gate (the DELETE route enqueues refresh:true for any DRAFT).
+  const handlePhotosMutated = useCallback(async () => {
+    if (WIZARD_ENABLED) {
+      awaitingBaselineRef.current = true;
+      setReReadingBoth(true);
+      setStripPhase('reading');
+      setPerceptionSettled(false);
+      setAnalysisDone(false);
+      setMutationNonce((n) => n + 1);
+      if (reReadTimerRef.current) clearTimeout(reReadTimerRef.current);
+      reReadTimerRef.current = setTimeout(() => {
+        // Window expiry: stop claiming to read; the next merge announces
+        // whatever is true (usually arrivedQuiet off the stale-but-only data).
+        setReReadingBoth(false);
+      }, REREAD_WINDOW_MS);
+    }
+    await refetchBook();
+  }, [refetchBook, setReReadingBoth]);
+
+  useEffect(
+    () => () => {
+      if (reReadTimerRef.current) clearTimeout(reReadTimerRef.current);
+    },
+    [],
+  );
+
   const handleReorder = useCallback(
     async (next: StripPhoto[]) => {
       setPhotos(next);
+      if (WIZARD_ENABLED) handlePhotoPendingDelta(1);
       try {
         const res = await fetch(`/api/book/${bookId}/reorder`, {
           method: 'POST',
@@ -533,9 +664,11 @@ export default function SetupPage() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
       } catch {
         toast.error(t('reorderError'));
+      } finally {
+        if (WIZARD_ENABLED) handlePhotoPendingDelta(-1);
       }
     },
-    [bookId, t],
+    [bookId, t, handlePhotoPendingDelta],
   );
 
   const handleSubmit = useCallback(async () => {
@@ -546,13 +679,23 @@ export default function SetupPage() {
     }
     setIsSubmitting(true);
     try {
+      handleReachFinish();
       // Flush any pending debounce first (awaited, so it lands before the
       // submit PATCH — no race). This matters for clears: buildSubmitPatchBody
       // omits empty fields, so a field cleared within the debounce window would
       // otherwise keep its stale DB value. flush() early-returns when nothing
       // is pending, so the common path adds no request.
       await patcherRef.current?.flush();
-      const patchBody = buildSubmitPatchBody(form);
+      const submitForm = WIZARD_ENABLED
+        ? {
+            ...form,
+            captureQuestions: filterStaleCastAnswers(
+              form.captureQuestions,
+              new Set(roster.map((c) => c.characterId)),
+            ),
+          }
+        : form;
+      const patchBody = buildSubmitPatchBody(submitForm);
 
       const patchRes = await fetch(`/api/book/${bookId}`, {
         method: 'PATCH',
@@ -583,7 +726,7 @@ export default function SetupPage() {
         setIsSubmitting(false);
       }
     }
-  }, [bookId, form, isSubmitting, t]);
+  }, [bookId, form, isSubmitting, t, handleReachFinish, roster]);
 
   if (generating) {
     return <GenerationProgress bookId={bookId} reviewFirst={form.reviewFirst} />;
@@ -608,6 +751,40 @@ export default function SetupPage() {
           {t('goBack')}
         </button>
       </div>
+    );
+  }
+
+  if (WIZARD_ENABLED) {
+    return (
+      <SetupWizard
+        form={form}
+        photos={photos}
+        prefilledName={prefilledName}
+        titlePending={titlePending}
+        stripPhase={stripPhase}
+        reReading={reReading}
+        isSubmitting={isSubmitting}
+        showNameError={showNameError}
+        bookId={bookId}
+        coverAssetId={coverAssetId}
+        discoveryChips={discoveryChips}
+        roster={roster}
+        pages={bookPages}
+        recurringKidCount={recurringChildren(roster).length}
+        ensembleAllowed={ENSEMBLE_BOOKS_FLAG}
+        photoPending={photoPending}
+        summaryEdited={touched.current.eventSummary}
+        onChange={handleChange}
+        onReorder={handleReorder}
+        onPhotosChanged={handlePhotosMutated}
+        onPhotoPendingDelta={handlePhotoPendingDelta}
+        onPickStar={handlePickStar}
+        onPickEveryone={handlePickEveryone}
+        onRambleBlur={handleRambleBlur}
+        onSubmit={handleSubmit}
+        onReachFinish={handleReachFinish}
+        onNameErrorRequest={handleNameErrorRequest}
+      />
     );
   }
 
